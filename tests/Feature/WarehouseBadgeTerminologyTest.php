@@ -82,12 +82,12 @@ class WarehouseBadgeTerminologyTest extends TestCase
         $item = Item::create(['code' => 'WBT-KABEL', 'name' => 'Kabel Badge Terminology', 'item_category_id' => $category->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
         app(InventoryReceiveService::class)->receiveQuantity($pusat, $item, 100, 5000, $this->owner);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         // "QUANTITY" sengaja tidak dicek dontSee — HTML comment lama di view
         // ini masih sebut "SERIAL NUMBER"/"ROLL KABEL" (dipertahankan karena
         // WarehouseStockRollTest kebetulan bergantung padanya), bukan badge
         // yang user lihat. Cukup pastikan badge barunya ada.
-        $response->assertOk()->assertSee('REGULER');
+        $response->assertOk()->assertSee('Quantity');
     }
 }

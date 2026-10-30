@@ -107,6 +107,12 @@ class PaymentService
             // supaya dua jalur tak pernah menyimpang.
             [$appliedAmount, $overpayAmount] = $this->splitAmount($validated['amount'], $useBalanceAmount, $remaining);
 
+            if (($validated['is_advance_payment'] ?? false) && (! Money::greaterThan($validated['amount'], 0) || ! Money::greaterThan($overpayAmount, 0))) {
+                throw ValidationException::withMessages([
+                    'is_advance_payment' => 'Bayar beberapa bulan di muka memerlukan uang baru dan kelebihan untuk saldo bulan berikutnya.',
+                ]);
+            }
+
             $payment = Payment::create([
                 'payment_number' => Payment::generatePaymentNumber($lockedInvoice, $appliedAmount),
                 'idempotency_key' => $validated['idempotency_key'] ?? null,
@@ -124,6 +130,7 @@ class PaymentService
                 'amount' => $appliedAmount,
                 'balance_used_amount' => $useBalanceAmount,
                 'overpay_amount' => Money::isZero($overpayAmount) ? null : $overpayAmount,
+                'is_advance_payment' => (bool) ($validated['is_advance_payment'] ?? false),
                 'received_by' => auth()->id(),
                 'collected_by' => $method->requiresCollector() ? ($validated['collected_by'] ?? null) : null,
                 'proof_file' => $proofPath,
@@ -364,6 +371,14 @@ class PaymentService
                 $remainingWithoutThisPayment,
             );
 
+            $isAdvancePayment = (bool) ($validated['is_advance_payment'] ?? $lockedPayment->is_advance_payment);
+
+            if ($isAdvancePayment && (! Money::greaterThan($validated['amount'], 0) || ! Money::greaterThan($newOverpayAmount, 0))) {
+                throw ValidationException::withMessages([
+                    'is_advance_payment' => 'Bayar beberapa bulan di muka memerlukan uang baru dan kelebihan untuk saldo bulan berikutnya.',
+                ]);
+            }
+
             if (Money::compare($appliedAmount, 0) <= 0) {
                 throw ValidationException::withMessages([
                     'amount' => 'Nominal pembayaran tidak valid — pastikan nominal lebih besar dari nol.',
@@ -381,6 +396,7 @@ class PaymentService
                 'amount' => $appliedAmount,
                 'balance_used_amount' => $newUseBalanceAmount,
                 'overpay_amount' => Money::isZero($newOverpayAmount) ? null : $newOverpayAmount,
+                'is_advance_payment' => $isAdvancePayment,
                 'proof_file' => $proofPath ?? $lockedPayment->proof_file,
                 'note' => $validated['note'] ?? null,
             ]);

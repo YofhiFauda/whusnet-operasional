@@ -1,6 +1,27 @@
 {{-- Skrip lipat/buka papan (tabel & matriks): satu sumber, dipasang oleh _table dan _matrix. --}}
 @push('scripts')
 <script>
+if (typeof window.calcDropdownPos !== 'function') {
+    window.calcDropdownPos = function(el, menuWidth = 224) {
+        const bounds = el.getBoundingClientRect();
+        const spaceBelow = window.innerHeight - bounds.bottom;
+        const spaceAbove = bounds.top;
+        const openUp = spaceBelow < 180 && spaceAbove > spaceBelow;
+        let left = bounds.right - menuWidth;
+
+        if (left < 8) left = 8;
+        if (left + menuWidth > window.innerWidth - 8) {
+            left = Math.max(8, window.innerWidth - menuWidth - 8);
+        }
+
+        return {
+            openUp,
+            top: openUp ? null : Math.round(bounds.bottom + 4),
+            bottom: openUp ? Math.round(window.innerHeight - bounds.top + 4) : null,
+            left: Math.round(left),
+        };
+    };
+}
 /**
  * Lipat/buka papan Kelola Stok. Keadaan awal dihitung dari data server
  * (`data-pop-count`, `data-force-open`): semua gudang terbuka bila jumlahnya
@@ -12,6 +33,7 @@
 function stockBoard(config) {
     return {
         startOpen: true,
+        categoriesOpen: true,
         openPops: {},
         openCategories: {},
         init() {
@@ -25,19 +47,22 @@ function stockBoard(config) {
             this.openPops[id] = !this.isPopOpen(id);
         },
         isCategoryOpen(key) {
-            return this.openCategories[key] ?? true;
+            return this.openCategories[key] ?? this.categoriesOpen;
         },
         toggleCategory(key) {
             this.openCategories[key] = !this.isCategoryOpen(key);
         },
         expandAll() {
             this.startOpen = true;
+            this.categoriesOpen = true;
             this.openPops = {};
             this.openCategories = {};
         },
         collapseAll() {
             this.startOpen = false;
+            this.categoriesOpen = false;
             this.openPops = {};
+            this.openCategories = {};
         },
     };
 }

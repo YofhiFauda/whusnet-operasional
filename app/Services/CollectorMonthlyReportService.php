@@ -158,13 +158,13 @@ class CollectorMonthlyReportService
     public static function emptyFigures(): array
     {
         return [
-            'tagihan' => ['tagihan_terbit' => 0.0, 'dimuka' => 0.0, 'diskon' => 0.0, 'bulanan' => 0.0, 'total_pembayaran' => 0.0, 'piutang' => 0.0],
+            'tagihan' => ['tagihan_terbit' => 0.0, 'dimuka' => 0.0, 'bayar_dimuka_diterima' => 0.0, 'diskon' => 0.0, 'bulanan' => 0.0, 'total_pembayaran' => 0.0, 'piutang' => 0.0],
             // `tak_tertagih_dipulihkan` = pengurang tak tertagih: hapus buku
             // periode terkunci yang di-Kembalikan bulan ini (lihat
             // notWrittenOffAsOf()). Snapshot lama belum punya kunci ini —
             // pembaca wajib `?? 0`.
             'piutang_lalu' => ['pembuka' => 0.0, 'sudah_dibayar' => 0.0, 'belum_dibayar' => 0.0, 'tak_tertagih' => 0.0, 'tak_tertagih_dipulihkan' => 0.0],
-            'pelanggan' => ['total' => 0, 'dimuka' => 0, 'sudah_bayar' => 0, 'belum_bayar' => 0],
+            'pelanggan' => ['total' => 0, 'dimuka' => 0, 'bayar_dimuka' => 0, 'sudah_bayar' => 0, 'belum_bayar' => 0],
             // `dikembalikan` = pengurang: pembayaran bulan terkunci yang
             // di-Kembalikan bulan ini (lihat countedAsOf()). Snapshot lama
             // belum punya kunci ini — pembaca wajib `?? 0`.
@@ -204,6 +204,7 @@ class CollectorMonthlyReportService
         $this->fillTagihanDanPelanggan($figures, $map, $popIds, $period, $nextStart);
         $this->fillPiutangLalu($figures, $map, $popIds, $period, $start, $nextStart);
         $this->fillUangDiterima($figures, $map, $popIds, $period, $start, $nextStart);
+        $this->fillBayarDimuka($figures, $map, $popIds, $start, $nextStart);
 
         // Total Pembayaran = penutup persamaan Tagihan Terbit = Bulanan(tunai)
         // + Dimuka(saldo) + Diskon + Piutang. Dihitung di sini, bukan per
@@ -231,18 +232,16 @@ class CollectorMonthlyReportService
      *    sebagai "sekarang"; nama internal & label UI diganti).
      *  - `bulanan` — bagian yang SUDAH DIBAYAR TUNAI (metode apa pun KECUALI
      *    `saldo`) — gabungan admin & kolektor, tak lagi dipecah.
-     *  - `dimuka` — bagian yang dibayar dari SALDO PELANGGAN (uang yang
-     *    dititipkan di muka untuk bulan-bulan mendatang, lalu terpakai
-     *    otomatis begitu tagihan bulan ini terbit — lihat
-     *    docs/plan/billing/analisa-rancangan-saldo-pelanggan.md, ADHOC-92,
-     *    BELUM diimplementasikan). `PaymentMethod::SALDO` belum ada di enum,
-     *    jadi filter string `'saldo'` di bawah ini SENGAJA tidak match apa
-     *    pun sekarang — kolom ini benar bernilai 0 sampai ADHOC-92 jalan,
-     *    lalu otomatis terisi tanpa perubahan kode laporan.
+     *  - `dimuka` — bagian yang dibayar dari SALDO PELANGGAN untuk invoice
+     *    bulan ini. Label UI: Dibayar dari Saldo. Uang fisiknya diterima pada
+     *    bulan pembayaran sumber, bukan pada bulan saldo dipakai.
+     *  - `bayar_dimuka_diterima` — nominal penuh transaksi bertanda bayar
+     *    beberapa bulan di muka, berdasarkan bulan penerimaan kas; tidak
+     *    ditambahkan lagi ke Total Pembayaran invoice.
      *  - `total_pembayaran` — bulanan + dimuka + diskon (dihitung di
      *    `figures()` setelah loop ini).
-     *  - Pelanggan: bucket `dimuka` = lunas SELURUHNYA lewat saldo (bukan
-     *    "bayar ke admin" seperti tafsiran lama).
+     *  - Pelanggan: bucket `dimuka` = lunas SELURUHNYA lewat saldo;
+     *    `bayar_dimuka` = jumlah pelanggan unik yang membayar di muka pada P.
      *
      * @param  array<int, array<string, array<string, float|int>>>  $figures
      * @param  array<int, int>  $map
@@ -395,8 +394,8 @@ class CollectorMonthlyReportService
      * Invoice bulanan bertagihan periode SESUDAH P (bayar di muka sebulan
      * lebih awal) masuk kolom Bulanan — uangnya untuk langganan, bukan piutang.
      * `Lebih Bayar` = `overpay_amount` (uang di atas sisa tagihan) dan ikut
-     * `Total`; `amount` sendiri tak pernah melebihi sisa, jadi jumlah keempat
-     * kolom lain persis sama dengan total /reports/payments.
+     * `Total`. Bagian `amount` yang berasal dari saldo pelanggan dikeluarkan
+     * dari kas baru; total kas mengikuti Payment::physicalAmount().
      *
      * @param  array<int, array<string, array<string, float|int>>>  $figures
      * @param  array<int, int>  $map
@@ -415,7 +414,7 @@ class CollectorMonthlyReportService
                 'pay.pop_id',
                 'i.invoice_type',
                 'i.billing_period',
-                DB::raw('SUM(pay.amount) AS amount'),
+                DB::raw('SUM(pay.amount - COALESCE(pay.balance_used_amount, 0)) AS amount'),
                 DB::raw('SUM(COALESCE(pay.overpay_amount, 0)) AS overpay'),
             ]);
 
@@ -444,7 +443,7 @@ class CollectorMonthlyReportService
             ->where('payment_date', '<', $start)
             ->whereIn('pop_id', $popIds)
             ->groupBy('pop_id')
-            ->get(['pop_id', DB::raw('SUM(amount + COALESCE(overpay_amount, 0)) AS amount')]);
+            ->get(['pop_id', DB::raw('SUM(amount - COALESCE(balance_used_amount, 0) + COALESCE(overpay_amount, 0)) AS amount')]);
 
         foreach ($reversals as $row) {
             $block = &$figures[$map[$row->pop_id]]['uang_diterima'];
@@ -465,10 +464,43 @@ class CollectorMonthlyReportService
     }
 
     /**
+     * Pembayaran yang sengaja menutup beberapa bulan dihitung pada bulan uang
+     * diterima. Nominal penuh adalah kas baru, sedangkan jumlah pelanggan
+     * didedup per cabang walau ada lebih dari satu transaksi.
+     *
+     * @param  array<int, array<string, array<string, float|int>>>  $figures
+     * @param  array<int, int>  $map
+     * @param  list<int>  $popIds
+     */
+    private function fillBayarDimuka(array &$figures, array $map, array $popIds, string $start, string $nextStart): void
+    {
+        $payments = Payment::query()
+            ->where(self::countedAsOf($nextStart))
+            ->where('is_advance_payment', true)
+            ->where('payment_date', '>=', $start)
+            ->where('payment_date', '<', $nextStart)
+            ->whereIn('pop_id', $popIds)
+            ->get(['id', 'pop_id', 'customer_id', 'amount', 'balance_used_amount', 'overpay_amount']);
+
+        $counted = [];
+
+        foreach ($payments as $payment) {
+            $branch = $map[$payment->pop_id];
+            $figures[$branch]['tagihan']['bayar_dimuka_diterima'] = Money::add(
+                $figures[$branch]['tagihan']['bayar_dimuka_diterima'],
+                $payment->physicalAmount(),
+            );
+
+            if ($payment->customer_id !== null && ! isset($counted[$branch][$payment->customer_id])) {
+                $counted[$branch][$payment->customer_id] = true;
+                $figures[$branch]['pelanggan']['bayar_dimuka']++;
+            }
+        }
+    }
+
+    /**
      * Subquery total bayar per invoice, dipecah tunai (metode apa pun kecuali
-     * `saldo`) vs saldo pelanggan (`payment_method = 'saldo'` — ADHOC-92,
-     * belum ada payment dengan metode ini, jadi `saldo_paid` selalu 0
-     * sekarang; lihat docblock `fillTagihanDanPelanggan()`). Dibatasi sampai
+     * `saldo`) vs saldo pelanggan (`payment_method = 'saldo'`). Dibatasi sampai
      * awal bulan berikutnya — lihat catatan basis di docblock kelas.
      */
     private function paidPerInvoiceByMethod(?string $from, string $before): QueryBuilder
@@ -480,8 +512,8 @@ class CollectorMonthlyReportService
             ->groupBy('invoice_id')
             ->select(
                 'invoice_id',
-                DB::raw("SUM(CASE WHEN payment_method = 'saldo' THEN amount ELSE 0 END) AS saldo_paid"),
-                DB::raw("SUM(CASE WHEN payment_method != 'saldo' THEN amount ELSE 0 END) AS cash_paid"),
+                DB::raw('SUM(COALESCE(balance_used_amount, 0)) AS saldo_paid'),
+                DB::raw('SUM(amount - COALESCE(balance_used_amount, 0)) AS cash_paid'),
             );
     }
 
@@ -559,9 +591,9 @@ class CollectorMonthlyReportService
     public static function detailableColumns(): array
     {
         return [
-            'tagihan' => ['tagihan_terbit', 'dimuka', 'diskon', 'bulanan', 'piutang'],
+            'tagihan' => ['tagihan_terbit', 'dimuka', 'bayar_dimuka_diterima', 'diskon',  'bulanan', 'piutang'],
             'piutang_lalu' => ['pembuka', 'sudah_dibayar', 'belum_dibayar', 'tak_tertagih', 'tak_tertagih_dipulihkan'],
-            'pelanggan' => ['total', 'dimuka', 'sudah_bayar', 'belum_bayar'],
+            'pelanggan' => ['total', 'dimuka', 'bayar_dimuka', 'sudah_bayar',  'belum_bayar'],
             'uang_diterima' => ['bulanan', 'piutang', 'lebih_bayar', 'aktivasi', 'lainnya', 'dikembalikan', 'total'],
         ];
     }
@@ -594,6 +626,10 @@ class CollectorMonthlyReportService
             return [];
         }
 
+        if (($block === 'tagihan' && $column === 'bayar_dimuka_diterima') || ($block === 'pelanggan' && $column === 'bayar_dimuka')) {
+            return $this->detailBayarDimuka($popIds, $start, $nextStart, $block === 'pelanggan');
+        }
+
         return match ($block) {
             'tagihan' => $this->detailTagihan($popIds, $period, $nextStart, $column),
             'piutang_lalu' => $this->detailPiutangLalu($popIds, $period, $start, $nextStart, $column),
@@ -601,6 +637,43 @@ class CollectorMonthlyReportService
             'uang_diterima' => $this->detailUangDiterima($popIds, $period, $start, $nextStart, $column),
             default => throw new InvalidArgumentException("Blok '{$block}' tidak dikenal."),
         };
+    }
+
+    /**
+     * @param  list<int>  $popIds
+     * @return list<array<string, mixed>>
+     */
+    private function detailBayarDimuka(array $popIds, string $start, string $nextStart, bool $perPelanggan): array
+    {
+        $payments = DB::table('payments as pay')
+            ->join('customers as c', 'c.id', '=', 'pay.customer_id')
+            ->where(self::countedAsOf($nextStart, 'pay'))
+            ->where('pay.is_advance_payment', true)
+            ->where('pay.payment_date', '>=', $start)
+            ->where('pay.payment_date', '<', $nextStart)
+            ->whereIn('pay.pop_id', $popIds)
+            ->orderBy('pay.payment_date')
+            ->get(['pay.customer_id', 'pay.payment_number', 'pay.payment_date', 'pay.amount', 'pay.balance_used_amount', 'pay.overpay_amount', 'c.full_name', 'c.cid', 'c.customer_code']);
+
+        $rows = [];
+
+        foreach ($payments as $payment) {
+            $nominal = Money::add(
+                Money::sub($payment->amount, $payment->balance_used_amount),
+                $payment->overpay_amount ?? 0,
+            );
+            $row = $this->row($payment->full_name, $payment->cid ?: $payment->customer_code, $payment->payment_number, $payment->payment_date, $nominal, 'Bayar beberapa bulan di muka');
+
+            if (! $perPelanggan) {
+                $rows[] = $row;
+            } elseif (isset($rows[$payment->customer_id])) {
+                $rows[$payment->customer_id]['nominal'] = Money::add($rows[$payment->customer_id]['nominal'], $nominal);
+            } else {
+                $rows[$payment->customer_id] = $row;
+            }
+        }
+
+        return array_values($rows);
     }
 
     /**
@@ -633,13 +706,10 @@ class CollectorMonthlyReportService
      */
     private function detailTagihan(array $popIds, string $period, string $nextStart, string $column): array
     {
-        // Bulanan & Dimuka = TRANSAKSI pembayaran nyata (siapa bayar berapa,
-        // kapan) — bukan agregat per invoice, supaya "siapa saja yang sudah
-        // membayar" langsung kelihatan barisnya. `PaymentMethod::SALDO`
-        // belum ada (ADHOC-92) → filter 'saldo' sengaja tak pernah match,
-        // 'Dimuka' akan kosong sampai fitur itu jalan.
+        // Bulanan & pemakaian saldo = transaksi pembayaran nyata (siapa bayar
+        // berapa, kapan), sehingga rincian menunjukkan pembayaran per invoice.
         if (in_array($column, ['bulanan', 'dimuka'], true)) {
-            $methodFilter = $column === 'dimuka' ? "= 'saldo'" : "!= 'saldo'";
+            $amountExpression = $column === 'dimuka' ? 'COALESCE(pay.balance_used_amount, 0)' : 'pay.amount - COALESCE(pay.balance_used_amount, 0)';
 
             $rows = DB::table('payments as pay')
                 ->join('invoices as i', 'i.id', '=', 'pay.invoice_id')
@@ -650,9 +720,9 @@ class CollectorMonthlyReportService
                 ->whereIn('i.pop_id', $popIds)
                 ->where(self::countedAsOf($nextStart, 'pay'))
                 ->where('pay.payment_date', '<', $nextStart)
-                ->whereRaw("pay.payment_method {$methodFilter}")
+                ->whereRaw("{$amountExpression} > 0")
                 ->orderBy('pay.payment_date')
-                ->get(['pay.id as payment_id', 'c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'pay.payment_date', 'pay.amount', 'pay.payment_method', 'pay.note']);
+                ->get(['pay.id as payment_id', 'c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'pay.payment_date', 'pay.amount', 'pay.balance_used_amount', 'pay.payment_method', 'pay.note']);
 
             // Klasifikasi (ADHOC-84 §8.2) — cuma baris ini yang benar-benar
             // transaksi payment (bukan agregat invoice), jadi cuma di sini
@@ -666,7 +736,7 @@ class CollectorMonthlyReportService
 
             return $rows
                 ->map(fn ($r) => $this->row(
-                    $r->full_name, $r->cid ?: $r->customer_code, $r->invoice_number, $r->payment_date, (float) $r->amount,
+                    $r->full_name, $r->cid ?: $r->customer_code, $r->invoice_number, $r->payment_date, (float) ($column === 'dimuka' ? $r->balance_used_amount : Money::sub($r->amount, $r->balance_used_amount)),
                     trim(($r->payment_method ?? '').' '.($r->note ?? '')),
                     $paymentsById->get($r->payment_id)?->classification() ?? [],
                 ))
@@ -852,13 +922,13 @@ class CollectorMonthlyReportService
             ->where('pay.payment_date', '<', $start)
             ->whereIn('pay.pop_id', $popIds)
             ->orderBy('pay.rejected_at')
-            ->get(['c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'pay.payment_number', 'pay.payment_date', 'pay.rejected_at', 'pay.amount', 'pay.overpay_amount', 'pay.reject_reason'])
+            ->get(['c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'pay.payment_number', 'pay.payment_date', 'pay.rejected_at', 'pay.amount', 'pay.balance_used_amount', 'pay.overpay_amount', 'pay.reject_reason'])
             ->map(fn ($r) => $this->row(
                 $r->full_name,
                 $r->cid ?: $r->customer_code,
                 $r->invoice_number ?? $r->payment_number,
                 $r->rejected_at,
-                (float) Money::add($r->amount, $r->overpay_amount ?? 0),
+                (float) Money::add(Money::sub($r->amount, $r->balance_used_amount ?? 0), $r->overpay_amount ?? 0),
                 "Dikembalikan (bayar tgl {$r->payment_date}): ".($r->reject_reason ?? '-'),
             ));
 
@@ -883,7 +953,7 @@ class CollectorMonthlyReportService
         }
 
         $rows = $query->orderBy('pay.payment_date')
-            ->get(['c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'i.invoice_type', 'i.billing_period', 'pay.payment_date', 'pay.amount', 'pay.note']);
+            ->get(['c.full_name', 'c.customer_code', 'c.cid', 'i.invoice_number', 'i.invoice_type', 'i.billing_period', 'pay.payment_date', 'pay.amount', 'pay.balance_used_amount', 'pay.overpay_amount', 'pay.note']);
 
         return $rows->filter(function ($r) use ($column, $period) {
             $kolom = match ($r->invoice_type) {
@@ -893,7 +963,7 @@ class CollectorMonthlyReportService
             };
 
             return $column === 'total' || $kolom === $column;
-        })->map(fn ($r) => $this->row($r->full_name, $r->cid ?: $r->customer_code, $r->invoice_number ?? '-', $r->payment_date, (float) $r->amount, (string) ($r->note ?? '')))
+        })->map(fn ($r) => $this->row($r->full_name, $r->cid ?: $r->customer_code, $r->invoice_number ?? '-', $r->payment_date, (float) Money::add(Money::sub($r->amount, $r->balance_used_amount), $column === 'total' ? $r->overpay_amount : 0), (string) ($r->note ?? '')))
             ->when($column === 'total', fn ($list) => $list->concat(
                 $reversals->map(fn (array $row) => [...$row, 'nominal' => -$row['nominal']])
             ))

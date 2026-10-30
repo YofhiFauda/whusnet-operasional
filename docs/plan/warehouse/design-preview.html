@@ -434,69 +434,88 @@
             </div>
           </div>
 
-          <!-- 3. TOOLBAR FILTER & SEARCH (Filter Pills dari Desain 1) -->
-          <div class="p-3.5 border-b border-border-light bg-slate-50 flex flex-col lg:flex-row items-center justify-between gap-3">
-            <div class="flex flex-wrap items-center gap-2 w-full lg:w-auto">
-              <!-- Search Input -->
-              <div class="relative w-full sm:w-64">
-                <span class="material-symbols-outlined absolute left-3 top-2 text-[17px] text-text-muted-light">search</span>
-                <input 
-                  id="searchInput" 
-                  onkeyup="filterTable()" 
-                  class="w-full pl-9 pr-3 py-1.5 bg-white border border-slate-200 rounded-lg text-xs text-text-main-light placeholder-slate-400 focus:outline-none focus:border-primary shadow-2xs" 
-                  placeholder="Filter kode, nama barang, SN..." 
-                  type="text"
-                />
+          <!-- 3. TOOLBAR FILTER & SEARCH TERPADU (Redesigned Simple & Functional) -->
+          <div class="p-3.5 border-b border-border-light bg-slate-50/70 space-y-2.5">
+            <!-- Tier 1: View Navigation Tabs & Band Expansion Controls -->
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-2.5 border-b border-slate-200/80">
+              <!-- Unified View Mode Tabs -->
+              <div class="inline-flex items-center p-1 bg-slate-200/80 rounded-xl text-xs font-semibold overflow-x-auto no-scrollbar" role="tablist">
+                <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white text-primary shadow-xs transition-all cursor-pointer font-bold" type="button">
+                  <span class="material-symbols-outlined text-[16px]">table_rows</span>
+                  <span>Papan (Tabel)</span>
+                </button>
+                <button class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-slate-600 hover:text-slate-900 transition-all cursor-pointer font-medium" type="button" title="Matriks Barang × Cabang">
+                  <span class="material-symbols-outlined text-[16px]">grid_view</span>
+                  <span>Matriks Cabang</span>
+                </button>
+                <div class="h-3.5 w-px bg-slate-300 mx-1 shrink-0"></div>
+                <button class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition-all cursor-pointer font-medium" type="button" title="Daftar Rincian per Lot">
+                  <span class="material-symbols-outlined text-[16px]">format_list_bulleted</span>
+                  <span>Rincian</span>
+                </button>
+                <button class="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-slate-500 hover:text-slate-800 transition-all cursor-pointer font-medium" type="button" title="Ringkasan per SKU">
+                  <span class="material-symbols-outlined text-[16px]">category</span>
+                  <span>Ringkasan</span>
+                </button>
               </div>
 
-              <!-- Quick Pills Filter Realistis -->
-              <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5">
-                <button onclick="setPill('all')" id="pill-all" class="pill-btn px-3 py-1 rounded-full text-xs font-semibold bg-slate-900 text-white cursor-pointer transition-all">
-                  Semua Stok <span class="ml-1 px-1.5 py-0.2 rounded-full bg-slate-700 text-[10px]">8</span>
+              <!-- Aksi Cepat Band Rak: Bentang & Ciutkan -->
+              <div class="flex items-center gap-1.5 shrink-0 self-end sm:self-center">
+                <button onclick="expandAllRaks()" class="h-8 px-2.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs" type="button" title="Buka Semua Rak">
+                  <span class="material-symbols-outlined text-[15px] text-primary">unfold_more</span>
+                  [+] Bentang Semua
                 </button>
-                <button onclick="setPill('menipis')" id="pill-menipis" class="pill-btn px-3 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer transition-all flex items-center gap-1.5">
-                  <span class="w-1.5 h-1.5 rounded-full bg-amber-500"></span> Stok Menipis <span class="font-mono text-[10px] text-slate-500">1</span>
-                </button>
-                <button onclick="setPill('sn')" id="pill-sn" class="pill-btn px-3 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer transition-all flex items-center gap-1.5">
-                  <span class="material-symbols-outlined text-[13px] text-primary">pin</span> Serial Number <span class="font-mono text-[10px] text-slate-500">4</span>
-                </button>
-                <button onclick="setPill('curah')" id="pill-curah" class="pill-btn px-3 py-1 rounded-full text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer transition-all flex items-center gap-1.5">
-                  <span class="material-symbols-outlined text-[13px] text-secondary">cable</span> Curah & Roll <span class="font-mono text-[10px] text-slate-500">4</span>
+                <button onclick="collapseAllRaks()" class="h-8 px-2.5 rounded-lg bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs" type="button" title="Tutup Semua Rak">
+                  <span class="material-symbols-outlined text-[15px] text-slate-500">unfold_less</span>
+                  [-] Ciutkan
                 </button>
               </div>
             </div>
 
-            <!-- Dropdown Filter & View Switcher -->
-            <div class="flex items-center gap-2 w-full lg:w-auto justify-end text-xs">
-              <select id="selectTracking" onchange="filterTable()" class="py-1.5 px-2.5 bg-white border border-slate-200 rounded-lg text-slate-700 focus:outline-none focus:border-primary shadow-2xs">
-                <option value="all">Tipe Tracking: Semua</option>
-                <option value="serialized">Serialized (SN)</option>
-                <option value="quantity">Non-SN (Quantity)</option>
-                <option value="roll">Linear (Roll Meter)</option>
-              </select>
+            <!-- Tier 2: Search Input + Kategori + Functional Filter Tabs -->
+            <div class="flex flex-col xl:flex-row xl:items-center justify-between gap-2.5">
+              <!-- Search & Kategori -->
+              <div class="flex items-center gap-2 flex-1 min-w-0">
+                <div class="relative flex-1 min-w-[14rem]">
+                  <span class="material-symbols-outlined absolute left-2.5 top-2 text-[17px] text-text-muted-light">search</span>
+                  <input 
+                    id="searchInput" 
+                    onkeyup="filterTable()" 
+                    class="w-full h-9 pl-9 pr-3 bg-white border border-slate-200 rounded-lg text-xs text-text-main-light placeholder-slate-400 focus:outline-none focus:border-primary shadow-2xs" 
+                    placeholder="Cari kode item, nama spesifikasi, SN..." 
+                    type="text"
+                  />
+                </div>
 
-              <div class="h-5 w-px bg-slate-200 mx-1"></div>
-
-              <!-- Tombol Bentang & Ciutkan Semua Rak (Desain 2) -->
-              <div class="flex items-center gap-1">
-                <button onclick="expandAllRaks()" class="px-2.5 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs" type="button" title="Buka Semua Rak">
-                  <span class="material-symbols-outlined text-[15px] text-primary">unfold_more</span>
-                  [+] Bentang Semua Rak
-                </button>
-                <button onclick="collapseAllRaks()" class="px-2.5 py-1 rounded bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 font-mono text-[11px] font-semibold transition-colors cursor-pointer flex items-center gap-1 shadow-2xs" type="button" title="Tutup Semua Rak">
-                  <span class="material-symbols-outlined text-[15px] text-slate-500">unfold_less</span>
-                  [-] Ciutkan Rak
-                </button>
+                <!-- Dropdown Kategori / Tracking Cepat -->
+                <select id="selectTracking" onchange="filterTable()" class="h-9 px-2.5 bg-white border border-slate-200 rounded-lg text-xs text-slate-700 focus:outline-none focus:border-primary shadow-2xs cursor-pointer">
+                  <option value="all">Semua Kategori</option>
+                  <option value="serialized">MODEM / ONT (SN)</option>
+                  <option value="quantity">SPLITTER & ODP</option>
+                  <option value="roll">KABEL DROPCORE</option>
+                </select>
               </div>
 
-              <div class="h-5 w-px bg-slate-200 mx-1"></div>
-
-              <div class="flex items-center rounded-lg border border-slate-200 bg-white p-0.5 shadow-2xs">
-                <button class="p-1 rounded bg-slate-100 text-primary cursor-pointer" title="Tampilan Tabel Berkelompok">
-                  <span class="material-symbols-outlined text-[17px]">table_rows</span>
+              <!-- Functional Filter Tabs (Central Interactive Hub) -->
+              <div class="flex items-center gap-1.5 overflow-x-auto no-scrollbar py-0.5 shrink-0">
+                <button onclick="setPill('all')" id="pill-all" class="pill-btn px-3 py-1.5 rounded-lg text-xs font-semibold bg-slate-900 text-white cursor-pointer transition-all shadow-xs">
+                  Semua Stok <span class="ml-1 px-1.5 py-0.2 rounded-full bg-slate-700 text-[10px]">8</span>
                 </button>
-                <button class="p-1 rounded hover:bg-slate-100 text-slate-500 cursor-pointer" title="Tampilan Ringkas">
-                  <span class="material-symbols-outlined text-[17px]">view_column</span>
+                <button onclick="setPill('sn')" id="pill-sn" class="pill-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer transition-all flex items-center gap-1 shadow-2xs">
+                  <span class="material-symbols-outlined text-[13px] text-primary">pin</span>
+                  <span>Serial (SN)</span>
+                  <span class="font-mono text-[10px] text-slate-400">4</span>
+                </button>
+                <button onclick="setPill('curah')" id="pill-curah" class="pill-btn px-2.5 py-1.5 rounded-lg text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer transition-all flex items-center gap-1 shadow-2xs">
+                  <span class="material-symbols-outlined text-[13px] text-secondary">cable</span>
+                  <span>Curah & Roll</span>
+                  <span class="font-mono text-[10px] text-slate-400">4</span>
+                </button>
+                <div class="h-4 w-px bg-slate-200 mx-0.5 hidden sm:block"></div>
+                <button onclick="setPill('menipis')" id="pill-menipis" class="pill-btn px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-slate-700 border border-slate-200 hover:bg-slate-100 cursor-pointer transition-all flex items-center gap-1.5 shadow-2xs">
+                  <span class="w-2 h-2 rounded-full bg-amber-500 animate-pulse"></span>
+                  <span>Stok Menipis</span>
+                  <span class="font-mono text-[10px] px-1 py-0.2 rounded bg-amber-100 text-amber-800 font-bold">1</span>
                 </button>
               </div>
             </div>

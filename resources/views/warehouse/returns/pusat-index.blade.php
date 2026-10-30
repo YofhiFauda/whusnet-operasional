@@ -5,7 +5,7 @@
 
 @section('content')
 
-<x-warehouse.header active="returns" title="Terima Retur di Gudang Pusat" subtitle="Modem retur dalam pengiriman dari Cabang (Tahap 2). Periksa fisik di sini — kondisi final ditentukan sekarang, stok Pusat baru bertambah setelah dikonfirmasi." />
+<x-warehouse.header active="pusat" title="Terima Retur di Gudang Pusat" subtitle="Modem retur dalam pengiriman dari Cabang (Tahap 2). Periksa fisik di sini — kondisi final ditentukan sekarang, stok Pusat baru bertambah setelah dikonfirmasi." />
 
 <x-warehouse.returns-nav active="pusat" />
 

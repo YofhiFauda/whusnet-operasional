@@ -61,10 +61,10 @@
 
     {{-- Header terpadu Gudang (Desktop & Mobile Responsive - Naked Header) --}}
     <x-warehouse.header
-        active="stock"
+        :active="$direction === 'reverse' ? 'transfers-reverse' : 'transfers-create'"
         title="Transfer Antar Gudang"
         subtitle="{{ $direction === 'reverse' ? 'Transfer stok biasa Cabang → Pusat' : 'Distribusi stok material & perangkat Pusat → Cabang' }}"
-        backUrl="{{ route('warehouse.stock.index') }}"
+        backUrl="{{ route('warehouse.transfers.index') }}"
     />
 
     <form id="transfer-form" action="{{ route('warehouse.transfers.store') }}" method="POST">

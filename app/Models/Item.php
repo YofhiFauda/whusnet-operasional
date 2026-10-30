@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'code',
     'name',
+    'short_specification',
     'item_category_id',
     'infrastructure_node_type_id',
     'infrastructure_location_kind',

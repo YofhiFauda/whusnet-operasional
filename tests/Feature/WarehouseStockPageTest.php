@@ -22,6 +22,8 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\WarehouseFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Collection;
+use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -77,10 +79,23 @@ class WarehouseStockPageTest extends TestCase
         app(InventoryTransferService::class)->receiveTransfer($t2, [], [$this->kabel->id => 50], $this->owner);
     }
 
+    private function stockRows(TestResponse $response): Collection
+    {
+        return $response->viewData('groups')->flatMap(fn (array $group) => $group['categories']
+            ->flatMap(fn (array $category) => $category['rows']
+                ->map(fn (array $row) => (object) [
+                    'pop_id' => $group['pop']->id,
+                    'item_id' => $row['item']->id,
+                    'qty' => $row['qty'],
+                    'price' => $row['price'],
+                    'price_tiers' => $row['price_tiers'],
+                ])));
+    }
+
     #[Test]
     public function owner_lihat_stok_semua_gudang(): void
     {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk()
             ->assertSee('Cabang WS A')
@@ -90,12 +105,12 @@ class WarehouseStockPageTest extends TestCase
     #[Test]
     public function filter_pop_id_cuma_nampilin_gudang_terpilih(): void
     {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'pop_id' => $this->cabangA->id]));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'pop_id' => $this->cabangA->id]));
 
         $response->assertOk()
             ->assertSee('Cabang WS A');
 
-        $balances = $response->viewData('balances');
+        $balances = $this->stockRows($response);
         $this->assertTrue($balances->contains(fn ($b) => $b->pop_id === $this->cabangA->id));
         $this->assertFalse($balances->contains(fn ($b) => $b->pop_id === $this->cabangB->id));
     }
@@ -106,7 +121,7 @@ class WarehouseStockPageTest extends TestCase
         $lain = Item::create(['code' => 'WS-LAIN', 'name' => 'Barang Lain WS', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'quantity']);
         app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $lain, 10, 1000, $this->owner);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'search' => 'Kabel WS']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'search' => 'Kabel WS']));
 
         $response->assertOk()
             ->assertSee('Kabel WS')
@@ -121,14 +136,14 @@ class WarehouseStockPageTest extends TestCase
         $balanceB = InventoryBalance::where('pop_id', $this->cabangB->id)->where('item_id', $this->kabel->id)->firstOrFail();
         $balanceB->update(['minimum_stock' => 10]); // 50 > 10 → aman
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'low_stock_only' => 1]));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'low_stock_only' => 1]));
 
         $response->assertOk()
             ->assertSee('Cabang WS A');
 
-        $balances = $response->viewData('balances');
-        $this->assertTrue($balances->contains(fn ($b) => $b->id === $balanceA->id));
-        $this->assertFalse($balances->contains(fn ($b) => $b->id === $balanceB->id));
+        $balances = $this->stockRows($response);
+        $this->assertTrue($balances->contains(fn ($b) => $b->pop_id === $this->cabangA->id));
+        $this->assertFalse($balances->contains(fn ($b) => $b->pop_id === $this->cabangB->id));
     }
 
     /**
@@ -147,13 +162,13 @@ class WarehouseStockPageTest extends TestCase
         $receiveSvc->receiveQuantity($this->pusat, $item, 12, 250000, $this->owner);
         $receiveSvc->receiveQuantity($this->pusat, $item, 10, 260000, $this->owner);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'search' => 'Barang 2 Lot WS']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'search' => 'Barang 2 Lot WS']));
 
-        $response->assertOk()
-            ->assertSee('Harga Lama')
-            ->assertSee('Harga Baru')
-            ->assertSee('Rp 250.000')
-            ->assertSee('Rp 260.000');
+        $response->assertOk();
+        $row = $this->stockRows($response)->first(fn ($row) => $row->item_id === $item->id);
+        $this->assertNotNull($row);
+        $this->assertCount(2, $row->price_tiers);
+        $this->assertEqualsCanonicalizing([250000, 260000], array_column($row->price_tiers, 'price'));
     }
 
     /**
@@ -164,12 +179,13 @@ class WarehouseStockPageTest extends TestCase
     #[Test]
     public function kelola_stok_barang_quantity_satu_lot_tampil_harga_tanpa_label_lama(): void
     {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'search' => 'Kabel WS']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'search' => 'Kabel WS']));
 
-        $response->assertOk()
-            ->assertSee('Rp 5.000')
-            ->assertDontSee('Harga Lama')
-            ->assertDontSee('Harga Baru');
+        $response->assertOk();
+        $row = $this->stockRows($response)->first(fn ($row) => $row->item_id === $this->kabel->id);
+        $this->assertNotNull($row);
+        $this->assertSame([], $row->price_tiers);
+        $this->assertSame(5000.0, $row->price);
     }
 
     #[Test]
@@ -181,7 +197,7 @@ class WarehouseStockPageTest extends TestCase
         $scope = UserRoleScope::create(['user_id' => $popAdminA->id, 'role_id' => $popAdminRole->id, 'scope_type' => 'selected_pop']);
         $scope->targets()->create(['pop_id' => $this->cabangA->id]);
 
-        $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk()
             ->assertSee('Cabang WS A')
@@ -200,7 +216,7 @@ class WarehouseStockPageTest extends TestCase
         // Filter pop_id dipaksa ke Cabang B (di luar scope) — query dasarnya
         // (whereIn popIds scoped) udah gak nyertain Cabang B sama sekali,
         // jadi filter tambahan ini otomatis gak match apa-apa, BUKAN 403.
-        $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index', ['view' => 'rincian', 'pop_id' => $this->cabangB->id]));
+        $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index', ['view' => 'papan', 'pop_id' => $this->cabangB->id]));
 
         $response->assertOk()->assertDontSee('Cabang WS B');
     }
@@ -220,11 +236,11 @@ class WarehouseStockPageTest extends TestCase
 
         app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WS-SN-001', 'WS-SN-002', 'WS-SN-003'], 250000, $this->owner);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk()->assertSee('Modem WS Test');
 
-        $balances = $response->viewData('balances');
+        $balances = $this->stockRows($response);
         $modemRow = $balances->first(fn ($b) => $b->item_id === $modem->id && $b->pop_id === $this->pusat->id);
 
         $this->assertNotNull($modemRow, 'Baris modem serialized wajib muncul di Kelola Stok');
@@ -248,7 +264,7 @@ class WarehouseStockPageTest extends TestCase
             'minimum_stock' => 5, // 1 SN < 5 → harus kebaca low stock
         ]);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'low_stock_only' => 1]));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'low_stock_only' => 1]));
 
         $response->assertOk()->assertSee('Modem WS Rendah');
     }
@@ -271,7 +287,7 @@ class WarehouseStockPageTest extends TestCase
         $scope = UserRoleScope::create(['user_id' => $popAdminA->id, 'role_id' => $popAdminRole->id, 'scope_type' => 'selected_pop']);
         $scope->targets()->create(['pop_id' => $this->cabangA->id]);
 
-        $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk()->assertDontSee('Modem WS Cabang A');
     }
@@ -286,38 +302,38 @@ class WarehouseStockPageTest extends TestCase
         app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WS-CAT-001'], 300000, $this->owner);
 
         // Filter kategori kabel: kabel muncul, modem tidak
-        $responseKabel = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'category_id' => $catKabel->id]));
+        $responseKabel = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'category_id' => $catKabel->id]));
         $responseKabel->assertOk();
-        $balancesKabel = $responseKabel->viewData('balances');
+        $balancesKabel = $this->stockRows($responseKabel);
         $this->assertTrue($balancesKabel->contains(fn ($b) => $b->item_id === $this->kabel->id));
         $this->assertFalse($balancesKabel->contains(fn ($b) => $b->item_id === $modem->id));
 
         // Filter kategori modem: modem muncul, kabel tidak
-        $responseModem = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'category_id' => $catModem->id]));
+        $responseModem = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'category_id' => $catModem->id]));
         $responseModem->assertOk();
-        $balancesModem = $responseModem->viewData('balances');
+        $balancesModem = $this->stockRows($responseModem);
         $this->assertTrue($balancesModem->contains(fn ($b) => $b->item_id === $modem->id));
         $this->assertFalse($balancesModem->contains(fn ($b) => $b->item_id === $this->kabel->id));
     }
 
     #[Test]
-    public function filter_item_id_cuma_nampilin_barang_spesifik(): void
+    public function pencarian_nama_cuma_nampilin_barang_spesifik(): void
     {
         $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
         $kabelLain = Item::create(['code' => 'WS-KABEL-2', 'name' => 'Kabel 2 Test', 'item_category_id' => $catKabel->id, 'unit' => 'meter', 'tracking_type' => 'quantity']);
         app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $kabelLain, 50, 4000, $this->owner);
 
         // Filter spesifik kabel 1
-        $response1 = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'item_id' => $this->kabel->id]));
+        $response1 = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'search' => $this->kabel->name]));
         $response1->assertOk();
-        $balances1 = $response1->viewData('balances');
+        $balances1 = $this->stockRows($response1);
         $this->assertTrue($balances1->contains(fn ($b) => $b->item_id === $this->kabel->id));
         $this->assertFalse($balances1->contains(fn ($b) => $b->item_id === $kabelLain->id));
 
         // Filter spesifik kabel 2
-        $response2 = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'item_id' => $kabelLain->id]));
+        $response2 = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'search' => $kabelLain->name]));
         $response2->assertOk();
-        $balances2 = $response2->viewData('balances');
+        $balances2 = $this->stockRows($response2);
         $this->assertTrue($balances2->contains(fn ($b) => $b->item_id === $kabelLain->id));
         $this->assertFalse($balances2->contains(fn ($b) => $b->item_id === $this->kabel->id));
     }
@@ -336,13 +352,13 @@ class WarehouseStockPageTest extends TestCase
 
         // Filter Cabang A + Kategori Modem
         $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', [
-            'view' => 'rincian',
+            'view' => 'papan',
             'pop_id' => $this->cabangA->id,
             'category_id' => $catModem->id,
         ]));
 
         $response->assertOk();
-        $balances = $response->viewData('balances');
+        $balances = $this->stockRows($response);
         $this->assertTrue($balances->contains(fn ($b) => $b->item_id === $modem->id && $b->pop_id === $this->cabangA->id));
         $this->assertFalse($balances->contains(fn ($b) => $b->item_id === $this->kabel->id));
     }
@@ -352,7 +368,7 @@ class WarehouseStockPageTest extends TestCase
      * qty di teknisi per (pop,item) + penginput transaksi terakhir.
      */
     #[Test]
-    public function mode_per_lot_menampilkan_pemegang_dan_penginput(): void
+    public function papan_menyembunyikan_custody_dan_memperbarui_stok_setelah_issue(): void
     {
         $teknisiRole = Role::where('name', 'Teknisi')->firstOrFail();
         $teknisi = User::factory()->create(['role_id' => $teknisiRole->id]);
@@ -360,17 +376,11 @@ class WarehouseStockPageTest extends TestCase
             ['item_id' => $this->kabel->id, 'qty' => 40],
         ], $this->owner);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
-        $response->assertOk()->assertSee('Pemegang &amp; Penginput', false);
-        $held = $response->viewData('heldByPopItem');
-        $key = $this->cabangA->id.'-'.$this->kabel->id;
-        $this->assertArrayHasKey($key, $held);
-        $this->assertSame(40.0, $held[$key]['qty']);
-        $this->assertSame(1, $held[$key]['techs']);
-
-        $lastActor = $response->viewData('lastActorByKey');
-        $this->assertArrayHasKey($key, $lastActor);
-        $this->assertSame($this->owner->id, $lastActor[$key]->created_by);
+        $response->assertOk()->assertDontSee('Pemegang &amp; Penginput', false);
+        $row = $this->stockRows($response)->first(fn ($row) => $row->item_id === $this->kabel->id && $row->pop_id === $this->cabangA->id);
+        $this->assertNotNull($row);
+        $this->assertSame(60.0, (float) $row->qty);
     }
 }

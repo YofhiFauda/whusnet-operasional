@@ -116,13 +116,20 @@ class WarehouseStockBoardService
 
             $categories = $rows
                 ->groupBy(fn (array $row) => $row['item']->item_category_id ?? 0)
-                ->map(fn (Collection $perCategory) => [
-                    'category' => $perCategory->first()['item']->category,
-                    'sku_count' => $perCategory->count(),
-                    'rows' => $perCategory
-                        ->sortBy(fn (array $row) => $row['item']->name, SORT_NATURAL | SORT_FLAG_CASE)
-                        ->values(),
-                ])
+                ->map(function (Collection $perCategory) {
+                    $totals = $this->formatCategoryTotal($perCategory);
+
+                    return [
+                        'category' => $perCategory->first()['item']->category,
+                        'sku_count' => $perCategory->count(),
+                        'total_qty' => $totals['total_qty'],
+                        'total_rolls' => $totals['total_rolls'],
+                        'total_display' => $totals['total_display'],
+                        'rows' => $perCategory
+                            ->sortBy(fn (array $row) => $row['item']->name, SORT_NATURAL | SORT_FLAG_CASE)
+                            ->values(),
+                    ];
+                })
                 // Kategori nonaktif tetap ikut urutan master; tanpa kategori
                 // (id 0) selalu di akhir.
                 ->sortBy(fn (array $group) => $group['category'] === null
@@ -223,18 +230,70 @@ class WarehouseStockBoardService
                 ])->all(),
             ])
             ->groupBy(fn (array $row) => $row['item']->item_category_id ?? 0)
-            ->map(fn (Collection $perCategory) => [
-                'category' => $perCategory->first()['item']->category,
-                'rows' => $perCategory
-                    ->sortBy(fn (array $row) => $row['item']->name, SORT_NATURAL | SORT_FLAG_CASE)
-                    ->values(),
-            ])
+            ->map(function (Collection $perCategory) use ($pops) {
+                $flattened = collect();
+                foreach ($perCategory as $itemRow) {
+                    foreach ($pops as $pop) {
+                        $cell = $itemRow['cells'][$pop->id] ?? null;
+                        if ($cell && isset($cell['row']) && $cell['row'] !== null) {
+                            $flattened->push($cell['row']);
+                        }
+                    }
+                }
+                $totals = $this->formatCategoryTotal($flattened);
+
+                return [
+                    'category' => $perCategory->first()['item']->category,
+                    'sku_count' => $perCategory->count(),
+                    'total_qty' => $totals['total_qty'],
+                    'total_rolls' => $totals['total_rolls'],
+                    'total_display' => $totals['total_display'],
+                    'rows' => $perCategory
+                        ->sortBy(fn (array $row) => $row['item']->name, SORT_NATURAL | SORT_FLAG_CASE)
+                        ->values(),
+                ];
+            })
             ->sortBy(fn (array $group) => $group['category'] === null
                 ? PHP_INT_MAX
                 : ($categoryOrder[$group['category']->id] ?? PHP_INT_MAX - 1))
             ->values();
 
         return ['pops' => $pops, 'categories' => $categories, 'search_truncated' => $truncated];
+    }
+
+    /**
+     * Format ringkas total barang per kategori (misal: "2.500 meter (3 roll)", "15 pcs", dsb).
+     *
+     * @param  Collection<int, array<string, mixed>>  $rows
+     * @return array{total_qty: float, total_rolls: int, total_display: string}
+     */
+    private function formatCategoryTotal(Collection $rows): array
+    {
+        $totalQty = (float) $rows->sum('qty');
+        $fmt = fn ($val) => rtrim(rtrim(number_format((float) $val, 2, ',', '.'), '0'), ',');
+
+        $units = $rows
+            ->map(fn (array $r) => trim((string) ($r['unit'] ?? '')))
+            ->filter(fn ($u) => $u !== '')
+            ->unique()
+            ->values();
+
+        $allRolls = $rows->isNotEmpty() && $rows->every(fn (array $r) => ($r['tracking'] ?? null) === TrackingType::ROLL);
+        $hasRolls = $rows->contains(fn (array $r) => ($r['tracking'] ?? null) === TrackingType::ROLL);
+        $totalRolls = (int) $rows->sum(fn (array $r) => (int) ($r['roll_count'] ?? 0));
+
+        $totalDisplay = match (true) {
+            $allRolls => $fmt($totalQty).' meter ('.$totalRolls.' roll)',
+            $hasRolls && $totalRolls > 0 => $fmt($totalQty).' unit/m ('.$totalRolls.' roll)',
+            $units->count() === 1 => $fmt($totalQty).' '.$units->first(),
+            default => $fmt($totalQty).' barang',
+        };
+
+        return [
+            'total_qty' => $totalQty,
+            'total_rolls' => $totalRolls,
+            'total_display' => $totalDisplay,
+        ];
     }
 
     /**
@@ -263,6 +322,7 @@ class WarehouseStockBoardService
         return Pop::query()
             ->warehouse()
             ->whereIn('id', $scopedIds)
+            ->with(['gudangPics' => fn ($q) => $q->where('status', 'active')->orderBy('name')])
             ->get()
             ->sortBy([
                 fn (Pop $a, Pop $b) => $b->isPusat() <=> $a->isPusat(),
@@ -532,6 +592,12 @@ class WarehouseStockBoardService
             'tracking' => $tracking,
             'qty' => $qty,
             'unit' => $tracking === TrackingType::ROLL ? 'meter' : (string) $item->unit,
+            'specification' => collect([
+                $item->short_specification,
+                $tracking === TrackingType::ROLL && $item->meter_per_roll !== null
+                    ? 'Panjang per roll: '.rtrim(rtrim(number_format((float) $item->meter_per_roll, 2, ',', '.'), '0'), ',').' meter'
+                    : null,
+            ])->filter()->implode(' · '),
             'roll_count' => $tracking === TrackingType::ROLL ? (int) $rollCounts->get($key, 0) : null,
             'min' => $min,
             'is_low' => $min !== null && $qty < $min,

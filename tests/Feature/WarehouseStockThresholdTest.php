@@ -88,7 +88,7 @@ class WarehouseStockThresholdTest extends TestCase
             'minimum_stock' => 50,
         ]);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'low_stock_only' => 1]));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'low_stock_only' => 1]));
         $response->assertOk()->assertSee('THR-KABEL');
     }
 

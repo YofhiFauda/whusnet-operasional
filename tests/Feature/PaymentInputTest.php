@@ -128,7 +128,12 @@ class PaymentInputTest extends TestCase
 
     public function test_payment_appears_on_customer_detail(): void
     {
-        $owner = User::where('email', 'owner@whusnet.net')->firstOrFail();
+        $owner = User::where('email', 'owner@whusnet.net')->first()
+            ?? User::factory()->create([
+                'email' => 'owner@whusnet.net',
+                'role_id' => Role::where('code', 'owner')->firstOrFail()->id,
+                'status' => 'active',
+            ]);
         $pop = $this->createPop('POP-PAY-3', 'PAY3', 'POP Payment 3');
         $invoice = $this->createInvoice($pop, 'INV-202606-8003');
 
@@ -238,6 +243,48 @@ class PaymentInputTest extends TestCase
             'paid_amount' => 0,
             'remaining_amount' => 150000,
             'invoice_status' => 'belum_dibayar',
+        ]);
+    }
+
+    public function test_admin_can_mark_advance_payment_but_only_when_cash_exceeds_invoice_balance(): void
+    {
+        $role = Role::where('name', 'Admin')->firstOrFail();
+        $admin = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $pop = $this->createPop('POP-ADV-1', 'ADV1', 'POP Advance');
+        $admin->pops()->attach($pop->id);
+        $scope = UserRoleScope::create([
+            'user_id' => $admin->id,
+            'role_id' => $role->id,
+            'scope_type' => ScopeType::SELECTED_POP,
+        ]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $pop->id]);
+        $invoice = $this->createInvoice($pop, 'INV-202606-ADV1');
+
+        $this->actingAs($admin)->get(route('invoices.payments.create', $invoice->id))
+            ->assertOk()
+            ->assertSee('name="is_advance_payment"', false);
+
+        $this->actingAs($admin)->post(route('invoices.payments.store', $invoice->id), [
+            'payment_date' => '2026-06-13',
+            'payment_method' => 'cash',
+            'amount' => 150000,
+            'is_advance_payment' => '1',
+        ])->assertSessionHasErrors('is_advance_payment');
+
+        $this->assertDatabaseCount('payments', 0);
+
+        $this->actingAs($admin)->post(route('invoices.payments.store', $invoice->id), [
+            'payment_date' => '2026-06-13',
+            'payment_method' => 'cash',
+            'amount' => 400000,
+            'is_advance_payment' => '1',
+        ])->assertSessionHasNoErrors();
+
+        $this->assertDatabaseHas('payments', [
+            'invoice_id' => $invoice->id,
+            'amount' => 150000,
+            'overpay_amount' => 250000,
+            'is_advance_payment' => 1,
         ]);
     }
 }

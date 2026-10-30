@@ -111,7 +111,7 @@ class CollectorMonthlyReportTest extends TestCase
         // inv2 ada di mini-POP tapi terhitung di cabang induknya. Admin &
         // kolektor sama-sama masuk 'bulanan' (tunai) sekarang — tidak lagi
         // dibedakan; 'dimuka' Pelanggan khusus lunas lewat saldo.
-        $this->assertSame(['total' => 3, 'dimuka' => 0, 'sudah_bayar' => 2, 'belum_bayar' => 1], $f['pelanggan']);
+        $this->assertSame(['total' => 3, 'dimuka' => 0, 'bayar_dimuka' => 0, 'sudah_bayar' => 2, 'belum_bayar' => 1], $f['pelanggan']);
     }
 
     #[Test]
@@ -165,6 +165,24 @@ class CollectorMonthlyReportTest extends TestCase
             ->get('/reports/payments?start_date=2026-08-01&end_date=2026-08-31')
             ->assertOk()
             ->assertViewHas('totalValidSum', fn ($sum) => (float) $sum === 295000.0);
+    }
+
+    #[Test]
+    public function saldo_dalam_pembayaran_campuran_tidak_dihitung_sebagai_kas_baru(): void
+    {
+        $invoice = $this->makeInvoice($this->branchA, '2026-08', 100000);
+        $payment = $this->makePayment($invoice, 100000, '2026-08-24');
+        DB::table('payments')->where('id', $payment->id)->update(['balance_used_amount' => 30000]);
+
+        $figures = $this->figuresA();
+
+        $this->assertEquals(270000, $figures['tagihan']['bulanan']);
+        $this->assertEquals(30000, $figures['tagihan']['dimuka']);
+        $this->assertEquals(270000, $figures['uang_diterima']['bulanan']);
+        $this->assertEquals(370000, $figures['uang_diterima']['total']);
+        $this->assertEquals(370000, collect($this->service()->detail('2026-08', $this->branchA->id, 'uang_diterima', 'total'))->sum('nominal'));
+        $this->assertEquals(270000, collect($this->service()->detail('2026-08', $this->branchA->id, 'tagihan', 'bulanan'))->sum('nominal'));
+        $this->assertEquals(30000, collect($this->service()->detail('2026-08', $this->branchA->id, 'tagihan', 'dimuka'))->sum('nominal'));
     }
 
     #[Test]
@@ -313,9 +331,17 @@ class CollectorMonthlyReportTest extends TestCase
             ->assertSee('Piutang Bulan Lalu')
             ->assertSee('Uang Diterima');
 
-        $this->actingAs($owner)->get('/reports/collector-monthly/export?period=2026-08')
-            ->assertOk()
+        $export = $this->actingAs($owner)->get('/reports/collector-monthly/export?period=2026-08');
+        $export->assertOk()
             ->assertHeader('content-disposition', 'attachment; filename=laporan-admin-collector-2026-08.xlsx');
+
+        $zip = new \ZipArchive;
+        $this->assertTrue($zip->open($export->baseResponse->getFile()->getPathname()));
+        $sheet = $zip->getFromName('xl/worksheets/sheet1.xml');
+        $strings = $zip->getFromName('xl/sharedStrings.xml');
+        $zip->close();
+        $this->assertStringContainsString('Bayar Dimuka Diterima', $sheet.$strings);
+        $this->assertStringContainsString('Lunas dari Saldo', $sheet.$strings);
     }
 
     #[Test]
@@ -357,5 +383,38 @@ class CollectorMonthlyReportTest extends TestCase
         UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $pop->id]);
 
         return $user;
+    }
+
+    #[Test]
+    public function bayar_dimuka_mencatat_nominal_tunai_penuh_dan_pelanggan_unik_tanpa_mengubah_rekonsiliasi(): void
+    {
+        $invoice = $this->makeInvoice($this->branchA, '2026-08', 100000);
+        $first = $this->makePayment($invoice, 100000, '2026-08-21', overpay: 300000);
+        $secondInvoice = $this->makeInvoice($this->branchA, '2026-07', 100000, customer: $invoice->customer);
+        $second = $this->makePayment($secondInvoice, 100000, '2026-08-22', overpay: 100000);
+        $ordinary = $this->makeInvoice($this->branchA, '2026-08', 100000);
+        $this->makePayment($ordinary, 100000, '2026-08-23', overpay: 50000);
+
+        DB::table('payments')->whereIn('id', [$first->id, $second->id])->update(['is_advance_payment' => true]);
+
+        $figures = $this->figuresA();
+        $this->assertEquals(600000, $figures['tagihan']['bayar_dimuka_diterima']);
+        $this->actingAs($this->ownerUser())->get('/reports/collector-monthly?period=2026-08')
+            ->assertOk()
+            ->assertSee('Bayar Dimuka Diterima')
+            ->assertSee('Lunas dari Saldo');
+        $this->assertSame(1, $figures['pelanggan']['bayar_dimuka']);
+
+        $nominalRows = $this->service()->detail('2026-08', $this->branchA->id, 'tagihan', 'bayar_dimuka_diterima');
+        $peopleRows = $this->service()->detail('2026-08', $this->branchA->id, 'pelanggan', 'bayar_dimuka');
+        $this->assertCount(2, $nominalRows);
+        $this->assertEquals(600000, array_sum(array_column($nominalRows, 'nominal')));
+        $this->assertCount(1, $peopleRows);
+        $this->assertEquals(600000, $peopleRows[0]['nominal']);
+        $this->assertEquals(
+            $figures['tagihan']['tagihan_terbit'],
+            $figures['tagihan']['total_pembayaran'] + $figures['tagihan']['piutang']
+        );
+        $this->assertEquals(1050000, $figures['uang_diterima']['total']);
     }
 }

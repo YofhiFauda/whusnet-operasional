@@ -9,6 +9,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 import './bootstrap';
+import './image-source-picker';
 
 /* ── Alpine.js — dibundel lokal lewat Vite, BUKAN CDN ──
    Dulu dimuat dari cdn.jsdelivr.net di layouts/app.blade.php. Tiga alasan

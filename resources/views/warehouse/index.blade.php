@@ -656,11 +656,11 @@
                                         <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10.5a3 3 0 11-6 0 3 3 0 016 0z"/><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 10.5c0 7.142-7.5 11.25-7.5 11.25S4.5 17.642 4.5 10.5a7.5 7.5 0 1115 0z"/></svg>
                                         <span>{{ $pop->city ?? 'Area Operasional' }}</span>
                                     </span>
-                                    @if($pop->pic_name)
+                                    @if($pop->pic_display_name)
                                     <span>&bull;</span>
                                     <span class="inline-flex items-center gap-1">
                                         <svg class="w-3.5 h-3.5 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/></svg>
-                                        <span>PIC: <strong class="text-slate-700 dark:text-slate-200 font-semibold">{{ $pop->pic_name }}</strong></span>
+                                        <span>PJ: <strong class="text-slate-700 dark:text-slate-200 font-semibold">{{ $pop->pic_display_name }}</strong></span>
                                     </span>
                                     @endif
                                 </div>

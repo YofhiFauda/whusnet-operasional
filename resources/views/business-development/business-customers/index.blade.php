@@ -164,80 +164,180 @@
         </div>
     </div>
 
-    {{-- ── LAYER 2: FILTER BAR (NAKED — NO ENCLOSING CARD, SESUAI DESIGN.MD TYPE A) ── --}}
-    <div class="mb-5">
-        <form action="{{ route('business-development.business-customers.index') }}" method="GET" class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
-            {{-- Filter Fields Grid --}}
-            <div class="grid grid-cols-1 sm:grid-cols-12 gap-2.5 flex-1 max-w-4xl">
-                {{-- Search Box --}}
-                <div class="sm:col-span-5">
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-                        Cari Pelanggan
-                    </label>
-                    <div class="relative">
-                        <input type="text"
-                               name="q"
-                               value="{{ $search }}"
-                               placeholder="Nama / ID / no HP / nama alat..."
-                               class="w-full h-9 pl-9 pr-3 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
-                        <svg class="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+    {{-- ── LAYER 2: FILTER CARD (EXPANDABLE / COLLAPSIBLE ON MOBILE) ── --}}
+    @php
+        $hasActiveFilter = ($search !== '' || !empty($category) || !empty($status));
+        $activeFilterCount = ($search !== '' ? 1 : 0) + (!empty($category) ? 1 : 0) + (!empty($status) ? 1 : 0);
+    @endphp
+
+    <div x-data="{
+            mobileFilterOpen: {{ $hasActiveFilter ? 'true' : 'false' }},
+            isDesktop: window.innerWidth >= 768
+         }"
+         @resize.window.debounce.100ms="isDesktop = window.innerWidth >= 768"
+         class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl shadow-2xs mb-5 overflow-hidden transition-all">
+
+        <!-- Header Filter: Mobile Toggle & Status Info -->
+        <div class="px-4 py-3 flex items-center justify-between gap-3 bg-slate-50/70 dark:bg-slate-800/80 border-b border-slate-200/80 dark:border-slate-700/80">
+            <div class="flex items-center gap-2.5 flex-wrap">
+                <button type="button"
+                        class="flex items-center gap-2 text-left cursor-pointer md:cursor-default focus:outline-none"
+                        @click="if (!isDesktop) mobileFilterOpen = !mobileFilterOpen">
+                    <div class="w-6 h-6 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-200/80 dark:border-sky-800/60">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"/>
                         </svg>
                     </div>
-                </div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 select-none">
+                        Filter &amp; Pencarian
+                    </span>
+                </button>
 
-                {{-- Tipe Paket Selector --}}
-                <div class="sm:col-span-4">
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-                        Tipe Paket
-                    </label>
-                    <select name="category"
-                            onchange="this.form.submit()"
-                            class="w-full h-9 px-3 py-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all cursor-pointer">
-                        <option value="">Semua Tipe</option>
-                        @foreach($businessCategories as $name)
-                            <option value="{{ $name }}" {{ $category === $name ? 'selected' : '' }}>{{ $name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                {{-- Status Selector --}}
-                <div class="sm:col-span-3">
-                    <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">
-                        Status
-                    </label>
-                    <select name="status"
-                            onchange="this.form.submit()"
-                            class="w-full h-9 px-3 py-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all cursor-pointer">
-                        <option value="">Semua Status</option>
-                        @foreach($statusOptions as $code => $label)
-                            <option value="{{ $code }}" {{ $status === $code ? 'selected' : '' }}>{{ $label }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                @if($hasActiveFilter)
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border border-sky-200/80 dark:border-sky-800/60">
+                        <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                        <span>{{ $activeFilterCount }} Filter Aktif</span>
+                    </span>
+                @endif
             </div>
 
-            {{-- Action Buttons --}}
-            <div class="flex items-center gap-2 self-end lg:self-auto shrink-0 pt-1 lg:pt-5">
-                @if($search !== '' || $category || $status)
+            <!-- Header Action Controls -->
+            <div class="flex items-center gap-2">
+                @if($hasActiveFilter)
                     <a href="{{ route('business-development.business-customers.index') }}"
-                       title="Reset Filter"
-                       class="h-9 px-3 inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors">
-                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                       class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors border border-rose-200 dark:border-rose-900/60"
+                       title="Reset Semua Filter">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                         </svg>
                         <span>Reset</span>
                     </a>
                 @endif
-                <button type="submit"
-                        class="h-9 px-4 inline-flex items-center gap-1.5 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-700 text-white shadow-2xs transition-colors cursor-pointer">
-                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+
+                <!-- Mobile Toggle Button (Visible on Mobile only) -->
+                <button type="button"
+                        @click="mobileFilterOpen = !mobileFilterOpen"
+                        :aria-expanded="mobileFilterOpen ? 'true' : 'false'"
+                        class="md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 transition-all cursor-pointer shadow-2xs">
+                    <span x-text="mobileFilterOpen ? 'Tutup Filter' : 'Buka Filter'"></span>
+                    <svg class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"
+                         :class="mobileFilterOpen ? 'rotate-180' : ''"
+                         fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
                     </svg>
-                    <span>Cari</span>
                 </button>
             </div>
-        </form>
+        </div>
+
+        <!-- Active Filter Pills (always visible if active, gives quick overview even if collapsed on mobile) -->
+        @if($hasActiveFilter)
+            <div class="px-4 py-2 bg-slate-50/50 dark:bg-slate-900/40 border-b border-slate-200/60 dark:border-slate-700/60 flex items-center gap-1.5 flex-wrap text-xs">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">Aktif:</span>
+
+                @if($search !== '')
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 shadow-2xs">
+                        <span class="text-slate-400 dark:text-slate-500">Cari:</span> "{{ $search }}"
+                        <a href="{{ route('business-development.business-customers.index', request()->except(['q', 'page'])) }}"
+                           class="text-slate-400 hover:text-rose-500 font-bold ml-1 transition-colors"
+                           title="Hapus filter pencarian">×</a>
+                    </span>
+                @endif
+
+                @if(!empty($category))
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 shadow-2xs">
+                        <span class="text-slate-400 dark:text-slate-500">Tipe:</span> {{ $category }}
+                        <a href="{{ route('business-development.business-customers.index', request()->except(['category', 'page'])) }}"
+                           class="text-slate-400 hover:text-rose-500 font-bold ml-1 transition-colors"
+                           title="Hapus filter tipe paket">×</a>
+                    </span>
+                @endif
+
+                @if(!empty($status))
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 shadow-2xs">
+                        <span class="text-slate-400 dark:text-slate-500">Status:</span> {{ $statusOptions[$status] ?? $status }}
+                        <a href="{{ route('business-development.business-customers.index', request()->except(['status', 'page'])) }}"
+                           class="text-slate-400 hover:text-rose-500 font-bold ml-1 transition-colors"
+                           title="Hapus filter status">×</a>
+                    </span>
+                @endif
+            </div>
+        @endif
+
+        <!-- Collapsible Filter Form Body -->
+        <div x-show="isDesktop || mobileFilterOpen" x-collapse x-cloak class="p-4 sm:p-5 bg-white dark:bg-slate-800">
+            <form action="{{ route('business-development.business-customers.index') }}" method="GET" class="flex flex-col lg:flex-row items-stretch lg:items-end justify-between gap-3.5">
+                {{-- Filter Fields Grid --}}
+                <div class="grid grid-cols-1 sm:grid-cols-12 gap-3 flex-1 max-w-4xl">
+                    {{-- Search Box --}}
+                    <div class="sm:col-span-5">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
+                            Cari Pelanggan
+                        </label>
+                        <div class="relative">
+                            <input type="text"
+                                   name="q"
+                                   value="{{ $search }}"
+                                   placeholder="Nama / ID / no HP / nama alat..."
+                                   class="w-full h-10 sm:h-9 pl-9 pr-3 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
+                            <svg class="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-3 sm:top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                            </svg>
+                        </div>
+                    </div>
+
+                    {{-- Tipe Paket Selector --}}
+                    <div class="sm:col-span-4">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
+                            Tipe Paket
+                        </label>
+                        <select name="category"
+                                onchange="this.form.submit()"
+                                class="w-full h-10 sm:h-9 px-3 py-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all cursor-pointer">
+                            <option value="">Semua Tipe</option>
+                            @foreach($businessCategories as $name)
+                                <option value="{{ $name }}" {{ $category === $name ? 'selected' : '' }}>{{ $name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+
+                    {{-- Status Selector --}}
+                    <div class="sm:col-span-3">
+                        <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1.5">
+                            Status
+                        </label>
+                        <select name="status"
+                                onchange="this.form.submit()"
+                                class="w-full h-10 sm:h-9 px-3 py-1.5 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all cursor-pointer">
+                            <option value="">Semua Status</option>
+                            @foreach($statusOptions as $code => $label)
+                                <option value="{{ $code }}" {{ $status === $code ? 'selected' : '' }}>{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                </div>
+
+                {{-- Action Buttons --}}
+                <div class="flex items-center gap-2 self-stretch lg:self-end shrink-0 pt-1 lg:pt-0">
+                    @if($hasActiveFilter)
+                        <a href="{{ route('business-development.business-customers.index') }}"
+                           title="Reset Filter"
+                           class="h-10 sm:h-9 px-3.5 flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors cursor-pointer">
+                            <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                            </svg>
+                            <span>Reset</span>
+                        </a>
+                    @endif
+                    <button type="submit"
+                            class="h-10 sm:h-9 px-5 flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 text-xs font-semibold rounded-lg bg-sky-600 hover:bg-sky-700 active:scale-98 text-white shadow-2xs transition-all cursor-pointer">
+                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                        </svg>
+                        <span>Cari</span>
+                    </button>
+                </div>
+            </form>
+        </div>
     </div>
 
     {{-- ── LAYER 3: PRIMARY CONTENT — TABLE PANEL (CARD BUDGET = 1) ── --}}

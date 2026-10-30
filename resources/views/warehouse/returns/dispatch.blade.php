@@ -5,7 +5,7 @@
 
 @section('content')
 
-<x-warehouse.header active="returns" title="Kirim Retur ke Pusat" subtitle="Modem hasil retur yang sudah diterima Cabang dari teknisi/pelanggan (Tahap 1), menunggu dikirim ke Gudang Pusat untuk verifikasi final." />
+<x-warehouse.header active="dispatch" title="Kirim Retur ke Pusat" subtitle="Modem hasil retur yang sudah diterima Cabang dari teknisi/pelanggan (Tahap 1), menunggu dikirim ke Gudang Pusat untuk verifikasi final." />
 
 <x-warehouse.returns-nav active="dispatch" />
 

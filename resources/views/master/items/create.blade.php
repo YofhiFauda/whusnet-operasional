@@ -46,6 +46,16 @@
             </div>
         </div>
 
+        <div>
+            <label for="short_specification" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Spesifikasi Singkat (opsional)</label>
+            <input type="text" name="short_specification" id="short_specification" maxlength="255"
+                   value="{{ old('short_specification') }}" placeholder="Contoh: GPON, 4 port LAN, dual band"
+                   class="w-full px-3 py-2 border @error('short_specification') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1">
+            <p class="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Tampil di bawah nama barang pada Papan Kelola Stok.</p>
+            @error('short_specification')
+                <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+            @enderror
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
             <!-- Tipe -->
             <div>

@@ -2,7 +2,6 @@
 
 namespace Tests\Feature;
 
-use App\Models\InventoryBalance;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
@@ -69,127 +68,38 @@ class WarehouseStockSortAndChipTest extends TestCase
     }
 
     #[Test]
-    public function sort_qty_desc_menaruh_stok_terbesar_di_atas(): void
+    public function parameter_sort_tampilan_lama_tidak_mengubah_urutan_papan(): void
     {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'sort' => 'qty', 'dir' => 'desc']));
+        $itemIds = fn ($response) => $response->viewData('groups')->flatMap(fn (array $group) => $group['categories']
+            ->flatMap(fn (array $category) => $category['rows']->map(fn (array $row) => $row['item']->id)))->all();
 
-        $response->assertOk()->assertSee('aria-sort="descending"', false);
-        $balances = $response->viewData('balances');
-        $this->assertSame($this->aksesoris->id, $balances->first()->item_id);
-        $this->assertSame($this->cabang->id, $balances->last()->pop_id);
-    }
+        $normal = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']))->assertOk();
+        $legacySort = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'sort' => 'qty', 'dir' => 'desc']))->assertOk();
+        $invalidSort = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'sort' => 'DROP TABLE']))->assertOk();
 
-    #[Test]
-    public function sort_qty_asc_menaruh_stok_terkecil_di_atas(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'sort' => 'qty', 'dir' => 'asc']));
-
-        $response->assertOk()->assertSee('aria-sort="ascending"', false);
-        $balances = $response->viewData('balances');
-        $this->assertSame($this->cabang->id, $balances->first()->pop_id);
-    }
-
-    #[Test]
-    public function sort_berdasarkan_nama_barang(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'sort' => 'item', 'dir' => 'asc']));
-
-        $response->assertOk();
-        $balances = $response->viewData('balances');
-        $this->assertSame($this->aksesoris->id, $balances->first()->item_id);
-    }
-
-    #[Test]
-    public function parameter_sort_tidak_dikenal_diabaikan(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'sort' => 'DROP TABLE', 'dir' => 'sembarang']));
-
-        $response->assertOk()->assertSee('aria-sort="none"', false);
-        $this->assertNull($response->viewData('sort'));
-        $this->assertSame('asc', $response->viewData('sortDirection'));
-    }
-
-    #[Test]
-    public function sort_kesehatan_desc_menaruh_stok_kritis_di_atas(): void
-    {
-        // Kabel di cabang (qty 100) dibuat kritis; aksesoris pusat aman.
-        $balanceCabang = InventoryBalance::where('pop_id', $this->cabang->id)->where('item_id', $this->kabel->id)->firstOrFail();
-        $balanceCabang->update(['minimum_stock' => 500]);
-
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'sort' => 'kesehatan', 'dir' => 'desc']));
-
-        $response->assertOk()->assertSee('aria-sort="descending"', false);
-        $balances = $response->viewData('balances');
-        $this->assertTrue($balances->first()->isLowStock(), 'baris kritis harus di atas saat kesehatan desc');
-    }
-
-    #[Test]
-    public function sort_jenis_mengurutkan_berdasarkan_tracking_type(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'sort' => 'jenis', 'dir' => 'asc']));
-
-        $response->assertOk();
-        $this->assertSame('jenis', $response->viewData('sort'));
-    }
-
-    #[Test]
-    public function parameter_sort_kolom_baru_tetap_whitelist(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'sort' => 'kesehatan']));
-        $response->assertOk();
-        $this->assertSame('kesehatan', $response->viewData('sort'));
+        $this->assertSame($itemIds($normal), $itemIds($legacySort));
+        $this->assertSame($itemIds($normal), $itemIds($invalidSort));
     }
 
     #[Test]
     public function chip_filter_aktif_tampil_dan_bisa_dihapus(): void
     {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'search' => 'Kabel Sort', 'low_stock_only' => 1]));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'search' => 'Kabel Sort', 'low_stock_only' => 1]));
 
         $response->assertOk()
             ->assertSee('Filter aktif')
-            ->assertSee('Stok Menipis')
+            ->assertSee('Hanya menipis')
             ->assertSee('Hapus semua');
 
-        // Link hapus chip "Stok Menipis" harus membawa search yang masih aktif.
-        $this->assertStringContainsString('href="'.e(route('warehouse.stock.index', ['view' => 'rincian', 'search' => 'Kabel Sort'])).'"', $response->getContent());
+        // Link hapus chip "Hanya menipis" harus membawa search yang masih aktif.
+        $this->assertStringContainsString('href="'.e(route('warehouse.stock.index', ['view' => 'papan', 'search' => 'Kabel Sort'])).'"', $response->getContent());
     }
 
     #[Test]
     public function tanpa_filter_chip_tidak_ditampilkan(): void
     {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk()->assertDontSee('Filter aktif');
-    }
-
-    /**
-     * Analisa §A6 — dropdown "Nama Barang" diganti combobox yang bisa diketik.
-     * Opsi barang dimuat sebagai array JS (comboBox), bukan <select> biasa.
-     */
-    /**
-     * Analisa Fase 5 (§U4/V6) — badge kondisi di modal SN (Alpine) memakai
-     * design token `.badge-*`, bukan kelas warna hardcode sendiri.
-     */
-    #[Test]
-    public function modal_sn_badge_kondisi_pakai_design_token(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
-
-        $response->assertOk()
-            ->assertSee("'badge-success'", false)
-            ->assertSee("'badge-warning'", false)
-            ->assertSee("'badge-info'", false)
-            ->assertSee("'badge-error'", false);
-    }
-
-    #[Test]
-    public function dropdown_barang_pakai_combobox_yang_bisa_dicari(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
-
-        $response->assertOk()
-            ->assertSee('comboBox(', false)
-            ->assertSee('Ketik / pilih nama barang', false)
-            ->assertSee('Kabel Sort'); // nama barang ada di opsi combobox
     }
 }

@@ -145,6 +145,7 @@ class ItemController extends Controller
                 Rule::unique('items', 'code')->ignore($item),
             ],
             'name' => ['required', 'string', 'max:150'],
+            'short_specification' => ['nullable', 'string', 'max:255'],
             'item_category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
             'unit' => ['required', 'string', 'max:20'],
             'is_active' => 'required|boolean',

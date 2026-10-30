@@ -69,6 +69,15 @@
                                 <svg class="w-4 h-4 text-slate-300 transition-transform duration-200" :class="isPopOpen({{ $popKey }}) ? '' : '-rotate-90'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                                 <span class="font-bold text-sm tracking-wide uppercase">{{ $pop->name }}</span>
                                 <span class="px-1.5 py-0.5 rounded text-[10px] font-bold border {{ $pop->isPusat() ? 'bg-sky-950 text-sky-300 border-sky-600/60' : 'bg-slate-800 text-slate-300 border-slate-600' }}">{{ strtoupper($pop->type) }}</span>
+                                <span class="inline-flex items-center gap-1.5 text-xs text-slate-300 ml-1">
+                                    <svg class="w-3.5 h-3.5 text-slate-400 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"/>
+                                    </svg>
+                                    <span class="text-slate-400">PJ:</span>
+                                    <strong class="font-semibold {{ $pop->pic_display_name ? 'text-slate-100' : 'text-slate-400 font-normal italic' }}">
+                                        {{ $pop->pic_display_name ?? 'Belum ditentukan' }}
+                                    </strong>
+                                </span>
                             </span>
                             <span class="flex items-center gap-2 text-xs text-slate-300 pl-6 sm:pl-0">
                                 @if($group['sku_count'] === 0)
@@ -100,7 +109,13 @@
                                 <svg class="w-4 h-4 text-slate-500 dark:text-slate-400 transition-transform duration-200" :class="isCategoryOpen(@js($catKey)) ? '' : '-rotate-90'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
                                 <span class="font-bold text-slate-800 dark:text-slate-100">{{ $category?->name ?? 'Tanpa Kategori' }}</span>
                             </span>
-                            <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400"><span class="font-mono">{{ $categoryGroup['sku_count'] }}</span> SKU</span>
+                            <span class="flex items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                <span><strong class="font-mono text-slate-700 dark:text-slate-200">{{ $categoryGroup['sku_count'] }}</strong> SKU</span>
+                                @if(isset($categoryGroup['total_display']))
+                                <span aria-hidden="true" class="text-slate-300 dark:text-slate-600">·</span>
+                                <span>Total: <strong class="font-mono text-slate-700 dark:text-slate-200">{{ $categoryGroup['total_display'] }}</strong></span>
+                                @endif
+                            </span>
                         </button>
                     </td>
                 </tr>
@@ -133,6 +148,9 @@
                         <button type="button" data-stock-detail="{{ $detailJson }}" aria-haspopup="dialog"
                                 @click.stop="$el.focus(); $dispatch('open-stock-drawer', JSON.parse($el.dataset.stockDetail))"
                                 class="text-left text-sm font-semibold text-slate-900 dark:text-slate-100 hover:text-sky-700 dark:hover:text-sky-300 hover:underline underline-offset-2 rounded focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-offset-1 dark:focus-visible:ring-offset-slate-900 cursor-pointer">{{ $item->name }}</button>
+                        @if($row['specification'])
+                        <div class="mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">{{ $row['specification'] }}</div>
+                        @endif
                         @if($row['match_label'])
                         <div class="mt-1 inline-flex items-center px-1.5 py-0.5 rounded text-[11px] font-semibold bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300">{{ $row['match_label'] }}</div>
                         @endif

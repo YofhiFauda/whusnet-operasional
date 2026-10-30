@@ -114,12 +114,12 @@ class WarehouseSwitchPopTest extends TestCase
     {
         session(['warehouse.pop_id' => $this->cabangA->id]);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk();
-        $balances = $response->viewData('balances');
-        $this->assertTrue($balances->contains(fn ($b) => $b->pop_id === $this->cabangA->id));
-        $this->assertFalse($balances->contains(fn ($b) => $b->pop_id === $this->cabangB->id));
+        $balances = $response->viewData('groups');
+        $this->assertTrue($balances->contains(fn ($b) => $b['pop']->id === $this->cabangA->id));
+        $this->assertFalse($balances->contains(fn ($b) => $b['pop']->id === $this->cabangB->id));
     }
 
     #[Test]
@@ -127,12 +127,12 @@ class WarehouseSwitchPopTest extends TestCase
     {
         session(['warehouse.pop_id' => $this->cabangA->id]);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'pop_id' => $this->cabangB->id]));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'pop_id' => $this->cabangB->id]));
 
         $response->assertOk();
-        $balances = $response->viewData('balances');
-        $this->assertTrue($balances->contains(fn ($b) => $b->pop_id === $this->cabangB->id));
-        $this->assertFalse($balances->contains(fn ($b) => $b->pop_id === $this->cabangA->id));
+        $balances = $response->viewData('groups');
+        $this->assertTrue($balances->contains(fn ($b) => $b['pop']->id === $this->cabangB->id));
+        $this->assertFalse($balances->contains(fn ($b) => $b['pop']->id === $this->cabangA->id));
         // pop_id eksplisit TIDAK menulis balik ke session.
         $this->assertSame($this->cabangA->id, session('warehouse.pop_id'));
     }
@@ -142,23 +142,23 @@ class WarehouseSwitchPopTest extends TestCase
     {
         session(['warehouse.pop_id' => $this->cabangA->id]);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian', 'pop_id' => '']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'pop_id' => '']));
 
         $response->assertOk();
-        $balances = $response->viewData('balances');
-        $this->assertTrue($balances->contains(fn ($b) => $b->pop_id === $this->cabangA->id));
-        $this->assertTrue($balances->contains(fn ($b) => $b->pop_id === $this->cabangB->id));
+        $balances = $response->viewData('groups');
+        $this->assertTrue($balances->contains(fn ($b) => $b['pop']->id === $this->cabangA->id));
+        $this->assertTrue($balances->contains(fn ($b) => $b['pop']->id === $this->cabangB->id));
     }
 
     #[Test]
     public function tanpa_session_dan_tanpa_pop_id_tetap_semua_gudang_seperti_dulu(): void
     {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk();
-        $balances = $response->viewData('balances');
-        $this->assertTrue($balances->contains(fn ($b) => $b->pop_id === $this->cabangA->id));
-        $this->assertTrue($balances->contains(fn ($b) => $b->pop_id === $this->cabangB->id));
+        $balances = $response->viewData('groups');
+        $this->assertTrue($balances->contains(fn ($b) => $b['pop']->id === $this->cabangA->id));
+        $this->assertTrue($balances->contains(fn ($b) => $b['pop']->id === $this->cabangB->id));
     }
 
     #[Test]
@@ -184,10 +184,10 @@ class WarehouseSwitchPopTest extends TestCase
         // Session berisi cabang B (seandainya scope-nya berubah belakangan).
         session(['warehouse.pop_id' => $this->cabangB->id]);
 
-        $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($popAdminA)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk();
-        $this->assertFalse($response->viewData('balances')->contains(fn ($b) => $b->pop_id === $this->cabangB->id));
+        $this->assertFalse($response->viewData('groups')->contains(fn ($b) => $b['pop']->id === $this->cabangB->id));
     }
 
     #[Test]

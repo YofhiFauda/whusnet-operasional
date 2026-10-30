@@ -117,7 +117,7 @@ class WarehouseStockOpnameTest extends TestCase
         $txn = InventoryTransaction::where('type', InventoryTransactionType::STOCK_OPNAME->value)->firstOrFail();
         $this->assertEquals(-10, (float) $txn->qty);
 
-        $stockPage = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $stockPage = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
         $stockPage->assertOk()->assertSee('Opname:');
         $stockPage->assertDontSee('Belum pernah');
     }
@@ -125,7 +125,7 @@ class WarehouseStockOpnameTest extends TestCase
     #[Test]
     public function item_yang_belum_pernah_diopname_tampil_beda(): void
     {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk()->assertSee('Belum pernah');
     }

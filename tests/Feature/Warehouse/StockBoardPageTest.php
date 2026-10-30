@@ -8,6 +8,7 @@ use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
+use App\Models\User;
 use App\Services\InventoryReceiveService;
 use Illuminate\Testing\TestResponse;
 use PHPUnit\Framework\Attributes\Test;
@@ -317,5 +318,74 @@ class StockBoardPageTest extends StockBoardTestCase
         $fragmenBanyak = $this->fragmen($this->papan()->assertOk());
         $this->assertStringContainsString('data-pop-count="6"', $fragmenBanyak);
         $this->assertStringContainsString('data-force-open="false"', $fragmenBanyak);
+    }
+
+    #[Test]
+    public function papan_menampilkan_spesifikasi_panjang_roll_dari_master_barang(): void
+    {
+        $roll = $this->buatItem('SP-ROLL', 'Kabel Spesifikasi', 'roll', 'meter', 1000);
+        app(InventoryReceiveService::class)->receiveRoll($this->pusat, $roll, 1, null, 1500, $this->owner);
+
+        $fragmen = $this->fragmen($this->papan()->assertOk());
+
+        $this->assertStringContainsString('Panjang per roll: 1.000 meter', $this->teks($fragmen));
+    }
+
+    #[Test]
+    public function spesifikasi_singkat_barang_non_roll_tampil_di_papan(): void
+    {
+        $item = $this->buatItem('SP-ONT-SPEC', 'ONT dengan Spesifikasi', 'quantity');
+        $item->update(['short_specification' => 'GPON, 4 port LAN']);
+        $this->stokQuantity($this->pusat, $item, 3);
+
+        $fragmen = $this->fragmen($this->papan()->assertOk());
+
+        $this->assertStringContainsString('GPON, 4 port LAN', $this->teks($fragmen));
+    }
+
+    #[Test]
+    public function skrip_modal_lama_tidak_dimuat_pada_papan_dan_matriks(): void
+    {
+        $papan = $this->papan()->assertOk()->getContent();
+        $matriks = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'matrix']))->assertOk()->getContent();
+
+        $this->assertStringNotContainsString('function serialListModal(', $papan);
+        $this->assertStringNotContainsString('function rollListModal(', $matriks);
+        $this->actingAs($this->owner)
+            ->get(route('warehouse.stock.index', ['view' => 'rincian']))
+            ->assertRedirect(route('warehouse.stock.index', ['view' => 'papan']));
+    }
+
+    #[Test]
+    public function papan_menampilkan_penanggung_jawab_pada_header_pusat_dan_cabang(): void
+    {
+        $this->pusat->update(['pic_name' => 'Budi Penanggung Jawab Pusat']);
+        $picUser = User::factory()->create(['name' => 'Siti PIC Cabang']);
+        $this->cabangA->gudangPics()->attach($picUser->id);
+
+        $modem = $this->buatItem('SP-MDM-PJ', 'Modem PJ', 'serialized', 'unit');
+        $this->sn($this->pusat, $modem, 'SPM-PJ-1');
+        $this->sn($this->cabangA, $modem, 'SPM-PJ-2');
+
+        $fragmen = $this->fragmen($this->papan()->assertOk());
+        $teks = $this->teks($fragmen);
+
+        $this->assertStringContainsString('PJ: Budi Penanggung Jawab Pusat', $teks);
+        $this->assertStringContainsString('PJ: Siti PIC Cabang', $teks);
+    }
+
+    #[Test]
+    public function papan_menampilkan_total_barang_per_kategori_pada_header_kategori(): void
+    {
+        $item1 = $this->buatItem('SP-TOT-1', 'Patch Cord A', 'quantity', 'pcs', null, 'patch_cord');
+        $item2 = $this->buatItem('SP-TOT-2', 'Patch Cord B', 'quantity', 'pcs', null, 'patch_cord');
+        $this->stokQuantity($this->pusat, $item1, 20);
+        $this->stokQuantity($this->pusat, $item2, 35);
+
+        $fragmen = $this->fragmen($this->papan()->assertOk());
+        $teks = $this->teks($fragmen);
+
+        // Header Kategori Patch Cord menampilkan 2 SKU dan Total: 55 pcs
+        $this->assertStringContainsString('2 SKU · Total: 55 pcs', $teks);
     }
 }

@@ -6,6 +6,7 @@ use Carbon\Carbon;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Lanjutan `DummyScaleSeeder`: permintaan stok gudang, tiket, FOP task, dan task
@@ -58,8 +59,8 @@ class DummyOperationsSeeder extends Seeder
 
         $alreadySeeded = DB::table('tickets')->join('customers', 'customers.id', '=', 'tickets.customer_id')
             ->where('customers.registered_by_name', self::MARK)->exists();
-        if ($alreadySeeded) {
-            $this->command?->info('Tiket dummy sudah ada — skip operasional.');
+        if ($alreadySeeded && ! getenv('DUMMY_RESET')) {
+            $this->command?->info('Tiket dummy sudah ada — skip operasional. Jalankan dengan DUMMY_RESET=1 untuk membersihkan & seed ulang (mis. setelah run terputus).');
 
             return;
         }
@@ -67,6 +68,8 @@ class DummyOperationsSeeder extends Seeder
         if (! $this->loadReferences()) {
             return;
         }
+
+        $this->purgePreviousDummyOperations();
 
         $ticketTotal = (int) (getenv('DUMMY_TICKETS') ?: intdiv($billed * 25, 100));
 
@@ -160,6 +163,17 @@ class DummyOperationsSeeder extends Seeder
      */
     private function seedStockRequests(): void
     {
+        // Tahap ini commit sendiri di luar transaksi tiket. Kalau run sebelumnya mati
+        // di tahap tiket, permintaan stok sudah terlanjur masuk sementara guard `run()`
+        // (berbasis tiket) tidak menangkapnya. Tanpa skip ini run ulang menerbitkan
+        // PST-… yang sama persis (counter mulai dari 0, seed acak tetap) dan mentok
+        // di unique `reference_number`.
+        if (DB::table('stock_requests')->where('notes', 'like', '[DUMMY]%')->exists()) {
+            $this->info('Permintaan stok dummy sudah ada — skip.');
+
+            return;
+        }
+
         $requestId = $this->takeId('stock_requests');
         $itemId = $this->takeId('stock_request_items');
         $items = $this->ref['items']->whereIn('tracking_type', ['quantity', 'serialized'])->values();
@@ -180,11 +194,11 @@ class DummyOperationsSeeder extends Seeder
                 };
                 $decided = $status === 'pending' ? null : $created->copy()->addHours(mt_rand(2, 48));
                 $ymd = $created->format('Ymd');
-                $this->docCounters["LEDGER:PST:{$ymd}"] = ($this->docCounters["LEDGER:PST:{$ymd}"] ?? 0) + 1;
+                $refNumber = $this->nextDocNumber("LEDGER:PST:{$ymd}", 'PST', $ymd, 'stock_requests', 'reference_number');
                 $id = $requestId++;
 
                 $requests[] = [
-                    'id' => $id, 'reference_number' => sprintf('PST-%s-%06d', $ymd, $this->docCounters["LEDGER:PST:{$ymd}"]),
+                    'id' => $id, 'reference_number' => $refNumber,
                     'cabang_pop_id' => $branch['pop']->id, 'status' => $status, 'notes' => '[DUMMY] '.$reasons[$n % 5],
                     'requested_by' => $this->ref['pics'][$b] ?? 1, 'decided_by' => $decided ? 1 : null, 'decided_at' => $decided,
                     'decision_notes' => $status === 'rejected' ? 'Stok pusat tidak mencukupi' : ($status === 'cancelled' ? 'Dibatalkan peminta' : null),
@@ -280,8 +294,7 @@ class DummyOperationsSeeder extends Seeder
 
                 $ticketId = $ids['tickets']++;
                 $ymd = $created->format('Ymd');
-                $this->docCounters["TKT:{$ymd}"] = ($this->docCounters["TKT:{$ymd}"] ?? 0) + 1;
-                $ticketNumber = sprintf('TKT-%s-%06d', $ymd, $this->docCounters["TKT:{$ymd}"]);
+                $ticketNumber = $this->nextDocNumber("TKT:{$ymd}", 'TKT', $ymd, 'tickets', 'ticket_number');
                 $displayId = $customer->cid ?: $customer->customer_code;
 
                 $handler = match (true) {
@@ -393,9 +406,9 @@ class DummyOperationsSeeder extends Seeder
         $techs = $c['techs'];
 
         $tfopYmd = $escalated->format('Ymd');
-        $this->docCounters["TFOP:{$tfopYmd}"] = ($this->docCounters["TFOP:{$tfopYmd}"] ?? 0) + 1;
+        $tfopNumber = $this->nextDocNumber("TFOP:{$tfopYmd}", 'TFOP', $tfopYmd, 'fop_tasks', 'task_number');
         $taskYmd = $tfopYmd;
-        $this->docCounters["TASK:{$taskYmd}"] = ($this->docCounters["TASK:{$taskYmd}"] ?? 0) + 1;
+        $taskNumber = $this->nextDocNumber("TASK:{$taskYmd}", 'TASK', $taskYmd, 'tasks', 'task_number');
 
         $scheduled = null;
         $started = null;
@@ -457,7 +470,7 @@ class DummyOperationsSeeder extends Seeder
 
         $rows['fop_tasks'][] = [
             'id' => $c['fop_task_id'], 'task_id' => $c['task_id'], 'team_id' => $teamId, 'manual_override_at' => null,
-            'task_number' => sprintf('TFOP-%s-%06d', $tfopYmd, $this->docCounters["TFOP:{$tfopYmd}"]), 'category' => $c['type'], 'task_date' => $scheduled,
+            'task_number' => $tfopNumber, 'category' => $c['type'], 'task_date' => $scheduled,
             'tugas' => $c['display_id'].'_'.$customer->full_name, 'village_id' => $customer->village_id, 'pop_id' => $customer->pop_id, 'scope_pop_id' => null,
             'scope_network_node_id' => null, 'scope_infrastructure_slot_id' => null, 'scope_infrastructure_port_id' => null, 'scope_snapshot' => null,
             'customer_id' => $customer->id, 'issue' => $c['issue'], 'notes' => "Ticket {$c['ticket_number']} — dikirim oleh Dummy",
@@ -467,7 +480,7 @@ class DummyOperationsSeeder extends Seeder
         ];
 
         $rows['tasks'][] = [
-            'id' => $c['task_id'], 'task_number' => sprintf('TASK-%s-%06d', $taskYmd, $this->docCounters["TASK:{$taskYmd}"]), 'customer_id' => $customer->id,
+            'id' => $c['task_id'], 'task_number' => $taskNumber, 'customer_id' => $customer->id,
             'pop_id' => $customer->pop_id, 'task_type' => $c['type'], 'title' => $c['issue'].': '.$customer->full_name, 'description' => $c['issue'],
             'status' => $status, 'scheduled_at' => $scheduled, 'started_at' => $started, 'started_via' => $started ? 'manual' : null,
             'started_latitude' => null, 'started_longitude' => null, 'started_accuracy_meters' => null, 'started_distance_meters' => null,
@@ -584,14 +597,14 @@ class DummyOperationsSeeder extends Seeder
                         $created = $now->copy()->subHours(2);
                     }
                     $ymd = $created->format('Ymd');
-                    $this->docCounters["TASK:{$ymd}"] = ($this->docCounters["TASK:{$ymd}"] ?? 0) + 1;
+                    $taskNumber = $this->nextDocNumber("TASK:{$ymd}", 'TASK', $ymd, 'tasks', 'task_number');
 
                     // Task otomatis lahir `pending` (antrean FOP, belum terjadwal) — sebagian sudah dijadwalkan.
                     $scheduled = mt_rand(1, 100) <= 35 ? $now->copy()->addDays(mt_rand(0, 3))->setTime(mt_rand(9, 15), 0) : null;
                     $status2 = $scheduled ? 'terjadwal' : 'pending';
                     $id = $taskId++;
                     $tasks[] = [
-                        'id' => $id, 'task_number' => sprintf('TASK-%s-%06d', $ymd, $this->docCounters["TASK:{$ymd}"]), 'customer_id' => $customer->id, 'pop_id' => $customer->pop_id,
+                        'id' => $id, 'task_number' => $taskNumber, 'customer_id' => $customer->id, 'pop_id' => $customer->pop_id,
                         'task_type' => $type, 'title' => "{$title}: {$customer->full_name}", 'description' => "{$title} pelanggan {$customer->full_name}", 'status' => $status2,
                         'scheduled_at' => $scheduled, 'started_at' => null, 'started_via' => null, 'started_latitude' => null, 'started_longitude' => null,
                         'started_accuracy_meters' => null, 'started_distance_meters' => null, 'work_finished_at' => null, 'completed_at' => null, 'completed_by' => null,
@@ -614,6 +627,81 @@ class DummyOperationsSeeder extends Seeder
     }
 
     // ───────────────────────── helper ─────────────────────────
+
+    /** Bersihkan sisa data operasional dummy terdahulu (misal dari run seeder yang terputus di tengah jalan). */
+    private function purgePreviousDummyOperations(): void
+    {
+        Schema::disableForeignKeyConstraints();
+        try {
+            $customerIds = DB::table('customers')->where('registered_by_name', self::MARK)->pluck('id')->all();
+            if (! empty($customerIds)) {
+                $ticketIds = DB::table('tickets')->whereIn('customer_id', $customerIds)->pluck('id')->all();
+                $fopIds = DB::table('fop_tasks')->whereIn('customer_id', $customerIds)->pluck('id')->all();
+                $taskIds = DB::table('tasks')->whereIn('customer_id', $customerIds)->pluck('id')->all();
+
+                foreach (array_chunk($ticketIds, 2000) as $chunk) {
+                    DB::table('ticket_histories')->whereIn('ticket_id', $chunk)->delete();
+                }
+                DB::table('tickets')->whereIn('customer_id', $customerIds)->delete();
+
+                foreach (array_chunk($fopIds, 2000) as $chunk) {
+                    foreach (['fop_task_status_history', 'fop_task_user', 'task_materials'] as $table) {
+                        DB::table($table)->whereIn('fop_task_id', $chunk)->delete();
+                    }
+                }
+                DB::table('fop_tasks')->whereIn('customer_id', $customerIds)->delete();
+
+                foreach (array_chunk($taskIds, 2000) as $chunk) {
+                    foreach (['task_reports', 'task_teams', 'task_maintenances', 'task_creq_details'] as $table) {
+                        DB::table($table)->whereIn('task_id', $chunk)->delete();
+                    }
+                }
+                DB::table('tasks')->whereIn('customer_id', $customerIds)->delete();
+            }
+
+            // Run yang terputus meninggalkan anak yatim (task/FOP task induknya sudah
+            // di-rollback, anaknya sudah commit karena FK dimatikan di sini). ID induk
+            // dipakai ulang oleh run berikutnya, jadi anak yatim itu bentrok di unique
+            // (task_id, user_id). Pembersihan via pelanggan di atas tidak menjangkaunya.
+            foreach (['task_teams', 'task_reports', 'task_maintenances', 'task_creq_details'] as $table) {
+                DB::table($table)->whereNotIn('task_id', DB::table('tasks')->select('id'))->delete();
+            }
+            foreach (['fop_task_status_history', 'fop_task_user', 'task_materials'] as $table) {
+                DB::table($table)->whereNotIn('fop_task_id', DB::table('fop_tasks')->select('id'))->delete();
+            }
+
+            $requestIds = DB::table('stock_requests')->where('notes', 'like', '[DUMMY]%')->pluck('id')->all();
+            foreach (array_chunk($requestIds, 2000) as $chunk) {
+                DB::table('stock_request_items')->whereIn('stock_request_id', $chunk)->delete();
+            }
+            DB::table('stock_requests')->where('notes', 'like', '[DUMMY]%')->delete();
+
+            $teamIds = DB::table('fop_task_teams')->where('name', 'like', 'DMY %')->pluck('id')->all();
+            foreach (array_chunk($teamIds, 2000) as $chunk) {
+                DB::table('fop_task_team_user')->whereIn('fop_task_team_id', $chunk)->delete();
+            }
+            DB::table('fop_task_teams')->where('name', 'like', 'DMY %')->delete();
+        } finally {
+            Schema::enableForeignKeyConstraints();
+        }
+    }
+
+    private function nextDocNumber(string $key, string $prefix, string $ymd, string $table, string $column): string
+    {
+        if (! isset($this->docCounters[$key])) {
+            $seq = (int) DB::table('number_sequences')->where('key', $key)->value('value');
+            $maxVal = DB::table($table)->where($column, 'like', "{$prefix}-{$ymd}-%")->orderByDesc($column)->value($column);
+            $maxTable = 0;
+            if ($maxVal && preg_match('/-(\d+)$/', (string) $maxVal, $matches)) {
+                $maxTable = (int) $matches[1];
+            }
+            $this->docCounters[$key] = max($seq, $maxTable);
+        }
+
+        $this->docCounters[$key]++;
+
+        return sprintf('%s-%s-%06d', $prefix, $ymd, $this->docCounters[$key]);
+    }
 
     /** @param  array<string, list<array<string, mixed>>>  $rows */
     private function flushTickets(array $rows): void

@@ -24,6 +24,7 @@ use App\Services\CustomerBalanceService;
 use App\Services\PaymentService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Validation\ValidationException;
 use Tests\TestCase;
 
 /**
@@ -54,7 +55,12 @@ class PaymentEditFullRevisionTest extends TestCase
 
         $this->seed(DatabaseSeeder::class);
         $this->package = InternetPackage::query()->firstOrFail();
-        $this->owner = User::where('email', 'owner@whusnet.net')->firstOrFail();
+        $this->owner = User::where('email', 'owner@whusnet.net')->first()
+            ?? User::factory()->create([
+                'email' => 'owner@whusnet.net',
+                'role_id' => Role::where('code', 'owner')->firstOrFail()->id,
+                'status' => 'active',
+            ]);
 
         $this->pop = $this->createPop('PEFR');
 
@@ -554,6 +560,47 @@ class PaymentEditFullRevisionTest extends TestCase
             'paid_amount' => 0,
             'remaining_amount' => $total,
             'invoice_status' => 'belum_dibayar',
+        ]);
+    }
+
+    public function test_edit_can_classify_advance_payment_and_reject_label_without_future_balance(): void
+    {
+        $invoice = $this->createInvoice('C-ADV', 150000);
+        $payment = $this->recordPayment($invoice, ['amount' => 200000]);
+
+        $this->putUpdate($payment, ['amount' => 200000, 'is_advance_payment' => '1'])->assertSessionHasNoErrors();
+        $this->assertTrue($payment->fresh()->is_advance_payment);
+        $this->actingAs($this->owner)->get(route('payments.edit', $payment->id))
+            ->assertOk()
+            ->assertSee('name="is_advance_payment"', false);
+
+        $this->putUpdate($payment, ['amount' => 150000, 'is_advance_payment' => '1'])
+            ->assertSessionHasErrors('is_advance_payment');
+
+        $this->putUpdate($payment, ['amount' => 150000, 'is_advance_payment' => '0'])
+            ->assertSessionHasNoErrors();
+        $this->assertFalse($payment->fresh()->is_advance_payment);
+    }
+
+    public function test_saldo_only_payment_cannot_be_labeled_as_new_advance_cash(): void
+    {
+        $invoice = $this->createInvoice('C-SALDO-ADV', 150000);
+        CustomerBalanceMutation::create([
+            'customer_id' => $invoice->customer_id,
+            'type' => 'credit',
+            'source' => 'kelebihan_bayar',
+            'amount' => 200000,
+            'payment_id' => null,
+            'pop_id' => $invoice->pop_id,
+            'created_by' => $this->owner->id,
+            'note' => 'Saldo tes.',
+        ]);
+
+        $this->expectException(ValidationException::class);
+        $this->recordPayment($invoice, [
+            'amount' => 0,
+            'use_balance_amount' => 200000,
+            'is_advance_payment' => true,
         ]);
     }
 }

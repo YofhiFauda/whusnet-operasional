@@ -667,6 +667,7 @@ class PaymentController extends Controller
                 },
             ],
             'use_balance_amount' => 'nullable|numeric|min:0',
+            'is_advance_payment' => 'sometimes|boolean',
             'amount' => [
                 'required',
                 'numeric',

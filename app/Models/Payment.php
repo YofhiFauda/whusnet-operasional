@@ -44,6 +44,7 @@ class Payment extends Model
         'amount',
         'balance_used_amount',
         'overpay_amount',
+        'is_advance_payment',
         'received_by',
         'collected_by',
         'collected_by_role',
@@ -66,6 +67,7 @@ class Payment extends Model
             'amount' => 'decimal:2',
             'balance_used_amount' => 'decimal:2',
             'overpay_amount' => 'decimal:2',
+            'is_advance_payment' => 'boolean',
             'payment_status' => PaymentStatus::class,
             'rejected_at' => 'datetime',
         ];
@@ -576,6 +578,7 @@ class Payment extends Model
             'amount',
             'balance_used_amount',
             'overpay_amount',
+            'is_advance_payment',
             'received_by',
             'collected_by',
             'proof_file',

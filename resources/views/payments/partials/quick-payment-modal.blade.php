@@ -200,6 +200,11 @@
                         <p id="qp-overpay-hint" class="hidden text-[10px] font-semibold text-sky-700 dark:text-sky-400 mt-1.5 px-2 py-1.5 rounded bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20"></p>
                     </div>
 
+                    <label class="flex items-start gap-2 rounded-md border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 px-3 py-2 text-xs text-slate-800 dark:text-slate-200 cursor-pointer">
+                        <input type="checkbox" id="qp-is-advance-payment" class="mt-0.5 rounded border-slate-300 text-sky-600 focus:ring-sky-500">
+                        <span><span class="font-semibold">Bayar beberapa bulan di muka</span><span class="block text-slate-500 dark:text-slate-400 mt-0.5">Pilih bila kelebihan pembayaran sengaja untuk tagihan bulan berikutnya.</span></span>
+                    </label>
+
                     {{-- Peringatan piutang lama (ADHOC-84 §2.4) — non-blokir,
                          cuma menyorot supaya kasir sadar ada tagihan lebih
                          lama yang belum dibayar sebelum melanjutkan tagihan
@@ -525,6 +530,7 @@
                 document.getElementById('qp-payment-method').value = 'cash';
                 document.getElementById('qp-sender-name').value = '';
                 document.getElementById('qp-note').value = '';
+                document.getElementById('qp-is-advance-payment').checked = false;
                 document.getElementById('qp-installment-hint').classList.add('hidden');
                 document.getElementById('qp-settle-hint').classList.add('hidden');
                 document.getElementById('qp-overpay-hint').classList.add('hidden');
@@ -796,6 +802,7 @@
                 payload.append('amount', qpNominalPolos());
                 payload.append('payment_date', document.getElementById('qp-payment-date').value);
                 payload.append('payment_method', method);
+                payload.append('is_advance_payment', document.getElementById('qp-is-advance-payment').checked ? '1' : '0');
 
                 if (method === 'transfer') {
                     payload.append('bank_account_id', document.getElementById('qp-bank-account').value);

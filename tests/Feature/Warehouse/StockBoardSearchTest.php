@@ -173,6 +173,13 @@ class StockBoardSearchTest extends StockBoardTestCase
         $this->assertTrue($groups->every(fn ($g) => $g['search_truncated'] === true));
         $this->assertNull(app(WarehouseStockBoardService::class)->emptyState(collect([$this->pusat->id]), $groups, $this->filters('CAPSN')));
 
+        foreach (['papan', 'matrix'] as $mode) {
+            $response = $this->actingAs($this->owner)
+                ->get(route('warehouse.stock.index', ['view' => $mode, 'search' => 'CAPSN']))
+                ->assertOk();
+            $response->assertSee('Hasil pencarian SN/kode roll dibatasi 50 pasangan gudang–barang.');
+        }
+
         $sedikit = $this->build([$this->pusat->id], $this->filters('CAPSN-1'));
         $this->assertFalse($sedikit->first()['search_truncated'], 'di bawah batas: tidak terpotong');
 

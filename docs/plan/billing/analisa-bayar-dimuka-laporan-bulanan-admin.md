@@ -1,7 +1,7 @@
 # Analisis Bayar Dimuka pada Laporan Bulanan Admin
 
 **Tanggal:** 2026-10-29  
-**Status:** Analisis disepakati secara konsep; belum diimplementasikan.  
+**Status:** Implementasi kode lokal selesai 2026-10-29; migration perlu dijalankan pada database tujuan.
 **Cakupan:** Laporan Bulanan Admin (/reports/collector-monthly), blok Tagihan, Pelanggan, dan penjelasan Piutang Bulan Lalu. Task aktif ADHOC-202 tetap berjalan.
 
 ## Definisi yang diminta
@@ -30,14 +30,14 @@ Laporan kas yang ada tetap menguraikan Rp400.000 sebagai **Bulanan Rp100.000 + L
 
 - CollectorMonthlyReportService::fillTagihanDanPelanggan() menghitung Tagihan Dimuka dari pembayaran invoice periode laporan dengan metode saldo. Itu **pemakaian saldo**, bukan nominal penuh yang diterima saat pelanggan membayar beberapa bulan sekaligus.
 - Pelanggan Bayar Dimuka saat ini menghitung pelanggan yang invoice bulan laporan lunas seluruhnya dari saldo. Itu **status pelunasan invoice**, bukan jumlah pelanggan unik yang melakukan transaksi bayar dimuka pada bulan tersebut.
-- Payment menyimpan bagian untuk invoice pada amount, kelebihan pada overpay_amount, dan saldo yang dipakai pada balance_used_amount. Payment::cashReceivedAmount() merupakan acuan uang fisik yang diterima.
+- Payment menyimpan bagian untuk invoice pada amount, kelebihan pada overpay_amount, dan saldo yang dipakai pada balance_used_amount. Payment::physicalAmount() merupakan acuan uang fisik yang diterima.
 - Sumber kredit saldo bayar_di_muka saat ini terkait kelebihan pembayaran invoice AWAL; kelebihan invoice lain berlabel kelebihan_bayar. Kedua sumber belum cukup untuk memastikan niat membayar 3–4 bulan sekaligus pada invoice bulanan. Semua overpay tidak boleh otomatis dianggap bayar dimuka.
 - Rumus Tagihan saat ini adalah Total Pembayaran = Bulanan + Dimuka (saldo dipakai) + Diskon. Mengganti Dimuka dengan nominal transaksi penuh tanpa mengubah struktur akan menghitung uang dua kali dan merusak rekonsiliasi Tagihan Terbit = Total Pembayaran + Piutang.
 
 ## Rancangan saat pekerjaan laporan dijadwalkan
 
 1. Petugas menandai transaksi secara eksplisit sebagai “Bayar beberapa bulan di muka” pada alur pembayaran yang mengizinkannya. Simpan penanda pada pembayaran sumber dan audit perubahannya. Mekanisme pemisahan pembayaran invoice serta kredit saldo tetap dipakai.
-2. Agregasi **Bayar Dimuka Diterima** memakai payment_date dalam periode laporan, payment yang sah, POP yang boleh diakses, penanda bayar dimuka, dan nominal uang fisik penuh yang setara dengan Payment::cashReceivedAmount(). Jumlahkan setiap transaksi sekali.
+2. Agregasi **Bayar Dimuka Diterima** memakai payment_date dalam periode laporan, payment yang sah, POP yang boleh diakses, penanda bayar dimuka, dan nominal uang fisik penuh yang setara dengan Payment::physicalAmount(). Jumlahkan setiap transaksi sekali.
 3. Agregasi **Pelanggan Bayar Dimuka** memakai customer_id unik dari transaksi yang sama. Hitungan baris rincian bukan hitungan orang.
 4. Tampilkan kedua metrik tanpa menjumlahkan nominal transaksi penuh lagi ke Total Pembayaran invoice atau Total Uang Diterima. Perjelas metrik lama sebagai **Dibayar dari Saldo**; rincian per sel dan ekspor harus mengikuti definisi yang sama.
 5. Pembayaran historis hanya boleh diberi penanda jika niat bayar dimuka dapat diverifikasi. Jangan menyimpulkan niat dari overpay_amount saja. Snapshot period_closings bulan yang sudah ditutup tidak ditulis ulang; koreksi dan pengembalian dicatat menurut aturan periode tindakan.

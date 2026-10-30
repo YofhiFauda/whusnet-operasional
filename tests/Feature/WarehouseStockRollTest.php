@@ -62,11 +62,11 @@ class WarehouseStockRollTest extends TestCase
 
         app(InventoryReceiveService::class)->receiveRoll($this->pusat, $kabel, 3, 'PT Vendor Stok', 2500000, $this->owner);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk()
             ->assertSee('Kabel FO Kelola Stok Test')
-            ->assertSee('ROLL KABEL')
+            ->assertSee('Panjang per roll: 1.000 meter')
             ->assertSee('3.000') // 3 roll x 1000 meter = 3000 meter sisa total
             ->assertSee('meter');
     }
@@ -81,7 +81,7 @@ class WarehouseStockRollTest extends TestCase
         $teknisi = User::factory()->create();
         $roll->update(['status' => RollStatus::ISSUED, 'current_pop_id' => null, 'current_technician_id' => $teknisi->id, 'issued_from_pop_id' => $this->pusat->id]);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan']));
 
         $response->assertOk()->assertDontSee('Kabel FO Kelola Stok Issued');
     }

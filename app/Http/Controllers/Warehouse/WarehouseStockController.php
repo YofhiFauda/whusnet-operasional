@@ -16,17 +16,13 @@ use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\Pop;
-use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Services\EffectiveAccessService;
 use App\Services\WarehouseStockBoardService;
-use App\Services\WarehouseStockPositionService;
 use App\Support\BoardFilters;
-use App\Support\LikeSearch;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
@@ -53,26 +49,39 @@ class WarehouseStockController extends Controller
     use AuthorizesWarehousePop;
     use ResolvesSelectedPop;
 
-    public function index(Request $request, EffectiveAccessService $access): View
+    public function index(Request $request, EffectiveAccessService $access): View|RedirectResponse
     {
-        $user = auth()->user();
+        if (in_array($request->query('view'), ['rincian', 'ringkasan'], true)) {
+            $query = ['view' => 'papan'];
+            foreach (['search', 'pop_id', 'category_id', 'tracking', 'low_stock_only'] as $key) {
+                if ($request->query->has($key) && is_scalar($request->query($key))) {
+                    $query[$key] = $request->query($key);
+                }
+            }
 
+            if ($request->query->has('pop_id') && $request->query('pop_id') === null) {
+                $query['pop_id'] = '';
+            }
+
+            $oldTracking = $request->query('tracking_type');
+            if (! isset($query['tracking']) && in_array($oldTracking, array_column(TrackingType::cases(), 'value'), true)) {
+                $query['tracking'] = $oldTracking;
+            }
+
+            return redirect()->route('warehouse.stock.index', $query);
+        }
+
+        $user = auth()->user();
         $pops = Pop::query()
             ->warehouse()
-            ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
+            ->with(['gudangPics' => fn ($q) => $q->where('status', 'active')->orderBy('name')])
+            ->when(! $access->hasAllPopAccess($user), fn ($query) => $query->whereIn('id', $access->getAllowedPopIds($user)))
             ->orderBy('type')
             ->orderBy('name')
             ->get();
-
         $popIds = $pops->pluck('id');
 
-        // Indikator Mode + gating Quick Action Bar (rancangan-layout.md §3.3-A)
-        // — MURNI informasional/kemudahan link, BUKAN cara baru buat pilih
-        // scope (scope tetap 100% dari EffectiveAccessService, gak ada
-        // dropdown yang mengubah apa yang di-query).
         $hasAllAccess = $access->hasAllPopAccess($user);
-        $canActAsPusat = $hasAllAccess || $pops->contains('type', 'pusat');
-        $canActAsCabang = $hasAllAccess || $pops->contains('type', 'cabang');
         $lockedSinglePop = ! $hasAllAccess && $pops->count() === 1 ? $pops->first() : null;
         $modeLabel = match (true) {
             $hasAllAccess => 'Semua Gudang (Nasional)',
@@ -80,417 +89,9 @@ class WarehouseStockController extends Controller
             default => $pops->count().' Gudang Terjangkau',
         };
 
-        // Konteks cabang global (analisa-ui-ux-warehouse.md §S1) — pop_id
-        // eksplisit di query tetap menang; absen → pakai switcher header (session).
         $popFilter = $this->resolveSelectedPopId($request, $access, $user);
 
-        // Papan Gudang → Kategori → Barang (spec 2026-10-29). Bercabang SEBELUM
-        // logika per lot/ringkasan supaya dua tampilan lama itu tidak berubah
-        // satu baris pun selama papan masih dibuktikan di `?view=papan`.
-        // `matrix` = sub-tampilan papan (Tabel | Matriks): filter, scope, dan izin
-        // aksi sama persis, hanya bentuk data yang dirender yang berbeda.
-        // Papan = tampilan DEFAULT (spec §2): tanpa `view` atau nilai tak dikenal jatuh
-        // ke papan. Per Lot lama hanya lewat `?view=rincian`, Ringkasan lewat
-        // `?view=ringkasan`; keduanya menunggu dihapus setelah papan stabil (spec §11.7).
-        if (! in_array($request->query('view'), ['rincian', 'ringkasan'], true)) {
-            return $this->board($request, $user, $pops, $popIds, $popFilter, $lockedSinglePop, $modeLabel, $request->query('view') === 'matrix');
-        }
-
-        $categoryFilter = $request->integer('category_id') ?: null;
-        $itemFilter = $request->integer('item_id') ?: null;
-        $search = LikeSearch::sanitize((string) $request->query('search', ''));
-        $lowStockOnly = $request->boolean('low_stock_only');
-        $trackingFilter = $request->query('tracking_type');
-        $trackingFilter = in_array($trackingFilter, array_column(TrackingType::cases(), 'value'), true) ? $trackingFilter : null;
-
-        // Mode tampilan (Fase 3, analisa §U1): "lot" = daftar per lot (default,
-        // perilaku lama), "ringkasan" = satu baris per item dari
-        // WarehouseStockPositionService. Ambang stok menipis ada di level lot,
-        // jadi di mode ringkasan filter itu dimatikan (chip-nya ikut hilang)
-        // daripada menampilkan hasil yang kelihatan ter-filter padahal tidak.
-        $viewMode = $request->query('view') === 'ringkasan' ? 'ringkasan' : 'lot';
-        if ($viewMode === 'ringkasan') {
-            $lowStockOnly = false;
-            $summaryRows = app(WarehouseStockPositionService::class)->summarize(
-                $popIds, $popFilter, $itemFilter, $categoryFilter, $search, $trackingFilter
-            );
-
-            // Sort mode ringkasan (analisa-ui-ux §A5, sisa Fase 3). Whitelist;
-            // default = nama barang asc (urutan dari service). 'item' pakai
-            // string, sisanya numerik.
-            $summarySort = in_array($request->query('sort'), ['item', 'total', 'held', 'in_transit', 'problem'], true) ? $request->query('sort') : null;
-            $summaryDir = $request->query('dir') === 'desc' ? 'desc' : 'asc';
-            if ($summarySort !== null) {
-                $summaryRows = $summaryRows->sortBy(
-                    fn ($row) => $summarySort === 'item' ? ($row['item']->name ?? '') : (float) $row[$summarySort],
-                    $summarySort === 'item' ? SORT_NATURAL | SORT_FLAG_CASE : SORT_REGULAR,
-                    $summaryDir === 'desc'
-                )->values();
-            }
-
-            $perPage = 25;
-            $page = LengthAwarePaginator::resolveCurrentPage();
-            $summary = new LengthAwarePaginator(
-                $summaryRows->forPage($page, $perPage)->values(),
-                $summaryRows->count(),
-                $perPage,
-                $page,
-                ['path' => $request->url(), 'query' => $request->query()]
-            );
-
-            return view('warehouse.stock.index', [
-                'pops' => $pops,
-                'categories' => ItemCategory::active()->ordered()->get(),
-                'items' => $this->dropdownItems($popIds, $itemFilter, $categoryFilter, $search),
-                'balances' => new LengthAwarePaginator(collect(), 0, $perPage, $page),
-                'summary' => $summary,
-                'summarySort' => $summarySort,
-                'summaryDir' => $summaryDir,
-                'viewMode' => $viewMode,
-                'popFilter' => $popFilter,
-                'categoryFilter' => $categoryFilter,
-                'itemFilter' => $itemFilter,
-                'search' => $search,
-                'lowStockOnly' => $lowStockOnly,
-                'trackingFilter' => $trackingFilter,
-                'lastOpnameByKey' => [],
-                'lastPriceByKey' => [],
-                'multiLotPopItemKeys' => [],
-                'sort' => null,
-                'sortDirection' => 'asc',
-                'canActAsPusat' => $canActAsPusat,
-                'canActAsCabang' => $canActAsCabang,
-                'lockedSinglePop' => $lockedSinglePop,
-                'modeLabel' => $modeLabel,
-            ]);
-        }
-
-        // Barang QUANTITY/BATCH — saldo asli dari `inventory_balances`
-        // (ditulis InventoryReceiveService::receiveQuantity() dkk).
-        $quantityBalances = InventoryBalance::query()
-            ->whereIn('pop_id', $popIds) // scope dulu, baru filter user — pop_id di luar scope otomatis gak match
-            ->when($popFilter, fn ($q) => $q->where('pop_id', $popFilter))
-            ->where('qty', '>', 0)
-            ->when($itemFilter, fn ($q) => $q->where('item_id', $itemFilter))
-            ->when($categoryFilter, function ($q) use ($categoryFilter) {
-                $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_category_id', $categoryFilter));
-            })
-            // Cari juga by nomor lot (ADHOC-… analisa-ui-ux-warehouse §A2) —
-            // lot = identitas baris QUANTITY, sama pentingnya dengan nama barang.
-            ->when($search !== '', function ($q) use ($search) {
-                $q->where(function ($qq) use ($search) {
-                    $qq->where('lot_no', 'like', "%{$search}%")
-                        ->orWhereHas('item', fn ($itemQuery) => $itemQuery->where('name', 'like', "%{$search}%")
-                            ->orWhere('code', 'like', "%{$search}%"));
-                });
-            })
-            ->when($lowStockOnly, fn ($q) => $q->lowStock())
-            // Jenis Tracking difilter lewat relasi item (kolomnya di
-            // `items.tracking_type`, bukan di `inventory_balances`).
-            ->when($trackingFilter, function ($q) use ($trackingFilter) {
-                $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('tracking_type', $trackingFilter));
-            })
-            ->with(['item.category', 'pop'])
-            ->get();
-
-        // Barang SERIALIZED (modem/ONT via SN) — 2026-09-07, laporan user
-        // "modem input by SN gak masuk Kelola Stok". `receiveSerialized()`
-        // CUMA nulis ke `inventory_serials`, gak pernah nyentuh
-        // `inventory_balances` sama sekali — jadi item serialized SELALU
-        // absen dari tabel di atas, padahal view-nya udah py logic render
-        // badge SN (kolomnya nunggu data yang gak pernah dateng). Di sini
-        // dihitung count(*) AVAILABLE per gudang+item lalu dibungkus jadi
-        // instance InventoryBalance SINTETIS (gak disimpan — cuma dipakai
-        // biar Blade & `isLowStock()` kepake apa adanya, gak perlu view
-        // baru/logic bercabang).
-        $serializedBalances = collect();
-        if ($trackingFilter === null || $trackingFilter === TrackingType::SERIALIZED->value) {
-            $serialGroups = InventorySerial::query()
-                ->whereIn('current_pop_id', $popIds)
-                ->when($popFilter, fn ($q) => $q->where('current_pop_id', $popFilter))
-                ->where('status', SerialStatus::AVAILABLE->value)
-                ->when($itemFilter, fn ($q) => $q->where('item_id', $itemFilter))
-                ->when($categoryFilter, function ($q) use ($categoryFilter) {
-                    $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_category_id', $categoryFilter));
-                })
-                // SN dicari langsung: hasil agregat ikut menyempit ke unit
-                // yang cocok, jadi user lihat "1 SN ini ada di gudang mana".
-                ->when($search !== '', function ($q) use ($search) {
-                    $q->where(function ($qq) use ($search) {
-                        $qq->where('serial_number', 'like', "%{$search}%")
-                            ->orWhereHas('item', fn ($itemQuery) => $itemQuery->where('name', 'like', "%{$search}%")
-                                ->orWhere('code', 'like', "%{$search}%"));
-                    });
-                })
-                ->selectRaw('current_pop_id as pop_id, item_id, COUNT(*) as qty')
-                ->groupBy('current_pop_id', 'item_id')
-                ->get();
-
-            if ($serialGroups->isNotEmpty()) {
-                $itemsById = Item::with('category')->whereIn('id', $serialGroups->pluck('item_id')->unique())->get()->keyBy('id');
-                $popsById = $pops->keyBy('id');
-
-                // Threshold (minimum_stock) buat item serialized DISIMPAN di
-                // `inventory_balances` juga (lot_no='', qty tetap 0 — cuma
-                // wadah angka ambang, lihat storeThreshold()) — ambil di
-                // sini biar badge "Stok Rendah" tetap kepake buat serialized.
-                $thresholds = InventoryBalance::query()
-                    ->whereIn('pop_id', $serialGroups->pluck('pop_id')->unique())
-                    ->whereIn('item_id', $serialGroups->pluck('item_id')->unique())
-                    ->where('lot_no', '')
-                    ->get(['pop_id', 'item_id', 'minimum_stock', 'maximum_stock'])
-                    ->keyBy(fn ($row) => $row->pop_id.'-'.$row->item_id);
-
-                $serializedBalances = $serialGroups->map(function ($group) use ($itemsById, $popsById, $thresholds) {
-                    $key = $group->pop_id.'-'.$group->item_id;
-                    $threshold = $thresholds->get($key);
-
-                    $balance = new InventoryBalance([
-                        'pop_id' => $group->pop_id,
-                        'item_id' => $group->item_id,
-                        'lot_no' => '',
-                        'qty' => $group->qty,
-                        'minimum_stock' => $threshold?->minimum_stock,
-                        'maximum_stock' => $threshold?->maximum_stock,
-                    ]);
-                    $balance->setRelation('item', $itemsById->get($group->item_id));
-                    $balance->setRelation('pop', $popsById->get($group->pop_id));
-
-                    return $balance;
-                });
-
-                if ($lowStockOnly) {
-                    $serializedBalances = $serializedBalances->filter(fn ($b) => $b->isLowStock())->values();
-                }
-            }
-        }
-
-        // Barang ROLL (kabel per-roll via `InventoryReceiveService::receiveRoll()`)
-        // — sama gap persis yang dulu kejadian ke SERIALIZED (2026-09-07):
-        // `receiveRoll()` CUMA nulis ke `inventory_rolls`, gak pernah nyentuh
-        // `inventory_balances`, jadi barang yang UDAH diterima ke Gudang Pusat
-        // gak pernah muncul di Kelola Stok (laporan user 2026-09-16). Pola
-        // SAMA persis $serializedBalances: agregat SINTETIS per pop+item,
-        // qty = SUM(length_remaining) dalam METER (bukan hitung roll) — biar
-        // "Jumlah Tersedia" langsung kebaca sebagai stok fisik kabel, bukan
-        // "berapa roll". Cuma roll yang MASIH DI GUDANG (current_pop_id
-        // keisi, status AVAILABLE/RECEIVED) yang ikut dihitung — roll yang
-        // lagi di custody teknisi bukan stok gudang lagi.
-        $rollBalances = collect();
-        if ($trackingFilter === null || $trackingFilter === TrackingType::ROLL->value) {
-            $rollGroups = InventoryRoll::query()
-                ->whereIn('current_pop_id', $popIds)
-                ->when($popFilter, fn ($q) => $q->where('current_pop_id', $popFilter))
-                ->whereIn('status', [RollStatus::AVAILABLE->value, RollStatus::RECEIVED->value])
-                ->when($itemFilter, fn ($q) => $q->where('item_id', $itemFilter))
-                ->when($categoryFilter, function ($q) use ($categoryFilter) {
-                    $q->whereHas('item', fn ($itemQuery) => $itemQuery->where('item_category_id', $categoryFilter));
-                })
-                ->when($search !== '', function ($q) use ($search) {
-                    $q->where(function ($qq) use ($search) {
-                        $qq->where('roll_code', 'like', "%{$search}%")
-                            ->orWhereHas('item', fn ($itemQuery) => $itemQuery->where('name', 'like', "%{$search}%")
-                                ->orWhere('code', 'like', "%{$search}%"));
-                    });
-                })
-                ->selectRaw('current_pop_id as pop_id, item_id, SUM(length_remaining) as qty')
-                ->groupBy('current_pop_id', 'item_id')
-                ->get();
-
-            if ($rollGroups->isNotEmpty()) {
-                $itemsById = Item::with('category')->whereIn('id', $rollGroups->pluck('item_id')->unique())->get()->keyBy('id');
-                $popsById = $pops->keyBy('id');
-
-                $thresholds = InventoryBalance::query()
-                    ->whereIn('pop_id', $rollGroups->pluck('pop_id')->unique())
-                    ->whereIn('item_id', $rollGroups->pluck('item_id')->unique())
-                    ->where('lot_no', '')
-                    ->get(['pop_id', 'item_id', 'minimum_stock', 'maximum_stock'])
-                    ->keyBy(fn ($row) => $row->pop_id.'-'.$row->item_id);
-
-                $rollBalances = $rollGroups->map(function ($group) use ($itemsById, $popsById, $thresholds) {
-                    $key = $group->pop_id.'-'.$group->item_id;
-                    $threshold = $thresholds->get($key);
-
-                    $balance = new InventoryBalance([
-                        'pop_id' => $group->pop_id,
-                        'item_id' => $group->item_id,
-                        'lot_no' => '',
-                        'qty' => $group->qty,
-                        'minimum_stock' => $threshold?->minimum_stock,
-                        'maximum_stock' => $threshold?->maximum_stock,
-                    ]);
-                    $balance->setRelation('item', $itemsById->get($group->item_id));
-                    $balance->setRelation('pop', $popsById->get($group->pop_id));
-
-                    return $balance;
-                });
-
-                if ($lowStockOnly) {
-                    $rollBalances = $rollBalances->filter(fn ($b) => $b->isLowStock())->values();
-                }
-            }
-        }
-
-        // Gabung TIGA sumber jadi SATU list — ini yang bikin item serialized/
-        // roll AKHIRNYA muncul di Kelola Stok. Paginasi di-handle manual di
-        // PHP (bukan DB::paginate() lagi) karena datanya sekarang gabungan
-        // beberapa query beda tabel — wajar buat skala jumlah SKU gudang ISP
-        // lokal (puluhan-ratusan per gudang, bukan jutaan baris).
-        $merged = $quantityBalances->concat($serializedBalances)->concat($rollBalances)
-            ->sortBy([['pop_id', 'asc'], ['item_id', 'asc']])
-            ->values();
-
-        // Sort kolom (analisa §A5). Whitelist — parameter lain diabaikan
-        // diam-diam, bukan error, supaya link lama/rusak tetap bisa dibuka.
-        // Default = urutan lama (pop lalu item) biar halaman tanpa sort
-        // tidak berubah perilakunya.
-        $sort = in_array($request->query('sort'), ['pop', 'item', 'qty', 'jenis', 'kesehatan'], true) ? $request->query('sort') : null;
-        $sortDirection = $request->query('dir') === 'desc' ? 'desc' : 'asc';
-        if ($sort !== null) {
-            $sortValue = match ($sort) {
-                'pop' => fn ($b) => $b->pop?->name ?? '',
-                'item' => fn ($b) => $b->item?->name ?? '',
-                'qty' => fn ($b) => (float) $b->qty,
-                // Jenis = tracking type barang; Kesehatan = low-stock dulu
-                // (yang kritis naik ke atas saat desc).
-                'jenis' => fn ($b) => $b->item?->tracking_type?->value ?? '',
-                'kesehatan' => fn ($b) => $b->isLowStock() ? 1 : 0,
-            };
-            $numericSort = in_array($sort, ['qty', 'kesehatan'], true);
-            $merged = $merged->sortBy($sortValue, $numericSort ? SORT_REGULAR : SORT_NATURAL | SORT_FLAG_CASE, $sortDirection === 'desc')->values();
-        }
-
-        $perPage = 25;
-        $page = LengthAwarePaginator::resolveCurrentPage();
-        $balances = new LengthAwarePaginator(
-            $merged->slice(($page - 1) * $perPage, $perPage)->values(),
-            $merged->count(),
-            $perPage,
-            $page,
-            ['path' => $request->url(), 'query' => $request->query()]
-        );
-
-        // "Opname terakhir per item per gudang" (Fase 2 P1, gap #3 —
-        // kontrol-anti-manipulasi.md §5). Query dibatasi ke kombinasi
-        // pop_id+item_id+lot_no yang KEBETULAN tampil di halaman ini
-        // (bukan full-table scan) — cukup murah karena cuma jalan per
-        // halaman paginated, bukan per baris N+1.
-        $lastOpnameByKey = [];
-        if ($balances->isNotEmpty()) {
-            $pairs = $balances->getCollection()->map(fn ($b) => [
-                'pop_id' => $b->pop_id, 'item_id' => $b->item_id, 'lot_no' => $b->lot_no,
-            ]);
-
-            $opnameRows = InventoryTransaction::query()
-                ->where('type', InventoryTransactionType::STOCK_OPNAME->value)
-                ->whereIn('to_pop_id', $pairs->pluck('pop_id')->unique())
-                ->whereIn('item_id', $pairs->pluck('item_id')->unique())
-                ->selectRaw('to_pop_id, item_id, lot_no, MAX(created_at) as last_opname_at')
-                ->groupBy('to_pop_id', 'item_id', 'lot_no')
-                ->get();
-
-            foreach ($opnameRows as $row) {
-                $key = $row->to_pop_id.'-'.$row->item_id.'-'.($row->lot_no ?? '');
-                $lastOpnameByKey[$key] = $row->last_opname_at;
-            }
-        }
-
-        // Pemegang & penginput per (pop, item) untuk mode per-lot (analisa §U3/V4).
-        // Held tidak lot-scoped (barang di tangan teknisi = per item+gudang asal),
-        // jadi dikunci pop_id-item_id — sama di tiap baris lot item itu, murni
-        // informasi. Dibatasi ke pasangan yang tampil di halaman ini.
-        $heldByPopItem = [];
-        $lastActorByKey = [];
-        if ($balances->isNotEmpty()) {
-            $popIdsOnPage = $balances->getCollection()->pluck('pop_id')->unique()->values();
-            $itemIdsOnPage = $balances->getCollection()->pluck('item_id')->unique()->values();
-
-            // Qty + jumlah teknisi per (pop,item) dari custody/SN/roll yang
-            // diissue DARI pop itu (issued_from_pop_id).
-            $custodyHeld = TechnicianCustody::query()->active()
-                ->whereIn('issued_from_pop_id', $popIdsOnPage)->whereIn('item_id', $itemIdsOnPage)
-                ->selectRaw('issued_from_pop_id as pop_id, item_id, SUM(qty_remaining) as qty, COUNT(DISTINCT technician_id) as techs')
-                ->groupBy('issued_from_pop_id', 'item_id')->get();
-            $serialHeld = InventorySerial::query()
-                ->whereIn('issued_from_pop_id', $popIdsOnPage)->whereIn('item_id', $itemIdsOnPage)
-                ->whereIn('status', [SerialStatus::ISSUED->value, SerialStatus::IN_USE->value])
-                ->selectRaw('issued_from_pop_id as pop_id, item_id, COUNT(*) as qty, COUNT(DISTINCT current_technician_id) as techs')
-                ->groupBy('issued_from_pop_id', 'item_id')->get();
-            $rollHeld = InventoryRoll::query()
-                ->whereIn('issued_from_pop_id', $popIdsOnPage)->whereIn('item_id', $itemIdsOnPage)
-                ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
-                ->selectRaw('issued_from_pop_id as pop_id, item_id, SUM(length_remaining) as qty, COUNT(DISTINCT current_technician_id) as techs')
-                ->groupBy('issued_from_pop_id', 'item_id')->get();
-
-            foreach ($custodyHeld->concat($serialHeld)->concat($rollHeld) as $row) {
-                $key = $row->pop_id.'-'.$row->item_id;
-                $heldByPopItem[$key]['qty'] = ($heldByPopItem[$key]['qty'] ?? 0) + (float) $row->qty;
-                $heldByPopItem[$key]['techs'] = ($heldByPopItem[$key]['techs'] ?? 0) + (int) $row->techs;
-            }
-
-            // Transaksi terakhir yang menyentuh (pop,item) + siapa penginputnya.
-            $lastActorRows = InventoryTransaction::query()
-                ->whereIn('item_id', $itemIdsOnPage)
-                ->where(fn ($q) => $q->whereIn('from_pop_id', $popIdsOnPage)->orWhereIn('to_pop_id', $popIdsOnPage))
-                ->with('createdBy:id,name')
-                ->orderBy('id')
-                ->get(['id', 'item_id', 'from_pop_id', 'to_pop_id', 'created_by', 'created_at']);
-            foreach ($lastActorRows as $row) {
-                foreach (array_unique(array_filter([$row->from_pop_id, $row->to_pop_id])) as $popId) {
-                    // diurut asc lalu ditimpa → yang terakhir (id tertinggi) menang
-                    $lastActorByKey[$popId.'-'.$row->item_id] = $row;
-                }
-            }
-        }
-
-        // Harga per lot barang QUANTITY (ADHOC-75, 2026-09-16) — Kelola Stok
-        // sebelumnya cuma nunjuk qty polos, jadi 2 baris lot (Harga Lama/Baru)
-        // gak bisa dibedain staf sama sekali dari tampilan. Last-cost per
-        // `(item_id, lot_no)` dari ledger RECEIVE, dibatasi ke item yang
-        // KEBETULAN tampil di halaman ini — pola sama `$lastOpnameByKey` di
-        // atas, bukan full-table scan.
-        $lastPriceByKey = [];
-        $multiLotPopItemKeys = [];
-        if ($balances->isNotEmpty()) {
-            $quantityRows = $balances->getCollection()
-                ->filter(fn ($b) => $b->item->tracking_type === TrackingType::QUANTITY);
-
-            // Label "Harga Lama"/"Harga Baru" cuma masuk akal kalau barang
-            // itu BENERAN lagi punya 2 lot aktif di gudang yang sama —
-            // barang yang cuma py 1 lot (belum pernah ganti harga) tampil
-            // harga polos aja, gak usah dilabel "Lama" (nyesatkan, kesannya
-            // ada "Baru" yang lain padahal enggak).
-            $multiLotPopItemKeys = $quantityRows
-                ->countBy(fn ($b) => $b->pop_id.'-'.$b->item_id)
-                ->filter(fn ($count) => $count > 1)
-                ->keys()->flip()->all();
-
-            $quantityItemIds = $quantityRows->pluck('item_id')->unique();
-
-            if ($quantityItemIds->isNotEmpty()) {
-                $priceRows = InventoryTransaction::query()
-                    ->where('type', InventoryTransactionType::RECEIVE->value)
-                    ->whereIn('item_id', $quantityItemIds)
-                    ->whereNotNull('unit_price_snapshot')
-                    ->orderBy('id')
-                    ->get(['item_id', 'lot_no', 'unit_price_snapshot']);
-
-                foreach ($priceRows as $row) {
-                    // Diurutkan ASC lalu ditimpa terus — baris TERAKHIR yang
-                    // ke-assign menang, itu last-cost per lot yang bener.
-                    $lastPriceByKey[$row->item_id.'-'.($row->lot_no ?? '')] = (float) $row->unit_price_snapshot;
-                }
-            }
-        }
-
-        $categories = ItemCategory::active()->ordered()->get();
-        $items = $this->dropdownItems($popIds, $itemFilter, $categoryFilter, $search);
-
-        return view('warehouse.stock.index', compact(
-            'pops', 'categories', 'items', 'balances', 'popFilter', 'categoryFilter', 'itemFilter', 'search', 'lowStockOnly', 'trackingFilter', 'lastOpnameByKey', 'lastPriceByKey', 'multiLotPopItemKeys',
-            'canActAsPusat', 'canActAsCabang', 'lockedSinglePop', 'modeLabel', 'sort', 'sortDirection', 'viewMode', 'heldByPopItem', 'lastActorByKey'
-        ));
+        return $this->board($request, $user, $pops, $popIds, $popFilter, $lockedSinglePop, $modeLabel, $request->query('view') === 'matrix');
     }
 
     /**
@@ -535,35 +136,6 @@ class WarehouseStockController extends Controller
             'canIssue' => $user->hasPermission('warehouse_issue.create'),
             'canRequestStock' => $user->hasPermission('warehouse_stock_request.create'),
         ]);
-    }
-
-    /**
-     * Isi dropdown "Nama Barang" — hanya barang yang punya stok di scope (atau
-     * barang yang sedang dipilih, supaya filter aktif tetap terlihat). Dipakai
-     * bareng oleh mode per lot dan ringkasan.
-     */
-    private function dropdownItems(Collection $popIds, ?int $itemFilter, ?int $categoryFilter, string $search): Collection
-    {
-        return Item::query()
-            ->where(function ($q) use ($popIds, $itemFilter) {
-                $q->whereHas('inventoryBalances', fn ($b) => $b->whereIn('pop_id', $popIds)->where('qty', '>', 0))
-                    ->orWhereHas('inventorySerials', fn ($s) => $s->whereIn('current_pop_id', $popIds)->where('status', SerialStatus::AVAILABLE->value))
-                    ->orWhereHas('inventoryRolls', fn ($r) => $r->whereIn('current_pop_id', $popIds)->whereIn('status', [RollStatus::AVAILABLE->value, RollStatus::RECEIVED->value]));
-
-                if ($itemFilter) {
-                    $q->orWhere('id', $itemFilter);
-                }
-            })
-            ->when($categoryFilter, fn ($q) => $q->where('item_category_id', $categoryFilter))
-            ->when($search !== '', function ($q) use ($search) {
-                $q->where(function ($qq) use ($search) {
-                    $qq->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%");
-                });
-            })
-            ->with('category')
-            ->orderBy('name')
-            ->get();
     }
 
     /**

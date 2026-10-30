@@ -7,24 +7,12 @@
 
 <x-warehouse.header active="transfers" title="Daftar Transfer Gudang" subtitle="Semua transfer antar gudang — dalam perjalanan maupun yang sudah diterima — beserta surat jalan & invoice-nya." />
 
-@if(auth()->user()->hasPermission('warehouse_branch_sale.view'))
-<a href="{{ route('warehouse.branch-sales.index') }}" class="mb-4 inline-flex rounded-lg border border-sky-300 px-4 py-2 text-sm font-semibold text-sky-700 dark:border-sky-800 dark:text-sky-300">Jual Beli SN Antar Cabang →</a>
-@endif
-
 @php
     $canInvoice = auth()->user()->hasPermission('warehouse_transfer_invoice.view');
     $hasFilter = $statusFilter || $fromFilter || $toFilter || $dateFrom || $dateTo;
 @endphp
 
 <div class="space-y-4">
-    @if(auth()->user()->hasPermission('warehouse_transfer.create'))
-    <div class="flex flex-wrap gap-2">
-        <a href="{{ route('warehouse.transfers.create') }}" class="rounded-lg bg-sky-600 px-4 py-2.5 text-xs font-bold text-white hover:bg-sky-700">Transfer Pusat → Cabang</a>
-        <a href="{{ route('warehouse.transfers.create', ['direction' => 'reverse']) }}" class="rounded-lg border border-sky-300 bg-white px-4 py-2.5 text-xs font-bold text-sky-700 hover:bg-sky-50 dark:border-sky-800 dark:bg-slate-900 dark:text-sky-300 dark:hover:bg-slate-800">Transfer Cabang → Pusat</a>
-    </div>
-    @endif
-
-
     {{-- Filter --}}
     <form method="GET" action="{{ route('warehouse.transfers.index') }}" class="bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 rounded-2xl p-4 sm:p-5 shadow-xs">
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">

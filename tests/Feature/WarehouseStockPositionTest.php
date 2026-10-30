@@ -145,41 +145,6 @@ class WarehouseStockPositionTest extends TestCase
         $this->assertSame(100.0, collect($lots)->sum('qty'));
     }
 
-    #[Test]
-    public function halaman_ringkasan_tampil_dan_mode_default_tetap_per_lot(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan']));
-
-        $response->assertOk()
-            ->assertSee('Ringkasan per Item')
-            ->assertSee('Total Tersedia')
-            ->assertSee('Kabel Posisi')
-            ->assertSee('Rincian lot per gudang');
-        $this->assertSame('ringkasan', $response->viewData('viewMode'));
-
-        $default = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'rincian']));
-        $this->assertSame('lot', $default->viewData('viewMode'));
-        $default->assertDontSee('Rincian lot per gudang');
-    }
-
-    /**
-     * Analisa §U1/U2 (2026-10-08) — rincian lot dibuka lewat drawer
-     * slide-over (`<x-ui.drawer>`), BUKAN `<details>` HTML native lagi.
-     * Chip dispatch `lot-drawer-data` (isi) + `open-drawer` (tampil),
-     * komponen drawer-nya SATU instance (name="lot-detail") buat semua baris.
-     */
-    #[Test]
-    public function rincian_lot_dibuka_lewat_drawer_bukan_details_native(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan']));
-
-        $response->assertOk()
-            ->assertDontSee('<details', false)
-            ->assertSee("\$dispatch('lot-drawer-data'", false)
-            ->assertSee("\$dispatch('open-drawer', 'lot-detail')", false)
-            ->assertSee('Rincian Lot per Gudang');
-    }
-
     /**
      * Analisa §U3 — "Dipegang" harus menyebut siapa pemegangnya, bukan cuma angka.
      */
@@ -213,21 +178,6 @@ class WarehouseStockPositionTest extends TestCase
         $this->assertNotEmpty($row['last_activity']['ref']);
     }
 
-    #[Test]
-    public function halaman_ringkasan_menampilkan_pemegang_dan_terakhir_diubah(): void
-    {
-        $teknisi = User::factory()->create(['name' => 'Teknisi Uji Halaman']);
-        app(InventoryIssueService::class)->issue($this->cabangA, $teknisi, [
-            ['item_id' => $this->kabel->id, 'qty' => 30],
-        ], $this->owner);
-
-        $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan']))
-            ->assertOk()
-            ->assertSee('Teknisi Uji Halaman')
-            ->assertSee('Terakhir Diubah')
-            ->assertSee('oleh');
-    }
-
     /**
      * Analisa §U1 — kolom In Transit: barang yang transfernya belum dikonfirmasi
      * terhitung terpisah dari stok gudang.
@@ -256,24 +206,9 @@ class WarehouseStockPositionTest extends TestCase
         $this->assertSame(10.0, $row['in_transit']);
     }
 
-    #[Test]
-    public function ringkasan_bisa_disort_by_total_desc(): void
-    {
-        $modem = Item::create(['code' => 'WSP-SORT', 'name' => 'Modem Sort Posisi', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'serialized']);
-        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WSPSORT1'], 350000, $this->owner);
-
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan', 'sort' => 'total', 'dir' => 'desc']));
-
-        $response->assertOk()->assertSee('In Transit', false)->assertSee('aria-sort="descending"', false);
-        $summary = $response->viewData('summary');
-        // Kabel total 300 > modem 1 → kabel di atas saat total desc.
-        $this->assertSame($this->kabel->id, $summary->first()['item']->id);
-        $this->assertSame('total', $response->viewData('summarySort'));
-    }
-
     /**
      * Analisa §U5 (keputusan user 2026-10-07) — HANYA SN punya kondisi asli.
-     * Quantity & roll: "Tidak dilacak per unit" (tidak punya alur retur yang
+     * Quantity & roll: "Tidak ada rincian kondisi" (tidak punya alur retur yang
      * bisa mengubah kondisinya, beda dari SN).
      */
     #[Test]
@@ -315,98 +250,25 @@ class WarehouseStockPositionTest extends TestCase
         $this->assertSame(1, $conditions->first(fn ($entry) => $entry['condition'] === ItemCondition::USED_GOOD && $entry['checked'])['count']);
         $this->assertSame(1, $conditions->firstWhere('condition', ItemCondition::USED_DAMAGED)['count']);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan', 'pop_id' => $this->pusat->id]));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'pop_id' => $this->pusat->id]));
         $response->assertOk()
-            ->assertSee('Bekas — Belum Dicek: 1')
-            ->assertSee('Bekas — Sudah Dicek: 1')
-            ->assertSee('Bekas — Rusak: 1');
+            ->assertSee('1 Bekas Belum Dicek')
+            ->assertSee('1 Bekas Sudah Dicek')
+            ->assertSee('1 Bekas Rusak');
     }
 
     #[Test]
-    public function halaman_ringkasan_tampilkan_kondisi_sn_dan_label_tidak_dilacak_untuk_quantity(): void
+    public function papan_menampilkan_kondisi_sn_dan_label_tanpa_rincian_untuk_quantity(): void
     {
         $modem = Item::create(['code' => 'WSP-CONDPAGE', 'name' => 'Modem Kondisi Halaman', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'serialized']);
         app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WSPCP1'], 350000, $this->owner);
 
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan', 'pop_id' => $this->pusat->id]));
+        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'papan', 'pop_id' => $this->pusat->id]));
 
         $response->assertOk()
             ->assertSee('Kondisi')
-            ->assertSee('Tidak dilacak per unit')
-            ->assertSee('Baru: 1', false);
-    }
-
-    /**
-     * Analisa §U2 — drill-down ke level SN/roll di ringkasan. Reuse modal
-     * "Daftar Serial Number"/"Daftar Roll Kabel" yang sama dengan mode per-lot
-     * (event `open-serial-modal`/`open-roll-modal`), bukan endpoint baru.
-     * Quantity TIDAK dapat tombol — gak punya identitas per-unit buat
-     * di-drill-down, berhenti di lot (sudah via `<details>`).
-     */
-    #[Test]
-    public function ringkasan_sn_bisa_drill_down_ke_modal_serial_number(): void
-    {
-        $modem = Item::create(['code' => 'WSP-DRILL-SN', 'name' => 'Modem Drill SN', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'serialized']);
-        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WSPDSN1'], 350000, $this->owner);
-
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan', 'pop_id' => $this->pusat->id]));
-
-        $response->assertOk()
-            ->assertSee("\$dispatch('open-serial-modal'", false)
-            ->assertSee('Lihat daftar SN di gudang ini', false);
-    }
-
-    #[Test]
-    public function ringkasan_roll_bisa_drill_down_ke_modal_roll_kabel(): void
-    {
-        $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
-        $fo = Item::create(['code' => 'WSP-DRILL-ROLL', 'name' => 'Kabel FO Drill', 'item_category_id' => $catKabel->id, 'unit' => 'meter', 'tracking_type' => 'roll', 'meter_per_roll' => 1000]);
-        app(InventoryReceiveService::class)->receiveRoll($this->pusat, $fo, 1, null, 1500000, $this->owner);
-
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan', 'pop_id' => $this->pusat->id]));
-
-        $response->assertOk()
-            ->assertSee("\$dispatch('open-roll-modal'", false)
-            ->assertSee('Lihat daftar roll di gudang ini', false);
-    }
-
-    #[Test]
-    public function ringkasan_quantity_tidak_dapat_tombol_drill_down(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan', 'pop_id' => $this->pusat->id, 'search' => $this->kabel->name]));
-
-        $response->assertOk();
-        $row = $response->viewData('summary')->firstWhere(fn ($r) => $r['item']->id === $this->kabel->id);
-        $this->assertNotNull($row);
-        $this->assertSame('quantity', $row['item']->tracking_type->value);
-        // "$dispatch('open-serial-modal'" SENDIRI selalu ada di halaman ini
-        // (quick-search Alpine di stock/index.blade.php, lepas dari baris
-        // ringkasan) — gak bisa dipakai buat assertDontSee apa adanya. Yang
-        // diperiksa: id barang quantity ini TIDAK PERNAH dirender literal
-        // sebagai `itemId: {id}` oleh baris ringkasan (quick-search pakai
-        // `item.itemId` Alpine, bukan angka PHP literal, jadi gak ketiban).
-        $response->assertDontSee("itemId: {$this->kabel->id},", false);
-    }
-
-    #[Test]
-    public function ringkasan_badge_karantina_pakai_design_token(): void
-    {
-        $modem = Item::create(['code' => 'WSP-QBADGE', 'name' => 'Modem Q Badge', 'item_category_id' => $this->kabel->item_category_id, 'unit' => 'pcs', 'tracking_type' => 'serialized']);
-        app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $modem, ['WSPQB1', 'WSPQB2'], 350000, $this->owner);
-        InventorySerial::where('serial_number', 'WSPQB1')->update(['status' => SerialStatus::QUARANTINE->value]);
-
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan']));
-
-        $response->assertOk()->assertSee('badge-error', false);
-    }
-
-    #[Test]
-    public function ringkasan_sort_parameter_asing_diabaikan(): void
-    {
-        $response = $this->actingAs($this->owner)->get(route('warehouse.stock.index', ['view' => 'ringkasan', 'sort' => 'DROP']));
-
-        $response->assertOk();
-        $this->assertNull($response->viewData('summarySort'));
+            ->assertSee('Tidak ada rincian kondisi')
+            ->assertSee('1 Baru', false);
     }
 
     #[Test]
