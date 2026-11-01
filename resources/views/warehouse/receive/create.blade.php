@@ -31,7 +31,7 @@
         'label' => "{$item->code} — {$item->name}",
         'tracking_type' => $item->tracking_type->value,
         'auto_generate_serial' => (bool) $item->auto_generate_serial,
-        'unit' => $item->unit,
+        'unit' => $item->pack_size ? 'Pack' : $item->unit,
         'category_id' => $item->item_category_id,
         'category_name' => $item->category?->name ?? 'Tanpa Kategori',
     ])->values();

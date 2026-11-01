@@ -44,13 +44,14 @@ class InventoryReceiveService
         ?User $actor = null,
         ?string $notes = null,
         ?string $referenceNumber = null,
+        ?float $enteredPackQty = null,
     ): InventoryTransaction {
         $this->assertPusat($pusat);
         $this->assertPositiveQty($qty);
         $this->assertPositivePrice($unitPrice);
         $this->assertQuantityTracking($item);
 
-        return DB::transaction(function () use ($pusat, $item, $qty, $unitPrice, $actor, $notes, $referenceNumber) {
+        return DB::transaction(function () use ($pusat, $item, $qty, $unitPrice, $actor, $notes, $referenceNumber, $enteredPackQty) {
             $lotNo = $this->resolveQuantityLot($pusat, $item, $unitPrice);
 
             $balance = InventoryBalance::query()
@@ -66,6 +67,7 @@ class InventoryReceiveService
                 'item_id' => $item->id,
                 'lot_no' => $lotNo === '' ? null : $lotNo,
                 'qty' => $qty,
+                'entered_pack_qty' => $enteredPackQty,
                 'unit_price_snapshot' => $unitPrice,
                 'to_pop_id' => $pusat->id,
                 'notes' => $notes,
@@ -344,7 +346,7 @@ class InventoryReceiveService
                 } elseif (isset($line['roll_count'])) {
                     $this->receiveRoll($pusat, $item, (int) $line['roll_count'], $line['vendor'] ?? null, (float) $line['unit_price'], $actor, $notes, $referenceNumber);
                 } else {
-                    $this->receiveQuantity($pusat, $item, (float) ($line['qty'] ?? 0), (float) $line['unit_price'], $actor, $notes, $referenceNumber);
+                    $this->receiveQuantity($pusat, $item, (float) ($line['qty'] ?? 0), (float) $line['unit_price'], $actor, $notes, $referenceNumber, isset($line['entered_pack_qty']) ? (float) $line['entered_pack_qty'] : null);
                 }
             }
 

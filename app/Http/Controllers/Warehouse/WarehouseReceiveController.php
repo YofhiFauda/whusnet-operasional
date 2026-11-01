@@ -161,7 +161,7 @@ class WarehouseReceiveController extends Controller
     private function normalizeLines(array $rows): array
     {
         $itemIds = collect($rows)->pluck('item_id')->map(fn ($id) => (int) $id)->unique();
-        $items = Item::whereIn('id', $itemIds)->get(['id', 'tracking_type', 'auto_generate_serial'])->keyBy('id');
+        $items = Item::whereIn('id', $itemIds)->get(['id', 'tracking_type', 'auto_generate_serial', 'pack_size'])->keyBy('id');
 
         return collect($rows)->map(function (array $row) use ($items) {
             $itemId = (int) $row['item_id'];
@@ -205,6 +205,20 @@ class WarehouseReceiveController extends Controller
 
             if (filled($row['serial_numbers'] ?? null)) {
                 throw new InvalidArgumentException("Barang #{$itemId} bukan tipe Serial Number — kosongkan kolom Serial Number, isi Qty.");
+            }
+
+            // Barang berpack_size: staf selalu input dalam Pack di form ini
+            // (bukan pilihan, keputusan rancangan) — qty yang dikirim ke
+            // Service WAJIB sudah pcs, entered_pack_qty cuma snapshot audit.
+            if ($item?->pack_size) {
+                $packQty = (float) ($row['qty'] ?? 0);
+
+                return [
+                    'item_id' => $itemId,
+                    'qty' => $packQty * (float) $item->pack_size,
+                    'entered_pack_qty' => $packQty,
+                    'unit_price' => $unitPrice,
+                ];
             }
 
             return [
