@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Enums\InventoryTransactionType;
 use App\Enums\TrackingType;
+use App\Models\InventoryBalance;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\Pop;
+use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
@@ -83,5 +85,41 @@ class WarehousePackConversionTest extends TestCase
             'qty' => 73,
             'entered_pack_qty' => null,
         ]);
+    }
+
+    #[Test]
+    public function issue_barang_berpack_size_dikonversi_ke_pcs(): void
+    {
+        $this->loginAsAdmin();
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $item = Item::create([
+            'code' => 'PACK-TEST-03',
+            'name' => 'Barang Berpack Uji Issue',
+            'unit' => 'pcs',
+            'tracking_type' => TrackingType::QUANTITY,
+            'pack_size' => 50,
+        ]);
+        $technician = User::factory()->create();
+        InventoryBalance::create(['pop_id' => $cabang->id, 'item_id' => $item->id, 'lot_no' => '', 'qty' => 200]);
+
+        $response = $this->post(route('warehouse.issues.store'), [
+            'cabang_pop_id' => $cabang->id,
+            'technician_id' => $technician->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 3],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('inventory_transactions', [
+            'item_id' => $item->id,
+            'type' => InventoryTransactionType::ISSUE->value,
+            'qty' => 150,
+            'entered_pack_qty' => 3,
+        ]);
+
+        $transaction = InventoryTransaction::where('item_id', $item->id)->first();
+        $this->get(route('warehouse.issues.show', $transaction->reference_number))
+            ->assertSee('3 Pack (150 pcs)');
     }
 }

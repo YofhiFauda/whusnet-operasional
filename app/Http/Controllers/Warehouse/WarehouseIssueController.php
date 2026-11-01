@@ -218,16 +218,16 @@ class WarehouseIssueController extends Controller
      * `WarehouseTransferController::normalizeLines()` buat alasan lengkap.
      *
      * @param  array<int, array<string, mixed>>  $rows
-     * @return list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>, roll_codes?:list<string>}>
+     * @return list<array{item_id:int, qty?:float, lot_no?:?string, entered_pack_qty?:?float, serial_numbers?:list<string>, roll_codes?:list<string>}>
      */
     private function normalizeLines(array $rows): array
     {
         $itemIds = collect($rows)->pluck('item_id')->map(fn ($id) => (int) $id)->unique();
-        $trackingTypes = Item::whereIn('id', $itemIds)->pluck('tracking_type', 'id');
+        $items = Item::whereIn('id', $itemIds)->get(['id', 'tracking_type', 'pack_size'])->keyBy('id');
 
-        return collect($rows)->map(function (array $row) use ($trackingTypes) {
+        return collect($rows)->map(function (array $row) use ($items) {
             $itemId = (int) $row['item_id'];
-            $trackingType = $trackingTypes[$itemId] ?? null;
+            $trackingType = $items[$itemId]?->tracking_type;
 
             if ($trackingType === TrackingType::SERIALIZED) {
                 $serials = collect(preg_split('/[\r\n,]+/', (string) ($row['serial_numbers'] ?? '')))
@@ -259,6 +259,22 @@ class WarehouseIssueController extends Controller
 
             if (filled($row['serial_numbers'] ?? null)) {
                 throw new InvalidArgumentException("Barang #{$itemId} bukan tipe Serial Number — kosongkan kolom Serial Number, isi Qty.");
+            }
+
+            $item = $items[$itemId] ?? null;
+
+            // Barang berpack_size: staf selalu input dalam Pack di form ini
+            // (bukan pilihan, keputusan rancangan) — qty yang dikirim ke
+            // Service WAJIB sudah pcs, entered_pack_qty cuma snapshot audit.
+            if ($item?->pack_size) {
+                $packQty = (float) ($row['qty'] ?? 0);
+
+                return [
+                    'item_id' => $itemId,
+                    'qty' => $packQty * (float) $item->pack_size,
+                    'entered_pack_qty' => $packQty,
+                    'lot_no' => $row['lot_no'] ?? null,
+                ];
             }
 
             return [
