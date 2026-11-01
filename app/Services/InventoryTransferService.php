@@ -35,7 +35,7 @@ use InvalidArgumentException;
 class InventoryTransferService
 {
     /**
-     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>}>  $lines
+     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, entered_pack_qty?:?float, serial_numbers?:list<string>}>  $lines
      */
     public function createTransfer(Pop $fromPusat, Pop $toCabang, array $lines, ?User $actor = null): InventoryTransfer
     {
@@ -83,7 +83,7 @@ class InventoryTransferService
     }
 
     /**
-     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>, roll_codes?:list<string>}>  $lines
+     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, entered_pack_qty?:?float, serial_numbers?:list<string>, roll_codes?:list<string>}>  $lines
      */
     private function dispatchStockTransfer(Pop $fromPusat, Pop $toCabang, array $lines, ?User $actor): InventoryTransfer
     {
@@ -110,7 +110,7 @@ class InventoryTransferService
                 match ($item->tracking_type) {
                     TrackingType::SERIALIZED => $this->dispatchSerialized($transfer, $fromPusat, $item, $line['serial_numbers'] ?? [], $actor),
                     TrackingType::ROLL => $this->dispatchRoll($transfer, $fromPusat, $item, $line['roll_codes'] ?? [], $actor),
-                    default => $this->dispatchQuantity($transfer, $fromPusat, $item, (float) ($line['qty'] ?? 0), $line['lot_no'] ?? null, $actor),
+                    default => $this->dispatchQuantity($transfer, $fromPusat, $item, (float) ($line['qty'] ?? 0), $line['lot_no'] ?? null, $actor, isset($line['entered_pack_qty']) ? (float) $line['entered_pack_qty'] : null),
                 };
             }
 
@@ -207,7 +207,7 @@ class InventoryTransferService
         }
     }
 
-    private function dispatchQuantity(InventoryTransfer $transfer, Pop $fromPusat, Item $item, float $qty, ?string $lotNo, ?User $actor): void
+    private function dispatchQuantity(InventoryTransfer $transfer, Pop $fromPusat, Item $item, float $qty, ?string $lotNo, ?User $actor, ?float $enteredPackQty = null): void
     {
         if ($qty <= 0) {
             throw new InvalidArgumentException("Qty transfer {$item->name} harus lebih besar dari nol.");
@@ -239,6 +239,7 @@ class InventoryTransferService
             'item_id' => $item->id,
             'lot_no' => $lotNo === '' ? null : $lotNo,
             'qty' => $qty,
+            'entered_pack_qty' => $enteredPackQty,
             'unit_price_snapshot' => $this->resolveLastCost($item, $lotNo === '' ? null : $lotNo),
             'from_pop_id' => $fromPusat->id,
             'created_by' => $actor?->id,

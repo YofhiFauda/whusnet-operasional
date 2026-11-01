@@ -122,4 +122,41 @@ class WarehousePackConversionTest extends TestCase
         $this->get(route('warehouse.issues.show', $transaction->reference_number))
             ->assertSee('3 Pack (150 pcs)');
     }
+
+    #[Test]
+    public function dispatch_transfer_barang_berpack_size_dikonversi_ke_pcs(): void
+    {
+        $this->loginAsAdmin();
+        $pusat = Pop::factory()->create(['type' => 'pusat']);
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $item = Item::create([
+            'code' => 'PACK-TEST-04',
+            'name' => 'Barang Berpack Uji Transfer',
+            'unit' => 'pcs',
+            'tracking_type' => TrackingType::QUANTITY,
+            'pack_size' => 50,
+        ]);
+        InventoryBalance::create(['pop_id' => $pusat->id, 'item_id' => $item->id, 'lot_no' => '', 'qty' => 500]);
+
+        $response = $this->post(route('warehouse.transfers.store'), [
+            'from_pop_id' => $pusat->id,
+            'to_pop_id' => $cabang->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 4],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('inventory_transactions', [
+            'item_id' => $item->id,
+            'type' => InventoryTransactionType::TRANSFER->value,
+            'qty' => 200,
+            'entered_pack_qty' => 4,
+            'from_pop_id' => $pusat->id,
+        ]);
+
+        $transaction = InventoryTransaction::where('item_id', $item->id)->first();
+        $this->get(route('warehouse.transfers.show', $transaction->inventory_transfer_id))
+            ->assertSee('4 Pack (200 pcs)');
+    }
 }

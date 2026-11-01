@@ -110,7 +110,7 @@
                                 @elseif($line->roll)
                                     {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }} meter
                                 @else
-                                    {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }} {{ $line->item->unit }}
+                                    {{ \App\Helpers\FormatHelper::qtyWithPack($line) }}
                                 @endif
                             </td>
                             <td class="px-6 py-4 text-right text-xs text-slate-700 dark:text-slate-300">
@@ -205,7 +205,7 @@
                             @elseif($line->roll)
                                 {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }} meter
                             @else
-                                {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }} {{ $line->item->unit }}
+                                {{ \App\Helpers\FormatHelper::qtyWithPack($line) }}
                             @endif
                         </td>
                     </tr>
@@ -268,7 +268,7 @@
                             @elseif($line->roll)
                                 {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }} meter
                             @else
-                                {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }} {{ $line->item->unit }}
+                                {{ \App\Helpers\FormatHelper::qtyWithPack($line) }}
                             @endif
                         </td>
                     </tr>
