@@ -41,6 +41,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'equipment_class_override',
     'meter_per_roll',
     'minimum_length',
+    'pack_size',
 ])]
 class Item extends Model
 {
@@ -57,6 +58,7 @@ class Item extends Model
             'equipment_class_override' => EquipmentClass::class,
             'meter_per_roll' => 'decimal:2',
             'minimum_length' => 'decimal:2',
+            'pack_size' => 'decimal:2',
             'infrastructure_location_kind' => InfrastructureLocationKind::class,
         ];
     }

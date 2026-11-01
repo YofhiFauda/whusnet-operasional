@@ -204,6 +204,19 @@
             </div>
         </div>
 
+        {{-- Konversi Pack→pcs — nullable di SEMUA tracking_type (server yang
+             menolak kombinasi salah lewat validasi `prohibited`), bukan
+             di-hide JS seperti Roll. --}}
+        <div class="pt-2">
+            <label for="pack_size" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Jumlah per Pack (pcs)</label>
+            <input type="number" step="0.01" min="0.01" name="pack_size" id="pack_size" value="{{ old('pack_size', $item->pack_size) }}" placeholder="mis. 50"
+                   class="w-full sm:w-1/2 px-3 py-2 border @error('pack_size') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1">
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Opsional — cuma berlaku buat barang Kuantitas yang dibeli per-Pack (mis. 1 Pack konektor RJ45 = 50 pcs).</p>
+            @error('pack_size')
+                <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+            @enderror
+        </div>
+
         <!-- Submit Actions -->
         <div class="flex items-center gap-3 justify-end pt-5 border-t border-slate-100 dark:border-slate-700/50 mt-5">
             <a href="{{ route('master.items.index') }}" class="inline-flex items-center justify-center px-4 py-2.5 border border-slate-300 dark:border-slate-600 rounded-md shadow-sm text-sm font-semibold text-slate-700 dark:text-slate-300 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 transition-colors focus:outline-none cursor-pointer">

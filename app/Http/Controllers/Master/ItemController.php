@@ -189,6 +189,19 @@ class ItemController extends Controller
             $rules['minimum_length'] = ['prohibited'];
         }
 
+        // Konversi Pack→pcs (mis. 1 Pack RJ45 = 50 pcs) — cuma berarti buat
+        // tracking_type QUANTITY: SERIALIZED dihitung per-SN, ROLL dihitung
+        // per-meter, keduanya gak punya konsep "Pack" sama sekali. Opsional
+        // (beda dari `meter_per_roll` yang WAJIB buat roll) — banyak barang
+        // QUANTITY (kabel potongan, ATK) emang gak pernah dibeli per-Pack.
+        $isQuantityType = $locked
+            ? $item?->tracking_type === TrackingType::QUANTITY
+            : ($request->input('tracking_type') === TrackingType::QUANTITY->value);
+
+        $rules['pack_size'] = $isQuantityType
+            ? ['nullable', 'numeric', 'min:0.01']
+            : ['prohibited'];
+
         $validated = $request->validate($rules);
         $category = ItemCategory::query()->findOrFail($validated['item_category_id']);
         $ownership = $locked
@@ -244,6 +257,10 @@ class ItemController extends Controller
         } else {
             $validated['meter_per_roll'] = null;
             $validated['minimum_length'] = null;
+        }
+
+        if (! $isQuantityType) {
+            $validated['pack_size'] = null;
         }
 
         if (! $locked) {
