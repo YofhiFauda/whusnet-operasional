@@ -1,85 +1,85 @@
-# Unify Dropdown Item Dipasang di Laporan PSB
+# Unify Dropdown Item Dipasang di Laporan PSB — Form 1 (Pemasangan/Aktivasi)
 
 Tanggal: 2026-11-02 · Status: **menunggu review user** · Modul: Task Teknisi / Instalasi (PSB)
 
 ## 1. Masalah
 
-Form laporan instalasi PSB (`CustomerInstallationController::report()`) menampilkan **4 section dropdown terpisah** buat item yang dipasang teknisi:
+Langkah 5 ("Alat") wizard laporan instalasi PSB (`CustomerInstallationController::report()`) sebenarnya berisi **2 form HTML berbeda**:
 
-| Section | Sumber data | Mekanisme custody |
-|---|---|---|
-| Modem / perangkat aktif | `InventorySerial::eligibleSerialsForTeam()` | per-serial (`InventorySerial.current_technician_id`, status `ISSUED`) |
-| Perangkat tambahan (AP/STB) | `AdditionalDeviceCustodyService::eligibleSerialsForTask()` | per-serial, filter `item.category.is_customer_extra_device=true` |
-| Perangkat pasif (RJ45, kabel pendek, dst) | `TechnicianCustody` milik tim | per-qty/batch, agregat tim |
-| Kabel panjang / FO | `InventoryRoll::current_technician_id`, `length_remaining > 0` | per-roll individual |
+- **Form 1 — Pemasangan/Aktivasi** (`storePemasangan()` → tombol "Aktivasi"): berisi data device + **3 picker barang terpisah** — combobox SN "Perangkat Aktif" (modem), combobox "Roll Kabel", dan `<x-material-rows>` khusus Perangkat Pasif.
+- **Form 2 — Perangkat Tambahan** (`CustomerInstallationAdditionalDeviceController::store()`, form HTML sendiri di bagian bawah Langkah 5 yang sama): sudah punya dropdown growable sendiri (tombol "+ Tambah Perangkat").
 
-Keempat query **sudah** custody-scoped ke tim task (bukan pilihan bebas) — ini sudah benar dan konsisten. Masalahnya murni presentasi: tiap jenis barang punya field/section sendiri yang hardcode di Blade, sehingga menambah jenis barang baru (atau sekadar menata ulang) berarti menyentuh 4 tempat berbeda, dan teknisi harus tahu dulu barang yang dia pegang masuk kategori mana sebelum bisa mulai isi laporan.
+Ketiga picker di Form 1 sumbernya custody tim yang sama (sudah benar, sudah di-scope), tapi dipisah jadi 3 kontrol UI beda karena mekanismenya beda:
+
+| Picker (Form 1) | Sumber data | Mekanisme | Kolom tujuan di `CustomerInstallation` |
+|---|---|---|---|
+| SN Perangkat Aktif (modem) | `eligibleSerialsForTeam()` → `InventorySerial` | per-serial, **singular** (1 modem/instalasi) | `selected_inventory_serial_id` |
+| Roll Kabel | `eligibleRollsForTeam()` → `InventoryRoll` | per-roll, **singular** (1 roll/instalasi) | `selected_inventory_roll_id` + `roll_meters_used` |
+| Material Terpakai (Pasif) | `eligiblePassiveCustodyForTeam()` → `TechnicianCustody` | per-qty/batch, **plural** (`<x-material-rows>` sudah growable) | `materials[]` (tabel `TaskMaterial`, lewat `TaskMaterialService`) |
+
+**Form 2 sudah sesuai pola target** (dropdown + tombol tambah baris) — tidak perlu diubah.
 
 ## 2. Tujuan & keberhasilan
 
-- Teknisi mengisi laporan lewat **satu dropdown "Pilih Item"** per baris, isinya gabungan semua barang yang dia pegang (custody tim), apa pun mekanisme di baliknya.
-- Baris bisa **ditambah sesuai kebutuhan** (tombol "+ Tambah Item"), bukan slot tetap per jenis barang.
-- Input tambahan (qty / meter / pilih serial) muncul otomatis sesuai mekanisme item yang dipilih — teknisi tidak perlu tahu istilah "serial/batch/roll".
-- **Tidak ada perubahan skema tabel** (`InventorySerial`, `TechnicianCustody`, `InventoryRoll` tetap). Tidak ada perubahan logika consumption yang sudah ada — hanya cara item dipilih dan dikirim ke controller.
-- Keberhasilan: 1 teknisi bisa lapor instalasi PSB campur modem + kabel roll + pasif + tambahan dari satu komponen input, tanpa tahu 4 section lama.
+- Di Form 1, teknisi pilih barang lewat **satu dropdown growable** (perluasan `<x-material-rows>` / komponen baru serupa) yang menawarkan Modem + Roll Kabel + Pasif sekaligus — bukan 3 kontrol terpisah.
+- Baris **Modem dan baris Roll dibatasi maksimal 1 masing-masing** (ditegakkan di UI, karena kolom tujuannya singular di DB — lihat tabel §1); baris Pasif tetap unlimited seperti sekarang.
+- Submit Form 1 **tetap menulis ke kolom/field yang sama persis** (`selected_inventory_serial_id`, `selected_inventory_roll_id`, `roll_meters_used`, `materials[]`) — komponen baru cuma mengganti cara teknisi *memilih*, bukan apa yang *disimpan/divalidasi/dieksekusi*.
+- **Tidak ada perubahan di `storePemasangan()`, `storeSpeedtest()`, skema tabel, atau logic consumption** (`installSerial()`, `consumeFromRoll()`, `InventoryService::reconcileMaterialsAgainstCustody()`). Risiko minim karena backend tidak disentuh — perubahan murni Blade + Alpine.
+- Keberhasilan: teknisi isi Form 1 lewat 1 dropdown gabungan tanpa perlu tahu istilah "SN/roll/custody"; test existing (`CustomerInstallationTest`, `InstallationRollConsumptionTest`, dll) tetap lulus tanpa diubah karena nama field POST tidak berubah.
 
 ## 3. Di luar cakupan
 
-- Form lain yang masih pakai pola lama (pendaftaran, verifikasi admin, maintenance non-PSB, edit pelanggan) — **tidak disentuh** di task ini. Unify dilakukan dulu di PSB; perluasan ke form lain adalah task terpisah kalau pola ini terbukti jalan.
-- Migrasi data custody existing — tidak perlu, karena sumber data (`InventorySerial`, `TechnicianCustody`, `InventoryRoll`) tidak berubah struktur.
-- `ItemCategory` tidak ditambah kolom config baru di task ini (misal flag "butuh serial/qty/meter") — mapping mechanism-per-item disimpulkan dari sumber datanya sendiri (serial vs custody vs roll), bukan dari field baru di `ItemCategory`. Kalau nanti mau generalize lebih jauh (device bawaan paket, bukan cuma PSB), baru dipertimbangkan nambah config di situ.
+- **Form 2 (Perangkat Tambahan)** — sudah punya pola growable sendiri, tidak diubah.
+- **Radio ownership modem** (`modem_acquisition_choice`: beli_sendiri/beli_gudang) — ditentukan dari `contract_type` pelanggan (keputusan dibuat saat registrasi, bukan di Langkah 5), tetap apa adanya. Saat `beli_sendiri` dipilih, baris "Modem" di dropdown baru otomatis tidak relevan (SN prohibited) — perilaku ini **tidak berubah**, cuma mengikuti validasi existing.
+- **Checkbox cable crossing** — tidak digabung ke dropdown ini, tetap kontrol terpisah seperti sekarang.
+- Form lain yang masih pakai pola lama (pendaftaran, verifikasi admin, maintenance non-PSB, edit pelanggan) — tidak disentuh.
+- Migrasi data / skema tabel — tidak perlu, tidak ada perubahan struktur data.
 
 ## 4. Desain
 
-### 4.1 Komponen UI
+### 4.1 Komponen UI baru: `installation-item-rows`
 
-Di view laporan PSB (`resources/views/installations/report.blade.php` atau partial terkait), 4 section dropdown diganti komponen **"Daftar Item Dipasang"**:
+Komponen Blade baru `resources/views/components/installation-item-rows.blade.php` (bukan memodifikasi `material-rows.blade.php` langsung — komponen itu dipakai juga di Laporan Survey yang tidak butuh mekanisme serial/roll; file baru menghindari risiko regresi ke halaman lain, sesuai pola "file yang berubah bersama hidup bersama").
 
-- Tabel baris dinamis (Alpine `x-data`), tiap baris: 1 dropdown "Pilih Item" + area input kondisional + tombol hapus baris.
-- Tombol **"+ Tambah Item"** menambah baris baru (index array naik). Tidak ada limit jumlah baris.
-- Dropdown "Pilih Item" isinya 1 list gabungan dikirim dari controller (lihat §4.2), tiap opsi bawa data `item_id`, `item_name`, `category`, `mechanism` (`serial|batch|roll`), dan info ketersediaan (`available_qty`/`length_remaining`/daftar serial), lewat `data-*` attribute buat dibaca Alpine.
-- Saat teknisi pilih item di satu baris, Alpine menampilkan input tambahan sesuai `mechanism`:
-  - `serial` → tampil serial number yang tersedia (auto-pilih kalau cuma 1, atau sub-dropdown kalau lebih dari 1).
-  - `batch` → input angka qty, dengan hint "maks tersedia: N" (divalidasi juga di server).
-  - `roll` → sub-dropdown pilih roll spesifik (kalau tim pegang lebih dari 1 roll item itu) + input meter terpakai, hint "sisa: N meter".
+- Dibangun dari pola `material-rows.blade.php` (Alpine `x-data`, `addRow()`/`removeRow()`), tapi tiap opsi dropdown "Barang" membawa `mechanism` (`modem|roll|pasif`) yang diturunkan dari sumber datanya (bukan field baru di `ItemCategory`):
+  - opsi `mechanism=modem`: satu opsi per `InventorySerial` eligible (dari `eligibleSerialsForTeam()`) — pilih opsi ini langsung menentukan SN-nya, tidak ada input qty.
+  - opsi `mechanism=roll`: satu opsi per `InventoryRoll` eligible (dari `eligibleRollsForTeam()`) — pilih opsi ini menampilkan input "Meter Terpakai" dengan hint `length_remaining` roll itu.
+  - opsi `mechanism=pasif`: satu opsi per item dari `eligiblePassiveCustodyForTeam()` (perilaku identik `<x-material-rows restrict-to-custody>` sekarang) — menampilkan input qty dengan hint `available`.
+- Alpine (`installationItemRows()`, fungsi baru, bukan reuse `materialRows()`) menegakkan: hanya **1 baris aktif** boleh ber-`mechanism=modem`, hanya **1 baris aktif** boleh ber-`mechanism=roll` (opsi modem/roll yang sudah dipakai baris lain disembunyikan dari dropdown baris berikutnya, sama pola `optionsFor()` yang sudah ada di `_additional_devices_step.blade.php` buat exclude SN terpakai).
+- **Nama `name` attribute per baris mengikuti `mechanism`-nya**, bukan satu pola array seragam:
+  - `mechanism=modem` → `<input type="hidden" name="selected_inventory_serial_id" :value="row.serial_id">` (field singular, tanpa index array).
+  - `mechanism=roll` → `name="selected_inventory_roll_id"` + `name="roll_meters_used"` (singular).
+  - `mechanism=pasif` → `name="materials[{{ index }}][item_id|qty|unit|item_type|note]"` (array, persis format `<x-material-rows>` sekarang — index baris boleh ada gap, `materials.*` wildcard validation tidak masalah).
+- Baris kosong (belum pilih barang) tidak merender `name` apa pun — aman diskip oleh validasi existing (sama seperti baris kosong `<x-material-rows>` sekarang, yang sudah dibuang `TaskMaterialService::normalizeRow()`).
 
-### 4.2 Query gabungan (server, sisi tampil form)
+### 4.2 Query gabungan (server, sisi render form)
 
-Service baru `EligibleInstallationItemsService` (atau method baru di `AdditionalDeviceCustodyService` — keputusan final saat implementasi, tergantung mana yang lebih pas dengan tanggung jawab existing) memanggil 3 sumber data yang **sudah ada, tanpa diubah**:
+Di `CustomerInstallationController::report()`, 3 metode private yang sudah ada (`eligibleSerialsForTeam()`, `eligibleRollsForTeam()`, `eligiblePassiveCustodyForTeam()`) **tidak diubah isinya** — hanya dipanggil seperti sekarang, lalu hasilnya dikirim ke `<x-installation-item-rows>` sebagai 3 prop terpisah (`:serial-options`, `:roll-options`, `:custody-options`). Komponen sendiri yang menggabungkan jadi satu daftar dropdown di sisi Alpine (`itemOptions` gabungan dengan field `mechanism` penanda asal). Tidak ada service baru, tidak ada query baru — murni pemetaan data yang sudah dikirim ke view, sama seperti sebelumnya.
 
-1. `InventorySerial::eligibleSerialsForTeam()` — modem/perangkat aktif + perangkat tambahan (beda hanya filter kategori).
-2. `TechnicianCustody` query existing per tim.
-3. `InventoryRoll::current_technician_id` + `length_remaining > 0` query existing.
+### 4.3 Perubahan di `report.blade.php`
 
-Hasil 3 sumber di-normalize jadi 1 collection seragam `{item_id, item_name, category_name, mechanism, ...}` dikirim ke view sebagai satu variable. Query asal **tidak digabung jadi satu SQL** — tetap 3 query/scope terpisah di model masing-masing, cuma dirapikan di 1 pemanggil servis.
+Blok render Step 5 yang sekarang memanggil combobox SN modem + combobox roll + `<x-material-rows :custody-options="$eligiblePassiveCustody" restrict-to-custody />` (sekitar baris 1050-1072, perlu dikonfirmasi ulang persis saat implementasi) diganti satu panggilan:
 
-### 4.3 Submit & konsumsi (server)
+```blade
+<x-installation-item-rows
+    :serial-options="$eligibleSerials"
+    :roll-options="$eligibleRolls"
+    :custody-options="$eligiblePassiveCustody"
+    :initial-rows="$existingUsage"
+/>
+```
 
-- Request mengirim array `items[i] = {item_id, mechanism, qty_or_meter?, serial_id?, roll_id?}`.
-- `FormRequest` baru validasi per baris sesuai `mechanism`:
-  - `serial`: `serial_id` wajib ada & masih berstatus `ISSUED` ke tim task ini.
-  - `batch`: `qty` wajib `> 0` dan `≤ qty_remaining` custody tim buat item itu (dihitung ulang di server, bukan percaya nilai dari klien).
-  - `roll`: `roll_id` wajib milik tim, `meter` wajib `> 0` dan `≤ length_remaining` roll itu.
-  - Baris kosong (tidak ada `item_id`) **diskip**, bukan error — laporan tanpa device line tetap valid kalau alur lama memang mengizinkannya (perlu dicek ulang saat implementasi, bukan diasumsikan berubah).
-  - Item yang sama dipilih di lebih dari satu baris dengan mechanism `batch`/`roll`: qty/meter **dijumlah dulu** sebelum dibandingkan ke sisa custody, supaya tidak lolos lewat split baris.
-- Service orchestrator (baru) loop tiap baris valid, dispatch ke method consumption **yang sudah ada** sesuai `mechanism` (serial → issue/install existing flow; batch → `consumeFromCustody()`; roll → `consumeFromRoll()`). Tidak menulis ulang logic consume.
-- Seluruh baris dibungkus **1 DB transaction** — kalau satu baris gagal (misal stok berubah di antara render form dan submit), semua baris dibatalkan, user diarahkan balik ke form (`back()->withErrors()->withInput()`, sesuai `PRG_REDIRECT_CONVENTION.md`) dengan pesan error menyebut baris mana yang gagal.
-- Locking saat consume reuse mekanisme lock yang sudah dipakai `consumeFromCustody()`/`consumeFromRoll()` kalau sudah ada (`lockForUpdate()`) — tidak bikin pola lock baru.
+Prefill (`$existingUsage`, baris material tersimpan) dan prefill SN/roll yang sudah tersimpan di `$installation->selected_inventory_serial_id`/`selected_inventory_roll_id` dipetakan jadi baris awal komponen (supaya buka ulang laporan tetap menunjukkan pilihan sebelumnya) — detail pemetaan ini bagian dari task implementasi, bukan keputusan baru.
 
 ### 4.4 Testing
 
-Test baru (nama sesuai gejala, bukan kelas, ikut konvensi repo):
+**Tidak perlu test backend baru** — `storePemasangan()`/`storeSpeedtest()` tidak berubah, field POST tetap sama, jadi test existing (`CustomerInstallationTest`, `InstallationRollConsumptionTest`, `MaterialReportFlowTest`, dll) harus tetap lulus **tanpa modifikasi** sebagai bukti bahwa perubahan ini murni presentasi. Ini justru acceptance criteria utama task: kalau test lama sampai perlu diubah, berarti scope sudah melebar ke backend dan harus dihentikan untuk dicek ulang.
 
-- Submit laporan PSB dengan baris campur ketiga mechanism sekaligus → semua ter-consume benar, custody berkurang sesuai.
-- Submit qty batch lebih dari `qty_remaining` → ditolak, custody tidak berubah.
-- Submit serial yang bukan milik tim task → ditolak.
-- Submit dengan baris kosong di tengah array → diskip, baris lain tetap diproses.
-- Submit item sama di 2 baris roll/batch berbeda yang totalnya melebihi sisa → ditolak (bukan lolos karena dicek per-baris).
-
-Test mechanism lama (`InstallationRollConsumptionTest`, `MaintenanceGantiPerangkatTambahanTest`, dll) **tidak dihapus** — mechanism consume-nya tidak berubah, hanya dipanggil dari jalur input baru.
+Test baru yang relevan (kalau ditambahkan) sebatas sanity di level Blade/Alpine rendering (opsional, repo ini tidak punya kebiasaan browser test) — fokus verifikasi via test existing yang hit endpoint `storePemasangan` dengan payload yang sekarang dihasilkan komponen baru (field names identik).
 
 ## 5. Risiko & catatan implementasi
 
-- Scope kecil secara data (tidak ada migrasi skema), tapi Blade + Alpine + FormRequest + 1 service baru cukup untuk disiplinkan lewat TDD per komponen (service dulu, baru UI).
-- Pastikan `view:cache`/Alpine tetap kebangun lewat `npm run build` setelah ubah Blade — kalau tidak, `public/build` lama bikin interaksi dropdown dinamis mati tanpa error jelas.
-- Perlu baca ulang `docs/fop-task/analisa-sync-execution-task.md` kalau laporan PSB ini juga menyentuh sinkronisasi Task/FopTask (belum dicek detail — task ini fokus ke input device-nya saja, bukan status task).
+- Komponen baru (bukan modifikasi `material-rows.blade.php`) supaya Laporan Survey (pemakai lain komponen itu) tidak kena resiko apa pun dari perubahan ini.
+- Pastikan `npm run build` dijalankan setelah ubah Blade — tanpa itu Alpine baru tidak ikut bundle, dropdown jadi mati tanpa error jelas.
+- Baris Modem/Roll yang "sudah dipakai di baris lain disembunyikan dari dropdown" meniru pola `optionsFor()` di `_additional_devices_step.blade.php` — baca file itu dulu sebagai referensi saat implementasi, jangan desain ulang dari nol.
+- Prefill (buka ulang laporan yang sudah pernah disubmit) harus dites manual (run app, isi laporan, reload halaman) karena ini area yang mudah salah tanpa browser test otomatis.
