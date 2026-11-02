@@ -65,3 +65,20 @@ document.addEventListener('wheel', () => {
         active.blur();
     }
 }, { passive: true });
+
+/* Dipakai material-rows.blade.php (itemOptionsFor) & installation-item-rows.blade.php
+   (itemOptionsWithLegacy) — dua komponen beda yang sama-sama butuh "baris lama
+   yang id-nya sudah gak ada di opsi sekarang (custody habis/dipindah) tetap
+   ditawarkan UNTUK BARIS ITU SAJA". Tanpa ini <select>/combobox jatuh diam-diam
+   ke opsi pertama saat render, dan submit ulang menimpa field jadi barang lain.
+   Global (bukan import module) karena kedua komponen mendefinisikan fungsi
+   Alpine-nya lewat <script> inline yang di-push lewat @push('scripts'), bukan
+   modul ES — pola yang sama dengan materialRows()/comboBox() di komponen itu
+   sendiri. */
+window.withLegacyOption = function (options, matcher, buildFallback) {
+    if (options.some(matcher)) {
+        return options;
+    }
+
+    return [...options, buildFallback()];
+};

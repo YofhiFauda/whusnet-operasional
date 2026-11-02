@@ -190,12 +190,23 @@ function installationItemRows(itemOptions, initialRows) {
         itemOptions: itemOptions,
         rows: initialRows.length ? initialRows : [],
 
+        // Pemilik baris saat ini per mekanisme singular ({modem: 2, roll: 0}).
+        // Dihitung ulang (O(rows)) hanya saat baris benar-benar berubah
+        // (ditandai _mechanismOwnersDirty), bukan setiap kali optionsFor()
+        // dipanggil — tanpa cache ini tiap baris x-for memanggil comboOptionsFor()
+        // yang masing-masing me-scan ulang seluruh rows, jadi O(rows²) tiap
+        // render walau isi rows belum berubah sama sekali sejak render terakhir.
+        _mechanismOwnersCache: null,
+        _mechanismOwnersDirty: true,
+
         addRow() {
             this.rows.push({ mechanism: '', option_id: '', qty: '', note: '' });
+            this._mechanismOwnersDirty = true;
         },
 
         removeRow(index) {
             this.rows.splice(index, 1);
+            this._mechanismOwnersDirty = true;
         },
 
         // Baris Modem/Roll yang sudah dipakai baris lain disembunyikan dari
@@ -211,18 +222,30 @@ function installationItemRows(itemOptions, initialRows) {
         // BEDA tetap bisa lolos jadi 2 baris modem sekaligus).
         singularMechanisms: ['modem', 'roll'],
 
-        optionsFor(index, modemAcquisition) {
-            const row = this.rows[index];
-            const usedSingularMechanisms = this.rows
-                .filter((r, i) => i !== index && this.singularMechanisms.includes(r.mechanism))
-                .map(r => r.mechanism);
+        mechanismOwners() {
+            if (this._mechanismOwnersDirty || this._mechanismOwnersCache === null) {
+                const owners = {};
+                this.rows.forEach((r, i) => {
+                    if (this.singularMechanisms.includes(r.mechanism)) {
+                        owners[r.mechanism] = i;
+                    }
+                });
+                this._mechanismOwnersCache = owners;
+                this._mechanismOwnersDirty = false;
+            }
 
-            return this.itemOptionsWithLegacy(row).filter(opt => {
+            return this._mechanismOwnersCache;
+        },
+
+        optionsFor(index, modemAcquisition) {
+            const owners = this.mechanismOwners();
+
+            return this.itemOptionsWithLegacy(this.rows[index]).filter(opt => {
                 if (modemAcquisition === 'beli_sendiri' && opt.mechanism === 'modem') {
                     return false;
                 }
                 if (this.singularMechanisms.includes(opt.mechanism)) {
-                    return ! usedSingularMechanisms.includes(opt.mechanism);
+                    return ! (opt.mechanism in owners) || owners[opt.mechanism] === index;
                 }
                 return true;
             });
@@ -231,27 +254,27 @@ function installationItemRows(itemOptions, initialRows) {
         // Baris lama yang option_id-nya sudah tidak ada di custody sekarang
         // (dicabut/dipindah gudang) tetap ditawarkan UNTUK BARIS ITU SAJA,
         // ditandai "tersimpan" — sama pola itemOptionsFor() legacy-row di
-        // material-rows.blade.php. Tanpa ini <select> jatuh diam-diam ke opsi
-        // pertama saat render, dan submit ulang menimpa field jadi barang lain.
+        // material-rows.blade.php (withLegacyOption() di app.js, dipakai
+        // keduanya, bukan logic yang diduplikasi per komponen). Tanpa ini
+        // <select> jatuh diam-diam ke opsi pertama saat render, dan submit
+        // ulang menimpa field jadi barang lain.
         itemOptionsWithLegacy(row) {
             if (! row || ! row.option_id) {
                 return this.itemOptions;
             }
 
-            const known = this.itemOptions.some(o => o.mechanism === row.mechanism && String(o.option_id) === String(row.option_id));
-
-            if (known) {
-                return this.itemOptions;
-            }
-
-            return [...this.itemOptions, {
-                mechanism: row.mechanism,
-                option_id: row.option_id,
-                label: `(tersimpan, sudah tidak ada di custody sekarang) #${row.option_id}`,
-                type: null,
-                unit: null,
-                available: null,
-            }];
+            return withLegacyOption(
+                this.itemOptions,
+                o => o.mechanism === row.mechanism && String(o.option_id) === String(row.option_id),
+                () => ({
+                    mechanism: row.mechanism,
+                    option_id: row.option_id,
+                    label: `(tersimpan, sudah tidak ada di custody sekarang) #${row.option_id}`,
+                    type: null,
+                    unit: null,
+                    available: null,
+                })
+            );
         },
 
         comboOptionsFor(index, modemAcquisition) {
@@ -272,6 +295,7 @@ function installationItemRows(itemOptions, initialRows) {
             this.rows[index].option_id = optionId ?? '';
             this.rows[index].qty = '';
             this.rows[index].note = '';
+            this._mechanismOwnersDirty = true;
         },
 
         findOption(row) {
