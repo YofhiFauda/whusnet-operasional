@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\ScopeType;
+use App\Models\Payment;
 use App\Models\PaymentBatch;
 use App\Models\Pop;
 use App\Models\Role;
@@ -13,6 +14,7 @@ use App\Services\CollectorBalanceService;
 use App\Services\CollectorPaymentReportService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Concerns\BuildsCollectorMonthlyScenario;
 use Tests\TestCase;
@@ -93,6 +95,36 @@ class CollectorPaymentReportTest extends TestCase
         $this->assertSame(3, $report['count']);
         // Urut menurut tanggal: 3 Sep sebelum 8 Sep.
         $this->assertSame('2026-09-03', $report['groups'][0]['date']->toDateString());
+    }
+
+    #[Test]
+    public function nomor_cicilan_dimuat_sekali_bukan_satu_query_per_baris(): void
+    {
+        $invoices = [];
+        for ($i = 0; $i < 12; $i++) {
+            $invoice = $this->makeInvoice($this->popA, '2026-09', 200000);
+            $this->makePayment($invoice, 100000, '2026-09-03', $this->kolektorA);
+            $this->makePayment($invoice, 100000, '2026-09-10', $this->kolektorA);
+            $invoices[] = $invoice;
+        }
+
+        DB::flushQueryLog();
+        DB::enableQueryLog();
+        $report = $this->build();
+        $contexts = $report['groups']->flatMap(fn ($group) => $group['payments'])
+            ->map(fn ($payment) => $payment->installmentContext());
+        $installmentQueries = collect(DB::getQueryLog())
+            ->filter(fn ($q) => str_contains($q['query'], 'order by `payment_date`') || str_contains($q['query'], 'order by "payment_date"'))
+            ->count();
+
+        $this->assertSame(24, $contexts->count());
+        $this->assertSame(1, $installmentQueries, 'satu query untuk semua invoice, bukan satu per pembayaran');
+        $this->assertSame([1, 2], $contexts->pluck('number')->unique()->sort()->values()->all());
+
+        // Hasil preload harus identik dengan jalur per-payment (instans segar, tanpa preload).
+        $fresh = $report['groups']->flatMap(fn ($group) => $group['payments'])
+            ->map(fn ($payment) => Payment::find($payment->id)->installmentContext());
+        $this->assertEquals($fresh->all(), $contexts->all());
     }
 
     #[Test]

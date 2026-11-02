@@ -172,9 +172,11 @@ class WarehouseHistoryController extends Controller
             // fopTask.customer & serial.customer — kolom tujuan baris INSTALL
             // menampilkan pelanggannya (lihat view); tanpa eager load ini
             // preventLazyLoading meledak di non-production.
-            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial.customer', 'roll', 'createdBy.role', 'transfer.fromPop', 'transfer.toPop', 'fopTask.customer'])
+            // Fase 1: kolom ramping tanpa eager load — cukup untuk kunci grup,
+            // hitungan, tipe, dan urutan. Dulu SELURUH ledger (puluhan ribu baris)
+            // dihidrasi lengkap dengan 11 relasi hanya untuk menampilkan 30 kartu.
             ->latest('id')
-            ->get();
+            ->get(['id', 'type', 'reference_number', 'from_pop_id', 'to_pop_id', 'item_id', 'created_at']);
 
         $groups = $this->groupByDocument($ledger);
 
@@ -190,8 +192,9 @@ class WarehouseHistoryController extends Controller
 
         $perPage = 30;
         $page = LengthAwarePaginator::resolveCurrentPage();
+        $pageGroups = $this->hydrateGroups($groups->slice(($page - 1) * $perPage, $perPage)->values());
         $ledger = new LengthAwarePaginator(
-            $groups->slice(($page - 1) * $perPage, $perPage)->values(),
+            $pageGroups,
             $groups->count(),
             $perPage,
             $page,
@@ -212,6 +215,36 @@ class WarehouseHistoryController extends Controller
         ];
 
         return view('warehouse.history.index', compact('ledger', 'pops', 'types', 'typeFilter', 'popFilter', 'search', 'dateFrom', 'dateTo', 'conditionFilter', 'adjustmentReasonFilter', 'technicianFilter', 'technicians', 'summary', 'sort', 'sortDirection'));
+    }
+
+    /**
+     * Fase 2: muat penuh (dengan relasi untuk tampilan) hanya baris milik
+     * kartu yang tampil di halaman ini, lalu pasang kembali ke grupnya. Urutan
+     * baris dalam grup sama dengan fase 1 (id menurun), jadi `representative`
+     * tetap baris yang sama.
+     *
+     * @param  Collection<int, object>  $groups
+     * @return Collection<int, object>
+     */
+    private function hydrateGroups(Collection $groups): Collection
+    {
+        $ids = $groups->flatMap(fn ($group) => $group->lines->pluck('id'))->all();
+        if ($ids === []) {
+            return $groups;
+        }
+
+        $full = InventoryTransaction::query()
+            ->whereKey($ids)
+            ->with(['item.category', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'serial.customer', 'roll', 'createdBy.role', 'transfer.fromPop', 'transfer.toPop', 'fopTask.customer'])
+            ->get()
+            ->keyBy('id');
+
+        return $groups->map(function ($group) use ($full) {
+            $group->lines = $group->lines->map(fn (InventoryTransaction $line) => $full->get($line->id) ?? $line)->values();
+            $group->representative = $group->lines->first();
+
+            return $group;
+        });
     }
 
     /**

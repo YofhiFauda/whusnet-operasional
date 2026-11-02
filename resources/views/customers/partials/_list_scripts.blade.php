@@ -1,6 +1,7 @@
 {{-- Skrip daftar pelanggan: navigasi keyboard tabel + seluruh perilaku modal
      Quick Hub / Network Assignment. Pasangan wajib _list_table + _quick_hub_modal. --}}
 @include('customers.partials._list_density_script')
+@include('customers.partials._list_columns_script')
 <script>
     /* ── Navigasi keyboard tabel ── */
     (function () {

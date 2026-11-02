@@ -254,6 +254,7 @@
 @endsection
 
 @push('scripts')
+@vite(['resources/js/charts.js'])
 <script>
     function selectPreset(preset) {
         document.getElementById('input_date_preset').value = preset;

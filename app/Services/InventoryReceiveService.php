@@ -44,13 +44,15 @@ class InventoryReceiveService
         ?User $actor = null,
         ?string $notes = null,
         ?string $referenceNumber = null,
+        ?float $enteredPackQty = null,
     ): InventoryTransaction {
         $this->assertPusat($pusat);
+        $this->assertOperationalItem($item);
         $this->assertPositiveQty($qty);
         $this->assertPositivePrice($unitPrice);
         $this->assertQuantityTracking($item);
 
-        return DB::transaction(function () use ($pusat, $item, $qty, $unitPrice, $actor, $notes, $referenceNumber) {
+        return DB::transaction(function () use ($pusat, $item, $qty, $unitPrice, $actor, $notes, $referenceNumber, $enteredPackQty) {
             $lotNo = $this->resolveQuantityLot($pusat, $item, $unitPrice);
 
             $balance = InventoryBalance::query()
@@ -66,6 +68,7 @@ class InventoryReceiveService
                 'item_id' => $item->id,
                 'lot_no' => $lotNo === '' ? null : $lotNo,
                 'qty' => $qty,
+                'entered_pack_qty' => $enteredPackQty,
                 'unit_price_snapshot' => $unitPrice,
                 'to_pop_id' => $pusat->id,
                 'notes' => $notes,
@@ -99,6 +102,7 @@ class InventoryReceiveService
         ?string $referenceNumber = null,
     ): array {
         $this->assertPusat($pusat);
+        $this->assertOperationalItem($item);
         $this->assertPositivePrice($unitPrice);
 
         if ($item->tracking_type !== TrackingType::SERIALIZED) {
@@ -176,6 +180,7 @@ class InventoryReceiveService
         ?string $referenceNumber = null,
     ): array {
         $this->assertPusat($pusat);
+        $this->assertOperationalItem($item);
         $this->assertPositivePrice($unitPrice);
 
         if ($item->tracking_type !== TrackingType::SERIALIZED) {
@@ -242,6 +247,7 @@ class InventoryReceiveService
         ?string $referenceNumber = null,
     ): array {
         $this->assertPusat($pusat);
+        $this->assertOperationalItem($item);
         $this->assertPositivePrice($unitPrice);
 
         if ($item->tracking_type !== TrackingType::ROLL) {
@@ -344,7 +350,7 @@ class InventoryReceiveService
                 } elseif (isset($line['roll_count'])) {
                     $this->receiveRoll($pusat, $item, (int) $line['roll_count'], $line['vendor'] ?? null, (float) $line['unit_price'], $actor, $notes, $referenceNumber);
                 } else {
-                    $this->receiveQuantity($pusat, $item, (float) ($line['qty'] ?? 0), (float) $line['unit_price'], $actor, $notes, $referenceNumber);
+                    $this->receiveQuantity($pusat, $item, (float) ($line['qty'] ?? 0), (float) $line['unit_price'], $actor, $notes, $referenceNumber, isset($line['entered_pack_qty']) ? (float) $line['entered_pack_qty'] : null);
                 }
             }
 
@@ -394,6 +400,18 @@ class InventoryReceiveService
             ->max() ?? 0;
 
         return sprintf('%s-%s-%06d', $prefix, $today, $lastNum + 1);
+    }
+
+    /**
+     * Merchandise Marketing masuk lewat MarketingMerchandiseService (tanpa harga).
+     * Guard ada di service, bukan controller: import, command, atau controller baru
+     * yang memanggil service ini tidak boleh menembus pemisahan alur Marketing.
+     */
+    private function assertOperationalItem(Item $item): void
+    {
+        if ($item->isNonOperational()) {
+            throw new InvalidArgumentException('Barang nonoperasional dicatat melalui halaman Barang Nonoperasional.');
+        }
     }
 
     private function assertPusat(Pop $pop): void

@@ -9,6 +9,7 @@ window.addEventListener('beforeunload', () => {
 });
 
 import './bootstrap';
+import './image-source-picker';
 
 /* ── Alpine.js — dibundel lokal lewat Vite, BUKAN CDN ──
    Dulu dimuat dari cdn.jsdelivr.net di layouts/app.blade.php. Tiga alasan
@@ -32,31 +33,35 @@ import collapse from '@alpinejs/collapse';
 import focus from '@alpinejs/focus';
 import { infrastructureReport } from './task-infrastructure-report';
 
-/* ── Chart.js — dibundel lokal lewat Vite, sama alasan Alpine di bawah:
-   aplikasi operasional internal, jangan tergantung CDN pihak ketiga buat
-   render chart di Dashboard NOC/FOP Analitik. `Chart.register(...registerables)`
-   daftarkan semua controller/element/scale bawaan (line/bar/doughnut, dst) —
-   tanpa ini cuma core Chart yang ke-load dan tiap jenis chart perlu didaftar
-   manual satu-satu. `window.Chart` WAJIB di-set (sama pola `window.Alpine`)
-   biar view Blade bisa langsung pakai `new Chart(...)` dari inline script.
-
-   WAJIB SEBELUM `Alpine.start()` di bawah — `import` di-hoist, tapi baris
-   assignment (`window.Chart = Chart`) TIDAK, jalan sesuai urutan tertulis.
-   `Alpine.start()` scan DOM SINKRON dan langsung panggil `init()` tiap
-   komponen `x-data` (termasuk `nocDashboardHandler()` di noc/dashboard.blade.php
-   yang manggil `window.nocDashboardRenderCharts()`) — kalau baris ini taruh
-   SESUDAH `Alpine.start()`, `window.Chart` masih `undefined` pas `init()`
-   jalan, dan render chart di-skip diam-diam (guard `typeof window.Chart ===
-   'undefined'`). Pernah kejadian persis ini — semua canvas chart Dashboard
-   NOC blank walau datanya ada. */
-import { Chart, registerables } from 'chart.js';
-
-Chart.register(...registerables);
-window.Chart = Chart;
-
 Alpine.plugin(collapse);
 Alpine.plugin(focus);
 
 window.Alpine = Alpine;
 Alpine.data('infrastructureReport', infrastructureReport);
 Alpine.start();
+
+/* Safety net: di beberapa browser/kondisi nyata (ketemu di halaman Detail
+   Pelanggan — tab lazy-mount lewat `<template x-if>` tetap blank walau HTML
+   & store sudah benar), walk otomatis `Alpine.start()` atas `document.body`
+   kadang tidak sampai mem-bind semua node sebelum event `load`. Manual
+   `Alpine.initTree(document.body)` di console selalu berhasil membereskannya
+   — initTree aman dipanggil ulang, directive bawaan Alpine sudah dijaga
+   idempoten (node yang sudah di-bind dilewati). Panggil sekali lagi di
+   `load` sebagai jaring pengaman, bukan pengganti walk awal. */
+window.addEventListener('load', () => {
+    Alpine.initTree(document.body);
+});
+
+/* `<input type="number">` yang lagi fokus ikut geser nilainya kalau kena
+   scroll wheel mouse/trackpad (perilaku bawaan Chrome/Edge) — user gak
+   sadar, nilainya diam-diam berubah per `step` (mis. kabel roll "Meter
+   Terpakai" step=0.01, scroll kepencet 29x pas isi form = 1000 jadi
+   999.71, ketauan 2026-11-01). Blur begitu wheel nyentuh input number
+   yang fokus — scroll halaman tetap jalan normal, cuma inputnya lepas
+   fokus duluan sebelum browser sempat ubah value. */
+document.addEventListener('wheel', () => {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && active.type === 'number') {
+        active.blur();
+    }
+}, { passive: true });

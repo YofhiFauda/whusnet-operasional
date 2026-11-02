@@ -62,6 +62,10 @@ class BusinessCustomerController extends Controller
         $search = LikeSearch::sanitize((string) $request->query('q', ''));
         $category = $request->query('category');
         $status = $request->query('status');
+        $perPage = (int) $request->query('per_page', 10);
+        if (! in_array($perPage, [10, 25, 50, 100], true)) {
+            $perPage = 10;
+        }
 
         $businessCategories = PackageCategory::query()
             ->whereNotNull('installation_fee_approval_role_id')
@@ -107,7 +111,7 @@ class BusinessCustomerController extends Controller
             })
             ->orderByRaw('(select activation_date from customer_services where customer_services.customer_id = customers.id) desc')
             ->orderBy('full_name')
-            ->paginate(25)
+            ->paginate($perPage)
             ->withQueryString();
 
         return view('business-development.business-customers.index', [

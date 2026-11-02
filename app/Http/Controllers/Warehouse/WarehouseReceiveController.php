@@ -36,7 +36,7 @@ class WarehouseReceiveController extends Controller
             ->when(! $access->hasAllPopAccess(auth()->user()), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds(auth()->user())))
             ->orderBy('name')
             ->get();
-        $items = Item::active()->with('category')->orderBy('name')->get();
+        $items = Item::active()->whereDoesntHave('category', fn ($query) => $query->where('is_operational', false))->with('category')->orderBy('name')->get();
 
         return view('warehouse.receive.create', compact('pusatPops', 'items'));
     }
@@ -161,7 +161,7 @@ class WarehouseReceiveController extends Controller
     private function normalizeLines(array $rows): array
     {
         $itemIds = collect($rows)->pluck('item_id')->map(fn ($id) => (int) $id)->unique();
-        $items = Item::whereIn('id', $itemIds)->get(['id', 'tracking_type', 'auto_generate_serial'])->keyBy('id');
+        $items = Item::whereIn('id', $itemIds)->get(['id', 'tracking_type', 'auto_generate_serial', 'pack_size'])->keyBy('id');
 
         return collect($rows)->map(function (array $row) use ($items) {
             $itemId = (int) $row['item_id'];
@@ -205,6 +205,27 @@ class WarehouseReceiveController extends Controller
 
             if (filled($row['serial_numbers'] ?? null)) {
                 throw new InvalidArgumentException("Barang #{$itemId} bukan tipe Serial Number — kosongkan kolom Serial Number, isi Qty.");
+            }
+
+            // Barang berpack_size: staf selalu input dalam Pack di form ini
+            // (bukan pilihan, keputusan rancangan) — qty yang dikirim ke
+            // Service WAJIB sudah pcs, entered_pack_qty cuma snapshot audit.
+            // `unit_price` yang diketik staf itu HARGA BELI PER PACK (dibaca
+            // dari faktur supplier yang emang per-Pack) — tapi
+            // `unit_price_snapshot` di seluruh sistem SELALU dipasangkan sama
+            // qty ber-satuan pcs. Konversi ke harga-per-pcs DI SINI (sama
+            // pola dengan `receiveRoll()` yang membagi harga-per-roll dengan
+            // `meter_per_roll` sebelum simpan), biar gak menggembungkan nilai
+            // stok sebesar `pack_size` kali lipat di setiap hitungan hilir.
+            if ($item?->pack_size) {
+                $packQty = (float) ($row['qty'] ?? 0);
+
+                return [
+                    'item_id' => $itemId,
+                    'qty' => $packQty * (float) $item->pack_size,
+                    'entered_pack_qty' => $packQty,
+                    'unit_price' => $unitPrice / (float) $item->pack_size,
+                ];
             }
 
             return [

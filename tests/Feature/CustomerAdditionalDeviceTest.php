@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\SerialStatus;
 use App\Models\Customer;
 use App\Models\CustomerAdditionalDevice;
+use App\Models\CustomerInstallation;
 use App\Models\CustomerService;
 use App\Models\InternetPackage;
 use App\Models\InventorySerial;
@@ -155,6 +156,82 @@ class CustomerAdditionalDeviceTest extends TestCase
             ->assertSeeInOrder(['SN-V1-LAMA', 'Tanpa Stok', 'SN-GUDANG-BARU', 'Gudang', 'Ditarik']);
     }
 
+    private function makeWarehouseExtraDevice(Customer $customer, string $status, string $sn): CustomerAdditionalDevice
+    {
+        $category = ItemCategory::firstOrCreate(
+            ['code' => 'ap_test_lock'],
+            ['name' => 'AP Test Lock', 'default_unit' => 'pcs', 'is_active' => true, 'is_customer_extra_device' => true],
+        );
+        $item = Item::firstOrCreate(
+            ['code' => 'AP-TEST-LOCK'],
+            ['name' => 'AP Test Lock', 'item_category_id' => $category->id, 'unit' => 'pcs'],
+        );
+        $serial = InventorySerial::create([
+            'item_id' => $item->id,
+            'serial_number' => $sn,
+            'status' => SerialStatus::INSTALLED,
+            'customer_id' => $customer->id,
+        ]);
+
+        return CustomerAdditionalDevice::create([
+            'customer_id' => $customer->id,
+            'device_type' => 'AP',
+            'serial_number' => $sn,
+            'inventory_serial_id' => $serial->id,
+            'status' => $status,
+        ]);
+    }
+
+    #[Test]
+    public function additional_device_from_warehouse_still_installed_cannot_be_deleted(): void
+    {
+        $pop = $this->createPop('ADDLCK');
+        $technician = $this->createUserWithRole('Teknisi');
+        $customer = $this->createCustomer($pop, 'TEST-ADD-LCK-001');
+        $additional = $this->makeWarehouseExtraDevice($customer, 'terpasang', 'ADD-LCK-0001');
+
+        $response = $this->actingAs($technician)->delete(route('customers.additional-device.destroy', [$customer, $additional]));
+
+        $response->assertRedirect();
+        $response->assertSessionHas('error');
+        $this->assertDatabaseHas('customer_additional_devices', ['id' => $additional->id]);
+        $this->assertSame(SerialStatus::INSTALLED, $additional->inventorySerial->refresh()->status);
+    }
+
+    #[Test]
+    public function additional_device_from_warehouse_already_retrieved_can_be_deleted(): void
+    {
+        $pop = $this->createPop('ADDLCK2');
+        $technician = $this->createUserWithRole('Teknisi');
+        $customer = $this->createCustomer($pop, 'TEST-ADD-LCK-002');
+        $additional = $this->makeWarehouseExtraDevice($customer, 'ditarik', 'ADD-LCK-0002');
+
+        $this->actingAs($technician)->delete(route('customers.additional-device.destroy', [$customer, $additional]))
+            ->assertSessionMissing('error');
+
+        $this->assertDatabaseMissing('customer_additional_devices', ['id' => $additional->id]);
+    }
+
+    #[Test]
+    public function detail_marks_installed_warehouse_device_as_locked_and_shows_shortage_reason(): void
+    {
+        $this->loginAsAdmin();
+        $pop = $this->createPop('ADDLCK3');
+        $customer = $this->createCustomer($pop, 'TEST-ADD-LCK-003');
+        $this->makeWarehouseExtraDevice($customer, 'terpasang', 'ADD-LCK-0003');
+        CustomerInstallation::create([
+            'customer_id' => $customer->id,
+            'extra_device_shortage' => true,
+            'extra_device_shortage_reason' => 'AP kedua rusak di perjalanan',
+        ]);
+
+        $this->get(route('customers.show', $customer->id))
+            ->assertOk()
+            ->assertSee('Dikunci Gudang')
+            ->assertSee('Kekurangan perangkat dilaporkan saat pemasangan')
+            ->assertSee('AP kedua rusak di perjalanan');
+    }
+
     private function attachPermission(Role $role, string $code): void
     {
         $permission = Permission::firstOrCreate(
@@ -162,6 +239,83 @@ class CustomerAdditionalDeviceTest extends TestCase
             ['name' => $code, 'feature_id' => null, 'action_id' => null, 'module' => 'test', 'description' => 'test']
         );
         $role->permissions()->syncWithoutDetaching([$permission->id]);
+    }
+
+    private function customerWithLimit(string $popCode, string $code, int $limit = 3): Customer
+    {
+        $pop = $this->createPop($popCode);
+        $customer = $this->createCustomer($pop, $code);
+        $package = InternetPackage::create([
+            'package_code' => 'PKT-'.$code,
+            'name' => 'Paket '.$code,
+            'category' => 'Home',
+            'package_group' => 'Basic',
+            'bandwidth_label' => '10 Mbps',
+            'download_speed_mbps' => 10,
+            'upload_speed_mbps' => 10,
+            'monthly_price' => 150000,
+            'max_additional_devices' => $limit,
+        ]);
+        $this->createActiveCustomerService($customer, $package);
+
+        return $customer;
+    }
+
+    #[Test]
+    public function modal_menolak_sn_yang_sudah_jadi_perangkat_utama_pelanggan_lain(): void
+    {
+        $technician = $this->createUserWithRole('Teknisi');
+        $customer = $this->customerWithLimit('ADDDUP1', 'TEST-ADD-DUP-001');
+        $other = $this->createCustomer($customer->pop, 'TEST-ADD-DUP-002');
+        $other->customerDevice()->create(['device_type' => 'ont', 'serial_number' => 'DUP-MAIN-001']);
+
+        $this->actingAs($technician)->post(route('customers.additional-device.store', $customer), [
+            'device_type' => 'AP', 'serial_number' => 'dup-main-001',
+        ])->assertSessionHas('error');
+
+        $this->assertDatabaseCount('customer_additional_devices', 0);
+    }
+
+    #[Test]
+    public function modal_menolak_sn_perangkat_tambahan_aktif_tapi_mengizinkan_sn_yang_sudah_ditarik(): void
+    {
+        $technician = $this->createUserWithRole('Teknisi');
+        $customer = $this->customerWithLimit('ADDDUP2', 'TEST-ADD-DUP-003');
+        $other = $this->createCustomer($customer->pop, 'TEST-ADD-DUP-004');
+        CustomerAdditionalDevice::create(['customer_id' => $other->id, 'device_type' => 'AP', 'serial_number' => 'DUP-AP-001', 'status' => 'terpasang']);
+        CustomerAdditionalDevice::create(['customer_id' => $other->id, 'device_type' => 'AP', 'serial_number' => 'DUP-AP-OLD', 'status' => 'ditarik']);
+
+        $this->actingAs($technician)->post(route('customers.additional-device.store', $customer), [
+            'device_type' => 'AP', 'serial_number' => 'DUP-AP-001',
+        ])->assertSessionHas('error');
+        $this->assertSame(0, $customer->additionalDevices()->count());
+
+        $this->actingAs($technician)->post(route('customers.additional-device.store', $customer), [
+            'device_type' => 'AP', 'serial_number' => 'DUP-AP-OLD',
+        ])->assertSessionMissing('error');
+        $this->assertSame(1, $customer->additionalDevices()->count());
+    }
+
+    #[Test]
+    public function modal_menolak_sn_gudang_terpasang_di_pelanggan_lain_dan_memperingatkan_sn_stok(): void
+    {
+        $technician = $this->createUserWithRole('Teknisi');
+        $customer = $this->customerWithLimit('ADDDUP3', 'TEST-ADD-DUP-005');
+        $other = $this->createCustomer($customer->pop, 'TEST-ADD-DUP-006');
+        $category = ItemCategory::create(['code' => 'ap_dup', 'name' => 'AP Dup', 'default_unit' => 'pcs', 'is_active' => true, 'is_customer_extra_device' => true]);
+        $item = Item::create(['code' => 'AP-DUP', 'name' => 'AP Dup', 'item_category_id' => $category->id, 'unit' => 'pcs']);
+        InventorySerial::create(['item_id' => $item->id, 'serial_number' => 'DUP-GDG-INST', 'status' => SerialStatus::INSTALLED, 'customer_id' => $other->id]);
+        InventorySerial::create(['item_id' => $item->id, 'serial_number' => 'DUP-GDG-STOK', 'status' => SerialStatus::AVAILABLE]);
+
+        $this->actingAs($technician)->post(route('customers.additional-device.store', $customer), [
+            'device_type' => 'AP', 'serial_number' => 'DUP-GDG-INST',
+        ])->assertSessionHas('error');
+        $this->assertSame(0, $customer->additionalDevices()->count());
+
+        $this->actingAs($technician)->post(route('customers.additional-device.store', $customer), [
+            'device_type' => 'AP', 'serial_number' => 'DUP-GDG-STOK',
+        ])->assertSessionHas('warning')->assertSessionMissing('error');
+        $this->assertSame(1, $customer->additionalDevices()->count());
     }
 
     public function test_additional_device_rejected_when_limit_reached(): void

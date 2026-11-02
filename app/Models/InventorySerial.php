@@ -98,6 +98,24 @@ class InventorySerial extends Model
         return $this->belongsTo(Item::class);
     }
 
+    /**
+     * Teks siap pakai buat baris "Jual Modem" di invoice (rancangan
+     * 2026-10-31, `docs/plan/warehouse/
+     * rancangan-modem-terjual-visibilitas-dan-rekonsiliasi.md` §3) — satu
+     * sumber format dipakai `CustomerVerificationController::finalVerify()`
+     * dan jalur C-REQ/MTN, supaya keterangan modem konsisten di mana pun
+     * baris ini terbit. Merek/model dari `Item` (bukan kolom di SN ini
+     * sendiri); kalau item-nya belum di-load, relasi di-load otomatis.
+     */
+    public function modemSaleDescription(): string
+    {
+        $this->loadMissing('item');
+        $label = trim(($this->item?->brand ?? '').' '.($this->item?->model ?? ''));
+        $label = $label !== '' ? $label : ($this->item?->name ?? 'Modem');
+
+        return "Pembelian modem {$label} · SN {$this->serial_number}";
+    }
+
     public function currentPop(): BelongsTo
     {
         return $this->belongsTo(Pop::class, 'current_pop_id');

@@ -5,7 +5,7 @@
 
 @section('content')
 
-<x-warehouse.header active="returns" title="Barang Rusak" subtitle="Rekap gabungan semua koreksi kerugian gudang — SN, roll kabel, saldo bulk, dan custody teknisi." />
+<x-warehouse.header active="damaged" title="Barang Rusak" subtitle="Rekap gabungan semua koreksi kerugian gudang — SN, roll kabel, saldo bulk, dan custody teknisi." />
 
 <x-warehouse.returns-nav active="damaged" />
 

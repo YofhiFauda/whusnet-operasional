@@ -55,6 +55,26 @@ class CustomerAdditionalDevice extends Model
     }
 
     /**
+     * Semua perangkat yang masih terpasang, termasuk baris teks bebas
+     * (legacy/`Tanpa Stok`) — kandidat "yang diganti" di Maintenance/C-REQ.
+     */
+    public function scopeTerpasang($query)
+    {
+        return $query->where('status', 'terpasang');
+    }
+
+    /**
+     * Perangkat yang MASIH ada di pelanggan — baris 'ditarik' cuma riwayat.
+     * Dipakai untuk semua hitungan jatah paket: tanpa ini, tiap penggantian
+     * perangkat (baris lama 'ditarik' + baris baru) menggerus jatah dan
+     * memblok Tambah Perangkat/ganti paket padahal jumlah fisiknya tetap.
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('status', '!=', 'ditarik');
+    }
+
+    /**
      * @return BelongsTo<Customer, $this>
      */
     public function customer(): BelongsTo

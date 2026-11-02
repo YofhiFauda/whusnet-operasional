@@ -35,9 +35,9 @@ use InvalidArgumentException;
 class InventoryTransferService
 {
     /**
-     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>}>  $lines
+     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, entered_pack_qty?:?float, serial_numbers?:list<string>}>  $lines
      */
-    public function createTransfer(Pop $fromPusat, Pop $toCabang, array $lines, ?User $actor = null): InventoryTransfer
+    public function createTransfer(Pop $fromPusat, Pop $toCabang, array $lines, ?User $actor = null, bool $marketing = false): InventoryTransfer
     {
         if (! $fromPusat->isPusat()) {
             throw new InvalidArgumentException("Transfer cuma boleh dikirim DARI Gudang Pusat — {$fromPusat->name} bertipe '{$fromPusat->type}'.");
@@ -47,7 +47,11 @@ class InventoryTransferService
             throw new InvalidArgumentException("Transfer cuma boleh dikirim KE Gudang Cabang — {$toCabang->name} bertipe '{$toCabang->type}'.");
         }
 
-        return $this->dispatchStockTransfer($fromPusat, $toCabang, $lines, $actor);
+        if (! $marketing) {
+            $this->assertNoNonOperationalItems($lines);
+        }
+
+        return $this->dispatchStockTransfer($fromPusat, $toCabang, $lines, $actor, $marketing);
     }
 
     /**
@@ -62,7 +66,18 @@ class InventoryTransferService
             throw new InvalidArgumentException('Transfer balik stok biasa harus dari Gudang Cabang ke Gudang Pusat.');
         }
 
+        $this->assertNoNonOperationalItems($lines);
+
         return $this->dispatchStockTransfer($fromCabang, $toPusat, $lines, $actor);
+    }
+
+    private function assertNoNonOperationalItems(array $lines): void
+    {
+        foreach ($lines as $line) {
+            if (Item::findOrFail($line['item_id'])->isNonOperational()) {
+                throw new InvalidArgumentException('Barang nonoperasional dipindahkan melalui permintaan Pusat ke Cabang.');
+            }
+        }
     }
 
     /**
@@ -83,9 +98,9 @@ class InventoryTransferService
     }
 
     /**
-     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>, roll_codes?:list<string>}>  $lines
+     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, entered_pack_qty?:?float, serial_numbers?:list<string>, roll_codes?:list<string>}>  $lines
      */
-    private function dispatchStockTransfer(Pop $fromPusat, Pop $toCabang, array $lines, ?User $actor): InventoryTransfer
+    private function dispatchStockTransfer(Pop $fromPusat, Pop $toCabang, array $lines, ?User $actor, bool $marketing = false): InventoryTransfer
     {
         if ($lines === []) {
             throw new InvalidArgumentException('Transfer wajib py minimal 1 baris barang.');
@@ -95,7 +110,7 @@ class InventoryTransferService
         // sama di InventoryReceiveService::receiveBatch()).
         usort($lines, fn ($a, $b) => $a['item_id'] <=> $b['item_id']);
 
-        return DB::transaction(function () use ($fromPusat, $toCabang, $lines, $actor) {
+        return DB::transaction(function () use ($fromPusat, $toCabang, $lines, $actor, $marketing) {
             $transfer = InventoryTransfer::create([
                 'reference_number' => app(NumberSequenceService::class)->ledgerNumber('TRF'),
                 'from_pop_id' => $fromPusat->id,
@@ -110,7 +125,7 @@ class InventoryTransferService
                 match ($item->tracking_type) {
                     TrackingType::SERIALIZED => $this->dispatchSerialized($transfer, $fromPusat, $item, $line['serial_numbers'] ?? [], $actor),
                     TrackingType::ROLL => $this->dispatchRoll($transfer, $fromPusat, $item, $line['roll_codes'] ?? [], $actor),
-                    default => $this->dispatchQuantity($transfer, $fromPusat, $item, (float) ($line['qty'] ?? 0), $line['lot_no'] ?? null, $actor),
+                    default => $this->dispatchQuantity($transfer, $fromPusat, $item, (float) ($line['qty'] ?? 0), $line['lot_no'] ?? null, $actor, $marketing, isset($line['entered_pack_qty']) ? (float) $line['entered_pack_qty'] : null),
                 };
             }
 
@@ -207,7 +222,7 @@ class InventoryTransferService
         }
     }
 
-    private function dispatchQuantity(InventoryTransfer $transfer, Pop $fromPusat, Item $item, float $qty, ?string $lotNo, ?User $actor): void
+    private function dispatchQuantity(InventoryTransfer $transfer, Pop $fromPusat, Item $item, float $qty, ?string $lotNo, ?User $actor, bool $marketing = false, ?float $enteredPackQty = null): void
     {
         if ($qty <= 0) {
             throw new InvalidArgumentException("Qty transfer {$item->name} harus lebih besar dari nol.");
@@ -239,7 +254,8 @@ class InventoryTransferService
             'item_id' => $item->id,
             'lot_no' => $lotNo === '' ? null : $lotNo,
             'qty' => $qty,
-            'unit_price_snapshot' => $this->resolveLastCost($item, $lotNo === '' ? null : $lotNo),
+            'entered_pack_qty' => $enteredPackQty,
+            'unit_price_snapshot' => $marketing ? null : $this->resolveLastCost($item, $lotNo === '' ? null : $lotNo),
             'from_pop_id' => $fromPusat->id,
             'created_by' => $actor?->id,
         ]);
@@ -292,7 +308,7 @@ class InventoryTransferService
                 throw new InvalidArgumentException('Pengiriman retur dikonfirmasi per SN lewat halaman Retur ke Pusat.');
             }
 
-            $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['serial', 'roll'])->get();
+            $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['serial', 'roll', 'item'])->get();
             $confirmedLines = $transfer->transactions()->whereNotNull('to_pop_id')->get();
             $isPartial = false;
 
@@ -421,6 +437,19 @@ class InventoryTransferService
                     );
                 $balance->increment('qty', $confirmedQty);
 
+                // Partial receive (receive_mode=partial + confirmed_quantities)
+                // MASIH ADA di controller — `$confirmedQty` di sini sudah dalam
+                // pcs untuk kedua mode (full maupun partial), karena Controller
+                // yang mengonversi input Pack staf ke pcs sebelum masuk sini.
+                // entered_pack_qty SELALU diturunkan balik dari qty pcs yang
+                // dikonfirmasi ÷ pack_size — berlaku sama buat jalur "Terima
+                // Semua" maupun partial, bukan dibaca mentah dari request
+                // (lih. docs/superpowers/specs/
+                // 2026-11-01-pack-pcs-conversion-design.md).
+                $enteredPackQty = $line->item->pack_size
+                    ? round($confirmedQty / $line->item->pack_size, 2)
+                    : null;
+
                 InventoryTransaction::create([
                     'type' => InventoryTransactionType::TRANSFER,
                     'reference_number' => $transfer->reference_number,
@@ -429,6 +458,7 @@ class InventoryTransferService
                     'lot_no' => $lotNo === '' ? null : $lotNo,
                     'source_inventory_transaction_id' => $line->id,
                     'qty' => $confirmedQty,
+                    'entered_pack_qty' => $enteredPackQty,
                     'unit_price_snapshot' => $line->unit_price_snapshot,
                     'to_pop_id' => $transfer->to_pop_id,
                     'created_by' => $actor->id,

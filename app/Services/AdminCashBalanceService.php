@@ -103,7 +103,7 @@ class AdminCashBalanceService
         // kewajiban setor — admin pegang uang lebih tapi sistem bilang tak
         // ada yang harus disetor.
         $dariManual = Money::sum(
-            $this->unsettledManualPaymentsQuery($admin)->get()->map(fn (Payment $p) => $p->physicalAmount())
+            $this->unsettledManualPaymentsQuery($admin)->get(['id', 'amount', 'balance_used_amount', 'overpay_amount'])->map(fn (Payment $p) => $p->physicalAmount())
         );
 
         return Money::add($dariKolektor, $dariManual);

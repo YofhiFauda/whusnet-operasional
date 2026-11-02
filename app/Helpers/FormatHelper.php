@@ -2,6 +2,7 @@
 
 namespace App\Helpers;
 
+use App\Models\InventoryTransaction;
 use Carbon\Carbon;
 
 class FormatHelper
@@ -130,5 +131,33 @@ class FormatHelper
         } catch (\Exception $e) {
             return $datetime;
         }
+    }
+
+    /**
+     * Tampilkan qty ledger dengan info Pack kalau staf entry pakai Pack
+     * (`entered_pack_qty` terisi — snapshot audit, lihat migration
+     * `add_entered_pack_qty_to_inventory_transactions_table`). `qty` (pcs)
+     * TETAP satu-satunya sumber kebenaran — method ini cuma menampilkan
+     * ulang angka yang sudah diketik staf, bukan menghitung ulang konversi
+     * Pack→pcs dari `item->pack_size`.
+     */
+    public static function qtyWithPack(InventoryTransaction $line): string
+    {
+        if ($line->entered_pack_qty !== null) {
+            return self::trimDecimal((float) $line->entered_pack_qty).' Pack ('.self::trimDecimal((float) $line->qty).' pcs)';
+        }
+
+        return self::trimDecimal((float) $line->qty).' '.$line->item->unit;
+    }
+
+    /**
+     * Format angka Indonesia (koma desimal) lalu buang nol desimal yang
+     * tidak berarti (`100.00` → `100`, `7.50` → `7,5`) — pola yang sudah
+     * dipakai berulang di view-view Gudang (`rtrim(rtrim(number_format(...),
+     * '0'), ',')`), disatukan di sini supaya tampilan qty konsisten.
+     */
+    private static function trimDecimal(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 2, ',', '.'), '0'), ',');
     }
 }

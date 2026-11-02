@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Enums\StockRequestStatus;
+use App\Models\Item;
 use App\Models\Pop;
 use App\Models\StockRequest;
 use App\Models\User;
@@ -20,7 +21,7 @@ class StockRequestService
     /**
      * @param  list<array{item_id:int, qty_requested:float, lot_no?:?string}>  $lines
      */
-    public function create(Pop $cabang, array $lines, User $actor, ?string $notes = null): StockRequest
+    public function create(Pop $cabang, array $lines, User $actor, ?string $notes = null, bool $marketing = false): StockRequest
     {
         if (! $cabang->isCabang()) {
             throw new InvalidArgumentException("Permintaan Stok cuma boleh diajukan ATAS NAMA Gudang Cabang — {$cabang->name} bertipe '{$cabang->type}'.");
@@ -30,6 +31,13 @@ class StockRequestService
             throw new InvalidArgumentException('Permintaan Stok wajib py minimal 1 baris barang.');
         }
 
+        if (! $marketing) {
+            foreach ($lines as $line) {
+                if (Item::findOrFail($line['item_id'])->isNonOperational()) {
+                    throw new InvalidArgumentException('Barang nonoperasional diminta lewat halaman Barang Nonoperasional.');
+                }
+            }
+        }
         // Kelompok H7, docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md:
         // `pic_gudang` cuma boleh mengajukan permintaan stok ATAS NAMA cabang
         // yang jadi penunjukannya — penting buat PIC scope `all_pop` (teknisi

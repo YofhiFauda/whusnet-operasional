@@ -316,7 +316,7 @@
 --}}
 @php
     $additionalLimit = $customer->customerService?->internetPackage?->max_additional_devices ?? 0;
-    $additionalCount = $customer->additionalDevices->count();
+    $additionalCount = $customer->additionalDevices->where('status', '!=', 'ditarik')->count();
 @endphp
 <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
     <div class="px-5 py-3 bg-teal-50/50 dark:bg-teal-950/20 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-2 items-center justify-between">
@@ -355,18 +355,34 @@
                     @endif
                 </span>
                 @can('customers.detail.devices.update')
-                    <form method="POST" action="{{ route('customers.additional-device.destroy', [$customer, $additional]) }}" onsubmit="return confirm('Hapus perangkat tambahan ini?');">
-                        @csrf
-                        @method('DELETE')
-                        <button type="submit" class="text-rose-600 hover:text-rose-700 font-semibold cursor-pointer">
-                            <i class="fa-solid fa-trash mr-1"></i> Hapus
-                        </button>
-                    </form>
+                    {{-- Perangkat Gudang yang masih terpasang dikunci: stok baru kembali lewat Ambil Alat (lihat CustomerAdditionalDeviceController::destroy()). --}}
+                    @if($additional->inventory_serial_id !== null && $additional->status === 'terpasang')
+                        <span class="text-[10px] text-slate-400 shrink-0" title="Tarik lewat Ambil Alat supaya stok Gudang ikut kembali">Dikunci Gudang</span>
+                    @else
+                        <form method="POST" action="{{ route('customers.additional-device.destroy', [$customer, $additional]) }}" onsubmit="return confirm('Hapus perangkat tambahan ini?');">
+                            @csrf
+                            @method('DELETE')
+                            <button type="submit" class="text-rose-600 hover:text-rose-700 font-semibold cursor-pointer">
+                                <i class="fa-solid fa-trash mr-1"></i> Hapus
+                            </button>
+                        </form>
+                    @endif
                 @endcan
             </div>
         @empty
             <p class="text-[11px] text-slate-400 text-center py-3">Belum ada perangkat tambahan.</p>
         @endforelse
+
+        {{-- Kekurangan perangkat yang dilaporkan teknisi di Laporan Pemasangan (disimpan di customer_installations, dulu tidak tampil di mana pun). --}}
+        @php
+            $shortageInstallation = $customer->installations()->where('extra_device_shortage', true)->latest()->first();
+        @endphp
+        @if($shortageInstallation)
+            <p class="mt-3 text-[11px] text-amber-700 dark:text-amber-400 leading-snug">
+                <span class="font-bold">Kekurangan perangkat dilaporkan saat pemasangan:</span>
+                {{ $shortageInstallation->extra_device_shortage_reason }}
+            </p>
+        @endif
     </div>
 </div>
 

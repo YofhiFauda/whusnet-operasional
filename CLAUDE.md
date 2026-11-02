@@ -46,6 +46,8 @@ php artisan reverb:start
 php artisan horizon
 ```
 
+**Artisan/test di container: pakai `docker compose exec -u www-data app php artisan ...`.** Default `exec` = root, dan `view:cache`/render Blade (termasuk `artisan test`) menulis `storage/framework/views` sebagai root. php-fpm jalan sebagai `www-data`, jadi saat Blade berubah `touch()` file kompilasi milik root gagal: `ErrorException … BladeCompiler.php:217 touch(): Utime failed: Operation not permitted` (muncul acak, hanya pada view yang baru berubah). Perbaikan cepat: `docker compose exec app chown -R www-data:www-data storage/framework/views`.
+
 **Habis `composer require` paket baru, container `app` gak otomatis lihat package-nya.**
 `docker-compose.yml` mount `cache_data:/var/www/bootstrap/cache` — named volume
 TERPISAH yang menutupi `bootstrap/cache/` bind-mount host di path yang sama.

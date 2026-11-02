@@ -23,13 +23,21 @@
 3. Pembayaran dilakukan secara internal. Nominal transaksi dicocokkan melalui laporan Gudang dengan bukti pembayaran internal di luar aplikasi. Gudang tidak mencatat transaksi maupun status lunas/belum dibayar, dan tidak diintegrasikan ke Finance.
 4. "Dibeli" adalah status **dokumen pembelian dan label asal stok**, bukan nilai baru `SerialStatus`. Status fisik SN tetap TRANSFERRED selama perjalanan dan AVAILABLE setelah B menerima. Sisa yang hilang tetap LOST setelah penutupan dengan bukti.
 
+### Perubahan keputusan 2026-10-31 (menggantikan butir lain di dokumen ini bila bertentangan)
+
+1. **Tanpa pembatalan/koreksi dokumen.** Transaksi hanya internal.
+2. **Tanpa "Tutup sisa SN yang hilang".** `BranchInventorySaleService::closeMissing()`, route `warehouse.branch-sales.close-missing`, dan form-nya dihapus; status "Hilang" tidak ada lagi di laporan. SN yang belum tiba tetap "Dalam perjalanan" dan dokumen baru final (`posted_total`, `posted_at`) setelah **semua** SN diterima. Konsekuensi yang diterima user: SN yang benar-benar tak sampai membuat dokumennya terbuka terus. Jalur umum `closeMissingTransfer` tetap ditolak untuk dokumen jual beli.
+3. **Pelaku hanya petugas Gudang Pusat: `owner` dan `admin_gudang`** memegang `warehouse_branch_sale.view/create/receive` + `warehouse_branch_sale_price.view` (`atasan` hanya memantau: view + harga). `pic_gudang` dan `pop_admin` **dicabut** (seeder + migrasi `2026_10_31_120000_revoke_branch_sale_permissions_from_branch_roles`). `admin_gudang` bertindak atas nama Cabang, jadi scope POP-nya harus mencakup Cabang penjual/pembeli (mis. `all_pop`).
+4. Laporan per SN (`/warehouse/branch-sales/report`, ekspor CSV) sudah ada; status hanya `diterima` / `dalam_perjalanan`.
+5. **Penerimaan = satu tombol "Terima semua SN"** di halaman detail (tanpa checkbox dan tanpa kolom Terima). Endpoint `receive` memanggil `BranchInventorySaleService::receiveAll()` yang menerima seluruh SN yang belum diterima; penerimaan sebagian tidak lagi tersedia dari UI (service `receive()` tetap menerima subset untuk pemanggil lain).
+
 Harga jual wajib disimpan per SN sebagai snapshot; jangan membaca harga item terkini ketika laporan periode lama dibuka. Aturan pajak/PPN internal, persetujuan diskon, dan jurnal akuntansi tidak diasumsikan dalam rencana ini.
 
 ## Arsitektur dan file
 
 | File | Tanggung jawab |
 |---|---|
-| `database/migrations/*_create_branch_inventory_sales_tables.php` (baru) | Header jual beli ber-FK unik ke `inventory_transfers`, nomor dokumen, nilai final dan status kewajiban internal; baris per `inventory_serial_id` dengan harga jual snapshot dan indeks unik (sale, serial). Tidak ada unique global pada serial, agar unit bisa berpindah lagi kelak. FK `restrictOnDelete` untuk histori; dokumen terbit dikoreksi dengan pembalik, tidak dihapus. |
+| `database/migrations/*_create_branch_inventory_sales_tables.php` (baru) | Header jual beli ber-FK unik ke `inventory_transfers`, nomor dokumen, nilai final dan status kewajiban internal; baris per `inventory_serial_id` dengan harga jual snapshot dan indeks unik (sale, serial). Tidak ada unique global pada serial, agar unit bisa berpindah lagi kelak. FK `restrictOnDelete` untuk histori. Dokumen jual beli tidak dibatalkan atau dikoreksi (keputusan user 2026-10-31: transaksi hanya internal); salah kirim ditangani lewat penerimaan/penutupan sisa hilang di bawah. |
 | `app/Models/BranchInventorySale.php`, `BranchInventorySaleLine.php` (baru) | Relasi Cabang penjual/pembeli, transfer, SN, harga. Harga memakai decimal, bukan float untuk operasi uang. |
 | `app/Services/BranchInventorySaleService.php` (baru) | Validasi Cabang berbeda, hak kepemilikan/kelayakan SN, harga, snapshot, pembuatan dokumen dan dispatch dalam satu transaksi. Kunci SN dengan `lockForUpdate()`. |
 | `app/Services/InventoryTransferService.php` | Tambah jalur Cabang→Cabang khusus dokumen jual beli SN; konfirmasi hanya SN yang diterima fisik. Transfer biasa dan retur RTR tetap pada jalur masing-masing. |

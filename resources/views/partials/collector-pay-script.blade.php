@@ -372,6 +372,13 @@
                 if (submittingBtn) {
                     submittingBtn.disabled = false;
                     submittingBtn.textContent = restoreLabel;
+                    const tr = submittingBtn.closest('tr');
+                    if (tr) {
+                        tr.querySelectorAll('.cb-btn-pay').forEach(b => {
+                            b.disabled = false;
+                            b.textContent = restoreLabel;
+                        });
+                    }
                 }
             });
     }
@@ -403,10 +410,18 @@
                 amountInput.value = window.Rupiah.formatDariServer(String(result.remaining_amount));
             }
 
-            const btn = tr.querySelector('button');
-            if (btn) {
-                btn.disabled = false;
-                btn.textContent = 'Bayar';
+            const payBtns = tr.querySelectorAll('.cb-btn-pay');
+            if (payBtns.length > 0) {
+                payBtns.forEach(b => {
+                    b.disabled = false;
+                    b.textContent = 'Bayar';
+                });
+            } else {
+                const btn = tr.querySelector('button');
+                if (btn) {
+                    btn.disabled = false;
+                    btn.textContent = 'Bayar';
+                }
             }
 
             const checkbox = tr.querySelector('.cb-row-checkbox');
@@ -515,13 +530,21 @@
 
         if (!cbBarisValid([tr])) return;
 
-        const btn = tr.querySelector('button');
+        const payBtns = tr.querySelectorAll('.cb-btn-pay');
+        const primaryBtn = payBtns[0] || tr.querySelector('button');
 
         cbConfirmOverpay([tr], () => {
-            btn.disabled = true;
-            btn.textContent = 'Memproses...';
+            if (payBtns.length > 0) {
+                payBtns.forEach(b => {
+                    b.disabled = true;
+                    b.textContent = 'Memproses...';
+                });
+            } else if (primaryBtn) {
+                primaryBtn.disabled = true;
+                primaryBtn.textContent = 'Memproses...';
+            }
 
-            cbPost([cbRowToPayload(tr)], btn, 'Bayar');
+            cbPost([cbRowToPayload(tr)], primaryBtn, 'Bayar');
         });
     }
 

@@ -9,28 +9,15 @@
 {{-- Flash messages ditangani otomatis oleh global Component Toast (<x-toast />) --}}
 
 @php
-    $totalCount = $records->count();
-    $totalLangganan = $records->sum(fn($r) => (float) ($r->customer?->customerService?->total_monthly_bill ?? 0));
-    $totalDpp = $records->sum(fn($r) => (float) ($r->harga_dikurangi_ppn ?? 0));
-    $issuedInstallationInvoices = $records->filter(fn($r) => $r->installationFeeInvoice !== null);
-    $totalInstalasi = $issuedInstallationInvoices->sum(fn($r) => (float) ($r->installation_fee ?? 0));
-    $countInstalasi = $issuedInstallationInvoices->count();
-    $pendingValidationCount = $records->filter(fn($r) => $r->needsInstallationFeeValidation() && ! $r->installationFeeInvoice)->count();
+    $totalCount = $records->total();
+    $totalLangganan = $summary['totalLangganan'];
+    $totalDpp = $summary['totalDpp'];
+    $totalInstalasi = $summary['totalInstalasi'];
+    $countInstalasi = $summary['countInstalasi'];
+    $pendingValidationCount = $summary['pendingValidationCount'];
 @endphp
 
-<div x-data="{
-    searchQuery: '',
-    showGuide: false,
-    matchesQuery(row) {
-        if (!this.searchQuery.trim()) return true;
-        const q = this.searchQuery.toLowerCase();
-        return (row.name && row.name.toLowerCase().includes(q)) ||
-               (row.cid && row.cid.toLowerCase().includes(q)) ||
-               (row.pop && row.pop.toLowerCase().includes(q)) ||
-               (row.address && row.address.toLowerCase().includes(q)) ||
-               (row.sales && row.sales.toLowerCase().includes(q));
-    }
-}">
+<div x-data="{ showGuide: false }">
 
     {{-- ── LAYER 1: PAGE HEADER (NAKED — NO CARD WRAPPER) ── --}}
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-5">
@@ -229,27 +216,24 @@
 
             {{-- Instant Search & Action Bar --}}
             <div class="flex items-center gap-2 self-end lg:self-auto w-full lg:w-auto">
-                {{-- Client-side Search Box --}}
+                {{-- Search all filtered records --}}
                 <div class="relative flex-1 lg:w-64">
                     <input type="text"
-                           x-model="searchQuery"
+                           name="q"
+                           value="{{ $search }}"
                            placeholder="Cari nama, CID, POP, staf..."
                            class="w-full h-9 pl-9 pr-3 text-xs border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 placeholder-slate-400 dark:placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
                     <svg class="w-4 h-4 text-slate-400 dark:text-slate-500 absolute left-3 top-2.5 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
                     </svg>
-                    <button type="button"
-                            x-show="searchQuery"
-                            @click="searchQuery = ''"
-                            class="absolute right-2.5 top-2.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
-                            style="display: none;">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-                        </svg>
+                    <button type="submit"
+                            aria-label="Cari pelanggan"
+                            class="absolute right-2 top-1.5 px-1 text-xs font-medium text-slate-500 hover:text-sky-600 dark:hover:text-sky-400">
+                        Cari
                     </button>
                 </div>
 
-                @if($roleId || $salesUserId || $periode !== now()->format('Y-m'))
+                @if($roleId || $salesUserId || $search !== '' || $periode !== now()->format('Y-m'))
                     <a href="{{ route('customer-acquisitions.index', ['periode' => $periode]) }}"
                        title="Reset Filter"
                        class="h-9 px-3 inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/30 border border-slate-200 dark:border-slate-700 rounded-lg transition-colors shrink-0">
@@ -287,16 +271,8 @@
                             $customer = $record->customer;
                             $salesName = $customer->salesUser ? $customer->salesUser->name : ($customer->sales_code ?? '—');
                             $salesRole = $customer->salesUser?->role?->name ?? '—';
-                            $rowPayload = [
-                                'name' => $customer->full_name,
-                                'cid' => $customer->customer_id ?? '',
-                                'pop' => $customer->pop?->name ?? '',
-                                'address' => $customer->clean_address ?? '',
-                                'sales' => $salesName,
-                            ];
                         @endphp
-                        <tr x-show="matchesQuery({{ json_encode($rowPayload) }})"
-                            class="hover:bg-slate-50/75 dark:hover:bg-slate-700/25 transition-colors">
+                        <tr class="hover:bg-slate-50/75 dark:hover:bg-slate-700/25 transition-colors">
 
                             {{-- Pelanggan (Avatar + Nama + CID) --}}
                             <td class="px-4 py-3">
@@ -460,16 +436,8 @@
                     $customer = $record->customer;
                     $salesName = $customer->salesUser ? $customer->salesUser->name : ($customer->sales_code ?? '—');
                     $salesRole = $customer->salesUser?->role?->name ?? '—';
-                    $rowPayload = [
-                        'name' => $customer->full_name,
-                        'cid' => $customer->customer_id ?? '',
-                        'pop' => $customer->pop?->name ?? '',
-                        'address' => $customer->clean_address ?? '',
-                        'sales' => $salesName,
-                    ];
                 @endphp
-                <div x-show="matchesQuery({{ json_encode($rowPayload) }})"
-                     class="p-4 space-y-3">
+                <div class="p-4 space-y-3">
                     {{-- Top row: Avatar + Name + CID + View Action --}}
                     <div class="flex items-start justify-between gap-2">
                         <div class="flex items-center gap-2.5 min-w-0">
@@ -592,6 +560,7 @@
             @endforelse
         </div>
     </div>
+    @include('customers.partials._list_pagination', ['customers' => $records])
 </div>
 @endsection
 

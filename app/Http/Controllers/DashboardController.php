@@ -320,53 +320,50 @@ class DashboardController extends Controller
      */
     private function omsetStats(string|int|null $popId): array
     {
-        $activeCustomers = (clone $this->scopedCustomerQuery($popId))
-            ->where('status', 'active')
-            ->with(['salesUser.role', 'customerService.internetPackage'])
-            ->get();
-
-        $salesCustomers = $activeCustomers->filter(function ($c) {
-            $roleCode = strtolower($c->salesUser?->role?->code ?? '');
-
-            return $roleCode === 'sales';
-        });
-
-        $teknisiCustomers = $activeCustomers->filter(function ($c) {
-            $roleCode = strtolower($c->salesUser?->role?->code ?? '');
-
-            // Kelompok F1, docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md
-            // — pelanggan yang didaftarkan PIC Gudang (role 'pic_gudang') ikut
-            // dihitung sebagai didaftarkan teknisi (keputusan user: "Ikut").
-            return in_array($roleCode, Role::TECHNICIAN_CODES, true);
-        });
-
+        // Dulu: semua pelanggan aktif + salesUser.role + customerService.internetPackage
+        // dihidrasi lalu difilter/dijumlah di PHP (15k pelanggan → puluhan ribu model,
+        // 200+ MB). Sekarang satu query agregat; tiap segmen tetap dihitung bebas
+        // (pelanggan boleh masuk Teknisi sekaligus Bisnis, sama seperti filter lama).
         $bisnisCategoryNames = PackageCategory::query()
             ->whereNotNull('installation_fee_approval_role_id')
             ->orWhere('name', 'LIKE', '%bisnis%')
             ->orWhere('name', 'LIKE', '%business%')
             ->pluck('name')
             ->map(fn ($n) => strtolower((string) $n))
-            ->toArray();
+            ->all();
 
-        $bisnisCustomers = $activeCustomers->filter(function ($c) use ($bisnisCategoryNames) {
-            $catName = strtolower($c->customerService?->internetPackage?->category ?? '');
-            if ($catName === '') {
-                return false;
-            }
-            if (str_contains($catName, 'bisnis') || str_contains($catName, 'business')) {
-                return true;
-            }
+        $isSales = "LOWER(COALESCE(sales_roles.code, '')) = 'sales'";
+        $technicianCodes = implode(',', array_fill(0, count(Role::TECHNICIAN_CODES), '?'));
+        $isTeknisi = "LOWER(COALESCE(sales_roles.code, '')) IN ({$technicianCodes})";
+        $categoryMarks = $bisnisCategoryNames === [] ? null : implode(',', array_fill(0, count($bisnisCategoryNames), '?'));
+        $isBisnis = "(LOWER(COALESCE(internet_packages.category, '')) LIKE '%bisnis%'"
+            ." OR LOWER(COALESCE(internet_packages.category, '')) LIKE '%business%'"
+            .($categoryMarks ? " OR LOWER(internet_packages.category) IN ({$categoryMarks})" : '').')';
 
-            return in_array($catName, $bisnisCategoryNames, true);
-        });
+        $row = (clone $this->scopedCustomerQuery($popId))
+            ->where('customers.status', 'active')
+            ->leftJoin('users as sales_users', 'sales_users.id', '=', 'customers.sales_user_id')
+            ->leftJoin('roles as sales_roles', 'sales_roles.id', '=', 'sales_users.role_id')
+            ->leftJoin('customer_services', 'customer_services.customer_id', '=', 'customers.id')
+            ->leftJoin('internet_packages', 'internet_packages.id', '=', 'customer_services.internet_package_id')
+            ->selectRaw(
+                "SUM(CASE WHEN {$isSales} THEN 1 ELSE 0 END) as sales_count,
+                 SUM(CASE WHEN {$isSales} THEN COALESCE(customer_services.total_monthly_bill, 0) ELSE 0 END) as sales_amount,
+                 SUM(CASE WHEN {$isTeknisi} THEN 1 ELSE 0 END) as teknisi_count,
+                 SUM(CASE WHEN {$isTeknisi} THEN COALESCE(customer_services.total_monthly_bill, 0) ELSE 0 END) as teknisi_amount,
+                 SUM(CASE WHEN {$isBisnis} THEN 1 ELSE 0 END) as bisnis_count,
+                 SUM(CASE WHEN {$isBisnis} THEN COALESCE(customer_services.total_monthly_bill, 0) ELSE 0 END) as bisnis_amount",
+                [...Role::TECHNICIAN_CODES, ...Role::TECHNICIAN_CODES, ...($categoryMarks ? $bisnisCategoryNames : []), ...($categoryMarks ? $bisnisCategoryNames : [])]
+            )
+            ->first();
 
         return [
-            'omset_sales_amount' => (float) $salesCustomers->sum(fn ($c) => $c->customerService?->total_monthly_bill ?? 0),
-            'omset_sales_count' => $salesCustomers->count(),
-            'omset_teknisi_amount' => (float) $teknisiCustomers->sum(fn ($c) => $c->customerService?->total_monthly_bill ?? 0),
-            'omset_teknisi_count' => $teknisiCustomers->count(),
-            'omset_bisnis_amount' => (float) $bisnisCustomers->sum(fn ($c) => $c->customerService?->total_monthly_bill ?? 0),
-            'omset_bisnis_count' => $bisnisCustomers->count(),
+            'omset_sales_amount' => (float) ($row->sales_amount ?? 0),
+            'omset_sales_count' => (int) ($row->sales_count ?? 0),
+            'omset_teknisi_amount' => (float) ($row->teknisi_amount ?? 0),
+            'omset_teknisi_count' => (int) ($row->teknisi_count ?? 0),
+            'omset_bisnis_amount' => (float) ($row->bisnis_amount ?? 0),
+            'omset_bisnis_count' => (int) ($row->bisnis_count ?? 0),
         ];
     }
 
@@ -780,16 +777,15 @@ class DashboardController extends Controller
             ->groupBy('billing_period')
             ->pluck('total', 'billing_period');
 
-        $payments = (clone $this->scopedPaymentQuery($popId))
+        // Dijumlah per bulan di SQL — dulu seluruh baris pembayaran 6 bulan
+        // dihidrasi lalu di-groupBy di PHP.
+        $paymentsByMonth = (clone $this->scopedPaymentQuery($popId))
             ->where('payment_status', PaymentStatus::VALID->value)
             ->whereBetween('payment_date', [$minDate, $maxDate])
-            ->get(['payment_date', 'amount']);
-
-        $paymentsByMonth = $payments->groupBy(function ($p) {
-            return is_string($p->payment_date)
-                ? substr($p->payment_date, 0, 7)
-                : $p->payment_date?->format('Y-m');
-        })->map(fn ($group) => (float) $group->sum('amount'));
+            ->selectRaw('SUBSTR(payment_date, 1, 7) as ym, SUM(amount) as total')
+            ->groupBy('ym')
+            ->pluck('total', 'ym')
+            ->map(fn ($total) => (float) $total);
 
         $labels = [];
         $invoiceSeries = [];

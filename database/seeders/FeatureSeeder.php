@@ -139,6 +139,18 @@ class FeatureSeeder extends Seeder
                 'sort_order' => 13,
             ],
             [
+                // Rekonsiliasi "SN terjual belum ditagih" (rancangan
+                // 2026-10-31, docs/plan/warehouse/
+                // rancangan-modem-terjual-visibilitas-dan-rekonsiliasi.md
+                // §5) — feature sendiri, bukan numpang 'reports.*': audiens
+                // dibatasi (K1, lihat dokumen itu) owner/atasan/admin, bukan
+                // semua yang boleh lihat laporan generik.
+                'code' => 'modem_sale_reconciliation',
+                'name' => 'Rekonsiliasi Modem Terjual',
+                'type' => FeatureType::ROOT,
+                'sort_order' => 13,
+            ],
+            [
                 // Tabel "Bayar Wifi Cash" per kolektor — halaman terpisah dari
                 // laporan bulanan admin (audiens & data beda), permission sendiri.
                 'code' => 'collector_payment_report',

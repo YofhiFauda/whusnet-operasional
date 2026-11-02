@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1"/>
+<title>Mockup Redesign Toolbar Gudang — Whusnet Operasional</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>tailwind.config = { darkMode: 'class' }</script>
+<script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+<style>
+  [x-cloak]{display:none!important}
+  .no-scrollbar::-webkit-scrollbar{display:none}.no-scrollbar{scrollbar-width:none}
+  body{font-family:Inter,system-ui,sans-serif}
+  kbd{font-family:ui-monospace,monospace}
+  @media (prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+</style>
+</head>
+<body class="bg-slate-100 dark:bg-slate-950 text-slate-800 dark:text-slate-200 transition-colors"
+      x-data="{ dark:false }" :class="dark && 'dark'">
+
+<!-- ============ ICON SPRITE (stroke 2, satu keluarga: Heroicons outline) ============ -->
+<svg class="hidden" xmlns="http://www.w3.org/2000/svg">
+  <symbol id="i-home" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></symbol>
+  <symbol id="i-box" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4"/></symbol>
+  <symbol id="i-swap" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></symbol>
+  <symbol id="i-users" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></symbol>
+  <symbol id="i-chart" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18M18.7 8l-5.1 5.1-2.8-2.8L7 14"/></symbol>
+  <symbol id="i-scan" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7V5a1 1 0 011-1h2M4 17v2a1 1 0 001 1h2m10-14V5a1 1 0 00-1-1h-2m4 14v2a1 1 0 01-1 1h-2M7 12h10"/></symbol>
+  <symbol id="i-plus" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4v16m8-8H4"/></symbol>
+  <symbol id="i-chev" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></symbol>
+  <symbol id="i-search" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h16M4 18h16"/></symbol>
+  <symbol id="i-x" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 18L18 6M6 6l12 12"/></symbol>
+  <symbol id="i-dots" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.6"/><circle cx="12" cy="12" r="1.6"/><circle cx="19" cy="12" r="1.6"/></symbol>
+  <symbol id="i-grid" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.75 6A2.25 2.25 0 016 3.75h2.25A2.25 2.25 0 0110.5 6v2.25a2.25 2.25 0 01-2.25 2.25H6a2.25 2.25 0 01-2.25-2.25V6zM3.75 15.75A2.25 2.25 0 016 13.5h2.25a2.25 2.25 0 012.25 2.25V18a2.25 2.25 0 01-2.25 2.25H6A2.25 2.25 0 013.75 18v-2.25zM13.5 6a2.25 2.25 0 012.25-2.25H18A2.25 2.25 0 0120.25 6v2.25A2.25 2.25 0 0118 10.5h-2.25a2.25 2.25 0 01-2.25-2.25V6zM13.5 15.75a2.25 2.25 0 012.25-2.25H18a2.25 2.25 0 012.25 2.25V18A2.25 2.25 0 0118 20.25h-2.25A2.25 2.25 0 0113.5 18v-2.25z"/></symbol>
+  <symbol id="i-list" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/></symbol>
+  <symbol id="i-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z"/></symbol>
+</svg>
+
+<div class="max-w-6xl mx-auto px-4 py-8 space-y-10">
+
+  <!-- ===== Judul dokumen ===== -->
+  <header class="flex items-start justify-between gap-4">
+    <div>
+      <p class="text-[11px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Mockup · belum diimplementasi</p>
+      <h1 class="text-2xl font-bold tracking-tight">Redesign Toolbar Gudang</h1>
+      <p class="text-sm text-slate-500 dark:text-slate-400 mt-1 max-w-2xl">
+        Dua toolbar: <strong>(A) header navigasi Gudang</strong> (<code>components/warehouse/header.blade.php</code>) dan
+        <strong>(B) toolbar papan Kelola Stok</strong> (<code>warehouse/stock/board/_toolbar.blade.php</code>).
+        Semua dropdown di bawah bisa dicoba. Tautan hanya contoh, tidak berpindah halaman.
+      </p>
+    </div>
+    <button type="button" @click="dark=!dark" class="shrink-0 inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">
+      <svg class="w-4 h-4"><use href="#i-moon"/></svg><span x-text="dark ? 'Mode terang' : 'Mode gelap'"></span>
+    </button>
+  </header>
+
+  <!-- ===== Ringkasan masalah ===== -->
+  <section class="grid sm:grid-cols-3 gap-3 text-xs">
+    <div class="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
+      <p class="font-bold text-rose-600 dark:text-rose-400 mb-1">Sekarang: 3 lapis di atas konten</p>
+      <p class="text-slate-600 dark:text-slate-400">Judul + subjudul + tombol (±90px), baris pemilih cabang + cari, lalu baris ±12 tab yang bergulir ke samping. Konten baru mulai di bawah ±220px.</p>
+    </div>
+    <div class="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
+      <p class="font-bold text-rose-600 dark:text-rose-400 mb-1">Sekarang: sub-tab tersembunyi</p>
+      <p class="text-slate-600 dark:text-slate-400">Papan / Matriks / Rincian / Ringkasan baru terlihat setelah Kelola Stok dibuka. Dua markup terpisah untuk desktop dan mobile.</p>
+    </div>
+    <div class="rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-4">
+      <p class="font-bold text-emerald-600 dark:text-emerald-400 mb-1">Usulan: 1 bar, 5 grup, sub-tab langsung</p>
+      <p class="text-slate-600 dark:text-slate-400">Satu bar ±56px. Hover/klik grup membuka daftar tujuan <em>termasuk tab di dalam halaman</em>. Konten naik ±130px.</p>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       A1. SEKARANG (ringkas, untuk pembanding)
+       ===================================================================== -->
+  <section>
+    <h2 class="text-sm font-bold uppercase tracking-wider text-slate-500 mb-2">A · Header navigasi — sekarang</h2>
+    <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 space-y-3">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-2xl font-bold tracking-tight">Gudang &amp; Inventori Logistik</p>
+          <p class="text-xs text-slate-500 mt-1">Pusat kendali stok, pergerakan barang, barang di tangan teknisi, dan pelacakan serial number perangkat aktif.</p>
+        </div>
+        <div class="flex gap-2 shrink-0">
+          <span class="px-3.5 py-2 text-xs font-semibold rounded-lg text-white bg-sky-600">Scan Barang</span>
+          <span class="px-3.5 py-2 text-xs font-bold rounded-lg text-white bg-slate-800 dark:bg-slate-700">+ Aksi ⌄</span>
+        </div>
+      </div>
+      <div class="flex items-center justify-between gap-3 text-xs">
+        <span class="px-3 py-1.5 rounded-lg bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 font-bold">Menampilkan: Gudang Pusat ⌄</span>
+        <span class="px-3 py-1.5 w-64 rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-400">Cari SN, roll, transfer, surat jalan...</span>
+      </div>
+      <div class="overflow-x-auto no-scrollbar">
+        <div class="flex items-center gap-1.5 min-w-max text-xs font-semibold text-slate-600 dark:text-slate-400">
+          <span class="text-[10px] uppercase text-slate-400">Ringkasan</span>
+          <span class="px-3 py-1.5 rounded-lg bg-sky-600 text-white">Dashboard</span>
+          <span class="px-3 py-1.5">Riwayat Mutasi</span><span class="px-3 py-1.5">Pemakaian Material</span><span class="px-3 py-1.5">Laporan</span><span class="px-3 py-1.5">Laporan Barang Terjual</span>
+          <span class="text-slate-300">|</span><span class="text-[10px] uppercase text-slate-400">Stok</span>
+          <span class="px-3 py-1.5">Kelola Stok</span><span class="px-3 py-1.5">Daftar Transfer</span><span class="px-3 py-1.5">Konfirmasi Transfer</span><span class="px-3 py-1.5">Jual Beli Cabang</span><span class="px-3 py-1.5">Lacak Barang / SN</span>
+          <span class="text-slate-300">|</span><span class="text-[10px] uppercase text-slate-400">Lapangan</span>
+          <span class="px-3 py-1.5">Barang di Tangan Teknisi</span><span class="px-3 py-1.5">Scan Barang</span>
+          <span class="text-slate-300">|</span><span class="text-[10px] uppercase text-slate-400">Retur</span><span class="px-3 py-1.5">Barang Retur</span>
+          <span class="text-slate-300">|</span><span class="text-[10px] uppercase text-slate-400">Permintaan</span><span class="px-3 py-1.5">Permintaan Stok</span>
+          <span class="text-slate-400">→ …terpotong di layar sempit</span>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- =====================================================================
+       A2. USULAN — bar tunggal
+       ===================================================================== -->
+  <section x-data="{
+        open: null, aksi:false, pop:false, kbd:false,
+        toggle(k){ this.open = this.open===k ? null : k },
+        focusSearch(){ $refs.q.focus() }
+      }"
+      @keydown.window="if(event.key==='/' && !['INPUT','SELECT','TEXTAREA'].includes(event.target.tagName)){ event.preventDefault(); focusSearch() }"
+      @keydown.escape.window="open=null; aksi=false; pop=false"
+      @click.outside="open=null; aksi=false; pop=false">
+    <h2 class="text-sm font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 mb-2">A · Header navigasi — usulan <span class="normal-case font-medium text-slate-500">(coba: klik grup, tekan <kbd class="px-1 rounded border border-slate-300 dark:border-slate-600 text-[10px]">/</kbd> untuk cari, <kbd class="px-1 rounded border border-slate-300 dark:border-slate-600 text-[10px]">Esc</kbd> tutup)</span></h2>
+
+    <div class="relative rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xs">
+      <!-- BAR TUNGGAL -->
+      <div class="flex items-center gap-1 px-3 h-14">
+        <!-- Judul ringkas + konteks cabang digabung: satu chip -->
+        <div class="relative mr-2">
+          <button type="button" @click="pop=!pop; open=null; aksi=false" :aria-expanded="pop"
+                  class="inline-flex items-center gap-2 h-9 pl-2.5 pr-2 rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-bold cursor-pointer hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors">
+            <svg class="w-4 h-4"><use href="#i-box"/></svg>
+            <span class="leading-tight text-left"><span class="block text-[9px] font-semibold uppercase tracking-wider text-sky-500">Gudang</span><span class="block">Pusat (POP)</span></span>
+            <svg class="w-3 h-3 transition-transform" :class="pop && 'rotate-180'"><use href="#i-chev"/></svg>
+          </button>
+          <div x-show="pop" x-cloak x-transition.origin.top.left.duration.150ms class="absolute left-0 top-11 w-60 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-30 text-xs">
+            <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Berlaku di semua halaman Gudang</p>
+            <a href="#" class="flex items-center justify-between px-3 py-2 bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 font-bold">Pusat (POP)<span>✓</span></a>
+            <a href="#" class="block px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50">Ponorogo (CABANG)</a>
+            <a href="#" class="block px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50">Siman (CABANG)</a>
+            <div class="border-t border-slate-100 dark:border-slate-700 mt-1 pt-1"><a href="#" class="block px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-500">Semua Cabang Saya</a></div>
+          </div>
+        </div>
+
+        <!-- NAV UTAMA: 5 grup -->
+        <nav class="flex items-center gap-0.5" aria-label="Navigasi Gudang">
+          <a href="#" class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold cursor-pointer transition-colors bg-sky-600 text-white shadow-xs" aria-current="page">
+            <svg class="w-4 h-4"><use href="#i-home"/></svg>Dasbor
+          </a>
+
+          <!-- Grup: Stok -->
+          <div class="relative">
+            <button type="button" @click="toggle('stok')" :aria-expanded="open==='stok'" aria-haspopup="menu"
+                    class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold cursor-pointer transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" :class="open==='stok' && 'bg-slate-100 dark:bg-slate-800'">
+              <svg class="w-4 h-4"><use href="#i-box"/></svg>Stok<svg class="w-3 h-3 opacity-60 transition-transform" :class="open==='stok' && 'rotate-180'"><use href="#i-chev"/></svg>
+            </button>
+            <div x-show="open==='stok'" x-cloak x-transition.origin.top.left.duration.150ms class="absolute left-0 top-11 w-72 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-30 text-xs" role="menu">
+              <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Kelola Stok</p>
+              <div class="grid grid-cols-2 gap-1 px-2 pb-1.5">
+                <a href="#" role="menuitem" class="flex items-center gap-2 px-2.5 h-9 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-700 dark:hover:text-sky-300 font-semibold"><svg class="w-4 h-4 text-sky-500"><use href="#i-grid"/></svg>Papan</a>
+                <a href="#" role="menuitem" class="flex items-center gap-2 px-2.5 h-9 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-700 dark:hover:text-sky-300 font-semibold"><svg class="w-4 h-4 text-sky-500"><use href="#i-grid"/></svg>Matriks</a>
+                <a href="#" role="menuitem" class="flex items-center gap-2 px-2.5 h-9 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-700 dark:hover:text-sky-300 font-semibold"><svg class="w-4 h-4 text-sky-500"><use href="#i-list"/></svg>Rincian</a>
+                <a href="#" role="menuitem" class="flex items-center gap-2 px-2.5 h-9 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/40 hover:text-sky-700 dark:hover:text-sky-300 font-semibold"><svg class="w-4 h-4 text-sky-500"><use href="#i-box"/></svg>Ringkasan</a>
+              </div>
+              <div class="border-t border-slate-100 dark:border-slate-700 pt-1">
+                <a href="#" role="menuitem" class="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold"><svg class="w-4 h-4 text-slate-400"><use href="#i-search"/></svg>Lacak Barang / SN</a>
+                <a href="#" role="menuitem" class="flex items-center gap-2.5 px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold"><svg class="w-4 h-4 text-slate-400"><use href="#i-swap"/></svg>Jual Beli Cabang</a>
+              </div>
+            </div>
+          </div>
+
+          <!-- Grup: Transfer -->
+          <div class="relative">
+            <button type="button" @click="toggle('transfer')" :aria-expanded="open==='transfer'" aria-haspopup="menu"
+                    class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold cursor-pointer transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" :class="open==='transfer' && 'bg-slate-100 dark:bg-slate-800'">
+              <svg class="w-4 h-4"><use href="#i-swap"/></svg>Transfer
+              <span class="rounded-full bg-amber-500/15 border border-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 text-[10px] font-bold" aria-label="3 menunggu konfirmasi">3</span>
+              <svg class="w-3 h-3 opacity-60 transition-transform" :class="open==='transfer' && 'rotate-180'"><use href="#i-chev"/></svg>
+            </button>
+            <div x-show="open==='transfer'" x-cloak x-transition.origin.top.left.duration.150ms class="absolute left-0 top-11 w-64 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-30 text-xs" role="menu">
+              <a href="#" role="menuitem" class="flex items-center justify-between px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold">Daftar Transfer</a>
+              <a href="#" role="menuitem" class="flex items-center justify-between px-3 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-semibold">Konfirmasi Transfer<span class="rounded-full bg-amber-500/15 border border-amber-500/20 text-amber-600 dark:text-amber-400 px-1.5 text-[10px] font-bold">3</span></a>
+              <a href="#" role="menuitem" class="flex items-center justify-between px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold">Permintaan Stok</a>
+            </div>
+          </div>
+
+          <!-- Grup: Lapangan -->
+          <div class="relative">
+            <button type="button" @click="toggle('lapangan')" :aria-expanded="open==='lapangan'" aria-haspopup="menu"
+                    class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold cursor-pointer transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" :class="open==='lapangan' && 'bg-slate-100 dark:bg-slate-800'">
+              <svg class="w-4 h-4"><use href="#i-users"/></svg>Lapangan<svg class="w-3 h-3 opacity-60 transition-transform" :class="open==='lapangan' && 'rotate-180'"><use href="#i-chev"/></svg>
+            </button>
+            <div x-show="open==='lapangan'" x-cloak x-transition.origin.top.left.duration.150ms class="absolute left-0 top-11 w-64 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-30 text-xs" role="menu">
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold">Barang di Tangan Teknisi</a>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold">Barang Retur</a>
+            </div>
+          </div>
+
+          <!-- Grup: Laporan -->
+          <div class="relative">
+            <button type="button" @click="toggle('laporan')" :aria-expanded="open==='laporan'" aria-haspopup="menu"
+                    class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg text-xs font-semibold cursor-pointer transition-colors text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800" :class="open==='laporan' && 'bg-slate-100 dark:bg-slate-800'">
+              <svg class="w-4 h-4"><use href="#i-chart"/></svg>Laporan<svg class="w-3 h-3 opacity-60 transition-transform" :class="open==='laporan' && 'rotate-180'"><use href="#i-chev"/></svg>
+            </button>
+            <div x-show="open==='laporan'" x-cloak x-transition.origin.top.left.duration.150ms class="absolute left-0 top-11 w-64 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-30 text-xs" role="menu">
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold">Riwayat Mutasi</a>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold">Pemakaian Material</a>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold">Laporan Bulanan</a>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold">Laporan Barang Terjual</a>
+            </div>
+          </div>
+        </nav>
+
+        <!-- KANAN: cari + scan + aksi -->
+        <div class="ml-auto flex items-center gap-1.5">
+          <form onsubmit="return false" class="relative hidden md:block">
+            <label for="gq" class="sr-only">Cari SN, roll, transfer, surat jalan</label>
+            <svg class="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400"><use href="#i-search"/></svg>
+            <input id="gq" x-ref="q" type="text" placeholder="Cari SN, roll, transfer…" class="w-52 focus:w-72 transition-[width] duration-200 h-9 pl-8 pr-8 text-xs font-medium border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 placeholder-slate-400 focus:outline-none focus:bg-white dark:focus:bg-slate-900 focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+            <kbd class="absolute right-2 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 border border-slate-300 dark:border-slate-600 rounded px-1">/</kbd>
+          </form>
+          <a href="#" class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors" title="Scan Barang" aria-label="Scan Barang">
+            <svg class="w-4 h-4"><use href="#i-scan"/></svg>
+          </a>
+          <div class="relative">
+            <button type="button" @click="aksi=!aksi; open=null; pop=false" :aria-expanded="aksi" aria-haspopup="menu"
+                    class="inline-flex items-center gap-1.5 h-9 px-3.5 rounded-lg text-xs font-bold text-white bg-sky-600 hover:bg-sky-700 shadow-xs shadow-sky-600/20 cursor-pointer transition-colors">
+              <svg class="w-4 h-4"><use href="#i-plus"/></svg>Aksi
+            </button>
+            <div x-show="aksi" x-cloak x-transition.origin.top.right.duration.150ms class="absolute right-0 top-11 w-64 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-30 text-xs" role="menu">
+              <p class="px-3 py-1 text-[10px] font-bold uppercase tracking-wider text-slate-400">Masuk &amp; Retur</p>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-emerald-50 dark:hover:bg-emerald-950/30 font-semibold">Terima Barang Masuk</a>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-teal-50 dark:hover:bg-teal-950/30 font-semibold">Terima Retur Modem</a>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-teal-50 dark:hover:bg-teal-950/30 font-semibold">Terima Modem dari Pelanggan</a>
+              <p class="px-3 pt-2 pb-1 mt-1 border-t border-slate-100 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider text-slate-400">Keluar</p>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-sky-50 dark:hover:bg-sky-950/30 font-semibold">Transfer ke Cabang</a>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-indigo-50 dark:hover:bg-indigo-950/30 font-semibold">Serah ke Teknisi</a>
+              <p class="px-3 pt-2 pb-1 mt-1 border-t border-slate-100 dark:border-slate-700 text-[10px] font-bold uppercase tracking-wider text-slate-400">Penyesuaian</p>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-semibold">Penyesuaian Saldo</a>
+              <a href="#" role="menuitem" class="block px-3 py-2 hover:bg-amber-50 dark:hover:bg-amber-950/30 font-semibold">Stock Opname</a>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- BREADCRUMB + JUDUL HALAMAN (menggantikan judul besar + subjudul panjang) -->
+      <div class="flex items-center gap-2 px-4 h-10 border-t border-slate-100 dark:border-slate-800 text-xs">
+        <span class="text-slate-400">Gudang</span><span class="text-slate-300">/</span><span class="text-slate-400">Stok</span><span class="text-slate-300">/</span>
+        <h3 class="font-bold text-slate-800 dark:text-slate-100">Kelola Stok</h3>
+        <span class="ml-auto text-[11px] text-slate-400 hidden sm:inline">Subjudul panjang dipindah ke ikon info (ⓘ) di samping judul</span>
+      </div>
+    </div>
+    <p class="text-[11px] text-slate-500 mt-2">Tinggi header: ±96px (sekarang ±220px). Grup dan item tetap difilter per permission seperti sekarang; grup tanpa item yang boleh dilihat tidak dirender. Badge Transfer tampil di tombol grup supaya tidak tersembunyi saat dropdown tertutup.</p>
+  </section>
+
+  <!-- =====================================================================
+       B1. TOOLBAR KELOLA STOK — usulan
+       ===================================================================== -->
+  <section x-data="{ view:'papan', track:'', low:false, exp:false, more:false, chips:true }" @click.outside="more=false">
+    <h2 class="text-sm font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 mb-2">B · Toolbar Kelola Stok — usulan</h2>
+
+    <div class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800 p-3 shadow-xs space-y-2.5">
+      <!-- BARIS TUNGGAL -->
+      <div class="flex flex-wrap items-center gap-2">
+        <!-- Tampilan -->
+        <div class="inline-flex p-1 bg-slate-100 dark:bg-slate-800/80 rounded-xl text-xs font-semibold" role="tablist" aria-label="Mode tampilan stok">
+          <template x-for="v in [['papan','Papan','i-grid'],['matrix','Matriks','i-grid'],['rincian','Rincian','i-list'],['ringkasan','Ringkasan','i-box']]" :key="v[0]">
+            <button type="button" role="tab" :aria-selected="view===v[0]" @click="view=v[0]"
+                    class="inline-flex items-center gap-1.5 h-7 px-2.5 rounded-lg cursor-pointer transition-colors whitespace-nowrap"
+                    :class="view===v[0] ? 'bg-white dark:bg-slate-900 text-sky-600 dark:text-sky-400 shadow-xs' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100'">
+              <svg class="w-3.5 h-3.5"><use :href="'#'+v[2]"/></svg><span x-text="v[1]"></span>
+            </button>
+          </template>
+        </div>
+
+        <!-- Tracking: select ringkas menggantikan 4 tab -->
+        <div class="relative">
+          <label for="trk" class="sr-only">Jenis tracking</label>
+          <select id="trk" x-model="track" class="appearance-none h-9 pl-3 pr-7 text-xs font-semibold border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 cursor-pointer focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+            <option value="">Semua jenis</option><option value="sn"># SN</option><option value="roll">Roll</option><option value="qty">Curah (Qty)</option>
+          </select>
+          <svg class="pointer-events-none absolute right-2 top-1/2 -translate-y-1/2 w-3 h-3 text-slate-400"><use href="#i-chev"/></svg>
+        </div>
+
+        <!-- Menipis -->
+        <button type="button" @click="low=!low" :aria-pressed="low"
+                class="inline-flex items-center gap-1.5 h-9 px-3 rounded-lg border text-xs font-semibold cursor-pointer transition-colors"
+                :class="low ? 'bg-rose-50 dark:bg-rose-950/40 border-rose-300 dark:border-rose-800 text-rose-700 dark:text-rose-300' : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'">
+          <span class="w-2 h-2 rounded-full" :class="low ? 'bg-rose-500' : 'bg-amber-500'"></span>Menipis
+        </button>
+
+        <!-- Cari + kategori dalam satu field group -->
+        <div class="flex flex-1 min-w-[16rem] items-center rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-800/70 focus-within:ring-2 focus-within:ring-sky-500/20 focus-within:border-sky-500 transition-all h-9">
+          <svg class="w-3.5 h-3.5 ml-2.5 text-slate-400 shrink-0"><use href="#i-search"/></svg>
+          <label for="bs" class="sr-only">Cari barang</label>
+          <input id="bs" type="search" placeholder="Cari nama, kode, SN, atau nomor roll…" class="flex-1 min-w-0 h-full px-2 text-xs font-medium bg-transparent focus:outline-none placeholder-slate-400">
+          <div class="h-4 w-px bg-slate-200 dark:bg-slate-700"></div>
+          <label for="bc" class="sr-only">Kategori</label>
+          <select id="bc" class="h-full pl-2.5 pr-2 text-xs font-medium bg-transparent focus:outline-none cursor-pointer max-w-[9rem]">
+            <option>Semua kategori</option><option>Modem / ONT</option><option>Kabel</option><option>Konektor</option>
+          </select>
+        </div>
+
+        <!-- Tombol ⋯ : Bentang/Ciutkan (khusus Papan) -->
+        <div class="relative" x-show="view==='papan' || view==='matrix'">
+          <button type="button" @click="more=!more" :aria-expanded="more" aria-label="Opsi tampilan"
+                  class="inline-flex items-center justify-center w-9 h-9 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer transition-colors">
+            <svg class="w-4 h-4"><use href="#i-dots"/></svg>
+          </button>
+          <div x-show="more" x-cloak x-transition.origin.top.right.duration.150ms class="absolute right-0 top-11 w-52 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-xl py-1.5 z-30 text-xs">
+            <button type="button" @click="exp=true; more=false" class="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold cursor-pointer">Bentang semua gudang &amp; kategori</button>
+            <button type="button" @click="exp=false; more=false" class="w-full text-left px-3 py-2 hover:bg-slate-50 dark:hover:bg-slate-700/50 font-semibold cursor-pointer">Ciutkan semua</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Chip filter aktif: hanya muncul bila ada filter -->
+      <div x-show="track || low" x-cloak class="flex flex-wrap items-center gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800 text-xs">
+        <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mr-0.5">Filter aktif</span>
+        <button x-show="track" @click="track=''" type="button" class="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 rounded-full font-medium bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200/80 dark:border-sky-800/80 cursor-pointer hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors">
+          <span x-text="'Jenis: ' + ({sn:'SN',roll:'Roll',qty:'Curah'}[track])"></span><svg class="w-3 h-3"><use href="#i-x"/></svg>
+        </button>
+        <button x-show="low" @click="low=false" type="button" class="inline-flex items-center gap-1.5 pl-2.5 pr-1.5 py-0.5 rounded-full font-medium bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200/80 dark:border-sky-800/80 cursor-pointer hover:bg-sky-100 dark:hover:bg-sky-900/50 transition-colors">
+          Hanya menipis<svg class="w-3 h-3"><use href="#i-x"/></svg>
+        </button>
+        <button type="button" @click="track=''; low=false" class="font-semibold text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 underline underline-offset-2 ml-1 cursor-pointer">Hapus semua</button>
+      </div>
+    </div>
+    <ul class="text-[11px] text-slate-500 mt-2 space-y-0.5 list-disc pl-4">
+      <li>Dari 3 baris (±150px) jadi 1 baris, chip hanya muncul saat ada filter. Cari + kategori satu field group; tombol <em>Cari</em> dihapus (Enter / ganti kategori langsung kirim).</li>
+      <li>Tracking: 4 tab jadi 1 select (hemat ±200px lebar); Menipis tetap tombol toggle terpisah karena sering dipakai.</li>
+      <li>Bentang/Ciutkan masuk menu ⋯ dan hanya tampil di Papan/Matriks. Di Rincian/Ringkasan tombolnya tidak relevan, jadi tidak dirender.</li>
+      <li>Pada implementasi, semua tautan tetap dirakit server lewat <code>route()</code> (aturan repo); mockup ini memakai state Alpine hanya untuk demo.</li>
+    </ul>
+  </section>
+
+  <!-- =====================================================================
+       C. MOBILE
+       ===================================================================== -->
+  <section>
+    <h2 class="text-sm font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 mb-2">C · Mobile (390px) — satu markup, bukan dua</h2>
+    <div class="flex justify-center">
+      <div class="w-[390px] max-w-full rounded-[28px] border-[6px] border-slate-800 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 overflow-hidden h-[640px] relative"
+           x-data="{ sheet:false, g:'stok', aksi:false }">
+        <!-- Top bar -->
+        <div class="flex items-center gap-2 px-3 h-14 bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800">
+          <button type="button" @click="sheet=true" aria-label="Buka menu Gudang" class="w-11 h-11 -ml-1 inline-flex items-center justify-center rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"><svg class="w-5 h-5"><use href="#i-menu"/></svg></button>
+          <div class="min-w-0 flex-1 leading-tight">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400">Pusat (POP)</p>
+            <p class="text-sm font-bold truncate">Kelola Stok</p>
+          </div>
+          <a href="#" aria-label="Scan Barang" class="w-11 h-11 inline-flex items-center justify-center rounded-lg border border-slate-200 dark:border-slate-700 cursor-pointer"><svg class="w-5 h-5"><use href="#i-scan"/></svg></a>
+          <button type="button" @click="aksi=true" aria-label="Aksi" class="w-11 h-11 inline-flex items-center justify-center rounded-lg bg-sky-600 text-white cursor-pointer"><svg class="w-5 h-5"><use href="#i-plus"/></svg></button>
+        </div>
+        <!-- Tab tampilan: scroll horizontal, tab aktif ditengah -->
+        <div class="flex gap-1 px-3 py-2 overflow-x-auto no-scrollbar bg-white dark:bg-slate-900 border-b border-slate-200 dark:border-slate-800 text-xs font-semibold">
+          <span class="px-3 h-9 inline-flex items-center rounded-lg bg-sky-600 text-white shrink-0">Papan</span>
+          <span class="px-3 h-9 inline-flex items-center rounded-lg text-slate-600 dark:text-slate-300 shrink-0">Matriks</span>
+          <span class="px-3 h-9 inline-flex items-center rounded-lg text-slate-600 dark:text-slate-300 shrink-0">Rincian</span>
+          <span class="px-3 h-9 inline-flex items-center rounded-lg text-slate-600 dark:text-slate-300 shrink-0">Ringkasan</span>
+        </div>
+        <!-- Filter: cari + tombol Filter (sheet) -->
+        <div class="flex gap-2 px-3 py-2">
+          <div class="flex-1 relative"><svg class="absolute left-2.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400"><use href="#i-search"/></svg><input type="search" placeholder="Cari barang, SN, roll…" class="w-full h-11 pl-9 pr-3 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 focus:outline-none focus:ring-2 focus:ring-sky-500/20"></div>
+          <button type="button" class="h-11 px-3 inline-flex items-center gap-1.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-xs font-semibold cursor-pointer">Filter <span class="rounded-full bg-sky-600 text-white text-[10px] px-1.5">2</span></button>
+        </div>
+        <div class="px-3 text-xs text-slate-400">(konten papan…)</div>
+
+        <!-- Sheet navigasi -->
+        <div x-show="sheet" x-cloak class="absolute inset-0 z-20" role="dialog" aria-modal="true" aria-label="Menu Gudang">
+          <div class="absolute inset-0 bg-black/50" @click="sheet=false" x-transition.opacity></div>
+          <div class="absolute left-0 top-0 bottom-0 w-[300px] bg-white dark:bg-slate-900 shadow-2xl overflow-y-auto" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="-translate-x-full" x-transition:enter-end="translate-x-0">
+            <div class="flex items-center justify-between px-4 h-14 border-b border-slate-100 dark:border-slate-800">
+              <p class="text-sm font-bold">Gudang</p>
+              <button type="button" @click="sheet=false" aria-label="Tutup menu" class="w-11 h-11 -mr-2 inline-flex items-center justify-center cursor-pointer"><svg class="w-5 h-5"><use href="#i-x"/></svg></button>
+            </div>
+            <div class="px-3 py-2"><div class="px-3 h-11 inline-flex w-full items-center justify-between rounded-lg bg-sky-50 dark:bg-sky-950/40 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 text-xs font-bold">Pusat (POP) <svg class="w-3 h-3"><use href="#i-chev"/></svg></div></div>
+            <nav class="px-2 pb-6 text-sm">
+              <a href="#" class="flex items-center gap-3 px-3 h-11 rounded-lg font-semibold"><svg class="w-5 h-5 text-slate-400"><use href="#i-home"/></svg>Dasbor</a>
+
+              <template x-for="grp in [
+                {k:'stok', n:'Stok', i:'i-box', items:['Papan','Matriks','Rincian','Ringkasan per Item','Lacak Barang / SN','Jual Beli Cabang']},
+                {k:'transfer', n:'Transfer', i:'i-swap', items:['Daftar Transfer','Konfirmasi Transfer (3)','Permintaan Stok']},
+                {k:'lapangan', n:'Lapangan', i:'i-users', items:['Barang di Tangan Teknisi','Barang Retur']},
+                {k:'laporan', n:'Laporan', i:'i-chart', items:['Riwayat Mutasi','Pemakaian Material','Laporan Bulanan','Laporan Barang Terjual']}
+              ]" :key="grp.k">
+                <div>
+                  <button type="button" @click="g = g===grp.k ? '' : grp.k" :aria-expanded="g===grp.k" class="w-full flex items-center gap-3 px-3 h-11 rounded-lg font-semibold cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800">
+                    <svg class="w-5 h-5 text-slate-400"><use :href="'#'+grp.i"/></svg><span x-text="grp.n"></span>
+                    <svg class="w-3.5 h-3.5 ml-auto transition-transform" :class="g===grp.k && 'rotate-180'"><use href="#i-chev"/></svg>
+                  </button>
+                  <div x-show="g===grp.k" x-collapse class="ml-8 border-l border-slate-100 dark:border-slate-800">
+                    <template x-for="it in grp.items" :key="it"><a href="#" class="flex items-center px-4 h-11 text-slate-600 dark:text-slate-300 hover:text-sky-600 text-[13px]" x-text="it"></a></template>
+                  </div>
+                </div>
+              </template>
+            </nav>
+          </div>
+        </div>
+
+        <!-- Sheet aksi -->
+        <div x-show="aksi" x-cloak class="absolute inset-0 z-20 flex items-end" role="dialog" aria-modal="true" aria-label="Aksi Gudang">
+          <div class="absolute inset-0 bg-black/50" @click="aksi=false"></div>
+          <div class="relative w-full bg-white dark:bg-slate-900 rounded-t-2xl p-3 pb-5 text-sm" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="translate-y-full" x-transition:enter-end="translate-y-0">
+            <div class="mx-auto w-10 h-1 rounded-full bg-slate-300 dark:bg-slate-700 mb-3"></div>
+            <div class="grid grid-cols-2 gap-2 text-xs font-semibold">
+              <a href="#" class="h-14 px-3 inline-flex items-center rounded-xl bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300">Terima Barang Masuk</a>
+              <a href="#" class="h-14 px-3 inline-flex items-center rounded-xl bg-teal-50 dark:bg-teal-950/30 text-teal-700 dark:text-teal-300">Terima Retur / Modem</a>
+              <a href="#" class="h-14 px-3 inline-flex items-center rounded-xl bg-sky-50 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300">Transfer ke Cabang</a>
+              <a href="#" class="h-14 px-3 inline-flex items-center rounded-xl bg-indigo-50 dark:bg-indigo-950/30 text-indigo-700 dark:text-indigo-300">Serah ke Teknisi</a>
+              <a href="#" class="h-14 px-3 inline-flex items-center rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300">Penyesuaian Saldo</a>
+              <a href="#" class="h-14 px-3 inline-flex items-center rounded-xl bg-amber-50 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300">Stock Opname</a>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <ul class="text-[11px] text-slate-500 mt-3 space-y-0.5 list-disc pl-4 max-w-[390px] mx-auto">
+      <li>Coba tombol ☰ (menu bertingkat) dan + (aksi). Semua target sentuh ≥ 44px.</li>
+      <li>Satu komponen untuk semua lebar: di &lt; lg bar jadi ikon + sheet; di ≥ lg jadi bar dengan dropdown. Tidak ada lagi blok mobile yang ditulis ulang.</li>
+      <li>Tab tampilan Kelola Stok tetap terlihat di atas konten, jadi pindah Papan ↔ Matriks tetap satu ketukan.</li>
+    </ul>
+  </section>
+
+  <!-- =====================================================================
+       D. KEPUTUSAN
+       ===================================================================== -->
+  <section class="rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 p-5 text-xs space-y-2">
+    <h2 class="text-sm font-bold">Catatan implementasi &amp; hal yang perlu diputuskan</h2>
+    <ul class="list-disc pl-4 space-y-1 text-slate-600 dark:text-slate-400">
+      <li><strong>Sub-tab halaman lain</strong> (mis. tab Custody <code>?tab=</code>, tab Laporan) belum dimasukkan ke dropdown karena belum dipetakan. Kelola Stok sudah punya 4 view yang jelas; sisanya ditambah setelah daftar tabnya dipastikan.</li>
+      <li><strong>Ikon baru perlu dipilih</strong> untuk beberapa item (Jual Beli Cabang, Laporan). Mockup memakai ikon yang sudah ada di repo supaya satu keluarga (Heroicons outline, stroke 2).</li>
+      <li><strong>Hover vs klik</strong>: mockup memakai klik (aman untuk sentuh dan keyboard). Hover-intent bisa ditambah di desktop, tapi bukan syarat.</li>
+      <li><strong>Pencarian global</strong> di bar jadi ikon pada layar &lt; md (tidak ditampilkan di mockup), dibuka lewat tombol cari.</li>
+      <li><strong>Aksesibilitas</strong>: <code>aria-expanded</code>/<code>aria-haspopup</code> di tombol grup, <code>Esc</code> menutup, fokus cincin tetap terlihat, badge punya <code>aria-label</code>.</li>
+      <li><strong>Test yang kena</strong>: penanda halaman aktif (<code>data-active-tab</code>) dan teks tab di test Blade gudang perlu disesuaikan. Cek <code>tests/Feature/Warehouse/*</code> sebelum mengubah header.</li>
+    </ul>
+  </section>
+</div>
+</body>
+</html>

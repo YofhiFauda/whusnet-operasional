@@ -95,12 +95,12 @@
     {{-- 1. Tagihan --}}
     <div class="{{ $card }} p-5">
         <h3 class="text-sm font-bold uppercase text-slate-800 dark:text-slate-100 mb-2">Tagihan {{ $periodLabel }}</h3>
-        <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Angka bergaris putus-putus bisa diklik untuk melihat rincian pelanggannya.</p>
+        <p class="text-xs text-slate-500 dark:text-slate-400 mb-2">Angka bergaris putus-putus bisa diklik untuk melihat rincian pelanggannya. Bayar Dimuka Diterima adalah nominal transaksi penuh dan tidak dijumlahkan lagi ke Total Pembayaran.</p>
         <div class="overflow-x-auto">
             <table class="w-full border-collapse">
                 <thead>
                     <tr>
-                        @foreach(['No', 'OLT', 'Tagihan Terbit', 'Dimuka', 'Diskon', 'Bulanan', 'Total Pembayaran', 'Piutang', 'Pendapatan %', 'Piutang %'] as $h)
+                        @foreach(['No', 'OLT', 'Tagihan Terbit', 'Bayar Dimuka Diterima', 'Dibayar dari Saldo', 'Diskon', 'Bulanan', 'Total Pembayaran', 'Piutang', 'Pendapatan %', 'Piutang %'] as $h)
                             <th class="{{ $th }}">{{ $h }}</th>
                         @endforeach
                     </tr>
@@ -112,7 +112,8 @@
                             <td class="{{ $tdNo }}">{{ $i + 1 }}</td>
                             <td class="{{ $tdText }}">{{ $row['pop']->name }}</td>
                             <x-reports.detail-cell :cls="$td" :value="$rp($t['tagihan_terbit'])" block="tagihan" column="tagihan_terbit" :pop-id="$pid" label="Tagihan Terbit — {{ $row['pop']->name }}" :clickable="$can('tagihan', 'tagihan_terbit')" />
-                            <x-reports.detail-cell :cls="$td" :value="$rp($t['dimuka'])" block="tagihan" column="dimuka" :pop-id="$pid" label="Dimuka (saldo) — {{ $row['pop']->name }}" :clickable="$can('tagihan', 'dimuka')" />
+                            <x-reports.detail-cell :cls="$td" :value="$rp($t['bayar_dimuka_diterima'] ?? 0)" block="tagihan" column="bayar_dimuka_diterima" :pop-id="$pid" label="Bayar dimuka diterima — {{ $row['pop']->name }}" :clickable="$can('tagihan', 'bayar_dimuka_diterima')" />
+                            <x-reports.detail-cell :cls="$td" :value="$rp($t['dimuka'])" block="tagihan" column="dimuka" :pop-id="$pid" label="Dibayar dari saldo — {{ $row['pop']->name }}" :clickable="$can('tagihan', 'dimuka')" />
                             <x-reports.detail-cell :cls="$td" :value="$rp($t['diskon'])" block="tagihan" column="diskon" :pop-id="$pid" label="Diskon — {{ $row['pop']->name }}" :clickable="$can('tagihan', 'diskon')" />
                             <x-reports.detail-cell :cls="$td" :value="$rp($t['bulanan'])" block="tagihan" column="bulanan" :pop-id="$pid" label="Bulanan (bayar tunai) — {{ $row['pop']->name }}" :clickable="$can('tagihan', 'bulanan')" />
                             <td class="{{ $td }}">{{ $rp($t['total_pembayaran']) }}</td>
@@ -128,6 +129,7 @@
                         <td class="{{ $tfText }}"></td>
                         <td class="{{ $tfText }}">Total</td>
                         <td class="{{ $tf }}">{{ $rp($t['tagihan_terbit']) }}</td>
+                        <td class="{{ $tf }}">{{ $rp($t['bayar_dimuka_diterima'] ?? 0) }}</td>
                         <td class="{{ $tf }}">{{ $rp($t['dimuka']) }}</td>
                         <td class="{{ $tf }}">{{ $rp($t['diskon']) }}</td>
                         <td class="{{ $tf }}">{{ $rp($t['bulanan']) }}</td>
@@ -140,7 +142,7 @@
                         <td class="{{ $tfText }} bg-[#e2efda]"></td>
                         <td class="{{ $tfText }} bg-[#e2efda]">Piutang {{ $previousLabel }}</td>
                         <td class="{{ $tf }} bg-[#e2efda]">{{ $rp($totals['piutang_lalu']['belum_dibayar']) }}</td>
-                        <td class="{{ $tf }} bg-[#e2efda]" colspan="7"></td>
+                        <td class="{{ $tf }} bg-[#e2efda]" colspan="8"></td>
                     </tr>
                 </tfoot>
             </table>
@@ -204,7 +206,7 @@
             <table class="w-full border-collapse">
                 <thead>
                     <tr>
-                        @foreach(['No', 'OLT', 'Total Pelanggan', 'Bayar Dimuka', 'Sudah Bayar', 'Belum Bayar'] as $h)
+                        @foreach(['No', 'OLT', 'Total Pelanggan', 'Bayar Dimuka', 'Lunas dari Saldo', 'Sudah Bayar', 'Belum Bayar'] as $h)
                             <th class="{{ $th }}">{{ $h }}</th>
                         @endforeach
                     </tr>
@@ -216,7 +218,8 @@
                             <td class="{{ $tdNo }}">{{ $i + 1 }}</td>
                             <td class="{{ $tdText }}">{{ $row['pop']->name }}</td>
                             <x-reports.detail-cell :cls="$td" :value="$rp($c['total'])" block="pelanggan" column="total" :pop-id="$pid" label="Pelanggan tagihan bulan ini — {{ $row['pop']->name }}" :clickable="$can('pelanggan', 'total')" />
-                            <x-reports.detail-cell :cls="$td" :value="$rp($c['dimuka'])" block="pelanggan" column="dimuka" :pop-id="$pid" label="Pelanggan lunas dari saldo (dimuka) — {{ $row['pop']->name }}" :clickable="$can('pelanggan', 'dimuka')" />
+                            <x-reports.detail-cell :cls="$td" :value="$rp($c['bayar_dimuka'] ?? 0)" block="pelanggan" column="bayar_dimuka" :pop-id="$pid" label="Pelanggan unik bayar dimuka — {{ $row['pop']->name }}" :clickable="$can('pelanggan', 'bayar_dimuka')" />
+                            <x-reports.detail-cell :cls="$td" :value="$rp($c['dimuka'])" block="pelanggan" column="dimuka" :pop-id="$pid" label="Pelanggan lunas dari saldo — {{ $row['pop']->name }}" :clickable="$can('pelanggan', 'dimuka')" />
                             <x-reports.detail-cell :cls="$td" :value="$rp($c['sudah_bayar'])" block="pelanggan" column="sudah_bayar" :pop-id="$pid" label="Pelanggan sudah bayar — {{ $row['pop']->name }}" :clickable="$can('pelanggan', 'sudah_bayar')" />
                             <x-reports.detail-cell :cls="$td" :value="$rp($c['belum_bayar'])" block="pelanggan" column="belum_bayar" :pop-id="$pid" label="Pelanggan belum bayar — {{ $row['pop']->name }}" :clickable="$can('pelanggan', 'belum_bayar')" />
                         </tr>
@@ -228,6 +231,7 @@
                         <td class="{{ $tfText }}"></td>
                         <td class="{{ $tfText }}">Total</td>
                         <td class="{{ $tf }}">{{ $rp($c['total']) }}</td>
+                        <td class="{{ $tf }}">{{ $rp($c['bayar_dimuka'] ?? 0) }}</td>
                         <td class="{{ $tf }}">{{ $rp($c['dimuka']) }}</td>
                         <td class="{{ $tf }}">{{ $rp($c['sudah_bayar']) }}</td>
                         <td class="{{ $tf }}">{{ $rp($c['belum_bayar']) }}</td>

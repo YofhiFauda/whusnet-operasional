@@ -42,7 +42,7 @@
             </span>
             <div class="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-700/80 px-2 py-0.5 rounded text-xs font-mono font-medium text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-600/60">
                 <span>{{ $displayIdLabel ?? 'CID' }}: {{ $displayId }}</span>
-                <button type="button" onclick="copyText('{{ $displayId }}', 'CID')" class="text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 ml-1 cursor-pointer transition-colors" title="Salin CID">
+                <button type="button" onclick="copyText('{{ $displayId }}', 'CID')" class="text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 ml-1 cursor-pointer transition-colors" title="Salin CID" aria-label="Salin CID">
                     <i class="fa-regular fa-copy"></i>
                 </button>
             </div>
@@ -52,7 +52,7 @@
                     Kolektor: {{ $customer->collector->name }}
                 </span>
             @else
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                     Belum Ada Kolektor
                 </span>
             @endif
@@ -89,10 +89,10 @@
             <span class="inline-flex items-center gap-1.5">
                 <i class="fa-solid fa-network-wired text-indigo-500 text-[11px]"></i>
                 <span>{{ $customer->pop->name ?? 'POP Belum Set' }}</span>
-                <span class="text-slate-400">({{ $customer->miniPop->name ?? 'Mini POP Belum Set' }})</span>
+                <span class="text-slate-500 dark:text-slate-400">({{ $customer->miniPop->name ?? 'Mini POP Belum Set' }})</span>
             </span>
             <span class="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
-            <span class="inline-flex items-center gap-1.5 text-slate-400">
+            <span class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                 <i class="fa-regular fa-calendar-check text-[11px]"></i>
                 <span>Terdaftar sejak {{ $regDate }}</span>
             </span>
@@ -101,7 +101,11 @@
     <div class="flex items-center gap-2 shrink-0 flex-wrap w-full xl:w-auto pt-1 xl:pt-0">
         @can('customers.detail.installation.activate')
             @php
-                $hasWorkflowTask = isset($customerTasks) && $customerTasks->whereIn('task_type', [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value])->isNotEmpty();
+                // task_type di-cast ke enum TaskType di model Task — whereIn()
+                // harus dibandingkan ke case enum-nya, bukan ->value, kalau
+                // tidak loose-compare-nya gak pernah match (enum instance
+                // tidak == string) dan $hasWorkflowTask selalu false.
+                $hasWorkflowTask = isset($customerTasks) && $customerTasks->whereIn('task_type', [\App\Enums\TaskType::SURVEY, \App\Enums\TaskType::PEMASANGAN])->isNotEmpty();
                 $isProvenLegacyActive = $customer->old_customer_id && $customer->customerService?->request_status === 'ACTIVE';
             @endphp
             @if($customer->data_completeness_status !== 'siap_billing' && $customer->status !== 'active' && !$hasWorkflowTask && $isProvenLegacyActive)
@@ -147,7 +151,7 @@
         @endcan
 
         <a href="{{ route('customers.index') }}" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-2xs">
-            <i class="fa-solid fa-arrow-left text-slate-400"></i>
+            <i class="fa-solid fa-arrow-left text-slate-500 dark:text-slate-400"></i>
             <span>Kembali</span>
         </a>
     </div>
@@ -159,14 +163,14 @@
     <!-- SECTION A: QUICK METRIC STRIP (Responsive hairline grid for Mobile, Tablet, & Desktop) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-px bg-slate-200 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-700">
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">LANGGANAN & BIAYA</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">LANGGANAN & BIAYA</span>
             <span class="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1 truncate" title="{{ $customer->internetPackage->name ?? 'Belum Ada Paket' }}">
                 {{ $customer->internetPackage->name ?? 'Belum Ada Paket' }}
             </span>
             <span class="text-xs font-mono font-semibold text-sky-600 dark:text-sky-400">Rp {{ number_format($totalBill, 0, ',', '.') }}/bln (Nett)</span>
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PPPOE</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">PPPOE</span>
             @php
                 $pppoeShown = $customer->customerDevice?->pppoe_username ?: ($customer->customerTechnicalDetail?->pppoe_username ?: ($customer->customerService?->pppoe_username ?: ($customer->pppoe_username ?? '-')));
                 $pppoeWarning = \App\Services\CustomerCidService::pppoeMismatchWarning($customer, $pppoeShown);
@@ -179,7 +183,7 @@
             @endif
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MODEM ONT & SIGNAL</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">MODEM ONT & SIGNAL</span>
             <span class="text-xs font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 truncate" title="{{ $customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang') }}">
                 {{ $customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang') }}
             </span>
@@ -187,21 +191,21 @@
             <x-warehouse.acquisition-badge :device="$customer->customerDevice" class="mt-1.5 self-start" />
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">BILLING & TAGIHAN</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">BILLING & TAGIHAN</span>
             @if($latestInvoice)
                 <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1 truncate" title="{{ $latestInvoice->invoice_number }} ({{ $latestInvoice->invoice_status->label() }})">
                     {{ $latestInvoice->invoice_number }} ({{ $latestInvoice->invoice_status->label() }})
                 </span>
             @else
-                <span class="text-xs font-bold text-slate-400 mt-1">Belum Ada Tagihan</span>
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 mt-1">Belum Ada Tagihan</span>
             @endif
             <span class="text-[11px] text-slate-500">Jatuh Tempo: {{ $customer->customerService?->due_date ? 'Tgl ' . \Carbon\Carbon::parse($customer->customerService->due_date)->day . ' Per Bulan' : '-' }}</span>
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0 sm:col-span-2 lg:col-span-1">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KELENGKAPAN PROFIL</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">KELENGKAPAN PROFIL</span>
             <div class="flex items-center justify-between mt-1">
                 <span class="text-xs font-bold {{ count($completeness['missing_required']) > 0 ? 'text-rose-600' : (count($completeness['missing_optional']) > 0 ? 'text-amber-600' : 'text-emerald-600') }}">{{ $completeness['percentage'] }}% Lengkap</span>
-                <span class="text-[10px] font-mono text-slate-400">{{ $completeness['filled_count'] }}/{{ $completeness['total_count'] }} Parameter</span>
+                <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400">{{ $completeness['filled_count'] }}/{{ $completeness['total_count'] }} Parameter</span>
             </div>
             <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-1.5 overflow-hidden">
                 <div class="{{ count($completeness['missing_required']) > 0 ? 'bg-rose-500' : (count($completeness['missing_optional']) > 0 ? 'bg-amber-500' : 'bg-emerald-500') }} h-full rounded-full transition-all duration-300" style="width: {{ $completeness['percentage'] }}%"></div>
@@ -214,10 +218,11 @@
         <!-- Omni-Search Bar & Mode Toggle (Fully Responsive for Mobile/Tablet/Desktop) -->
         <div class="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div class="relative flex-1 min-w-0">
-                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-xs"></i>
+                <label for="omni-search" class="sr-only">Cari di seluruh tab</label>
                 <input type="text" id="omni-search" onkeyup="filterContent()" placeholder="⚡ Cari apapun di seluruh tab (contoh: IP, ZTE, PPPoE, Speedtest, NIK, Prorate, Tiang, Kontrak)..."
                        class="w-full pl-9 pr-10 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
-                <button type="button" onclick="clearSearch()" id="clear-search-btn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
+                <button type="button" onclick="clearSearch()" id="clear-search-btn" aria-label="Hapus pencarian" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
@@ -232,37 +237,37 @@
         </div>
 
         <!-- 15 Tab Buttons Nav with Smooth Scroll & Touch Support -->
-        <div id="tab-nav-wrapper" class="overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth flex border-b border-slate-200 dark:border-slate-700 px-2 bg-slate-50/50 dark:bg-slate-900/30 touch-pan-x">
-            <button type="button" onclick="switchTab('ringkasan')" id="tab-btn-ringkasan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-sky-600 text-sky-600 whitespace-nowrap cursor-pointer transition-colors">Ringkasan (Overview)</button>
+        <div id="tab-nav-wrapper" role="tablist" aria-label="Bagian detail pelanggan" class="overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth flex border-b border-slate-200 dark:border-slate-700 px-2 bg-slate-50/50 dark:bg-slate-900/30 touch-pan-x">
+            <button type="button" onclick="switchTab('ringkasan')" id="tab-btn-ringkasan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-sky-600 text-sky-600 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="true" aria-controls="tab-content-ringkasan">Ringkasan (Overview)</button>
             @if(auth()->user()->hasPermission('customers.detail.identity.view'))
-            <button type="button" onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Identitas</button>
+            <button type="button" onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-identitas">Identitas</button>
             @endif
             @if(auth()->user()->hasPermission('customers.detail.address.view'))
-            <button type="button" onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Alamat</button>
+            <button type="button" onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-alamat">Alamat</button>
             @endif
-            <button type="button" onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">POP/Cabang</button>
+            <button type="button" onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-pop">POP/Cabang</button>
             @if(auth()->user()->hasPermission('customers.detail.survey.view'))
-            <button type="button" onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Survey</button>
+            <button type="button" onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-survey">Survey</button>
             @endif
             @if(auth()->user()->hasPermission('customers.detail.installation.view'))
-            <button type="button" onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Pemasangan</button>
+            <button type="button" onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-pemasangan">Pemasangan</button>
             @endif
             @if(auth()->user()->hasPermission('customers.detail.devices.view'))
-            <button type="button" onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Perangkat</button>
+            <button type="button" onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-perangkat">Perangkat</button>
             @endif
             @if(auth()->user()->hasPermission('customers.detail.packages.view'))
-            <button type="button" onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Paket & Layanan</button>
+            <button type="button" onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-paket-layanan">Paket & Layanan</button>
             @endif
-            <button type="button" onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Billing</button>
-            <button type="button" onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Tagihan</button>
-            <button type="button" onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Pembayaran</button>
+            <button type="button" onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-billing">Billing</button>
+            <button type="button" onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-tagihan">Tagihan</button>
+            <button type="button" onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-pembayaran">Pembayaran</button>
             @if(auth()->user()->hasPermission('customers.detail.documents.view'))
-            <button type="button" onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Dokumen & Berkas</button>
+            <button type="button" onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-dokumen">Dokumen & Berkas</button>
             @endif
-            <button type="button" onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Riwayat Ticketing</button>
-            <button type="button" onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Riwayat Perubahan</button>
+            <button type="button" onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-riwayat-ticketing">Riwayat Ticketing</button>
+            <button type="button" onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-riwayat-perubahan">Riwayat Perubahan</button>
             @if($customer->customerTechnicalDetail)
-            <button type="button" onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Detail Teknis Lama</button>
+            <button type="button" onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-teknis-lama">Detail Teknis Lama</button>
             @endif
         </div>
     </div>
@@ -271,11 +276,11 @@
     <div class="p-2 md:p-6 text-xs" id="details-container">
 
         <!-- TAB 1: RINGKASAN (OVERVIEW) -->
-        <div id="tab-content-ringkasan" class="tab-content space-y-6 searchable-section">
+        <div id="tab-content-ringkasan" class="tab-content space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-ringkasan">
             <!-- Completeness Overview Banner -->
             <div class="border {{ count($completeness['missing_required']) > 0 ? 'border-rose-200 dark:border-rose-800 bg-rose-50/40 dark:bg-rose-950/20' : (count($completeness['missing_optional']) > 0 ? 'border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20' : 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-950/20') }} rounded-lg p-5">
                 <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Kelengkapan Data Profil Pelanggan</h3>
+                    <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Kelengkapan Data Profil Pelanggan</h2>
                     <span class="text-xs font-semibold text-slate-500">Persentase Terisi: <strong class="text-sky-600 font-bold">{{ $completeness['percentage'] }}%</strong></span>
                 </div>
                 <div class="flex items-center gap-3 flex-wrap">
@@ -291,7 +296,7 @@
             <!-- CARD TIMELINE PROSES ALUR PENGERJAAN -->
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-5 bg-white dark:bg-slate-800">
                 <div class="flex flex-wrap gap-2 items-center justify-between mb-3">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CARD TIMELINE PROSES ALUR PENGERJAAN</span>
+                    <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">CARD TIMELINE PROSES ALUR PENGERJAAN</span>
                     <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded border {{ $customer->status === 'active' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800' : 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600' }}">
                         {{ Str::headline($customer->status) }}
                     </span>
@@ -339,16 +344,16 @@
             <!-- CARD RINGKASAN WAKTU & PENANGGUNG JAWAB PER TAHAP -->
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 shadow-sm">
                 <div class="px-5 py-3.5 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                         <i class="fa-solid fa-clock-rotate-left text-sky-600 mr-1.5"></i> Ringkasan Waktu &amp; Penanggung Jawab Per Tahap Workflow
-                    </h3>
+                    </h2>
                     <p class="text-[11px] text-slate-500 mt-0.5">Rekapitulasi timestamp eksekusi dan PIC penanggung jawab dari tahap pendaftaran hingga verifikasi aktivasi.</p>
                 </div>
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr class="bg-slate-50/40 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <tr class="bg-slate-50/40 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                 <th class="px-5 py-3">Tahap Alur Workflow</th>
                                 <th class="px-5 py-3">Waktu &amp; Tanggal Eksekusi</th>
                                 <th class="px-5 py-3">Penanggung Jawab (PIC)</th>
@@ -383,11 +388,11 @@
                                             <span class="w-6 h-6 shrink-0 rounded-full {{ $accent }} flex items-center justify-center font-bold text-[10px]">{{ $stage['no'] }}</span>
                                             <div>
                                                 <span class="block text-xs font-bold text-slate-900 dark:text-slate-100 searchable-text">{{ $stage['title'] }}</span>
-                                                <span class="block text-[10px] text-slate-400 font-mono">{{ $stage['subtitle'] }}</span>
+                                                <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-mono">{{ $stage['subtitle'] }}</span>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-5 py-3 font-mono searchable-text {{ $waktu ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400' }}">
+                                    <td class="px-5 py-3 font-mono searchable-text {{ $waktu ? 'text-slate-700 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400' }}">
                                         {{ $waktu ?: 'Belum tercatat' }}
                                     </td>
                                     <td class="px-5 py-3">
@@ -399,7 +404,7 @@
                                                 </div>
                                             </div>
                                         @else
-                                            <span class="text-slate-400">Belum ada PIC</span>
+                                            <span class="text-slate-500 dark:text-slate-400">Belum ada PIC</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -412,18 +417,18 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Active Subscription card -->
                 <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">LANGGANAN AKTIF</span>
-                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->internetPackage ? ($customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name) : 'Belum Ada Paket' }}</h4>
+                    <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">LANGGANAN AKTIF</span>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->internetPackage ? ($customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name) : 'Belum Ada Paket' }}</h3>
                     <p class="text-xs text-slate-500 mt-1">Kategori: {{ $customer->internetPackage->category ?? '-' }}</p>
                     <div class="flex items-baseline mt-3">
                         <span class="text-lg font-bold text-slate-900 dark:text-slate-100 font-mono searchable-text">Rp {{ number_format($totalBill, 0, ',', '.') }}</span>
-                        <span class="text-[10px] text-slate-400 ml-1">/bulan (Nett)</span>
+                        <span class="text-[10px] text-slate-500 dark:text-slate-400 ml-1">/bulan (Nett)</span>
                     </div>
                 </div>
                 
                 <!-- Address Card -->
                 <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">ALAMAT INSTALASI</span>
+                    <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">ALAMAT INSTALASI</span>
                     <p class="text-xs text-slate-800 dark:text-slate-200 font-semibold leading-relaxed searchable-text">{{ $customer->address ?? 'Belum diisi' }}</p>
                     <p class="text-[10px] text-slate-500 mt-1.5 searchable-text">
                         Kel. {{ $customer->village->name ?? ($customer->customerAddress->village ?? '-') }}, 
@@ -439,26 +444,26 @@
 
             <!-- Technical summary card -->
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-5">
-                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">RINGKASAN TEKNIS JARINGAN</span>
+                <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">RINGKASAN TEKNIS JARINGAN</span>
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 text-xs">
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">NOMOR CID / REQ ID</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">NOMOR CID / REQ ID</span>
                         <span class="font-mono font-bold text-sky-600 dark:text-sky-400 searchable-text">{{ $displayId }}</span>
                     </div>
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">POP CABANG</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">POP CABANG</span>
                         <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text">{{ $customer->pop->name ?? '-' }}</span>
                     </div>
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">MINI POP (OLT)</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">MINI POP (OLT)</span>
                         <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text">{{ $customer->miniPop->name ?? 'Belum di-assign' }}</span>
                     </div>
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">DISTRIBUSI ODP</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">DISTRIBUSI ODP</span>
                         <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text">{{ $customer->distribution->code ?? 'Belum di-assign' }}</span>
                     </div>
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">ONT SERIAL NUMBER</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">ONT SERIAL NUMBER</span>
                         <span class="font-mono font-semibold text-slate-800 dark:text-slate-200 searchable-text">{{ $customer->ont_sn ?? '-' }}</span>
                     </div>
                 </div>
@@ -467,7 +472,7 @@
             <!-- Missing Fields Alert if applicable -->
             @if(count($completeness['missing_required']) > 0 || count($completeness['missing_optional']) > 0)
             <div class="border border-amber-200 dark:border-amber-800 rounded-lg p-5 bg-amber-50/40 dark:bg-amber-950/20">
-                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">PARAMETER YANG BELUM LENGKAP</span>
+                <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">PARAMETER YANG BELUM LENGKAP</span>
                 <div class="space-y-3 text-xs">
                     @if(count($completeness['missing_required']) > 0)
                     <div>
@@ -497,42 +502,44 @@
 
         <!-- TAB 2: IDENTITAS -->
         @if(auth()->user()->hasPermission('customers.detail.identity.view'))
-        <div id="tab-content-identitas" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-identitas" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-identitas">
+        <template x-if="$store.tabState.mounted.includes('identitas') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Formulir Identitas Pelanggan</span>
                 </div>
                 <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs">
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">ID Registrasi (Permanen)</span>
+                        <span class="text-slate-500 dark:text-slate-400">ID Registrasi (Permanen)</span>
                         <span class="font-mono font-bold text-sky-600 dark:text-sky-400 searchable-text">{{ $customer->customer_code }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nama Lengkap</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nama Lengkap</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->full_name }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nomor Identitas (NIK)</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nomor Identitas (NIK)</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->identity_number ?? 'Belum diisi' }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Jenis Kelamin</span>
+                        <span class="text-slate-500 dark:text-slate-400">Jenis Kelamin</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->gender?->label() ?? 'Belum diisi' }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nomor HP Utama</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nomor HP Utama</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->primary_phone ?? 'Belum diisi' }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nomor HP Alternatif</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nomor HP Alternatif</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->alternative_phone ?? 'Belum diisi' }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Alamat Email</span>
+                        <span class="text-slate-500 dark:text-slate-400">Alamat Email</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->email ?? 'Belum diisi' }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between md:col-span-2">
-                        <span class="text-slate-400">Tanggal Registrasi</span>
+                        <span class="text-slate-500 dark:text-slate-400">Tanggal Registrasi</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text">{{ $regDate }}</span>
                     </div>
                 </div>
@@ -544,26 +551,30 @@
                 </div>
                 <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">ID SALES</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">ID SALES</span>
                         {{-- Skema 3 (2026-09-12) — FK jadi sumber utama, kode lama (varchar) fallback data legacy. --}}
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->salesUser?->name ?? $customer->sales_code ?? '-' }}</span>
                     </div>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">AGENT</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">AGENT</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->agent?->name ?? $customer->agent_code ?? '-' }}</span>
                     </div>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">REFERRAL PELANGGAN</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">REFERRAL PELANGGAN</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->referralCustomer?->full_name ?? $customer->referral_customer_code ?? '-' }}</span>
                     </div>
                 </div>
             </div>
         </div>
+        </template>
+        </div>
         @endif
 
         <!-- TAB 3: ALAMAT -->
         @if(auth()->user()->hasPermission('customers.detail.address.view'))
-        <div id="tab-content-alamat" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-alamat" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-alamat">
+        <template x-if="$store.tabState.mounted.includes('alamat') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 @php
                     $lat = $customer->latitude ?? ($customer->customerAddress->latitude ?? null);
@@ -577,40 +588,44 @@
                 </div>
                 <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs">
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between md:col-span-2">
-                        <span class="text-slate-400">Alamat Lengkap</span>
+                        <span class="text-slate-500 dark:text-slate-400">Alamat Lengkap</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 text-right searchable-text">{{ $customer->address ?? 'Belum diisi' }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Desa / Kelurahan</span>
+                        <span class="text-slate-500 dark:text-slate-400">Desa / Kelurahan</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->village->name ?? ($customer->customerAddress->village ?? 'Belum diisi') }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Kecamatan</span>
+                        <span class="text-slate-500 dark:text-slate-400">Kecamatan</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->district->name ?? ($customer->customerAddress->district ?? 'Belum diisi') }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Kota / Kabupaten</span>
+                        <span class="text-slate-500 dark:text-slate-400">Kota / Kabupaten</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->city->name ?? ($customer->customerAddress->city ?? 'Belum diisi') }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Provinsi</span>
+                        <span class="text-slate-500 dark:text-slate-400">Provinsi</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->customerAddress->province ?? 'Jawa Timur' }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Garis Lintang (Latitude)</span>
+                        <span class="text-slate-500 dark:text-slate-400">Garis Lintang (Latitude)</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->latitude ?? ($customer->customerAddress->latitude ?? 'Belum diisi') }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Garis Bujur (Longitude)</span>
+                        <span class="text-slate-500 dark:text-slate-400">Garis Bujur (Longitude)</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->longitude ?? ($customer->customerAddress->longitude ?? 'Belum diisi') }}</span>
                     </div>
                 </div>
             </div>
         </div>
+        </template>
+        </div>
         @endif
 
         <!-- TAB 4: POP/CABANG -->
-        <div id="tab-content-pop" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-pop" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-pop">
+        <template x-if="$store.tabState.mounted.includes('pop') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Data POP / Cabang Terkoneksi</span>
@@ -621,40 +636,40 @@
                 @if($customer->pop)
                 <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs">
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nama POP / Cabang</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nama POP / Cabang</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->pop->name }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Kode Cabang</span>
+                        <span class="text-slate-500 dark:text-slate-400">Kode Cabang</span>
                         <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->pop->code }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Tipe Cabang</span>
+                        <span class="text-slate-500 dark:text-slate-400">Tipe Cabang</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 uppercase text-[10px] tracking-wider searchable-text">{{ $customer->pop->type }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Status POP</span>
+                        <span class="text-slate-500 dark:text-slate-400">Status POP</span>
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">
                             {{ $customer->pop->status ? 'Aktif' : 'Nonaktif' }}
                         </span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between md:col-span-2">
-                        <span class="text-slate-400">Alamat Kantor POP</span>
+                        <span class="text-slate-500 dark:text-slate-400">Alamat Kantor POP</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 text-right searchable-text">
                             {{ $customer->pop->address }}, Kel. {{ $customer->pop->village }}, Kec. {{ $customer->pop->district }}, {{ $customer->pop->city }}
                         </span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Penanggung Jawab (PIC)</span>
+                        <span class="text-slate-500 dark:text-slate-400">Penanggung Jawab (PIC)</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->pop->pic_name ?? 'Belum ditentukan' }}</span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nomor HP PIC</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nomor HP PIC</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->pop->pic_phone ?? 'Belum ditentukan' }}</span>
                     </div>
                 </div>
                 @else
-                <div class="p-8 text-center text-slate-400 text-xs">
+                <div class="p-8 text-center text-slate-500 dark:text-slate-400 text-xs">
                     Belum ada POP/Cabang yang di-assign untuk pelanggan ini.
                 </div>
                 @endif
@@ -688,38 +703,54 @@
                     </div>
                 </div>
                 @else
-                <div class="p-8 text-center text-slate-400 text-xs">
+                <div class="p-8 text-center text-slate-500 dark:text-slate-400 text-xs">
                     Belum ada assignment port ODP aktif untuk pelanggan ini.
                 </div>
                 @endif
             </div>
             @endcan
         </div>
+        </template>
+        </div>
 
         <!-- TAB 5: SURVEY -->
         @if(auth()->user()->hasPermission('customers.detail.survey.view'))
-        <div id="tab-content-survey" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-survey" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-survey">
+        <template x-if="$store.tabState.mounted.includes('survey') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             @include('customers.tabs._survey')
+        </div>
+        </template>
         </div>
         @endif
 
         <!-- TAB 6: PEMASANGAN -->
         @if(auth()->user()->hasPermission('customers.detail.installation.view'))
-        <div id="tab-content-pemasangan" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-pemasangan" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-pemasangan">
+        <template x-if="$store.tabState.mounted.includes('pemasangan') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             @include('customers.tabs._installation')
+        </div>
+        </template>
         </div>
         @endif
 
         <!-- TAB 7: PERANGKAT -->
         @if(auth()->user()->hasPermission('customers.detail.devices.view'))
-        <div id="tab-content-perangkat" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-perangkat" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-perangkat">
+        <template x-if="$store.tabState.mounted.includes('perangkat') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             @include('customers.tabs._device')
+        </div>
+        </template>
         </div>
         @endif
 
         <!-- TAB 8: PAKET & LAYANAN -->
         @if(auth()->user()->hasPermission('customers.detail.packages.view'))
-        <div id="tab-content-paket-layanan" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-paket-layanan" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-paket-layanan">
+        <template x-if="$store.tabState.mounted.includes('paket-layanan') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Paket Internet & Status Layanan Jaringan</span>
@@ -728,26 +759,26 @@
                     @if($customer->internetPackage)
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase">KODE LAYANAN</span>
+                            <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">KODE LAYANAN</span>
                             <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->internetPackage->package_code }} - {{ $customer->internetPackage->name }}</span>
                         </div>
                         <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase">KATEGORI LAYANAN</span>
+                            <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">KATEGORI LAYANAN</span>
                             <span class="font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">{{ $customer->internetPackage->category }}</span>
                         </div>
                         <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase">KECEPATAN (BANDWIDTH)</span>
+                            <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">KECEPATAN (BANDWIDTH)</span>
                             <span class="font-mono font-semibold text-sky-600 dark:text-sky-400 mt-1 block searchable-text">
                                 {{ $customer->internetPackage->download_speed_mbps }} Mbps Down / {{ $customer->internetPackage->upload_speed_mbps }} Mbps Up
                             </span>
                         </div>
                         <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase">JENIS KONTRAK</span>
+                            <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">JENIS KONTRAK</span>
                             <span class="font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">Rutin Bulanan</span>
                         </div>
                     </div>
                     @else
-                    <div class="p-4 text-center text-slate-400">
+                    <div class="p-4 text-center text-slate-500 dark:text-slate-400">
                         Belum ada paket internet yang terpilih.
                     </div>
                     @endif
@@ -755,7 +786,7 @@
                     @if($customer->customerService && auth()->user()->hasPermission('customers.detail.packages.change'))
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30" x-data="{ gantiPaketOpen: false }">
                         <div class="flex items-center justify-between">
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">GANTI PAKET INTERNET</span>
+                            <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">GANTI PAKET INTERNET</span>
                             <template x-if="!gantiPaketOpen">
                                 <button type="button" @click="gantiPaketOpen = true" class="text-[11px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400">Ganti Paket</button>
                             </template>
@@ -776,7 +807,7 @@
                                 </div>
                             </form>
                         </template>
-                        <p class="text-[10px] text-slate-400 mt-2" x-show="gantiPaketOpen" x-cloak>Perubahan harga baru berlaku mulai tagihan periode berikutnya — tagihan bulan berjalan tidak berubah.</p>
+                        <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-2" x-show="gantiPaketOpen" x-cloak>Perubahan harga baru berlaku mulai tagihan periode berikutnya — tagihan bulan berjalan tidak berubah.</p>
                     </div>
                     @endif
 
@@ -832,7 +863,7 @@
                                     <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Nominal Denda <span class="text-rose-500">*</span></label>
                                     <input type="text" inputmode="decimal" name="penalty_amount" data-rupiah required value="{{ old('penalty_amount', 0) }}"
                                            class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
-                                    <p class="text-[10px] text-slate-400 mt-1">Masa langganan pelanggan ini &le;1 tahun — denda wajib diisi (boleh 0). Nilai diprefill dari alasan terpilih, tapi tetap wajib dikonfirmasi/diubah sebelum submit.</p>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Masa langganan pelanggan ini &le;1 tahun — denda wajib diisi (boleh 0). Nilai diprefill dari alasan terpilih, tapi tetap wajib dikonfirmasi/diubah sebelum submit.</p>
                                     @error('penalty_amount')
                                         <p class="text-[11px] text-rose-600 mt-1">{{ $message }}</p>
                                     @enderror
@@ -889,7 +920,7 @@
                                     <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Bebaskan Tagihan Periode <span class="text-rose-500">*</span></label>
                                     <div class="space-y-1 max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-900/60">
                                         @forelse($leaveWaiverPeriods as $row)
-                                        <label class="flex items-center gap-2 text-[11px] {{ $row['eligible'] ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-600' }}">
+                                        <label class="flex items-center gap-2 text-[11px] {{ $row['eligible'] ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-500' }}">
                                             <input type="checkbox" name="periods[]" value="{{ $row['billing_period'] }}"
                                                    {{ $row['eligible'] ? '' : 'disabled' }}
                                                    class="rounded border-slate-300 dark:border-slate-600">
@@ -897,14 +928,14 @@
                                             @if($row['invoice'])
                                             <span>— Rp {{ number_format((float) $row['invoice']->total_amount, 0, ',', '.') }} (sudah terbit)</span>
                                             @else
-                                            <span class="text-slate-400">(belum terbit)</span>
+                                            <span class="text-slate-500 dark:text-slate-400">(belum terbit)</span>
                                             @endif
                                             @if(! $row['eligible'])
                                             <span class="italic">({{ $row['reason'] }})</span>
                                             @endif
                                         </label>
                                         @empty
-                                        <p class="text-[11px] text-slate-400">Tidak ada periode yang bisa dibebaskan.</p>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Tidak ada periode yang bisa dibebaskan.</p>
                                         @endforelse
                                     </div>
                                     @error('periods')
@@ -930,26 +961,26 @@
                     @endif
 
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">INTEGRASI TEKNIS JARINGAN</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">INTEGRASI TEKNIS JARINGAN</span>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 font-mono text-xs">
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">ONT Serial Number</span>
+                                <span class="text-slate-500 dark:text-slate-400">ONT Serial Number</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->ont_sn ?? 'Belum terpasang' }}</span>
                             </div>
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Nama Perangkat OLT</span>
+                                <span class="text-slate-500 dark:text-slate-400">Nama Perangkat OLT</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->olt_code ?? 'Belum diisi' }}</span>
                             </div>
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Nomor OLT [CID Generator]</span>
+                                <span class="text-slate-500 dark:text-slate-400">Nomor OLT [CID Generator]</span>
                                 <span class="font-bold text-sky-600 searchable-text">{{ $displayId }}</span>
                             </div>
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Kode Kotak ODP</span>
+                                <span class="text-slate-500 dark:text-slate-400">Kode Kotak ODP</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->odp_code ?? 'Belum terhubung' }}</span>
                             </div>
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">VLAN ID Jaringan</span>
+                                <span class="text-slate-500 dark:text-slate-400">VLAN ID Jaringan</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->vlan_id ?? 'Belum ditentukan' }}</span>
                             </div>
                         </div>
@@ -957,10 +988,14 @@
                 </div>
             </div>
         </div>
+        </template>
+        </div>
         @endif
 
         <!-- TAB 9: BILLING -->
-        <div id="tab-content-billing" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-billing" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-billing">
+        <template x-if="$store.tabState.mounted.includes('billing') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Rincian Biaya Bulanan, Biaya Pemasangan Awal & Billing Cycle</span>
@@ -968,7 +1003,7 @@
                 <div class="p-5 space-y-6 text-xs">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
-                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">BREAKDOWN BIAYA NETT BULANAN</span>
+                        <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">BREAKDOWN BIAYA NETT BULANAN</span>
                         <div class="space-y-3 font-mono text-xs">
                             <div class="flex justify-between text-slate-500">
                                 <span>Harga Paket Internet</span>
@@ -997,17 +1032,17 @@
                     </div>
 
                     <div>
-                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">MASA AKTIF & PERIODE</span>
+                        <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">MASA AKTIF & PERIODE</span>
                         <div class="space-y-3 text-xs">
                             <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Tanggal Aktivasi Layanan</span>
+                                <span class="text-slate-500 dark:text-slate-400">Tanggal Aktivasi Layanan</span>
                                 <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">
                                     {{ $customer->customerService?->activation_date ? \App\Support\IndonesianDate::date($customer->customerService->activation_date) : 'Belum diaktivasi' }}
                                 </span>
                             </div>
                             @if($customer->customerService?->activation_time)
                             <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Waktu Aktivasi</span>
+                                <span class="text-slate-500 dark:text-slate-400">Waktu Aktivasi</span>
                                 <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">
                                     {{ substr($customer->customerService->activation_time, 0, 5) }} WIB
                                 </span>
@@ -1015,20 +1050,20 @@
                             @endif
                             @if($customer->customerService?->activated_by_name || $customer->customerService?->activatedBy)
                             <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Petugas Aktivasi</span>
+                                <span class="text-slate-500 dark:text-slate-400">Petugas Aktivasi</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">
                                     {{ $customer->customerService->activatedBy->name ?? $customer->customerService->activated_by_name ?? '-' }}
                                 </span>
                             </div>
                             @endif
                             <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Tanggal Jatuh Tempo Bulanan</span>
+                                <span class="text-slate-500 dark:text-slate-400">Tanggal Jatuh Tempo Bulanan</span>
                                 <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">
                                     {{ $customer->customerService?->due_date ? \App\Support\IndonesianDate::date($customer->customerService->due_date) : 'Belum ditentukan' }}
                                 </span>
                             </div>
                             <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Siklus Billing</span>
+                                <span class="text-slate-500 dark:text-slate-400">Siklus Billing</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 capitalize searchable-text">
                                     {{ $customer->customerService?->billing_cycle ?? 'Monthly' }}
                                 </span>
@@ -1056,7 +1091,7 @@
                     @endphp
                     <div class="pt-4 border-t border-slate-200 dark:border-slate-700">
                         <div class="flex flex-wrap gap-2 items-center justify-between mb-3">
-                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                 RINCIAN TAGIHAN AWAL / REGISTRASI ({{ $initialInvoice->invoice_number }})
                             </span>
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide {{ $initialInvoice->invoice_status->value === 'lunas' ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800' }}">
@@ -1066,7 +1101,7 @@
                         <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
-                                    <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                    <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
                                         <th class="px-4 py-2">Komponen Biaya Awal</th>
                                         <th class="px-4 py-2">Kolom di Sistem</th>
                                         <th class="px-4 py-2 text-right">Nominal Biaya</th>
@@ -1095,7 +1130,7 @@
                                     <tr>
                                         <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100">PPN</td>
                                         <td class="px-4 py-2 font-sans text-slate-500">ppn</td>
-                                        <td class="px-4 py-2 text-right {{ (float) $initialInvoice->ppn > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-sans text-slate-400' }} searchable-text">
+                                        <td class="px-4 py-2 text-right {{ (float) $initialInvoice->ppn > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-sans text-slate-500 dark:text-slate-400' }} searchable-text">
                                             {{ (float) $initialInvoice->ppn > 0 ? 'Rp '.number_format((float) $initialInvoice->ppn, 2, ',', '.') : 'Tidak dikenakan' }}
                                         </td>
                                     </tr>
@@ -1111,12 +1146,16 @@
                 </div>
             </div>
         </div>
+        </template>
+        </div>
 
         <!-- TAB 10: TAGIHAN -->
-        <div id="tab-content-tagihan" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-tagihan" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-tagihan">
+        <template x-if="$store.tabState.mounted.includes('tagihan') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Tagihan Pelanggan</h3>
+                    <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Tagihan Pelanggan</h2>
                     <p class="text-[11px] text-slate-500 mt-0.5">Daftar invoice tagihan bulanan yang diterbitkan secara manual maupun sistem.</p>
                 </div>
                 @can('invoices.create')
@@ -1139,12 +1178,12 @@
                     ['title' => 'Tagihan Bulanan', 'rows' => $invoicesBulanan, 'badge' => 'bg-sky-50 text-sky-600 border-sky-200'],
                 ] as $group)
                     <div class="{{ !$loop->first ? 'mt-6' : '' }}">
-                        <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">{{ $group['title'] }} ({{ $group['rows']->count() }})</h4>
+                        <h3 class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">{{ $group['title'] }} ({{ $group['rows']->count() }})</h3>
                         @if($group['rows']->count() > 0)
                             <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
                                 <table class="w-full text-left border-collapse text-xs">
                                     <thead>
-                                        <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-400 uppercase text-[10px]">
+                                        <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-500 dark:text-slate-400 uppercase text-[10px]">
                                             <th class="px-4 py-3">No. Tagihan</th>
                                             <th class="px-4 py-3">Jenis</th>
                                             <th class="px-4 py-3">Periode</th>
@@ -1192,7 +1231,7 @@
                                                         {{ $statusLabel }}
                                                     </span>
                                                 </td>
-                                                <td class="px-4 py-3 text-slate-400 font-sans searchable-text">{{ $invoice->creator->name ?? 'System' }}</td>
+                                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400 font-sans searchable-text">{{ $invoice->creator->name ?? 'System' }}</td>
                                                 @can('payments.create')
                                                     @php $settled = in_array($invoice->invoice_status->value, ['lunas', 'batal'], true); @endphp
                                                     <td class="px-4 py-3 text-center font-sans" id="invoice-pay-btn-{{ $invoice->id }}">
@@ -1206,7 +1245,7 @@
                                                                 class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold uppercase tracking-wide shadow-sm cursor-pointer {{ $settled ? 'hidden' : '' }}">
                                                             Bayar
                                                         </button>
-                                                        <span class="text-slate-400 text-[10px] {{ $settled ? '' : 'hidden' }}">—</span>
+                                                        <span class="text-slate-500 dark:text-slate-400 text-[10px] {{ $settled ? '' : 'hidden' }}">—</span>
                                                     </td>
                                                 @endcan
                                             </tr>
@@ -1215,16 +1254,16 @@
                                 </table>
                             </div>
                         @else
-                            <div class="py-6 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-xs">
+                            <div class="py-6 text-center text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-xs">
                                 Belum ada {{ strtolower($group['title']) }}.
                             </div>
                         @endif
                     </div>
                 @endforeach
             @else
-                <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                <div class="py-12 text-center text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
                     <i class="fa-solid fa-file-invoice text-3xl mb-2 text-slate-300"></i>
-                    <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Tagihan Terbit</h4>
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Tagihan Terbit</h3>
                     <p class="text-[11px] text-slate-500 mt-1">Gunakan tombol "Buat Tagihan Manual" untuk membuat invoice pertama pelanggan.</p>
                 </div>
             @endif
@@ -1233,11 +1272,11 @@
                  & Cuti Berlangganan, dua pintu satu tabel. --}}
             @if($activeBillingWaivers->isNotEmpty())
             <div class="mt-6">
-                <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Riwayat Pembebasan Tagihan ({{ $activeBillingWaivers->count() }})</h4>
+                <h3 class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Riwayat Pembebasan Tagihan ({{ $activeBillingWaivers->count() }})</h3>
                 <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-400 uppercase text-[10px]">
+                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-500 dark:text-slate-400 uppercase text-[10px]">
                                 <th class="px-4 py-3">Periode</th>
                                 <th class="px-4 py-3">Sumber</th>
                                 <th class="px-4 py-3">Catatan</th>
@@ -1278,13 +1317,17 @@
                         </tbody>
                     </table>
                 </div>
-                <p class="text-[10px] text-slate-400 mt-1.5">Mencabut TIDAK menghidupkan kembali invoice yang sudah dibatalkan — jalankan generator tagihan bulanan untuk periode itu kalau perlu ditagih ulang.</p>
+                <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">Mencabut TIDAK menghidupkan kembali invoice yang sudah dibatalkan — jalankan generator tagihan bulanan untuk periode itu kalau perlu ditagih ulang.</p>
             </div>
             @endif
         </div>
+        </template>
+        </div>
 
         <!-- TAB 11: PEMBAYARAN -->
-        <div id="tab-content-pembayaran" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-pembayaran" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-pembayaran">
+        <template x-if="$store.tabState.mounted.includes('pembayaran') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             {{-- Kartu Saldo Pelanggan (ADHOC-92) — saldo aktif + perkiraan
                  "cukup N bulan" + riwayat ledger. Gerbang permission sendiri
                  (`customer_balance.view`), terpisah dari `payments.view` yang
@@ -1294,7 +1337,7 @@
             <div class="border border-sky-200 dark:border-sky-500/20 bg-sky-50/60 dark:bg-sky-500/10 rounded-lg p-4 space-y-3">
                 <div class="flex items-center justify-between flex-wrap gap-2">
                     <div>
-                        <h3 class="text-xs font-bold text-sky-900 dark:text-sky-300 uppercase tracking-wider">Saldo Pelanggan</h3>
+                        <h2 class="text-xs font-bold text-sky-900 dark:text-sky-300 uppercase tracking-wider">Saldo Pelanggan</h2>
                         <p class="text-[11px] text-sky-700/80 dark:text-sky-400/80 mt-0.5">Otomatis dipakai untuk tagihan Bulanan berikutnya begitu terbit (FIFO periode terlama dulu).</p>
                     </div>
                     <div class="text-right">
@@ -1338,7 +1381,7 @@
 
             <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Pembayaran Pelanggan</h3>
+                    <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Pembayaran Pelanggan</h2>
                     <p class="text-[11px] text-slate-500 mt-0.5">Pembayaran yang terhubung ke invoice pelanggan ini.</p>
                 </div>
             </div>
@@ -1349,7 +1392,7 @@
                 <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-400 uppercase text-[10px]">
+                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-500 dark:text-slate-400 uppercase text-[10px]">
                                 <th class="px-4 py-3">No. Pembayaran</th>
                                 <th class="px-4 py-3">No. Tagihan</th>
                                 <th class="px-4 py-3">Tanggal</th>
@@ -1399,7 +1442,7 @@
                                         @if($payment->proof_file)
                                             <a href="{{ asset('storage/' . $payment->proof_file) }}" target="_blank" class="text-sky-600 hover:underline font-semibold">Lihat bukti ↗</a>
                                         @else
-                                            <span class="text-slate-400">-</span>
+                                            <span class="text-slate-500 dark:text-slate-400">-</span>
                                         @endif
                                     </td>
                                 </tr>
@@ -1408,20 +1451,24 @@
                     </table>
                 </div>
             @else
-                <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                <div class="py-12 text-center text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
                     <i class="fa-solid fa-receipt text-3xl mb-2 text-slate-300"></i>
-                    <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Riwayat Pembayaran</h4>
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Riwayat Pembayaran</h3>
                     <p class="text-[11px] text-slate-500 mt-1">Pembayaran akan tampil setelah kasir/finance mencatat pembayaran invoice.</p>
                 </div>
             @endif
         </div>
+        </template>
+        </div>
 
         <!-- TAB 12: DOKUMEN & BERKAS -->
-        <div id="tab-content-dokumen" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-dokumen" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-dokumen">
+        <template x-if="$store.tabState.mounted.includes('dokumen') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             @if(auth()->user()->hasPermission('customers.detail.documents.view'))
                 <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">LAMPIRAN DOKUMEN PENDUKUNG</h3>
+                        <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">LAMPIRAN DOKUMEN PENDUKUNG</h2>
                         <p class="text-[11px] text-slate-500 mt-0.5">Dokumen disimpan aman & private sesuai hak akses permission sistem.</p>
                     </div>
                     @if(auth()->user()->hasPermission('upload_customer_documents'))
@@ -1448,8 +1495,8 @@
                                 <div class="p-3 flex items-center justify-between gap-3 text-xs">
                                     <div class="min-w-0">
                                         <span class="block text-xs font-semibold text-slate-900 dark:text-slate-100 truncate searchable-text">{{ $document->typeLabel() }}</span>
-                                        <span class="block text-[10px] text-slate-400 font-mono mt-0.5">{{ $document->created_at?->format('d/m/Y H:i') }}</span>
-                                        <span class="block text-[10px] text-slate-400 truncate">Upload: {{ $document->uploader?->name ?? '-' }}</span>
+                                        <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5">{{ $document->created_at?->format('d/m/Y H:i') }}</span>
+                                        <span class="block text-[10px] text-slate-500 dark:text-slate-400 truncate">Upload: {{ $document->uploader?->name ?? '-' }}</span>
                                     </div>
                                     <a href="{{ route('customers.documents.show', $document->id) }}" target="_blank" class="shrink-0 p-1.5 text-sky-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Buka Dokumen">
                                         <i class="fa-solid fa-arrow-up-right-from-square"></i>
@@ -1459,68 +1506,82 @@
                         @endforeach
                     </div>
                 @else
-                    <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                    <div class="py-12 text-center text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
                         <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-300"></i>
-                        <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Dokumen</h4>
+                        <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Dokumen</h3>
                         <p class="text-[11px] text-slate-500 mt-1">Dokumen rumah, kontrak, survey, dan foto pemasangan akan tampil di sini setelah diupload.</p>
                     </div>
                 @endif
             @else
-                <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
-                    <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Akses dokumen dibatasi</h4>
+                <div class="py-12 text-center text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Akses dokumen dibatasi</h3>
                     <p class="text-[11px] text-slate-500 mt-1">User Anda tidak memiliki permission untuk melihat dokumen pelanggan.</p>
                 </div>
             @endif
         </div>
+        </template>
+        </div>
 
         <!-- TAB 13: RIWAYAT TICKETING -->
-        <div id="tab-content-riwayat-ticketing" class="tab-content hidden space-y-6 searchable-section">
-            @include('customers.tabs._riwayat_ticketing')
+        <div id="tab-content-riwayat-ticketing" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-riwayat-ticketing">
+            <template x-if="$store.tabState.mounted.includes('riwayat-ticketing') || $store.tabState.searchActive">
+            <div class="space-y-6 searchable-section">
+                @include('customers.tabs._riwayat_ticketing')
+            </div>
+            </template>
         </div>
 
         <!-- TAB 14: RIWAYAT PERUBAHAN -->
-        <div id="tab-content-riwayat-perubahan" class="tab-content hidden space-y-6 searchable-section">
-            @include('customers.tabs._riwayat_perubahan')
+        <div id="tab-content-riwayat-perubahan" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-riwayat-perubahan">
+            <template x-if="$store.tabState.mounted.includes('riwayat-perubahan') || $store.tabState.searchActive">
+            <div class="space-y-6 searchable-section">
+                @include('customers.tabs._riwayat_perubahan')
+            </div>
+            </template>
         </div>
 
         <!-- TAB 15: DETAIL TEKNIS LAMA -->
         @if($customer->customerTechnicalDetail)
-        <div id="tab-content-teknis-lama" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-teknis-lama" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-teknis-lama">
+            <template x-if="$store.tabState.mounted.includes('teknis-lama') || $store.tabState.searchActive">
+            <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Detail Teknis Jaringan Lama (Hasil Migrasi Database)</span>
                 </div>
                 <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-xs">
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">ID Report Lama</span>
+                        <span class="text-slate-500 dark:text-slate-400">ID Report Lama</span>
                         <span class="font-mono font-bold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->customerTechnicalDetail->old_report_id ?? '-' }}</span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">ID Request/Layanan Lama</span>
+                        <span class="text-slate-500 dark:text-slate-400">ID Request/Layanan Lama</span>
                         <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->customerTechnicalDetail->old_request_id ?? '-' }}</span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Tipe Koneksi Jaringan</span>
+                        <span class="text-slate-500 dark:text-slate-400">Tipe Koneksi Jaringan</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->customerTechnicalDetail->connection_type ?? '-' }}</span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">ONT Serial Number</span>
+                        <span class="text-slate-500 dark:text-slate-400">ONT Serial Number</span>
                         <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->customerTechnicalDetail->router_or_ont_serial ?? '-' }}</span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nomor ODP / Port</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nomor ODP / Port</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">{{ $customer->customerTechnicalDetail->odp_number ?? '-' }} / {{ $customer->customerTechnicalDetail->odp_port ?? '-' }}</span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Redaman Optik Kabel</span>
+                        <span class="text-slate-500 dark:text-slate-400">Redaman Optik Kabel</span>
                         <span class="font-mono font-bold text-sky-600 searchable-text">{{ $customer->customerTechnicalDetail->fiber_signal ?? '-' }}</span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Hasil Test Speed</span>
+                        <span class="text-slate-500 dark:text-slate-400">Hasil Test Speed</span>
                         <span class="font-mono font-bold text-emerald-600 searchable-text">{{ $customer->customerTechnicalDetail->test_download ?? '-' }} Mbps Down / {{ $customer->customerTechnicalDetail->test_upload ?? '-' }} Mbps Up</span>
                     </div>
                 </div>
             </div>
+            </div>
+            </template>
         </div>
         @endif
 
@@ -1540,8 +1601,8 @@
 <div id="document-upload-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Upload Dokumen Pelanggan Baru</h3>
-            <button type="button" onclick="closeModal('document-upload-modal')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+            <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Upload Dokumen Pelanggan Baru</h2>
+            <button type="button" onclick="closeModal('document-upload-modal')" aria-label="Tutup" class="text-slate-500 dark:text-slate-400 hover:text-slate-600 cursor-pointer">
                 <i class="fa-solid fa-xmark text-base"></i>
             </button>
         </div>
@@ -1649,11 +1710,11 @@
         <div class="pb-3 mb-4 border-b border-slate-200 dark:border-slate-700 space-y-1">
             <div class="flex justify-between items-start">
                 <div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pelanggan</span>
+                    <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Pelanggan</span>
                     <span class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ $customer->full_name }}</span>
                 </div>
                 <div class="text-right">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">ID Jaringan</span>
+                    <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">ID Jaringan</span>
                     <span class="font-mono text-xs text-sky-600 font-bold bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded">{{ $displayId }}</span>
                 </div>
             </div>
@@ -1693,7 +1754,7 @@
                         </option>
                     @endforeach
                 </select>
-                <p class="text-[11px] text-slate-400">Daftar Distribusi otomatis mengikuti Mini POP yang dipilih di atas.</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Daftar Distribusi otomatis mengikuti Mini POP yang dipilih di atas.</p>
             </div>
 
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700 mt-4">
@@ -1709,6 +1770,39 @@
 
 @section('scripts')
 <script>
+    // 14 dari 15 tab dirender LAZY lewat <template x-if> (lihat
+    // $store.tabState di bawah) — tab yang belum pernah dibuka TIDAK ada di
+    // DOM sama sekali (bukan cuma disembunyikan `hidden`), supaya DOM size
+    // halaman ini gak langsung ~2000 elemen di awal (audit Lighthouse
+    // "Avoid an excessive DOM size"). Begitu sebuah tab pernah dibuka lewat
+    // switchTab(), dia TETAP termount selamanya (searchable-section-nya
+    // harus selalu bisa discan ulang kalau omni-search dipakai lagi) — tidak
+    // ada logic unmount balik.
+    //
+    // `searchActive` pengecualian terpisah: begitu true (dipicu ketik di
+    // omni-search ATAU klik mode "All-In-One"), SEMUA tab langsung termount
+    // sekaligus — fitur cari-di-semua-tab butuh seluruh teks ada di DOM buat
+    // discan. Ini SEKALI JALAN (gak pernah balik ke false) — menghindari
+    // kompleksitas unmount-saat-query-dikosongkan demi korbankan sedikit
+    // penghematan DOM buat user yang pernah search sekali.
+    document.addEventListener('alpine:init', () => {
+        Alpine.store('tabState', { mounted: ['ringkasan'], searchActive: false });
+    });
+
+    function mountTab(tabId) {
+        const store = window.Alpine && Alpine.store('tabState');
+        if (store && ! store.mounted.includes(tabId)) {
+            store.mounted.push(tabId);
+        }
+    }
+
+    function mountAllTabs() {
+        const store = window.Alpine && Alpine.store('tabState');
+        if (store) {
+            store.searchActive = true;
+        }
+    }
+
     let currentViewMode = 'tabs'; // 'tabs' or 'all'
 
     function switchTab(tabId) {
@@ -1716,21 +1810,29 @@
             setViewMode('tabs');
         }
 
-        // Hide all tab panels
-        document.querySelectorAll('.tab-content').forEach(el => {
-            el.classList.add('hidden');
+        mountTab(tabId);
+
+        // Alpine.nextTick: tunggu <template x-if> tab yang baru di-mount
+        // benar-benar masuk DOM dulu sebelum di-unhide, kalau tidak sempat
+        // ke-skip satu frame kosong.
+        Alpine.nextTick(() => {
+            // Hide all tab panels
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.add('hidden');
+            });
+
+            // Show active tab panel
+            const activeTab = document.getElementById('tab-content-' + tabId);
+            if (activeTab) {
+                activeTab.classList.remove('hidden');
+            }
         });
-        
-        // Show active tab panel
-        const activeTab = document.getElementById('tab-content-' + tabId);
-        if (activeTab) {
-            activeTab.classList.remove('hidden');
-        }
 
         // Reset active state for tab buttons
         document.querySelectorAll('.tab-button').forEach(btn => {
             btn.classList.remove('border-sky-600', 'text-sky-600');
             btn.classList.add('border-transparent', 'text-slate-500');
+            btn.setAttribute('aria-selected', 'false');
         });
 
         // Add active state to clicked tab button
@@ -1738,6 +1840,7 @@
         if (activeBtn) {
             activeBtn.classList.add('border-sky-600', 'text-sky-600');
             activeBtn.classList.remove('border-transparent', 'text-slate-500');
+            activeBtn.setAttribute('aria-selected', 'true');
             activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
     }
@@ -1749,8 +1852,11 @@
         const navWrapper = document.getElementById('tab-nav-wrapper');
 
         if (mode === 'all') {
-            document.querySelectorAll('.tab-content').forEach(el => {
-                el.classList.remove('hidden');
+            mountAllTabs();
+            Alpine.nextTick(() => {
+                document.querySelectorAll('.tab-content').forEach(el => {
+                    el.classList.remove('hidden');
+                });
             });
             if (navWrapper) navWrapper.classList.add('hidden');
 
@@ -1779,31 +1885,42 @@
     function filterContent() {
         const query = document.getElementById('omni-search')?.value.toLowerCase().trim() || '';
         const clearBtn = document.getElementById('clear-search-btn');
-        const sections = document.querySelectorAll('.searchable-section');
 
+        // Nyari butuh SEMUA tab ter-mount dulu (teks tab yang belum pernah
+        // dibuka belum ada di DOM sama sekali — lihat komentar $store.tabState
+        // di atas). Alpine.nextTick supaya querySelectorAll di bawah baca DOM
+        // yang sudah lengkap, bukan yang masih separuh jalan ke-mount.
         if (query.length > 0) {
-            if (clearBtn) clearBtn.classList.remove('hidden');
-            if (currentViewMode === 'tabs') {
-                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('hidden'));
-            }
-        } else {
-            if (clearBtn) clearBtn.classList.add('hidden');
-            if (currentViewMode === 'tabs') {
-                switchTab('ringkasan');
-            }
+            mountAllTabs();
         }
 
-        sections.forEach(sec => {
-            if (query === '') {
-                if (currentViewMode === 'all') sec.classList.remove('hidden');
+        Alpine.nextTick(() => {
+            const sections = document.querySelectorAll('.searchable-section');
+
+            if (query.length > 0) {
+                if (clearBtn) clearBtn.classList.remove('hidden');
+                if (currentViewMode === 'tabs') {
+                    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('hidden'));
+                }
             } else {
-                const text = sec.innerText.toLowerCase();
-                if (text.includes(query)) {
-                    sec.classList.remove('hidden');
-                } else {
-                    sec.classList.add('hidden');
+                if (clearBtn) clearBtn.classList.add('hidden');
+                if (currentViewMode === 'tabs') {
+                    switchTab('ringkasan');
                 }
             }
+
+            sections.forEach(sec => {
+                if (query === '') {
+                    if (currentViewMode === 'all') sec.classList.remove('hidden');
+                } else {
+                    const text = sec.innerText.toLowerCase();
+                    if (text.includes(query)) {
+                        sec.classList.remove('hidden');
+                    } else {
+                        sec.classList.add('hidden');
+                    }
+                }
+            });
         });
     }
 

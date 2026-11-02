@@ -260,4 +260,75 @@ class CustomerAcquisitionModuleTest extends TestCase
         $response->assertOk();
         $response->assertSee('Budi Sales Uji');
     }
+
+    public function test_index_paginates_filtered_records_and_keeps_filter_links(): void
+    {
+        $user = $this->loginAsAdmin();
+        $this->giveAllPopScope($user);
+
+        $salesRole = Role::where('code', 'sales')->firstOrFail();
+        $sales = User::factory()->create(['status' => 'active', 'role_id' => $salesRole->id]);
+
+        for ($number = 1; $number <= 26; $number++) {
+            $customer = Customer::factory()->create([
+                'status' => 'active',
+                'full_name' => sprintf('Pelanggan Akuisisi %02d', $number),
+                'address' => sprintf('Jalan Akuisisi %02d', $number),
+                'sales_user_id' => $sales->id,
+            ]);
+
+            CustomerAcquisition::factory()->for($customer)->create([
+                'periode' => now()->format('Y-m'),
+                'verified_at' => now()->startOfMonth()->addMinutes($number),
+            ]);
+        }
+
+        $filters = [
+            'periode' => now()->format('Y-m'),
+            'role_id' => $salesRole->id,
+            'sales_user_id' => $sales->id,
+            'per_page' => 25,
+        ];
+
+        $defaultFilters = $filters;
+        unset($defaultFilters['per_page']);
+
+        $default = $this->get(route('customer-acquisitions.index', $defaultFilters));
+        $default->assertOk();
+        $default->assertViewHas('records', fn ($records) => $records->perPage() === 10 && $records->count() === 10 && $records->total() === 26);
+
+        foreach ([50, 100] as $perPage) {
+            $response = $this->get(route('customer-acquisitions.index', [...$defaultFilters, 'per_page' => $perPage]));
+            $response->assertOk();
+            $response->assertViewHas('records', fn ($records) => $records->perPage() === $perPage && $records->count() === 26);
+            $response->assertSee('value="'.$perPage.'" selected', false);
+        }
+
+        $invalid = $this->get(route('customer-acquisitions.index', [...$defaultFilters, 'per_page' => 999]));
+        $invalid->assertViewHas('records', fn ($records) => $records->perPage() === 10);
+        $firstPage = $this->get(route('customer-acquisitions.index', $filters));
+        $firstPage->assertOk();
+        $firstPage->assertViewHas('records', fn ($records) => $records->count() === 25 && $records->total() === 26);
+        $firstPage->assertSee('Pelanggan Akuisisi 01');
+        $firstPage->assertDontSee('Pelanggan Akuisisi 26');
+        $firstPage->assertSee('page=2', false);
+        $firstPage->assertSee('name="per_page"', false);
+        $firstPage->assertSee('value="25" selected', false);
+        $firstPage->assertSee('role_id='.$salesRole->id, false);
+        $firstPage->assertSee('sales_user_id='.$sales->id, false);
+        $firstPage->assertDontSee('matchesQuery(', false);
+
+        $secondPage = $this->get(route('customer-acquisitions.index', [...$filters, 'page' => 2]));
+        $secondPage->assertOk();
+        $secondPage->assertViewHas('records', fn ($records) => $records->count() === 1 && $records->first()->customer->full_name === 'Pelanggan Akuisisi 26');
+        $secondPage->assertSee('26 Pelanggan');
+
+        $search = $this->get(route('customer-acquisitions.index', [...$filters, 'q' => 'Pelanggan Akuisisi 26']));
+        $search->assertOk();
+        $search->assertViewHas('records', fn ($records) => $records->total() === 1 && $records->first()->customer->full_name === 'Pelanggan Akuisisi 26');
+
+        $addressSearch = $this->get(route('customer-acquisitions.index', [...$filters, 'q' => 'Jalan Akuisisi 26']));
+        $addressSearch->assertOk();
+        $addressSearch->assertViewHas('records', fn ($records) => $records->total() === 1 && $records->first()->customer->full_name === 'Pelanggan Akuisisi 26');
+    }
 }

@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Warehouse;
 
+use App\Enums\StockRequestKind;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\Item;
@@ -36,6 +37,7 @@ class WarehouseStockRequestController extends Controller
         $statusFilter = $request->query('status', 'open');
 
         $requests = StockRequest::query()
+            ->where('request_kind', StockRequestKind::OPERATIONAL->value)
             ->when(! $hasAllAccess, fn ($q) => $q->whereIn('cabang_pop_id', $allowedPopIds))
             ->when($statusFilter === 'open', fn ($q) => $q->whereIn('status', ['pending', 'partial']))
             ->when(! in_array($statusFilter, ['all', 'open'], true), fn ($q) => $q->where('status', $statusFilter))
@@ -54,7 +56,7 @@ class WarehouseStockRequestController extends Controller
         $cabangPops = Pop::query()->where('type', 'cabang')
             ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
             ->orderBy('name')->get();
-        $items = Item::active()->with('category')->orderBy('name')->get();
+        $items = Item::active()->whereDoesntHave('category', fn ($query) => $query->where('is_operational', false))->with('category')->orderBy('name')->get();
 
         return view('warehouse.stock-requests.create', compact('cabangPops', 'items'));
     }
@@ -85,6 +87,7 @@ class WarehouseStockRequestController extends Controller
 
     public function show(StockRequest $stockRequest, EffectiveAccessService $access): View
     {
+        abort_if($stockRequest->request_kind === StockRequestKind::MARKETING, 404);
         $this->assertPopIdInScope($stockRequest->cabang_pop_id, auth()->user(), $access);
 
         $stockRequest->load(['cabangPop', 'requestedBy', 'decidedBy', 'items.item']);

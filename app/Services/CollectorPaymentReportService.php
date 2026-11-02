@@ -37,7 +37,7 @@ class CollectorPaymentReportService
 
         $payments = Payment::query()
             ->applyUserScope($viewer)
-            ->with(['customer', 'collector', 'invoice:id,billing_period'])
+            ->with(['customer', 'collector', 'invoice:id,billing_period,total_amount'])
             ->where('payment_status', PaymentStatus::VALID->value)
             // Hanya uang yang ditagih lapangan; `collected_by` null = bayar di kantor.
             ->when($collectorId, fn ($q) => $q->where('collected_by', $collectorId), fn ($q) => $q->whereNotNull('collected_by'))
@@ -49,6 +49,9 @@ class CollectorPaymentReportService
             ->whereRaw('COALESCE(collected_date, payment_date) < ?', [$endExclusive])
             ->orderBy('id')
             ->get();
+
+        // Nomor cicilan tiap baris dihitung dari pembayaran sekeluarga — muat sekali.
+        Payment::preloadInstallmentContext($payments);
 
         $groups = $payments
             ->groupBy(fn (Payment $p) => $p->payment_batch_id ? 'batch-'.$p->payment_batch_id : 'solo-'.$p->id)

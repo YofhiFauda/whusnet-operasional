@@ -363,6 +363,12 @@ return [
             ActionCode::EXPORT->value,
         ],
 
+        // Rekonsiliasi "SN terjual belum ditagih" (rancangan 2026-10-31 §5).
+        'modem_sale_reconciliation' => [
+            ActionCode::VIEW->value,
+            ActionCode::EXPORT->value,
+        ],
+
         'audit_logs' => [
             ActionCode::VIEW->value,
             ActionCode::EXPORT->value,
@@ -937,6 +943,8 @@ return [
         'collector_report.export' => 'Ekspor Laporan Bulanan Admin ke Excel',
         'collector_payment_report.view' => 'Lihat Laporan Bayar Kolektor (tabel bayar per kolektor)',
         'collector_payment_report.export' => 'Ekspor Laporan Bayar Kolektor ke Excel',
+        'modem_sale_reconciliation.view' => 'Lihat Rekonsiliasi SN Terjual Belum Ditagih',
+        'modem_sale_reconciliation.export' => 'Ekspor Rekonsiliasi SN Terjual Belum Ditagih ke CSV',
 
         // Skema 1-3 Business Development (2026-09-12)
         'agents.view' => 'Lihat Master Agent',

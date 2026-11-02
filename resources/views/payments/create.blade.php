@@ -151,6 +151,12 @@
                     <p id="overpay-hint" class="hidden text-xs font-semibold text-sky-700 dark:text-sky-400 mt-2 px-3 py-2 rounded-lg bg-sky-50 dark:bg-sky-500/10 border border-sky-200 dark:border-sky-500/20"></p>
                 </div>
 
+                <label class="flex items-start gap-2 rounded-lg border border-border bg-surface-muted px-3 py-2.5 text-xs text-text-main cursor-pointer">
+                    <input type="checkbox" name="is_advance_payment" value="1" @checked(old('is_advance_payment')) class="mt-0.5 rounded border-border text-primary focus:ring-primary/25">
+                    <span><span class="font-semibold">Bayar beberapa bulan di muka</span><span class="block text-text-muted mt-0.5">Pilih bila pelanggan sengaja membayar lebih dari sisa tagihan untuk bulan berikutnya. Nominal penuh akan tercatat di Laporan Bulanan Admin.</span></span>
+                </label>
+                @error('is_advance_payment')<p class="text-xs text-red-600">{{ $message }}</p>@enderror
+
                 <!-- Bukti Pembayaran Dropzone -->
                 <div>
                     <label for="proof_file" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Bukti Pembayaran (Opsional)</label>

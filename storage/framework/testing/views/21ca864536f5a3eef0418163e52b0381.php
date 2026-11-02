@@ -309,7 +309,7 @@
 
 <?php
     $additionalLimit = $customer->customerService?->internetPackage?->max_additional_devices ?? 0;
-    $additionalCount = $customer->additionalDevices->count();
+    $additionalCount = $customer->additionalDevices->where('status', '!=', 'ditarik')->count();
 ?>
 <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
     <div class="px-5 py-3 bg-teal-50/50 dark:bg-teal-950/20 border-b border-slate-200 dark:border-slate-700 flex flex-wrap gap-2 items-center justify-between">
@@ -336,19 +336,46 @@
                 <span class="text-slate-700 dark:text-slate-200 searchable-text">
                     <span class="font-semibold text-slate-900 dark:text-slate-100 uppercase"><?php echo e($additional->device_type); ?></span>
                     — <?php echo e($additional->brand); ?> <?php echo e($additional->model); ?> (<?php echo e($additional->serial_number ?: 'tanpa SN'); ?>)
+                    <?php if($additional->inventory_serial_id === null): ?>
+                        <span class="ml-1.5 px-2 py-0.5 rounded text-[10px] font-bold bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-300">Tanpa Stok</span>
+                    <?php else: ?>
+                        <span class="ml-1.5 px-2 py-0.5 rounded text-[10px] font-bold border bg-sky-100 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border-sky-300 dark:border-sky-800">Gudang</span>
+                        <?php if($additional->status === 'ditarik'): ?>
+                            <span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border-amber-300 dark:border-amber-800">Ditarik</span>
+                        <?php else: ?>
+                            <span class="ml-1 px-2 py-0.5 rounded text-[10px] font-bold border bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800">Terpasang</span>
+                        <?php endif; ?>
+                    <?php endif; ?>
                 </span>
                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.devices.update')): ?>
-                    <form method="POST" action="<?php echo e(route('customers.additional-device.destroy', [$customer, $additional])); ?>" onsubmit="return confirm('Hapus perangkat tambahan ini?');">
-                        <?php echo csrf_field(); ?>
-                        <?php echo method_field('DELETE'); ?>
-                        <button type="submit" class="text-rose-600 hover:text-rose-700 font-semibold cursor-pointer">
-                            <i class="fa-solid fa-trash mr-1"></i> Hapus
-                        </button>
-                    </form>
+                    
+                    <?php if($additional->inventory_serial_id !== null && $additional->status === 'terpasang'): ?>
+                        <span class="text-[10px] text-slate-400 shrink-0" title="Tarik lewat Ambil Alat supaya stok Gudang ikut kembali">Dikunci Gudang</span>
+                    <?php else: ?>
+                        <form method="POST" action="<?php echo e(route('customers.additional-device.destroy', [$customer, $additional])); ?>" onsubmit="return confirm('Hapus perangkat tambahan ini?');">
+                            <?php echo csrf_field(); ?>
+                            <?php echo method_field('DELETE'); ?>
+                            <button type="submit" class="text-rose-600 hover:text-rose-700 font-semibold cursor-pointer">
+                                <i class="fa-solid fa-trash mr-1"></i> Hapus
+                            </button>
+                        </form>
+                    <?php endif; ?>
                 <?php endif; ?>
             </div>
         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
             <p class="text-[11px] text-slate-400 text-center py-3">Belum ada perangkat tambahan.</p>
+        <?php endif; ?>
+
+        
+        <?php
+            $shortageInstallation = $customer->installations()->where('extra_device_shortage', true)->latest()->first();
+        ?>
+        <?php if($shortageInstallation): ?>
+            <p class="mt-3 text-[11px] text-amber-700 dark:text-amber-400 leading-snug">
+                <span class="font-bold">Kekurangan perangkat dilaporkan saat pemasangan:</span>
+                <?php echo e($shortageInstallation->extra_device_shortage_reason); ?>
+
+            </p>
         <?php endif; ?>
     </div>
 </div>

@@ -42,6 +42,7 @@ class WarehouseController extends Controller
 
         $pops = Pop::query()
             ->warehouse()
+            ->with(['gudangPics' => fn ($q) => $q->where('status', 'active')->orderBy('name')])
             ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
             ->orderBy('type')
             ->orderBy('name')

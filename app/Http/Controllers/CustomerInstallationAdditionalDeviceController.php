@@ -126,7 +126,7 @@ class CustomerInstallationAdditionalDeviceController extends Controller
         // lebih dari limit bikin ganti paket berikutnya keblok
         // (CustomerPackageService::assertAdditionalDevicesWithinLimit()).
         $toInstall = $decisions->where('outcome', 'terpasang');
-        if ($toInstall->isNotEmpty() && $customer->additionalDevices()->count() + $toInstall->count() > $required) {
+        if ($toInstall->isNotEmpty() && $customer->additionalDevices()->active()->count() + $toInstall->count() > $required) {
             throw ValidationException::withMessages([
                 'decisions' => "Melebihi batas {$required} perangkat tambahan untuk paket pelanggan ini.",
             ]);

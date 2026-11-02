@@ -117,7 +117,7 @@ class WarehouseSearchController extends Controller
 
     /**
      * Transfer by `reference_number` ATAU nomor surat jalan (format
-     * `SJ/WHUS/{tahun}/{bulan}/{urut}`, lihat `WarehouseTransferController::suratJalanNumber()`
+     * `SJ/WHUS/{tahun}/{bulan}/{tanggal}/TRF-{id}`, lihat `InventoryTransfer::suratJalanNumber()`
      * — nomornya deterministik dari id+created_at transfer, bukan kolom
      * tersimpan, jadi dicari dengan membalik rumus itu, bukan `LIKE` ke kolom.
      *
@@ -137,13 +137,18 @@ class WarehouseSearchController extends Controller
             ->limit(20)->get();
 
         $bySuratJalan = collect();
-        if (preg_match('#SJ[/\-]?WHUS[/\-]?(\d{4})[/\-]?(\d{2})[/\-]?0*(\d+)#i', $query, $m)) {
-            [$year, $month, $id] = [$m[1], $m[2], (int) $m[3]];
-            $transfer = InventoryTransfer::query()->with(['fromPop', 'toPop'])->find($id);
+        $hasFullDate = preg_match('#^SJ/WHUS/(\d{4})/(\d{2})/(\d{2})/TRF-(\d+)$#i', $query, $matches) === 1;
+        $hasLegacyNumber = ! $hasFullDate
+            && preg_match('#^SJ/WHUS/(\d{4})/(\d{2})/0*(\d+)$#i', $query, $matches) === 1;
 
-            if ($transfer
-                && $transfer->created_at->format('Y') === $year
-                && $transfer->created_at->format('m') === $month
+        if ($hasFullDate || $hasLegacyNumber) {
+            $id = (int) $matches[$hasFullDate ? 4 : 3];
+            $transfer = InventoryTransfer::query()->with(['fromPop', 'toPop'])->find($id);
+            $dateMatches = $transfer && ($hasFullDate
+                ? strcasecmp($transfer->suratJalanNumber(), $query) === 0
+                : $transfer->created_at->format('Y/m') === $matches[1].'/'.$matches[2]);
+
+            if ($dateMatches
                 && ($hasAllAccess || in_array($transfer->from_pop_id, $allowedPopIds, true) || in_array($transfer->to_pop_id, $allowedPopIds, true))) {
                 $bySuratJalan->push($transfer);
             }

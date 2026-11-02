@@ -246,6 +246,15 @@
                                                 {{ $customer->customer_code ?? $customer->customer_id }}
                                             </span>
                                         @endif
+                                        {{-- Modem terjual (rancangan 2026-10-31 §4) — BD perlu tahu
+                                             invoice yang akan terbit MEMBAWA baris Jual Modem, bukan
+                                             cuma Biaya Instalasi yang diisi di halaman ini. --}}
+                                        @php $modemSaleAmount = (float) ($customer->pending_initial_invoice['billing']['modem_sale_amount'] ?? 0); @endphp
+                                        @if($modemSaleAmount > 0)
+                                            <span class="mt-0.5 inline-flex items-center gap-1 rounded bg-sky-50 px-1.5 py-0.5 text-[9px] font-semibold text-sky-700 dark:bg-sky-950/60 dark:text-sky-300" title="{{ $customer->pending_initial_invoice['billing']['modem_sale_description'] ?? '' }}">
+                                                Modem terjual {{ \App\Helpers\FormatHelper::rupiah($modemSaleAmount) }}
+                                            </span>
+                                        @endif
                                     </div>
                                 </div>
                             </td>

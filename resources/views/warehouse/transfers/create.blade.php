@@ -31,7 +31,8 @@
         'name' => $item->name,
         'label' => "{$item->code} — {$item->name}",
         'tracking_type' => $item->tracking_type->value,
-        'unit' => $item->unit,
+        'unit' => $item->pack_size ? 'Pack' : $item->unit,
+        'pack_size' => $item->pack_size,
         'category_id' => $item->item_category_id,
         'category_name' => $item->category?->name ?? 'Tanpa Kategori',
     ])->values();
@@ -61,10 +62,10 @@
 
     {{-- Header terpadu Gudang (Desktop & Mobile Responsive - Naked Header) --}}
     <x-warehouse.header
-        active="stock"
+        :active="$direction === 'reverse' ? 'transfers-reverse' : 'transfers-create'"
         title="Transfer Antar Gudang"
         subtitle="{{ $direction === 'reverse' ? 'Transfer stok biasa Cabang → Pusat' : 'Distribusi stok material & perangkat Pusat → Cabang' }}"
-        backUrl="{{ route('warehouse.stock.index') }}"
+        backUrl="{{ route('warehouse.transfers.index') }}"
     />
 
     <form id="transfer-form" action="{{ route('warehouse.transfers.store') }}" method="POST">
@@ -1085,7 +1086,13 @@ function warehouseTransferManager(itemOptions, categoryOptions, oldRows, stockEn
             }
 
             row.lot_no = detail.lotNo || '';
-            row.qty = detail.qty;
+            // `detail.qty` dari "Stok Tersedia" itu saldo lot dalam pcs —
+            // tapi input Pack di baris form ini mengharapkan jumlah Pack
+            // (lihat `onItemChange`/label unit di atas). Tanpa konversi,
+            // quick-pick nempelin angka pcs langsung ke field Pack
+            // (ketindihan pack_size kali lipat kalau staf tak sadar).
+            const opt = this.itemOptions.find(o => String(o.id) === String(detail.itemId));
+            row.qty = (opt && opt.pack_size) ? (detail.qty / opt.pack_size) : detail.qty;
         },
 
         onPickRoll(detail) {

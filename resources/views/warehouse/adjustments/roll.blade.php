@@ -49,29 +49,17 @@
             </select>
         </div>
 
-        <div x-show="evidenceRequired" x-cloak>
-            <label class="block mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">Bukti Fisik (Foto Kondisi / BAP Kehilangan) <span class="text-rose-500">*</span></label>
-            <input type="file" name="evidence" accept="image/*" :required="evidenceRequired"
-                   class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 file:mr-3 file:py-1 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-amber-100 dark:file:bg-amber-900/40 file:text-amber-700 dark:file:text-amber-300">
-            <p class="text-[11px] text-slate-400 mt-1">Wajib buat Hilang/Rusak/Dimusnahkan — kontrol-anti-manipulasi.md §2. Karantina TIDAK wajib foto (status tahan sementara, bukan klaim rugi).</p>
-        </div>
-
-        <div>
-            <label class="block mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">Alasan Perubahan Status <span class="text-rose-500">*</span></label>
-            <input type="text" name="reason" required maxlength="255" list="reason-suggestions-roll" placeholder="mis. roll_hilang_di_lapangan, kabel_putus_tidak_terpakai"
-                   class="w-full text-xs font-medium px-3 py-2.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all">
-            <datalist id="reason-suggestions-roll">
-                <option value="roll_hilang_di_lapangan">
-                <option value="kabel_rusak_tidak_terpakai">
-                <option value="roll_basah_jamur">
-            </datalist>
-        </div>
-
-        <div>
-            <label class="block mb-1.5 text-xs font-bold text-slate-700 dark:text-slate-200">Catatan Tambahan (Opsional)</label>
-            <textarea name="notes" rows="2" placeholder="Keterangan kondisi fisik roll..."
-                      class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500 transition-all"></textarea>
-        </div>
+        @include('warehouse.adjustments.partials._reason-evidence', [
+            'idPrefix' => 'roll',
+            'reasonLabel' => 'Alasan Perubahan Status',
+            'reasonPlaceholder' => 'mis. roll_hilang_di_lapangan, kabel_putus_tidak_terpakai',
+            'suggestions' => ['roll_hilang_di_lapangan', 'kabel_rusak_tidak_terpakai', 'roll_basah_jamur'],
+            'notesPlaceholder' => 'Keterangan kondisi fisik roll...',
+            'evidence' => 'when',
+            'evidenceWhen' => 'evidenceRequired',
+            'evidenceLabel' => 'Bukti Fisik (Foto Kondisi / BAP Kehilangan)',
+            'evidenceHint' => 'Wajib buat Hilang/Rusak/Dimusnahkan. Karantina tidak wajib foto (status tahan sementara, bukan klaim rugi).',
+        ])
 
         <div class="pt-4 border-t border-slate-100 dark:border-slate-700/60 flex items-center justify-between">
             <a href="{{ route('warehouse.custody.index') }}" class="px-4 py-2.5 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors">

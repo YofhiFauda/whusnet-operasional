@@ -18,9 +18,8 @@
     Diskon & Pajak SELALU Rp 0 (warehouse gak py konsep itu) — kolom/baris
     tetap ditampilkan demi kesetiaan ke template resmi, bukan dihapus.
 
-    TTD Kepala Gudang MURNI nama+jabatan (hardcode config('warehouse.kepala_gudang'))
-    + garis kosong — SAMA seperti Surat Jalan, TIDAK ADA gambar/upload TTD
-    di dokumen manapun (koreksi user 2026-09-17).
+    TTD Kepala Gudang menggunakan gambar dari ttd.docx di bawah "Mengetahui,"
+    serta nama+jabatan dari config('warehouse.kepala_gudang').
 --}}
 <!DOCTYPE html>
 <html lang="id">
@@ -54,23 +53,26 @@
             width: 100%;
             border-collapse: collapse;
             margin-bottom: 6px;
+            table-layout: fixed;
         }
 
         .kop-logo-td {
-            width: 160px;
+            width: 140px;
             vertical-align: middle;
             padding: 0;
+            text-align: left;
         }
 
         .kop-logo {
-            height: 56px;
+            height: 52px;
             width: auto;
             display: block;
         }
 
         .kop-text-td {
             vertical-align: middle;
-            padding-left: 12px;
+            text-align: center;
+            padding: 0 4px;
         }
 
         .kop-company-name {
@@ -98,6 +100,11 @@
         .kop-pipe {
             color: #71717a;
             padding: 0 4px;
+        }
+
+        .kop-spacer-td {
+            width: 140px;
+            padding: 0;
         }
 
         .kop-divider-line {
@@ -232,7 +239,14 @@
         }
 
         .signoff-space {
-            height: 60px;
+            height: 96px;
+        }
+
+        .signoff-signature {
+            display: block;
+            height: 90px;
+            width: auto;
+            margin: 0 auto;
         }
 
         .signoff-name {
@@ -252,6 +266,8 @@
     @php
         $logoPath = public_path('images/kop-surat-logo.png');
         $logoData = file_exists($logoPath) ? base64_encode(file_get_contents($logoPath)) : null;
+        $signaturePath = public_path('images/warehouse-transfer-signature-clean.png');
+        $signatureData = base64_encode(file_get_contents($signaturePath));
     @endphp
 
     <div class="a4">
@@ -267,6 +283,7 @@
                     <div class="kop-company-address">Pucangombo, Tegalombo, Pacitan, Jawa Timur</div>
                     <div class="kop-company-contact">info@connexa.net.id <span class="kop-pipe">│</span> 082240003434</div>
                 </td>
+                <td class="kop-spacer-td"></td>
             </tr>
         </table>
         <div class="kop-divider-line"></div>
@@ -354,7 +371,9 @@
                     <div class="signoff-block">
                         <div class="signoff-place">{{ $transfer->fromPop->city ?? 'Ponorogo' }}, {{ \App\Support\IndonesianDate::date($transfer->created_at) }}</div>
                         <div class="signoff-label">Mengetahui,</div>
-                        <div class="signoff-space"></div>
+                        <div class="signoff-space">
+                            <img src="data:image/png;base64,{{ $signatureData }}" class="signoff-signature" alt="Tanda tangan Kepala Gudang">
+                        </div>
                         <div class="signoff-name">{{ $kepalaGudang['name'] }}</div>
                         <div class="signoff-title">{{ $kepalaGudang['title'] }}</div>
                     </div>

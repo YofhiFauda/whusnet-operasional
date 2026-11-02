@@ -48,6 +48,7 @@ class WarehouseTraceabilityController extends Controller
         $ledger = collect();
         $rollUsage = collect();
         $rollInfraUsage = collect();
+        $purchase = null;
         $notFound = false;
 
         $user = auth()->user();
@@ -92,9 +93,19 @@ class WarehouseTraceabilityController extends Controller
                 //    cuma bisa ditelusuri lewat `fop_task_id`.
                 $ledger = InventoryTransaction::query()
                     ->where('serial_id', $serial->id)
-                    ->with(['fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'createdBy', 'transfer.fromPop', 'transfer.toPop', 'fopTask.customer'])
+                    ->with(['fromPop', 'toPop', 'fromTechnician', 'toTechnician', 'createdBy', 'transfer.fromPop', 'transfer.toPop', 'transfer.branchSale', 'fopTask.customer'])
                     ->orderBy('id')
                     ->get();
+
+                // Asal "Dibeli": penerimaan jual beli antar Cabang TERAKHIR, dan hanya
+                // selama SN masih di Cabang pembeli itu. Begitu SN pindah lagi, asal
+                // pembelian tetap ada di timeline tapi bukan lagi label lokasi terkini.
+                $purchase = $ledger->last(fn (InventoryTransaction $event) => $event->type->value === 'transfer'
+                    && $event->to_pop_id !== null
+                    && $event->transfer?->branchSale !== null);
+                if ($purchase && $purchase->to_pop_id !== $serial->current_pop_id) {
+                    $purchase = null;
+                }
             } else {
                 $notFound = true;
             }
@@ -131,6 +142,8 @@ class WarehouseTraceabilityController extends Controller
             }
         }
 
+        $totalRollMetersUsed = (float) $rollUsage->sum('qty') + (float) $rollInfraUsage->sum('qty');
+
         // Jalankan pencarian daftar hanya kalau tidak sedang lookup langsung.
         if ($serialNumber === '' && $rollCode === '' && $query !== '') {
             $results = $this->searchCandidates($query, $popFilter, $access, $user);
@@ -138,7 +151,7 @@ class WarehouseTraceabilityController extends Controller
 
         return view('warehouse.traceability.index', compact(
             'serialNumber', 'rollCode', 'serial', 'roll', 'ledger', 'notFound',
-            'query', 'results', 'pops', 'popFilter', 'rollUsage', 'rollInfraUsage'
+            'query', 'results', 'pops', 'popFilter', 'rollUsage', 'rollInfraUsage', 'totalRollMetersUsed', 'purchase'
         ));
     }
 

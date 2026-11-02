@@ -37,6 +37,12 @@ services:
     restart: unless-stopped
     environment: &app_env
       CONTAINER_ROLE: app
+      # Pool PHP-FPM (docker/php/fpm-pool.conf). Default ±2 GB RAM; setel di
+      # Coolify sesuai RAM server: max_children ≈ RAM untuk PHP / ±60 MB.
+      FPM_MAX_CHILDREN: ${FPM_MAX_CHILDREN:-20}
+      FPM_START_SERVERS: ${FPM_START_SERVERS:-6}
+      FPM_MIN_SPARE_SERVERS: ${FPM_MIN_SPARE_SERVERS:-4}
+      FPM_MAX_SPARE_SERVERS: ${FPM_MAX_SPARE_SERVERS:-10}
       APP_NAME: ${APP_NAME:-Whusnet-Operasional}
       APP_ENV: production
       APP_DEBUG: "false"
@@ -166,6 +172,16 @@ services:
         condition: service_healthy
       reverb:
         condition: service_started
+    healthcheck:
+      # /robots.txt dibakar langsung ke image ini (bukan lewat fastcgi ke
+      # app) — cek nginx worker sendiri hidup & bisa serve statis, tanpa
+      # ikut gagal kalau php-fpm di `app` lagi lambat (itu tanggung jawab
+      # healthcheck service `app`, bukan `nginx`).
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1/robots.txt"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 15s
     networks:
       - app_network
       - coolify

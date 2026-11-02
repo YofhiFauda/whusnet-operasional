@@ -42,7 +42,7 @@
             </span>
             <div class="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-700/80 px-2 py-0.5 rounded text-xs font-mono font-medium text-slate-700 dark:text-slate-300 border border-slate-200/60 dark:border-slate-600/60">
                 <span><?php echo e($displayIdLabel ?? 'CID'); ?>: <?php echo e($displayId); ?></span>
-                <button type="button" onclick="copyText('<?php echo e($displayId); ?>', 'CID')" class="text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 ml-1 cursor-pointer transition-colors" title="Salin CID">
+                <button type="button" onclick="copyText('<?php echo e($displayId); ?>', 'CID')" class="text-slate-500 dark:text-slate-400 hover:text-sky-600 dark:hover:text-sky-400 ml-1 cursor-pointer transition-colors" title="Salin CID" aria-label="Salin CID">
                     <i class="fa-regular fa-copy"></i>
                 </button>
             </div>
@@ -53,7 +53,7 @@
 
                 </span>
             <?php else: ?>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-slate-50 dark:bg-slate-800 text-slate-400 dark:text-slate-500 border border-slate-200 dark:border-slate-700">
+                <span class="inline-flex items-center px-2.5 py-0.5 rounded text-xs font-semibold bg-slate-50 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
                     Belum Ada Kolektor
                 </span>
             <?php endif; ?>
@@ -88,10 +88,10 @@
             <span class="inline-flex items-center gap-1.5">
                 <i class="fa-solid fa-network-wired text-indigo-500 text-[11px]"></i>
                 <span><?php echo e($customer->pop->name ?? 'POP Belum Set'); ?></span>
-                <span class="text-slate-400">(<?php echo e($customer->miniPop->name ?? 'Mini POP Belum Set'); ?>)</span>
+                <span class="text-slate-500 dark:text-slate-400">(<?php echo e($customer->miniPop->name ?? 'Mini POP Belum Set'); ?>)</span>
             </span>
             <span class="hidden sm:inline text-slate-300 dark:text-slate-700">•</span>
-            <span class="inline-flex items-center gap-1.5 text-slate-400">
+            <span class="inline-flex items-center gap-1.5 text-slate-500 dark:text-slate-400">
                 <i class="fa-regular fa-calendar-check text-[11px]"></i>
                 <span>Terdaftar sejak <?php echo e($regDate); ?></span>
             </span>
@@ -146,7 +146,7 @@
         <?php endif; ?>
 
         <a href="<?php echo e(route('customers.index')); ?>" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-2xs">
-            <i class="fa-solid fa-arrow-left text-slate-400"></i>
+            <i class="fa-solid fa-arrow-left text-slate-500 dark:text-slate-400"></i>
             <span>Kembali</span>
         </a>
     </div>
@@ -158,7 +158,7 @@
     <!-- SECTION A: QUICK METRIC STRIP (Responsive hairline grid for Mobile, Tablet, & Desktop) -->
     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-px bg-slate-200 dark:bg-slate-700 border-b border-slate-200 dark:border-slate-700">
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">LANGGANAN & BIAYA</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">LANGGANAN & BIAYA</span>
             <span class="text-xs font-bold text-slate-900 dark:text-slate-100 mt-1 truncate" title="<?php echo e($customer->internetPackage->name ?? 'Belum Ada Paket'); ?>">
                 <?php echo e($customer->internetPackage->name ?? 'Belum Ada Paket'); ?>
 
@@ -166,7 +166,7 @@
             <span class="text-xs font-mono font-semibold text-sky-600 dark:text-sky-400">Rp <?php echo e(number_format($totalBill, 0, ',', '.')); ?>/bln (Nett)</span>
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">PPPOE</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">PPPOE</span>
             <?php
                 $pppoeShown = $customer->customerDevice?->pppoe_username ?: ($customer->customerTechnicalDetail?->pppoe_username ?: ($customer->customerService?->pppoe_username ?: ($customer->pppoe_username ?? '-')));
                 $pppoeWarning = \App\Services\CustomerCidService::pppoeMismatchWarning($customer, $pppoeShown);
@@ -179,7 +179,7 @@
             <?php endif; ?>
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">MODEM ONT & SIGNAL</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">MODEM ONT & SIGNAL</span>
             <span class="text-xs font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 truncate" title="<?php echo e($customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang')); ?>">
                 <?php echo e($customer->ont_sn ?? ($customer->customerDevice->ont_sn ?? 'Belum Terpasang')); ?>
 
@@ -207,21 +207,21 @@
 <?php endif; ?>
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">BILLING & TAGIHAN</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">BILLING & TAGIHAN</span>
             <?php if($latestInvoice): ?>
                 <span class="text-xs font-bold text-emerald-600 dark:text-emerald-400 mt-1 truncate" title="<?php echo e($latestInvoice->invoice_number); ?> (<?php echo e($latestInvoice->invoice_status->label()); ?>)">
                     <?php echo e($latestInvoice->invoice_number); ?> (<?php echo e($latestInvoice->invoice_status->label()); ?>)
                 </span>
             <?php else: ?>
-                <span class="text-xs font-bold text-slate-400 mt-1">Belum Ada Tagihan</span>
+                <span class="text-xs font-bold text-slate-500 dark:text-slate-400 mt-1">Belum Ada Tagihan</span>
             <?php endif; ?>
             <span class="text-[11px] text-slate-500">Jatuh Tempo: <?php echo e($customer->customerService?->due_date ? 'Tgl ' . \Carbon\Carbon::parse($customer->customerService->due_date)->day . ' Per Bulan' : '-'); ?></span>
         </div>
         <div class="p-3.5 sm:p-4 bg-white dark:bg-slate-800 flex flex-col justify-center min-w-0 sm:col-span-2 lg:col-span-1">
-            <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">KELENGKAPAN PROFIL</span>
+            <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">KELENGKAPAN PROFIL</span>
             <div class="flex items-center justify-between mt-1">
                 <span class="text-xs font-bold <?php echo e(count($completeness['missing_required']) > 0 ? 'text-rose-600' : (count($completeness['missing_optional']) > 0 ? 'text-amber-600' : 'text-emerald-600')); ?>"><?php echo e($completeness['percentage']); ?>% Lengkap</span>
-                <span class="text-[10px] font-mono text-slate-400"><?php echo e($completeness['filled_count']); ?>/<?php echo e($completeness['total_count']); ?> Parameter</span>
+                <span class="text-[10px] font-mono text-slate-500 dark:text-slate-400"><?php echo e($completeness['filled_count']); ?>/<?php echo e($completeness['total_count']); ?> Parameter</span>
             </div>
             <div class="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5 mt-1.5 overflow-hidden">
                 <div class="<?php echo e(count($completeness['missing_required']) > 0 ? 'bg-rose-500' : (count($completeness['missing_optional']) > 0 ? 'bg-amber-500' : 'bg-emerald-500')); ?> h-full rounded-full transition-all duration-300" style="width: <?php echo e($completeness['percentage']); ?>%"></div>
@@ -234,10 +234,11 @@
         <!-- Omni-Search Bar & Mode Toggle (Fully Responsive for Mobile/Tablet/Desktop) -->
         <div class="p-3 sm:p-4 border-b border-slate-200 dark:border-slate-700 flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
             <div class="relative flex-1 min-w-0">
-                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 text-xs"></i>
+                <i class="fa-solid fa-magnifying-glass absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 text-xs"></i>
+                <label for="omni-search" class="sr-only">Cari di seluruh tab</label>
                 <input type="text" id="omni-search" onkeyup="filterContent()" placeholder="⚡ Cari apapun di seluruh tab (contoh: IP, ZTE, PPPoE, Speedtest, NIK, Prorate, Tiang, Kontrak)..."
                        class="w-full pl-9 pr-10 py-2 bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all">
-                <button type="button" onclick="clearSearch()" id="clear-search-btn" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
+                <button type="button" onclick="clearSearch()" id="clear-search-btn" aria-label="Hapus pencarian" class="hidden absolute right-3 top-1/2 -translate-y-1/2 text-slate-500 dark:text-slate-400 hover:text-slate-600 text-xs cursor-pointer">
                     <i class="fa-solid fa-xmark"></i>
                 </button>
             </div>
@@ -252,37 +253,37 @@
         </div>
 
         <!-- 15 Tab Buttons Nav with Smooth Scroll & Touch Support -->
-        <div id="tab-nav-wrapper" class="overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth flex border-b border-slate-200 dark:border-slate-700 px-2 bg-slate-50/50 dark:bg-slate-900/30 touch-pan-x">
-            <button type="button" onclick="switchTab('ringkasan')" id="tab-btn-ringkasan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-sky-600 text-sky-600 whitespace-nowrap cursor-pointer transition-colors">Ringkasan (Overview)</button>
+        <div id="tab-nav-wrapper" role="tablist" aria-label="Bagian detail pelanggan" class="overflow-x-auto no-scrollbar [scrollbar-width:none] [-ms-overflow-style:none] [&::-webkit-scrollbar]:hidden scroll-smooth flex border-b border-slate-200 dark:border-slate-700 px-2 bg-slate-50/50 dark:bg-slate-900/30 touch-pan-x">
+            <button type="button" onclick="switchTab('ringkasan')" id="tab-btn-ringkasan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-sky-600 text-sky-600 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="true" aria-controls="tab-content-ringkasan">Ringkasan (Overview)</button>
             <?php if(auth()->user()->hasPermission('customers.detail.identity.view')): ?>
-            <button type="button" onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Identitas</button>
+            <button type="button" onclick="switchTab('identitas')" id="tab-btn-identitas" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-identitas">Identitas</button>
             <?php endif; ?>
             <?php if(auth()->user()->hasPermission('customers.detail.address.view')): ?>
-            <button type="button" onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Alamat</button>
+            <button type="button" onclick="switchTab('alamat')" id="tab-btn-alamat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-alamat">Alamat</button>
             <?php endif; ?>
-            <button type="button" onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">POP/Cabang</button>
+            <button type="button" onclick="switchTab('pop')" id="tab-btn-pop" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-pop">POP/Cabang</button>
             <?php if(auth()->user()->hasPermission('customers.detail.survey.view')): ?>
-            <button type="button" onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Survey</button>
+            <button type="button" onclick="switchTab('survey')" id="tab-btn-survey" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-survey">Survey</button>
             <?php endif; ?>
             <?php if(auth()->user()->hasPermission('customers.detail.installation.view')): ?>
-            <button type="button" onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Pemasangan</button>
+            <button type="button" onclick="switchTab('pemasangan')" id="tab-btn-pemasangan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-pemasangan">Pemasangan</button>
             <?php endif; ?>
             <?php if(auth()->user()->hasPermission('customers.detail.devices.view')): ?>
-            <button type="button" onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Perangkat</button>
+            <button type="button" onclick="switchTab('perangkat')" id="tab-btn-perangkat" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-perangkat">Perangkat</button>
             <?php endif; ?>
             <?php if(auth()->user()->hasPermission('customers.detail.packages.view')): ?>
-            <button type="button" onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Paket & Layanan</button>
+            <button type="button" onclick="switchTab('paket-layanan')" id="tab-btn-paket-layanan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-paket-layanan">Paket & Layanan</button>
             <?php endif; ?>
-            <button type="button" onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Billing</button>
-            <button type="button" onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Tagihan</button>
-            <button type="button" onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Pembayaran</button>
+            <button type="button" onclick="switchTab('billing')" id="tab-btn-billing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-billing">Billing</button>
+            <button type="button" onclick="switchTab('tagihan')" id="tab-btn-tagihan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-tagihan">Tagihan</button>
+            <button type="button" onclick="switchTab('pembayaran')" id="tab-btn-pembayaran" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-pembayaran">Pembayaran</button>
             <?php if(auth()->user()->hasPermission('customers.detail.documents.view')): ?>
-            <button type="button" onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Dokumen & Berkas</button>
+            <button type="button" onclick="switchTab('dokumen')" id="tab-btn-dokumen" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-dokumen">Dokumen & Berkas</button>
             <?php endif; ?>
-            <button type="button" onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Riwayat Ticketing</button>
-            <button type="button" onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Riwayat Perubahan</button>
+            <button type="button" onclick="switchTab('riwayat-ticketing')" id="tab-btn-riwayat-ticketing" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-riwayat-ticketing">Riwayat Ticketing</button>
+            <button type="button" onclick="switchTab('riwayat-perubahan')" id="tab-btn-riwayat-perubahan" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-riwayat-perubahan">Riwayat Perubahan</button>
             <?php if($customer->customerTechnicalDetail): ?>
-            <button type="button" onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors">Detail Teknis Lama</button>
+            <button type="button" onclick="switchTab('teknis-lama')" id="tab-btn-teknis-lama" class="tab-button px-3.5 py-3 text-xs font-bold border-b-2 border-transparent text-slate-500 hover:text-slate-800 dark:hover:text-slate-200 whitespace-nowrap cursor-pointer transition-colors" role="tab" aria-selected="false" aria-controls="tab-content-teknis-lama">Detail Teknis Lama</button>
             <?php endif; ?>
         </div>
     </div>
@@ -291,11 +292,11 @@
     <div class="p-2 md:p-6 text-xs" id="details-container">
 
         <!-- TAB 1: RINGKASAN (OVERVIEW) -->
-        <div id="tab-content-ringkasan" class="tab-content space-y-6 searchable-section">
+        <div id="tab-content-ringkasan" class="tab-content space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-ringkasan">
             <!-- Completeness Overview Banner -->
             <div class="border <?php echo e(count($completeness['missing_required']) > 0 ? 'border-rose-200 dark:border-rose-800 bg-rose-50/40 dark:bg-rose-950/20' : (count($completeness['missing_optional']) > 0 ? 'border-amber-200 dark:border-amber-800 bg-amber-50/40 dark:bg-amber-950/20' : 'border-emerald-200 dark:border-emerald-800 bg-emerald-50/40 dark:bg-emerald-950/20')); ?> rounded-lg p-5">
                 <div class="flex items-center justify-between mb-2">
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Kelengkapan Data Profil Pelanggan</h3>
+                    <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Kelengkapan Data Profil Pelanggan</h2>
                     <span class="text-xs font-semibold text-slate-500">Persentase Terisi: <strong class="text-sky-600 font-bold"><?php echo e($completeness['percentage']); ?>%</strong></span>
                 </div>
                 <div class="flex items-center gap-3 flex-wrap">
@@ -312,7 +313,7 @@
             <!-- CARD TIMELINE PROSES ALUR PENGERJAAN -->
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-5 bg-white dark:bg-slate-800">
                 <div class="flex flex-wrap gap-2 items-center justify-between mb-3">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider">CARD TIMELINE PROSES ALUR PENGERJAAN</span>
+                    <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">CARD TIMELINE PROSES ALUR PENGERJAAN</span>
                     <span class="text-[10px] font-mono font-bold px-2 py-0.5 rounded border <?php echo e($customer->status === 'active' ? 'text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/50 border-emerald-200 dark:border-emerald-800' : 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-700 border-slate-200 dark:border-slate-600'); ?>">
                         <?php echo e(Str::headline($customer->status)); ?>
 
@@ -362,16 +363,16 @@
             <!-- CARD RINGKASAN WAKTU & PENANGGUNG JAWAB PER TAHAP -->
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden bg-white dark:bg-slate-800 shadow-sm">
                 <div class="px-5 py-3.5 bg-slate-50/70 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
+                    <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
                         <i class="fa-solid fa-clock-rotate-left text-sky-600 mr-1.5"></i> Ringkasan Waktu &amp; Penanggung Jawab Per Tahap Workflow
-                    </h3>
+                    </h2>
                     <p class="text-[11px] text-slate-500 mt-0.5">Rekapitulasi timestamp eksekusi dan PIC penanggung jawab dari tahap pendaftaran hingga verifikasi aktivasi.</p>
                 </div>
 
                 <div class="overflow-x-auto">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr class="bg-slate-50/40 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <tr class="bg-slate-50/40 dark:bg-slate-900/30 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                 <th class="px-5 py-3">Tahap Alur Workflow</th>
                                 <th class="px-5 py-3">Waktu &amp; Tanggal Eksekusi</th>
                                 <th class="px-5 py-3">Penanggung Jawab (PIC)</th>
@@ -406,11 +407,11 @@
                                             <span class="w-6 h-6 shrink-0 rounded-full <?php echo e($accent); ?> flex items-center justify-center font-bold text-[10px]"><?php echo e($stage['no']); ?></span>
                                             <div>
                                                 <span class="block text-xs font-bold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($stage['title']); ?></span>
-                                                <span class="block text-[10px] text-slate-400 font-mono"><?php echo e($stage['subtitle']); ?></span>
+                                                <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-mono"><?php echo e($stage['subtitle']); ?></span>
                                             </div>
                                         </div>
                                     </td>
-                                    <td class="px-5 py-3 font-mono searchable-text <?php echo e($waktu ? 'text-slate-700 dark:text-slate-300' : 'text-slate-400'); ?>">
+                                    <td class="px-5 py-3 font-mono searchable-text <?php echo e($waktu ? 'text-slate-700 dark:text-slate-300' : 'text-slate-500 dark:text-slate-400'); ?>">
                                         <?php echo e($waktu ?: 'Belum tercatat'); ?>
 
                                     </td>
@@ -423,7 +424,7 @@
                                                 </div>
                                             </div>
                                         <?php else: ?>
-                                            <span class="text-slate-400">Belum ada PIC</span>
+                                            <span class="text-slate-500 dark:text-slate-400">Belum ada PIC</span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -436,18 +437,18 @@
             <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <!-- Active Subscription card -->
                 <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">LANGGANAN AKTIF</span>
-                    <h4 class="text-sm font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->internetPackage ? ($customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name) : 'Belum Ada Paket'); ?></h4>
+                    <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">LANGGANAN AKTIF</span>
+                    <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->internetPackage ? ($customer->internetPackage->package_code . ' - ' . $customer->internetPackage->name) : 'Belum Ada Paket'); ?></h3>
                     <p class="text-xs text-slate-500 mt-1">Kategori: <?php echo e($customer->internetPackage->category ?? '-'); ?></p>
                     <div class="flex items-baseline mt-3">
                         <span class="text-lg font-bold text-slate-900 dark:text-slate-100 font-mono searchable-text">Rp <?php echo e(number_format($totalBill, 0, ',', '.')); ?></span>
-                        <span class="text-[10px] text-slate-400 ml-1">/bulan (Nett)</span>
+                        <span class="text-[10px] text-slate-500 dark:text-slate-400 ml-1">/bulan (Nett)</span>
                     </div>
                 </div>
                 
                 <!-- Address Card -->
                 <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                    <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">ALAMAT INSTALASI</span>
+                    <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">ALAMAT INSTALASI</span>
                     <p class="text-xs text-slate-800 dark:text-slate-200 font-semibold leading-relaxed searchable-text"><?php echo e($customer->address ?? 'Belum diisi'); ?></p>
                     <p class="text-[10px] text-slate-500 mt-1.5 searchable-text">
                         Kel. <?php echo e($customer->village->name ?? ($customer->customerAddress->village ?? '-')); ?>, 
@@ -464,26 +465,26 @@
 
             <!-- Technical summary card -->
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-5">
-                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">RINGKASAN TEKNIS JARINGAN</span>
+                <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-3">RINGKASAN TEKNIS JARINGAN</span>
                 <div class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-4 text-xs">
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">NOMOR CID / REQ ID</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">NOMOR CID / REQ ID</span>
                         <span class="font-mono font-bold text-sky-600 dark:text-sky-400 searchable-text"><?php echo e($displayId); ?></span>
                     </div>
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">POP CABANG</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">POP CABANG</span>
                         <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text"><?php echo e($customer->pop->name ?? '-'); ?></span>
                     </div>
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">MINI POP (OLT)</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">MINI POP (OLT)</span>
                         <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text"><?php echo e($customer->miniPop->name ?? 'Belum di-assign'); ?></span>
                     </div>
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">DISTRIBUSI ODP</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">DISTRIBUSI ODP</span>
                         <span class="font-semibold text-slate-800 dark:text-slate-200 searchable-text"><?php echo e($customer->distribution->code ?? 'Belum di-assign'); ?></span>
                     </div>
                     <div>
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">ONT SERIAL NUMBER</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">ONT SERIAL NUMBER</span>
                         <span class="font-mono font-semibold text-slate-800 dark:text-slate-200 searchable-text"><?php echo e($customer->ont_sn ?? '-'); ?></span>
                     </div>
                 </div>
@@ -492,7 +493,7 @@
             <!-- Missing Fields Alert if applicable -->
             <?php if(count($completeness['missing_required']) > 0 || count($completeness['missing_optional']) > 0): ?>
             <div class="border border-amber-200 dark:border-amber-800 rounded-lg p-5 bg-amber-50/40 dark:bg-amber-950/20">
-                <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">PARAMETER YANG BELUM LENGKAP</span>
+                <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">PARAMETER YANG BELUM LENGKAP</span>
                 <div class="space-y-3 text-xs">
                     <?php if(count($completeness['missing_required']) > 0): ?>
                     <div>
@@ -522,42 +523,42 @@
 
         <!-- TAB 2: IDENTITAS -->
         <?php if(auth()->user()->hasPermission('customers.detail.identity.view')): ?>
-        <div id="tab-content-identitas" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-identitas" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-identitas">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Formulir Identitas Pelanggan</span>
                 </div>
                 <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs">
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">ID Registrasi (Permanen)</span>
+                        <span class="text-slate-500 dark:text-slate-400">ID Registrasi (Permanen)</span>
                         <span class="font-mono font-bold text-sky-600 dark:text-sky-400 searchable-text"><?php echo e($customer->customer_code); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nama Lengkap</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nama Lengkap</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->full_name); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nomor Identitas (NIK)</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nomor Identitas (NIK)</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->identity_number ?? 'Belum diisi'); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Jenis Kelamin</span>
+                        <span class="text-slate-500 dark:text-slate-400">Jenis Kelamin</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->gender?->label() ?? 'Belum diisi'); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nomor HP Utama</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nomor HP Utama</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->primary_phone ?? 'Belum diisi'); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nomor HP Alternatif</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nomor HP Alternatif</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->alternative_phone ?? 'Belum diisi'); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Alamat Email</span>
+                        <span class="text-slate-500 dark:text-slate-400">Alamat Email</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->email ?? 'Belum diisi'); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between md:col-span-2">
-                        <span class="text-slate-400">Tanggal Registrasi</span>
+                        <span class="text-slate-500 dark:text-slate-400">Tanggal Registrasi</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($regDate); ?></span>
                     </div>
                 </div>
@@ -569,16 +570,16 @@
                 </div>
                 <div class="p-5 grid grid-cols-1 md:grid-cols-3 gap-6 text-xs">
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">ID SALES</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">ID SALES</span>
                         
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->salesUser?->name ?? $customer->sales_code ?? '-'); ?></span>
                     </div>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">AGENT</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">AGENT</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->agent?->name ?? $customer->agent_code ?? '-'); ?></span>
                     </div>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase">REFERRAL PELANGGAN</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">REFERRAL PELANGGAN</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->referralCustomer?->full_name ?? $customer->referral_customer_code ?? '-'); ?></span>
                     </div>
                 </div>
@@ -588,7 +589,7 @@
 
         <!-- TAB 3: ALAMAT -->
         <?php if(auth()->user()->hasPermission('customers.detail.address.view')): ?>
-        <div id="tab-content-alamat" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-alamat" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-alamat">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <?php
                     $lat = $customer->latitude ?? ($customer->customerAddress->latitude ?? null);
@@ -602,31 +603,31 @@
                 </div>
                 <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs">
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between md:col-span-2">
-                        <span class="text-slate-400">Alamat Lengkap</span>
+                        <span class="text-slate-500 dark:text-slate-400">Alamat Lengkap</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 text-right searchable-text"><?php echo e($customer->address ?? 'Belum diisi'); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Desa / Kelurahan</span>
+                        <span class="text-slate-500 dark:text-slate-400">Desa / Kelurahan</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->village->name ?? ($customer->customerAddress->village ?? 'Belum diisi')); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Kecamatan</span>
+                        <span class="text-slate-500 dark:text-slate-400">Kecamatan</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->district->name ?? ($customer->customerAddress->district ?? 'Belum diisi')); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Kota / Kabupaten</span>
+                        <span class="text-slate-500 dark:text-slate-400">Kota / Kabupaten</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->city->name ?? ($customer->customerAddress->city ?? 'Belum diisi')); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Provinsi</span>
+                        <span class="text-slate-500 dark:text-slate-400">Provinsi</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->customerAddress->province ?? 'Jawa Timur'); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Garis Lintang (Latitude)</span>
+                        <span class="text-slate-500 dark:text-slate-400">Garis Lintang (Latitude)</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->latitude ?? ($customer->customerAddress->latitude ?? 'Belum diisi')); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Garis Bujur (Longitude)</span>
+                        <span class="text-slate-500 dark:text-slate-400">Garis Bujur (Longitude)</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->longitude ?? ($customer->customerAddress->longitude ?? 'Belum diisi')); ?></span>
                     </div>
                 </div>
@@ -635,7 +636,7 @@
         <?php endif; ?>
 
         <!-- TAB 4: POP/CABANG -->
-        <div id="tab-content-pop" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-pop" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-pop">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Data POP / Cabang Terkoneksi</span>
@@ -646,42 +647,42 @@
                 <?php if($customer->pop): ?>
                 <div class="p-5 grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-4 text-xs">
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nama POP / Cabang</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nama POP / Cabang</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->pop->name); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Kode Cabang</span>
+                        <span class="text-slate-500 dark:text-slate-400">Kode Cabang</span>
                         <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->pop->code); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Tipe Cabang</span>
+                        <span class="text-slate-500 dark:text-slate-400">Tipe Cabang</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 uppercase text-[10px] tracking-wider searchable-text"><?php echo e($customer->pop->type); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Status POP</span>
+                        <span class="text-slate-500 dark:text-slate-400">Status POP</span>
                         <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-600 border border-emerald-200 uppercase">
                             <?php echo e($customer->pop->status ? 'Aktif' : 'Nonaktif'); ?>
 
                         </span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between md:col-span-2">
-                        <span class="text-slate-400">Alamat Kantor POP</span>
+                        <span class="text-slate-500 dark:text-slate-400">Alamat Kantor POP</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 text-right searchable-text">
                             <?php echo e($customer->pop->address); ?>, Kel. <?php echo e($customer->pop->village); ?>, Kec. <?php echo e($customer->pop->district); ?>, <?php echo e($customer->pop->city); ?>
 
                         </span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Penanggung Jawab (PIC)</span>
+                        <span class="text-slate-500 dark:text-slate-400">Penanggung Jawab (PIC)</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->pop->pic_name ?? 'Belum ditentukan'); ?></span>
                     </div>
                     <div class="py-1.5 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nomor HP PIC</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nomor HP PIC</span>
                         <span class="font-mono font-medium text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->pop->pic_phone ?? 'Belum ditentukan'); ?></span>
                     </div>
                 </div>
                 <?php else: ?>
-                <div class="p-8 text-center text-slate-400 text-xs">
+                <div class="p-8 text-center text-slate-500 dark:text-slate-400 text-xs">
                     Belum ada POP/Cabang yang di-assign untuk pelanggan ini.
                 </div>
                 <?php endif; ?>
@@ -713,7 +714,7 @@
                     </div>
                 </div>
                 <?php else: ?>
-                <div class="p-8 text-center text-slate-400 text-xs">
+                <div class="p-8 text-center text-slate-500 dark:text-slate-400 text-xs">
                     Belum ada assignment port ODP aktif untuk pelanggan ini.
                 </div>
                 <?php endif; ?>
@@ -723,28 +724,28 @@
 
         <!-- TAB 5: SURVEY -->
         <?php if(auth()->user()->hasPermission('customers.detail.survey.view')): ?>
-        <div id="tab-content-survey" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-survey" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-survey">
             <?php echo $__env->make('customers.tabs._survey', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
         </div>
         <?php endif; ?>
 
         <!-- TAB 6: PEMASANGAN -->
         <?php if(auth()->user()->hasPermission('customers.detail.installation.view')): ?>
-        <div id="tab-content-pemasangan" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-pemasangan" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-pemasangan">
             <?php echo $__env->make('customers.tabs._installation', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
         </div>
         <?php endif; ?>
 
         <!-- TAB 7: PERANGKAT -->
         <?php if(auth()->user()->hasPermission('customers.detail.devices.view')): ?>
-        <div id="tab-content-perangkat" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-perangkat" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-perangkat">
             <?php echo $__env->make('customers.tabs._device', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
         </div>
         <?php endif; ?>
 
         <!-- TAB 8: PAKET & LAYANAN -->
         <?php if(auth()->user()->hasPermission('customers.detail.packages.view')): ?>
-        <div id="tab-content-paket-layanan" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-paket-layanan" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-paket-layanan">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Paket Internet & Status Layanan Jaringan</span>
@@ -753,26 +754,26 @@
                     <?php if($customer->internetPackage): ?>
                     <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
                         <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase">KODE LAYANAN</span>
+                            <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">KODE LAYANAN</span>
                             <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->internetPackage->package_code); ?> - <?php echo e($customer->internetPackage->name); ?></span>
                         </div>
                         <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase">KATEGORI LAYANAN</span>
+                            <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">KATEGORI LAYANAN</span>
                             <span class="font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text"><?php echo e($customer->internetPackage->category); ?></span>
                         </div>
                         <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase">KECEPATAN (BANDWIDTH)</span>
+                            <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">KECEPATAN (BANDWIDTH)</span>
                             <span class="font-mono font-semibold text-sky-600 dark:text-sky-400 mt-1 block searchable-text">
                                 <?php echo e($customer->internetPackage->download_speed_mbps); ?> Mbps Down / <?php echo e($customer->internetPackage->upload_speed_mbps); ?> Mbps Up
                             </span>
                         </div>
                         <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-3 bg-slate-50/50 dark:bg-slate-900/30">
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase">JENIS KONTRAK</span>
+                            <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase">JENIS KONTRAK</span>
                             <span class="font-semibold text-slate-900 dark:text-slate-100 mt-1 block searchable-text">Rutin Bulanan</span>
                         </div>
                     </div>
                     <?php else: ?>
-                    <div class="p-4 text-center text-slate-400">
+                    <div class="p-4 text-center text-slate-500 dark:text-slate-400">
                         Belum ada paket internet yang terpilih.
                     </div>
                     <?php endif; ?>
@@ -780,7 +781,7 @@
                     <?php if($customer->customerService && auth()->user()->hasPermission('customers.detail.packages.change')): ?>
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30" x-data="{ gantiPaketOpen: false }">
                         <div class="flex items-center justify-between">
-                            <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider">GANTI PAKET INTERNET</span>
+                            <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">GANTI PAKET INTERNET</span>
                             <template x-if="!gantiPaketOpen">
                                 <button type="button" @click="gantiPaketOpen = true" class="text-[11px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400">Ganti Paket</button>
                             </template>
@@ -801,7 +802,7 @@
                                 </div>
                             </form>
                         </template>
-                        <p class="text-[10px] text-slate-400 mt-2" x-show="gantiPaketOpen" x-cloak>Perubahan harga baru berlaku mulai tagihan periode berikutnya — tagihan bulan berjalan tidak berubah.</p>
+                        <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-2" x-show="gantiPaketOpen" x-cloak>Perubahan harga baru berlaku mulai tagihan periode berikutnya — tagihan bulan berjalan tidak berubah.</p>
                     </div>
                     <?php endif; ?>
 
@@ -853,7 +854,7 @@ unset($__errorArgs, $__bag); ?>
                                     <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Nominal Denda <span class="text-rose-500">*</span></label>
                                     <input type="text" inputmode="decimal" name="penalty_amount" data-rupiah required value="<?php echo e(old('penalty_amount', 0)); ?>"
                                            class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
-                                    <p class="text-[10px] text-slate-400 mt-1">Masa langganan pelanggan ini &le;1 tahun — denda wajib diisi (boleh 0). Nilai diprefill dari alasan terpilih, tapi tetap wajib dikonfirmasi/diubah sebelum submit.</p>
+                                    <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1">Masa langganan pelanggan ini &le;1 tahun — denda wajib diisi (boleh 0). Nilai diprefill dari alasan terpilih, tapi tetap wajib dikonfirmasi/diubah sebelum submit.</p>
                                     <?php $__errorArgs = ['penalty_amount'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -914,7 +915,7 @@ unset($__errorArgs, $__bag); ?>
                                     <label class="block text-[10px] font-semibold text-slate-500 dark:text-slate-400 mb-1">Bebaskan Tagihan Periode <span class="text-rose-500">*</span></label>
                                     <div class="space-y-1 max-h-32 overflow-y-auto border border-slate-200 dark:border-slate-700 rounded-lg p-2 bg-white dark:bg-slate-900/60">
                                         <?php $__empty_1 = true; $__currentLoopData = $leaveWaiverPeriods; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $row): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                                        <label class="flex items-center gap-2 text-[11px] <?php echo e($row['eligible'] ? 'text-slate-700 dark:text-slate-200' : 'text-slate-400 dark:text-slate-600'); ?>">
+                                        <label class="flex items-center gap-2 text-[11px] <?php echo e($row['eligible'] ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-500'); ?>">
                                             <input type="checkbox" name="periods[]" value="<?php echo e($row['billing_period']); ?>"
                                                    <?php echo e($row['eligible'] ? '' : 'disabled'); ?>
 
@@ -923,14 +924,14 @@ unset($__errorArgs, $__bag); ?>
                                             <?php if($row['invoice']): ?>
                                             <span>— Rp <?php echo e(number_format((float) $row['invoice']->total_amount, 0, ',', '.')); ?> (sudah terbit)</span>
                                             <?php else: ?>
-                                            <span class="text-slate-400">(belum terbit)</span>
+                                            <span class="text-slate-500 dark:text-slate-400">(belum terbit)</span>
                                             <?php endif; ?>
                                             <?php if(! $row['eligible']): ?>
                                             <span class="italic">(<?php echo e($row['reason']); ?>)</span>
                                             <?php endif; ?>
                                         </label>
                                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
-                                        <p class="text-[11px] text-slate-400">Tidak ada periode yang bisa dibebaskan.</p>
+                                        <p class="text-[11px] text-slate-500 dark:text-slate-400">Tidak ada periode yang bisa dibebaskan.</p>
                                         <?php endif; ?>
                                     </div>
                                     <?php $__errorArgs = ['periods'];
@@ -970,26 +971,26 @@ unset($__errorArgs, $__bag); ?>
                     <?php endif; ?>
 
                     <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30">
-                        <span class="block text-[9px] font-bold text-slate-400 uppercase tracking-wider mb-2">INTEGRASI TEKNIS JARINGAN</span>
+                        <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">INTEGRASI TEKNIS JARINGAN</span>
                         <div class="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3 font-mono text-xs">
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">ONT Serial Number</span>
+                                <span class="text-slate-500 dark:text-slate-400">ONT Serial Number</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->ont_sn ?? 'Belum terpasang'); ?></span>
                             </div>
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Nama Perangkat OLT</span>
+                                <span class="text-slate-500 dark:text-slate-400">Nama Perangkat OLT</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->olt_code ?? 'Belum diisi'); ?></span>
                             </div>
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Nomor OLT [CID Generator]</span>
+                                <span class="text-slate-500 dark:text-slate-400">Nomor OLT [CID Generator]</span>
                                 <span class="font-bold text-sky-600 searchable-text"><?php echo e($displayId); ?></span>
                             </div>
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Kode Kotak ODP</span>
+                                <span class="text-slate-500 dark:text-slate-400">Kode Kotak ODP</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->odp_code ?? 'Belum terhubung'); ?></span>
                             </div>
                             <div class="flex justify-between py-1 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">VLAN ID Jaringan</span>
+                                <span class="text-slate-500 dark:text-slate-400">VLAN ID Jaringan</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->vlan_id ?? 'Belum ditentukan'); ?></span>
                             </div>
                         </div>
@@ -1000,7 +1001,7 @@ unset($__errorArgs, $__bag); ?>
         <?php endif; ?>
 
         <!-- TAB 9: BILLING -->
-        <div id="tab-content-billing" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-billing" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-billing">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Rincian Biaya Bulanan, Biaya Pemasangan Awal & Billing Cycle</span>
@@ -1008,7 +1009,7 @@ unset($__errorArgs, $__bag); ?>
                 <div class="p-5 space-y-6 text-xs">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
                     <div>
-                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">BREAKDOWN BIAYA NETT BULANAN</span>
+                        <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">BREAKDOWN BIAYA NETT BULANAN</span>
                         <div class="space-y-3 font-mono text-xs">
                             <div class="flex justify-between text-slate-500">
                                 <span>Harga Paket Internet</span>
@@ -1037,10 +1038,10 @@ unset($__errorArgs, $__bag); ?>
                     </div>
 
                     <div>
-                        <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-4">MASA AKTIF & PERIODE</span>
+                        <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-4">MASA AKTIF & PERIODE</span>
                         <div class="space-y-3 text-xs">
                             <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Tanggal Aktivasi Layanan</span>
+                                <span class="text-slate-500 dark:text-slate-400">Tanggal Aktivasi Layanan</span>
                                 <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">
                                     <?php echo e($customer->customerService?->activation_date ? \App\Support\IndonesianDate::date($customer->customerService->activation_date) : 'Belum diaktivasi'); ?>
 
@@ -1048,7 +1049,7 @@ unset($__errorArgs, $__bag); ?>
                             </div>
                             <?php if($customer->customerService?->activation_time): ?>
                             <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Waktu Aktivasi</span>
+                                <span class="text-slate-500 dark:text-slate-400">Waktu Aktivasi</span>
                                 <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">
                                     <?php echo e(substr($customer->customerService->activation_time, 0, 5)); ?> WIB
                                 </span>
@@ -1056,7 +1057,7 @@ unset($__errorArgs, $__bag); ?>
                             <?php endif; ?>
                             <?php if($customer->customerService?->activated_by_name || $customer->customerService?->activatedBy): ?>
                             <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Petugas Aktivasi</span>
+                                <span class="text-slate-500 dark:text-slate-400">Petugas Aktivasi</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text">
                                     <?php echo e($customer->customerService->activatedBy->name ?? $customer->customerService->activated_by_name ?? '-'); ?>
 
@@ -1064,14 +1065,14 @@ unset($__errorArgs, $__bag); ?>
                             </div>
                             <?php endif; ?>
                             <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Tanggal Jatuh Tempo Bulanan</span>
+                                <span class="text-slate-500 dark:text-slate-400">Tanggal Jatuh Tempo Bulanan</span>
                                 <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text">
                                     <?php echo e($customer->customerService?->due_date ? \App\Support\IndonesianDate::date($customer->customerService->due_date) : 'Belum ditentukan'); ?>
 
                                 </span>
                             </div>
                             <div class="flex justify-between py-1.5 border-b border-slate-100 dark:border-slate-700/50">
-                                <span class="text-slate-400">Siklus Billing</span>
+                                <span class="text-slate-500 dark:text-slate-400">Siklus Billing</span>
                                 <span class="font-semibold text-slate-900 dark:text-slate-100 capitalize searchable-text">
                                     <?php echo e($customer->customerService?->billing_cycle ?? 'Monthly'); ?>
 
@@ -1097,7 +1098,7 @@ unset($__errorArgs, $__bag); ?>
                     ?>
                     <div class="pt-4 border-t border-slate-200 dark:border-slate-700">
                         <div class="flex flex-wrap gap-2 items-center justify-between mb-3">
-                            <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                            <span class="block text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">
                                 RINCIAN TAGIHAN AWAL / REGISTRASI (<?php echo e($initialInvoice->invoice_number); ?>)
                             </span>
                             <span class="px-2 py-0.5 rounded text-[10px] font-bold border uppercase tracking-wide <?php echo e($initialInvoice->invoice_status->value === 'lunas' ? 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800' : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border-amber-200 dark:border-amber-800'); ?>">
@@ -1108,7 +1109,7 @@ unset($__errorArgs, $__bag); ?>
                         <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg">
                             <table class="w-full text-left border-collapse text-xs">
                                 <thead>
-                                    <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-400 uppercase">
+                                    <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
                                         <th class="px-4 py-2">Komponen Biaya Awal</th>
                                         <th class="px-4 py-2">Kolom di Sistem</th>
                                         <th class="px-4 py-2 text-right">Nominal Biaya</th>
@@ -1137,7 +1138,7 @@ unset($__errorArgs, $__bag); ?>
                                     <tr>
                                         <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100">PPN</td>
                                         <td class="px-4 py-2 font-sans text-slate-500">ppn</td>
-                                        <td class="px-4 py-2 text-right <?php echo e((float) $initialInvoice->ppn > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-sans text-slate-400'); ?> searchable-text">
+                                        <td class="px-4 py-2 text-right <?php echo e((float) $initialInvoice->ppn > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-sans text-slate-500 dark:text-slate-400'); ?> searchable-text">
                                             <?php echo e((float) $initialInvoice->ppn > 0 ? 'Rp '.number_format((float) $initialInvoice->ppn, 2, ',', '.') : 'Tidak dikenakan'); ?>
 
                                         </td>
@@ -1156,10 +1157,10 @@ unset($__errorArgs, $__bag); ?>
         </div>
 
         <!-- TAB 10: TAGIHAN -->
-        <div id="tab-content-tagihan" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-tagihan" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-tagihan">
             <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Tagihan Pelanggan</h3>
+                    <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Tagihan Pelanggan</h2>
                     <p class="text-[11px] text-slate-500 mt-0.5">Daftar invoice tagihan bulanan yang diterbitkan secara manual maupun sistem.</p>
                 </div>
                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('invoices.create')): ?>
@@ -1182,12 +1183,12 @@ unset($__errorArgs, $__bag); ?>
                     ['title' => 'Tagihan Bulanan', 'rows' => $invoicesBulanan, 'badge' => 'bg-sky-50 text-sky-600 border-sky-200'],
                 ]; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $group): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                     <div class="<?php echo e(!$loop->first ? 'mt-6' : ''); ?>">
-                        <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2"><?php echo e($group['title']); ?> (<?php echo e($group['rows']->count()); ?>)</h4>
+                        <h3 class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2"><?php echo e($group['title']); ?> (<?php echo e($group['rows']->count()); ?>)</h3>
                         <?php if($group['rows']->count() > 0): ?>
                             <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
                                 <table class="w-full text-left border-collapse text-xs">
                                     <thead>
-                                        <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-400 uppercase text-[10px]">
+                                        <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-500 dark:text-slate-400 uppercase text-[10px]">
                                             <th class="px-4 py-3">No. Tagihan</th>
                                             <th class="px-4 py-3">Jenis</th>
                                             <th class="px-4 py-3">Periode</th>
@@ -1238,7 +1239,7 @@ unset($__errorArgs, $__bag); ?>
 
                                                     </span>
                                                 </td>
-                                                <td class="px-4 py-3 text-slate-400 font-sans searchable-text"><?php echo e($invoice->creator->name ?? 'System'); ?></td>
+                                                <td class="px-4 py-3 text-slate-500 dark:text-slate-400 font-sans searchable-text"><?php echo e($invoice->creator->name ?? 'System'); ?></td>
                                                 <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('payments.create')): ?>
                                                     <?php $settled = in_array($invoice->invoice_status->value, ['lunas', 'batal'], true); ?>
                                                     <td class="px-4 py-3 text-center font-sans" id="invoice-pay-btn-<?php echo e($invoice->id); ?>">
@@ -1252,7 +1253,7 @@ unset($__errorArgs, $__bag); ?>
                                                                 class="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white rounded text-[10px] font-bold uppercase tracking-wide shadow-sm cursor-pointer <?php echo e($settled ? 'hidden' : ''); ?>">
                                                             Bayar
                                                         </button>
-                                                        <span class="text-slate-400 text-[10px] <?php echo e($settled ? '' : 'hidden'); ?>">—</span>
+                                                        <span class="text-slate-500 dark:text-slate-400 text-[10px] <?php echo e($settled ? '' : 'hidden'); ?>">—</span>
                                                     </td>
                                                 <?php endif; ?>
                                             </tr>
@@ -1261,16 +1262,16 @@ unset($__errorArgs, $__bag); ?>
                                 </table>
                             </div>
                         <?php else: ?>
-                            <div class="py-6 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-xs">
+                            <div class="py-6 text-center text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg text-xs">
                                 Belum ada <?php echo e(strtolower($group['title'])); ?>.
                             </div>
                         <?php endif; ?>
                     </div>
                 <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
             <?php else: ?>
-                <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                <div class="py-12 text-center text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
                     <i class="fa-solid fa-file-invoice text-3xl mb-2 text-slate-300"></i>
-                    <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Tagihan Terbit</h4>
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Tagihan Terbit</h3>
                     <p class="text-[11px] text-slate-500 mt-1">Gunakan tombol "Buat Tagihan Manual" untuk membuat invoice pertama pelanggan.</p>
                 </div>
             <?php endif; ?>
@@ -1278,11 +1279,11 @@ unset($__errorArgs, $__bag); ?>
             
             <?php if($activeBillingWaivers->isNotEmpty()): ?>
             <div class="mt-6">
-                <h4 class="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-2">Riwayat Pembebasan Tagihan (<?php echo e($activeBillingWaivers->count()); ?>)</h4>
+                <h3 class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mb-2">Riwayat Pembebasan Tagihan (<?php echo e($activeBillingWaivers->count()); ?>)</h3>
                 <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-400 uppercase text-[10px]">
+                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-500 dark:text-slate-400 uppercase text-[10px]">
                                 <th class="px-4 py-3">Periode</th>
                                 <th class="px-4 py-3">Sumber</th>
                                 <th class="px-4 py-3">Catatan</th>
@@ -1324,19 +1325,19 @@ unset($__errorArgs, $__bag); ?>
                         </tbody>
                     </table>
                 </div>
-                <p class="text-[10px] text-slate-400 mt-1.5">Mencabut TIDAK menghidupkan kembali invoice yang sudah dibatalkan — jalankan generator tagihan bulanan untuk periode itu kalau perlu ditagih ulang.</p>
+                <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-1.5">Mencabut TIDAK menghidupkan kembali invoice yang sudah dibatalkan — jalankan generator tagihan bulanan untuk periode itu kalau perlu ditagih ulang.</p>
             </div>
             <?php endif; ?>
         </div>
 
         <!-- TAB 11: PEMBAYARAN -->
-        <div id="tab-content-pembayaran" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-pembayaran" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-pembayaran">
             
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customer_balance.view')): ?>
             <div class="border border-sky-200 dark:border-sky-500/20 bg-sky-50/60 dark:bg-sky-500/10 rounded-lg p-4 space-y-3">
                 <div class="flex items-center justify-between flex-wrap gap-2">
                     <div>
-                        <h3 class="text-xs font-bold text-sky-900 dark:text-sky-300 uppercase tracking-wider">Saldo Pelanggan</h3>
+                        <h2 class="text-xs font-bold text-sky-900 dark:text-sky-300 uppercase tracking-wider">Saldo Pelanggan</h2>
                         <p class="text-[11px] text-sky-700/80 dark:text-sky-400/80 mt-0.5">Otomatis dipakai untuk tagihan Bulanan berikutnya begitu terbit (FIFO periode terlama dulu).</p>
                     </div>
                     <div class="text-right">
@@ -1381,7 +1382,7 @@ unset($__errorArgs, $__bag); ?>
 
             <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Pembayaran Pelanggan</h3>
+                    <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Pembayaran Pelanggan</h2>
                     <p class="text-[11px] text-slate-500 mt-0.5">Pembayaran yang terhubung ke invoice pelanggan ini.</p>
                 </div>
             </div>
@@ -1392,7 +1393,7 @@ unset($__errorArgs, $__bag); ?>
                 <div class="overflow-x-auto border border-slate-200 dark:border-slate-700 rounded-lg shadow-sm">
                     <table class="w-full text-left border-collapse text-xs">
                         <thead>
-                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-400 uppercase text-[10px]">
+                            <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 font-semibold text-slate-500 dark:text-slate-400 uppercase text-[10px]">
                                 <th class="px-4 py-3">No. Pembayaran</th>
                                 <th class="px-4 py-3">No. Tagihan</th>
                                 <th class="px-4 py-3">Tanggal</th>
@@ -1443,7 +1444,7 @@ unset($__errorArgs, $__bag); ?>
                                         <?php if($payment->proof_file): ?>
                                             <a href="<?php echo e(asset('storage/' . $payment->proof_file)); ?>" target="_blank" class="text-sky-600 hover:underline font-semibold">Lihat bukti ↗</a>
                                         <?php else: ?>
-                                            <span class="text-slate-400">-</span>
+                                            <span class="text-slate-500 dark:text-slate-400">-</span>
                                         <?php endif; ?>
                                     </td>
                                 </tr>
@@ -1452,20 +1453,20 @@ unset($__errorArgs, $__bag); ?>
                     </table>
                 </div>
             <?php else: ?>
-                <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                <div class="py-12 text-center text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
                     <i class="fa-solid fa-receipt text-3xl mb-2 text-slate-300"></i>
-                    <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Riwayat Pembayaran</h4>
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Riwayat Pembayaran</h3>
                     <p class="text-[11px] text-slate-500 mt-1">Pembayaran akan tampil setelah kasir/finance mencatat pembayaran invoice.</p>
                 </div>
             <?php endif; ?>
         </div>
 
         <!-- TAB 12: DOKUMEN & BERKAS -->
-        <div id="tab-content-dokumen" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-dokumen" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-dokumen">
             <?php if(auth()->user()->hasPermission('customers.detail.documents.view')): ?>
                 <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
-                        <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">LAMPIRAN DOKUMEN PENDUKUNG</h3>
+                        <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">LAMPIRAN DOKUMEN PENDUKUNG</h2>
                         <p class="text-[11px] text-slate-500 mt-0.5">Dokumen disimpan aman & private sesuai hak akses permission sistem.</p>
                     </div>
                     <?php if(auth()->user()->hasPermission('upload_customer_documents')): ?>
@@ -1492,8 +1493,8 @@ unset($__errorArgs, $__bag); ?>
                                 <div class="p-3 flex items-center justify-between gap-3 text-xs">
                                     <div class="min-w-0">
                                         <span class="block text-xs font-semibold text-slate-900 dark:text-slate-100 truncate searchable-text"><?php echo e($document->typeLabel()); ?></span>
-                                        <span class="block text-[10px] text-slate-400 font-mono mt-0.5"><?php echo e($document->created_at?->format('d/m/Y H:i')); ?></span>
-                                        <span class="block text-[10px] text-slate-400 truncate">Upload: <?php echo e($document->uploader?->name ?? '-'); ?></span>
+                                        <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-mono mt-0.5"><?php echo e($document->created_at?->format('d/m/Y H:i')); ?></span>
+                                        <span class="block text-[10px] text-slate-500 dark:text-slate-400 truncate">Upload: <?php echo e($document->uploader?->name ?? '-'); ?></span>
                                     </div>
                                     <a href="<?php echo e(route('customers.documents.show', $document->id)); ?>" target="_blank" class="shrink-0 p-1.5 text-sky-600 hover:bg-slate-100 dark:hover:bg-slate-700 rounded" title="Buka Dokumen">
                                         <i class="fa-solid fa-arrow-up-right-from-square"></i>
@@ -1503,64 +1504,64 @@ unset($__errorArgs, $__bag); ?>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                     </div>
                 <?php else: ?>
-                    <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                    <div class="py-12 text-center text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
                         <i class="fa-solid fa-folder-open text-3xl mb-2 text-slate-300"></i>
-                        <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Dokumen</h4>
+                        <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Belum Ada Dokumen</h3>
                         <p class="text-[11px] text-slate-500 mt-1">Dokumen rumah, kontrak, survey, dan foto pemasangan akan tampil di sini setelah diupload.</p>
                     </div>
                 <?php endif; ?>
             <?php else: ?>
-                <div class="py-12 text-center text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
-                    <h4 class="text-xs font-bold text-slate-900 dark:text-slate-100">Akses dokumen dibatasi</h4>
+                <div class="py-12 text-center text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 rounded-lg">
+                    <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100">Akses dokumen dibatasi</h3>
                     <p class="text-[11px] text-slate-500 mt-1">User Anda tidak memiliki permission untuk melihat dokumen pelanggan.</p>
                 </div>
             <?php endif; ?>
         </div>
 
         <!-- TAB 13: RIWAYAT TICKETING -->
-        <div id="tab-content-riwayat-ticketing" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-riwayat-ticketing" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-riwayat-ticketing">
             <?php echo $__env->make('customers.tabs._riwayat_ticketing', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
         </div>
 
         <!-- TAB 14: RIWAYAT PERUBAHAN -->
-        <div id="tab-content-riwayat-perubahan" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-riwayat-perubahan" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-riwayat-perubahan">
             <?php echo $__env->make('customers.tabs._riwayat_perubahan', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
         </div>
 
         <!-- TAB 15: DETAIL TEKNIS LAMA -->
         <?php if($customer->customerTechnicalDetail): ?>
-        <div id="tab-content-teknis-lama" class="tab-content hidden space-y-6 searchable-section">
+        <div id="tab-content-teknis-lama" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-teknis-lama">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Detail Teknis Jaringan Lama (Hasil Migrasi Database)</span>
                 </div>
                 <div class="p-6 grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-4 text-xs">
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">ID Report Lama</span>
+                        <span class="text-slate-500 dark:text-slate-400">ID Report Lama</span>
                         <span class="font-mono font-bold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->customerTechnicalDetail->old_report_id ?? '-'); ?></span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">ID Request/Layanan Lama</span>
+                        <span class="text-slate-500 dark:text-slate-400">ID Request/Layanan Lama</span>
                         <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->customerTechnicalDetail->old_request_id ?? '-'); ?></span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Tipe Koneksi Jaringan</span>
+                        <span class="text-slate-500 dark:text-slate-400">Tipe Koneksi Jaringan</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->customerTechnicalDetail->connection_type ?? '-'); ?></span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">ONT Serial Number</span>
+                        <span class="text-slate-500 dark:text-slate-400">ONT Serial Number</span>
                         <span class="font-mono font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->customerTechnicalDetail->router_or_ont_serial ?? '-'); ?></span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Nomor ODP / Port</span>
+                        <span class="text-slate-500 dark:text-slate-400">Nomor ODP / Port</span>
                         <span class="font-semibold text-slate-900 dark:text-slate-100 searchable-text"><?php echo e($customer->customerTechnicalDetail->odp_number ?? '-'); ?> / <?php echo e($customer->customerTechnicalDetail->odp_port ?? '-'); ?></span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Redaman Optik Kabel</span>
+                        <span class="text-slate-500 dark:text-slate-400">Redaman Optik Kabel</span>
                         <span class="font-mono font-bold text-sky-600 searchable-text"><?php echo e($customer->customerTechnicalDetail->fiber_signal ?? '-'); ?></span>
                     </div>
                     <div class="py-2 border-b border-slate-100 dark:border-slate-700/50 flex justify-between">
-                        <span class="text-slate-400">Hasil Test Speed</span>
+                        <span class="text-slate-500 dark:text-slate-400">Hasil Test Speed</span>
                         <span class="font-mono font-bold text-emerald-600 searchable-text"><?php echo e($customer->customerTechnicalDetail->test_download ?? '-'); ?> Mbps Down / <?php echo e($customer->customerTechnicalDetail->test_upload ?? '-'); ?> Mbps Up</span>
                     </div>
                 </div>
@@ -1584,8 +1585,8 @@ unset($__errorArgs, $__bag); ?>
 <div id="document-upload-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
-            <h3 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Upload Dokumen Pelanggan Baru</h3>
-            <button type="button" onclick="closeModal('document-upload-modal')" class="text-slate-400 hover:text-slate-600 cursor-pointer">
+            <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Upload Dokumen Pelanggan Baru</h2>
+            <button type="button" onclick="closeModal('document-upload-modal')" aria-label="Tutup" class="text-slate-500 dark:text-slate-400 hover:text-slate-600 cursor-pointer">
                 <i class="fa-solid fa-xmark text-base"></i>
             </button>
         </div>
@@ -1700,11 +1701,11 @@ unset($__errorArgs, $__bag); ?>
         <div class="pb-3 mb-4 border-b border-slate-200 dark:border-slate-700 space-y-1">
             <div class="flex justify-between items-start">
                 <div>
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">Pelanggan</span>
+                    <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">Pelanggan</span>
                     <span class="text-sm font-bold text-slate-900 dark:text-slate-100"><?php echo e($customer->full_name); ?></span>
                 </div>
                 <div class="text-right">
-                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">ID Jaringan</span>
+                    <span class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block">ID Jaringan</span>
                     <span class="font-mono text-xs text-sky-600 font-bold bg-slate-100 dark:bg-slate-700 px-1.5 py-0.5 rounded"><?php echo e($displayId); ?></span>
                 </div>
             </div>
@@ -1745,7 +1746,7 @@ unset($__errorArgs, $__bag); ?>
                         </option>
                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                 </select>
-                <p class="text-[11px] text-slate-400">Daftar Distribusi otomatis mengikuti Mini POP yang dipilih di atas.</p>
+                <p class="text-[11px] text-slate-500 dark:text-slate-400">Daftar Distribusi otomatis mengikuti Mini POP yang dipilih di atas.</p>
             </div>
 
             <div class="flex justify-end gap-2 pt-2 border-t border-slate-200 dark:border-slate-700 mt-4">
@@ -1792,6 +1793,7 @@ unset($__errorArgs, $__bag); ?>
         document.querySelectorAll('.tab-button').forEach(btn => {
             btn.classList.remove('border-sky-600', 'text-sky-600');
             btn.classList.add('border-transparent', 'text-slate-500');
+            btn.setAttribute('aria-selected', 'false');
         });
 
         // Add active state to clicked tab button
@@ -1799,6 +1801,7 @@ unset($__errorArgs, $__bag); ?>
         if (activeBtn) {
             activeBtn.classList.add('border-sky-600', 'text-sky-600');
             activeBtn.classList.remove('border-transparent', 'text-slate-500');
+            activeBtn.setAttribute('aria-selected', 'true');
             activeBtn.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
         }
     }

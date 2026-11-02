@@ -197,7 +197,12 @@
 
         // Custom localized / friendly message mapping
         if (el.tagName === 'SELECT' && (el.validity.valueMissing || !el.value)) {
-            message = 'Harap pilih salah satu item dalam daftar / pilihan terlebih dahulu.';
+            // Sebut kolomnya: form bisa punya satu select wajib di luar layar (mis. Cabang
+            // pembeli di atas tabel SN panjang), dan pesan generik tidak menunjuk yang mana.
+            const selectLabel = el.labels && el.labels[0] ? el.labels[0].innerText.replace('*', '').trim() : '';
+            message = selectLabel
+                ? `Harap pilih "${selectLabel}" terlebih dahulu.`
+                : 'Harap pilih salah satu item dalam daftar / pilihan terlebih dahulu.';
         } else if ((el.type === 'checkbox' || el.type === 'radio') && el.validity.valueMissing) {
             message = 'Harap pilih / centang minimal satu item dalam daftar.';
         } else if (el.validity.valueMissing) {

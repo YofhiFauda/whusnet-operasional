@@ -122,7 +122,14 @@ class CustomerAcquisition extends Model
             return null;
         }
 
-        return static::$packageCategoryCache[$categoryName] ??= PackageCategory::with('installationFeeApprovalRole')->where('name', $categoryName)->first();
+        // array_key_exists, bukan `??=`: nama kategori yang tidak ada di Master
+        // (data legacy) menghasilkan null, dan `??=` menganggap null = belum
+        // di-cache sehingga query yang sama diulang per baris (774x di /customer-acquisitions).
+        if (! array_key_exists($categoryName, static::$packageCategoryCache)) {
+            static::$packageCategoryCache[$categoryName] = PackageCategory::with('installationFeeApprovalRole')->where('name', $categoryName)->first();
+        }
+
+        return static::$packageCategoryCache[$categoryName];
     }
 
     /**

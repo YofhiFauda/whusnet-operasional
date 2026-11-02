@@ -278,4 +278,67 @@ class BusinessCustomerListTest extends TestCase
         $response->assertSee('List Pelanggan Bisnis');
         $response->assertSee(route('business-development.business-customers.index'), false);
     }
+
+    public function test_page_size_selector_matches_customer_list_and_keeps_filters(): void
+    {
+        $this->loginAsAdmin();
+
+        for ($number = 1; $number <= 11; $number++) {
+            $this->makeCustomer($this->bisnis, ['full_name' => sprintf('BISNIS PAGINASI %02d', $number)]);
+        }
+
+        $filters = [
+            'q' => 'BISNIS PAGINASI',
+            'category' => $this->bisnis->name,
+            'status' => 'active',
+        ];
+
+        $default = $this->get(route('business-development.business-customers.index', $filters));
+        $default->assertOk();
+        $default->assertViewHas('customers', fn ($customers) => $customers->perPage() === 10 && $customers->count() === 10 && $customers->total() === 11);
+        $default->assertSee('name="per_page"', false);
+        $default->assertSee('page=2', false);
+        $default->assertSee('q=BISNIS', false);
+
+        foreach ([25, 50, 100] as $perPage) {
+            $response = $this->get(route('business-development.business-customers.index', [...$filters, 'per_page' => $perPage]));
+            $response->assertOk();
+            $response->assertViewHas('customers', fn ($customers) => $customers->perPage() === $perPage && $customers->count() === 11);
+            $response->assertSee('value="'.$perPage.'" selected', false);
+        }
+
+        $invalid = $this->get(route('business-development.business-customers.index', [...$filters, 'per_page' => 999]));
+        $invalid->assertViewHas('customers', fn ($customers) => $customers->perPage() === 10);
+
+        $secondPage = $this->get(route('business-development.business-customers.index', [...$filters, 'page' => 2]));
+        $secondPage->assertViewHas('customers', fn ($customers) => $customers->count() === 1 && $customers->total() === 11);
+    }
+
+    public function test_filter_card_renders_mobile_collapsible_elements_and_active_badges(): void
+    {
+        $this->loginAsAdmin();
+
+        $this->makeCustomer($this->bisnis, ['full_name' => 'PT ALPHA CORP']);
+
+        // Test initial state without filters
+        $responseWithoutFilter = $this->get(route('business-development.business-customers.index'));
+        $responseWithoutFilter->assertOk();
+        $responseWithoutFilter->assertSee('Filter &amp; Pencarian', false);
+        $responseWithoutFilter->assertSee('mobileFilterOpen: false', false);
+        $responseWithoutFilter->assertSee('x-collapse', false);
+        $responseWithoutFilter->assertSee('Buka Filter');
+        $responseWithoutFilter->assertDontSee('Filter Aktif');
+
+        // Test with active filter applied
+        $responseWithFilter = $this->get(route('business-development.business-customers.index', [
+            'q' => 'ALPHA',
+            'status' => 'active',
+        ]));
+        $responseWithFilter->assertOk();
+        $responseWithFilter->assertSee('mobileFilterOpen: true', false);
+        $responseWithFilter->assertSee('2 Filter Aktif');
+        $responseWithFilter->assertSee('Cari:');
+        $responseWithFilter->assertSee('ALPHA');
+        $responseWithFilter->assertSee('Status:');
+    }
 }

@@ -222,9 +222,13 @@ class NocDashboardController extends Controller
                 });
 
                 // 6. Statistik per Daerah (District/POP Categorized & Percentage)
-                $regionStatsRaw = (clone $filteredQuery)
-                    ->with(['customer.district:id,name', 'pop:id,name'])
-                    ->get()
+                // Satu kali muat untuk statistik daerah DAN matriks tren di bawah —
+                // dulu query + hidrasi tiket yang sama dijalankan dua kali.
+                $allFilteredTickets = (clone $filteredQuery)
+                    ->with(['customer:id,district_id', 'customer.district:id,name', 'pop:id,name', 'issueCategory:id,name'])
+                    ->get();
+
+                $regionStatsRaw = $allFilteredTickets
                     ->groupBy(function (Ticket $t) {
                         return $t->customer?->district?->name ?? $t->pop?->name ?? 'Tidak diketahui';
                     })
@@ -241,10 +245,6 @@ class NocDashboardController extends Controller
                 });
 
                 // 7. Trend Matrix: Daerah vs Issue Category
-                $allFilteredTickets = (clone $filteredQuery)
-                    ->with(['customer.district:id,name', 'pop:id,name', 'issueCategory:id,name'])
-                    ->get();
-
                 $topRegions = $regionStatsRaw->keys()->take(6)->toArray();
                 $topIssues = $issueStatsRaw->keys()->take(6)->toArray();
 
@@ -509,13 +509,17 @@ class NocDashboardController extends Controller
      */
     private function buildSlaCompliance(Builder $filteredQuery): array
     {
-        $resolved = (clone $filteredQuery)
+        // Dihitung di SQL — dulu seluruh tiket resolved periode dihidrasi hanya
+        // untuk membandingkan dua kolom tanggalnya di PHP.
+        $row = (clone $filteredQuery)
             ->whereNotNull('resolved_at')
             ->whereNotNull('sla_deadline_at')
-            ->get(['resolved_at', 'sla_deadline_at']);
+            ->selectRaw('COUNT(*) as total, COALESCE(SUM(CASE WHEN resolved_at > sla_deadline_at THEN 1 ELSE 0 END), 0) as breach')
+            ->toBase()
+            ->first();
 
-        $total = $resolved->count();
-        $breach = $resolved->filter(fn (Ticket $t) => $t->resolved_at->greaterThan($t->sla_deadline_at))->count();
+        $total = (int) ($row->total ?? 0);
+        $breach = (int) ($row->breach ?? 0);
         $ontime = $total - $breach;
 
         return [
@@ -693,7 +697,7 @@ class NocDashboardController extends Controller
             ->applyUserScope()
             ->where('type', TaskType::MAINTENANCE->value)
             ->whereBetween('created_at', [$start, $end])
-            ->with(['customer.district:id,name', 'pop:id,name', 'issueCategory:id,name'])
+            ->with(['customer:id,district_id', 'customer.district:id,name', 'pop:id,name', 'issueCategory:id,name'])
             ->get(['id', 'created_at', 'customer_id', 'pop_id', 'issue_category_id']);
 
         $labels = [];
@@ -774,22 +778,35 @@ class NocDashboardController extends Controller
             return [];
         }
 
-        $customers = Customer::query()
+        // Total pelanggan per POP per akhir bulan dihitung di SQL (satu baris per
+        // POP, satu kolom per bulan). Dulu semua pelanggan dihidrasi lalu disaring
+        // ulang di PHP untuk tiap POP × tiap bulan — O(pelanggan × 12) di memori.
+        $monthEnds = array_map(fn (string $key) => Carbon::createFromFormat('Y-m', $key)->endOfMonth(), $monthKeys);
+        $monthColumns = [];
+        $monthBindings = [];
+        foreach ($monthEnds as $i => $monthEnd) {
+            $monthColumns[] = "SUM(CASE WHEN registration_date IS NOT NULL AND registration_date <= ? AND (terminated_at IS NULL OR terminated_at > ?) THEN 1 ELSE 0 END) as m{$i}";
+            $monthBindings[] = $monthEnd->format('Y-m-d H:i:s');
+            $monthBindings[] = $monthEnd->format('Y-m-d H:i:s');
+        }
+
+        $customerRows = Customer::query()
             ->applyUserScope()
             ->whereNotNull('pop_id')
             ->whereIn('pop_id', $pops->pluck('id'))
             ->where('status', '!=', WorkflowTransition::REJECTED->value)
-            ->get(['pop_id', 'registration_date', 'terminated_at']);
+            ->selectRaw('pop_id, '.implode(', ', $monthColumns), $monthBindings)
+            ->groupBy('pop_id')
+            ->toBase()
+            ->get()
+            ->keyBy('pop_id');
 
         $ticketsByPop = $tickets->groupBy('pop_id');
-        $customersByPop = $customers->groupBy('pop_id');
-        $monthEnds = array_map(fn (string $key) => Carbon::createFromFormat('Y-m', $key)->endOfMonth(), $monthKeys);
 
         $result = [];
 
         foreach ($pops as $pop) {
             $popTickets = $ticketsByPop->get($pop->id, collect());
-            $popCustomers = $customersByPop->get($pop->id, collect());
 
             $complaints = array_fill(0, count($monthKeys), 0);
             foreach ($popTickets as $ticket) {
@@ -799,13 +816,8 @@ class NocDashboardController extends Controller
                 }
             }
 
-            $customerCounts = array_map(
-                fn (Carbon $monthEnd) => $popCustomers->filter(
-                    fn (Customer $c) => $c->registration_date && $c->registration_date->lte($monthEnd)
-                        && (! $c->terminated_at || $c->terminated_at->greaterThan($monthEnd))
-                )->count(),
-                $monthEnds
-            );
+            $customerRow = $customerRows->get($pop->id);
+            $customerCounts = array_map(fn (int $i) => (int) ($customerRow->{"m{$i}"} ?? 0), array_keys($monthEnds));
 
             // POP yang gak pernah punya pelanggan sepanjang window — skip,
             // bukan tampilkan card kosong (keputusan user).

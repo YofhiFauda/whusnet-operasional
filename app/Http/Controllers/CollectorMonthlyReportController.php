@@ -11,7 +11,10 @@ use Illuminate\View\View;
 use InvalidArgumentException;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Common\Entity\Style\Border;
+use OpenSpout\Common\Entity\Style\BorderName;
 use OpenSpout\Common\Entity\Style\BorderPart;
+use OpenSpout\Common\Entity\Style\BorderStyle;
+use OpenSpout\Common\Entity\Style\BorderWidth;
 use OpenSpout\Common\Entity\Style\CellAlignment;
 use OpenSpout\Common\Entity\Style\Color;
 use OpenSpout\Common\Entity\Style\Style;
@@ -201,23 +204,23 @@ class CollectorMonthlyReportController extends Controller
     private function writeSheet(SimpleExcelWriter $writer, array $report, string $period): void
     {
         $border = new Border(
-            new BorderPart(Border::TOP, Color::BLACK, Border::WIDTH_THIN, Border::STYLE_SOLID),
-            new BorderPart(Border::BOTTOM, Color::BLACK, Border::WIDTH_THIN, Border::STYLE_SOLID),
-            new BorderPart(Border::LEFT, Color::BLACK, Border::WIDTH_THIN, Border::STYLE_SOLID),
-            new BorderPart(Border::RIGHT, Color::BLACK, Border::WIDTH_THIN, Border::STYLE_SOLID),
+            new BorderPart(BorderName::TOP, Color::BLACK, BorderWidth::THIN, BorderStyle::SOLID),
+            new BorderPart(BorderName::BOTTOM, Color::BLACK, BorderWidth::THIN, BorderStyle::SOLID),
+            new BorderPart(BorderName::LEFT, Color::BLACK, BorderWidth::THIN, BorderStyle::SOLID),
+            new BorderPart(BorderName::RIGHT, Color::BLACK, BorderWidth::THIN, BorderStyle::SOLID),
         );
-        $title = (new Style)->setFontBold()->setFontSize(14);
-        $section = (new Style)->setFontBold();
-        $head = (new Style)->setFontBold()->setBackgroundColor('8EA9DB')->setBorder($border)->setCellAlignment(CellAlignment::CENTER);
-        $cell = (new Style)->setBorder($border)->setFormat('#,##0')->setCellAlignment(CellAlignment::RIGHT);
-        $text = (new Style)->setBorder($border);
-        $pct = (new Style)->setBorder($border)->setFormat('0.0"%"')->setCellAlignment(CellAlignment::RIGHT);
-        $total = (new Style)->setFontBold()->setBackgroundColor('C6E0B4')->setBorder($border)->setFormat('#,##0')->setCellAlignment(CellAlignment::RIGHT);
-        $totalText = (new Style)->setFontBold()->setBackgroundColor('C6E0B4')->setBorder($border);
-        $totalPct = (new Style)->setFontBold()->setBackgroundColor('C6E0B4')->setBorder($border)->setFormat('0.0"%"')->setCellAlignment(CellAlignment::RIGHT);
+        $title = (new Style)->withFontBold(true)->withFontSize(14);
+        $section = (new Style)->withFontBold(true);
+        $head = (new Style)->withFontBold(true)->withBackgroundColor('8EA9DB')->withBorder($border)->withCellAlignment(CellAlignment::CENTER);
+        $cell = (new Style)->withBorder($border)->withFormat('#,##0')->withCellAlignment(CellAlignment::RIGHT);
+        $text = (new Style)->withBorder($border);
+        $pct = (new Style)->withBorder($border)->withFormat('0.0"%"')->withCellAlignment(CellAlignment::RIGHT);
+        $total = (new Style)->withFontBold(true)->withBackgroundColor('C6E0B4')->withBorder($border)->withFormat('#,##0')->withCellAlignment(CellAlignment::RIGHT);
+        $totalText = (new Style)->withFontBold(true)->withBackgroundColor('C6E0B4')->withBorder($border);
+        $totalPct = (new Style)->withFontBold(true)->withBackgroundColor('C6E0B4')->withBorder($border)->withFormat('0.0"%"')->withCellAlignment(CellAlignment::RIGHT);
 
-        $add = fn (array $values, ?Style $style = null) => $writer->addRow(Row::fromValues($values, $style));
-        $addStyled = fn (array $values, array $styles) => $writer->addRow(Row::fromValuesWithStyles($values, null, $styles));
+        $add = fn (array $values, ?Style $style = null) => $writer->addRow($style ? Row::fromValuesWithStyle($values, $style) : Row::fromValues($values));
+        $addStyled = fn (array $values, array $styles) => $writer->addRow(Row::fromValuesWithStyles($values, $styles));
 
         $bulan = $this->monthLabel($period);
         $lalu = $this->monthLabel(Report::parsePeriod($period)->subMonth()->format('Y-m'));
@@ -229,14 +232,14 @@ class CollectorMonthlyReportController extends Controller
         $blocks = [
             [
                 'TAGIHAN '.mb_strtoupper($bulan),
-                ['No', 'OLT', 'Tagihan Terbit', 'Dimuka', 'Diskon', 'Bulanan', 'Total Pembayaran', 'Piutang', 'Pendapatan %', 'Piutang %'],
+                ['No', 'OLT', 'Tagihan Terbit', 'Bayar Dimuka Diterima', 'Dibayar dari Saldo', 'Diskon', 'Bulanan', 'Total Pembayaran', 'Piutang', 'Pendapatan %', 'Piutang %'],
                 fn (array $f) => [
-                    $f['tagihan']['tagihan_terbit'], $f['tagihan']['dimuka'], $f['tagihan']['diskon'], $f['tagihan']['bulanan'],
+                    $f['tagihan']['tagihan_terbit'], $f['tagihan']['bayar_dimuka_diterima'] ?? 0, $f['tagihan']['dimuka'], $f['tagihan']['diskon'], $f['tagihan']['bulanan'],
                     $f['tagihan']['total_pembayaran'], $f['tagihan']['piutang'],
                     Report::percentage($f['tagihan']['total_pembayaran'], $f['tagihan']['tagihan_terbit']),
                     Report::percentage($f['tagihan']['piutang'], $f['tagihan']['tagihan_terbit']),
                 ],
-                'nnnnnnpp',
+                'nnnnnnnpp',
             ],
             [
                 'PIUTANG BULAN LALU (s.d. '.mb_strtoupper($lalu).')',
@@ -254,9 +257,9 @@ class CollectorMonthlyReportController extends Controller
             ],
             [
                 'PELANGGAN ('.mb_strtoupper($bulan).')',
-                ['No', 'OLT', 'Total Pelanggan', 'Bayar Dimuka', 'Sudah Bayar', 'Belum Bayar'],
-                fn (array $f) => [$f['pelanggan']['total'], $f['pelanggan']['dimuka'], $f['pelanggan']['sudah_bayar'], $f['pelanggan']['belum_bayar']],
-                'nnnn',
+                ['No', 'OLT', 'Total Pelanggan', 'Bayar Dimuka', 'Lunas dari Saldo', 'Sudah Bayar', 'Belum Bayar'],
+                fn (array $f) => [$f['pelanggan']['total'], $f['pelanggan']['bayar_dimuka'] ?? 0, $f['pelanggan']['dimuka'], $f['pelanggan']['sudah_bayar'], $f['pelanggan']['belum_bayar']],
+                'nnnnn',
             ],
             [
                 'UANG DITERIMA '.mb_strtoupper($bulan),
@@ -293,7 +296,7 @@ class CollectorMonthlyReportController extends Controller
         $options = $writer->getWriter()->getOptions();
         $options->setColumnWidth(6, 1);
         $options->setColumnWidth(22, 2);
-        $options->setColumnWidth(18, 3, 4, 5, 6, 7, 8, 9, 10);
+        $options->setColumnWidth(18, 3, 4, 5, 6, 7, 8, 9, 10, 11);
     }
 
     /**

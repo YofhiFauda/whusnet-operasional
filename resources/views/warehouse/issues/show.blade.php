@@ -94,7 +94,7 @@
                             @elseif($line->roll)
                                 {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',') }} meter
                             @else
-                                {{ rtrim(rtrim(number_format((float) $line->qty, 2, ',', '.'), '0'), ',').' '.$line->item->unit }}
+                                {{ \App\Helpers\FormatHelper::qtyWithPack($line) }}
                             @endif
                         </td>
                     </tr>

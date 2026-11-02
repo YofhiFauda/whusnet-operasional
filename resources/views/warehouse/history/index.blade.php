@@ -469,8 +469,16 @@
                         : ($txn->toPop->name ?? ($txn->toTechnician->name ?? ($txn->transfer?->toPop ? ($txn->transfer->toPop->name.($txn->transfer->isInTransit() ? ' (menunggu konfirmasi)' : '')) : 'Pelanggan / Luar'))),
                     'item_name' => ($group->lineCount > 1) ? "{$group->itemCount} Jenis Barang" : $txn->item->name,
                     'category' => ($group->lineCount > 1) ? $group->lines->pluck('item.name')->unique()->take(3)->implode(', ') : ($txn->item->category?->name ?? 'Material Logistik'),
-                    'qty' => ($group->lineCount > 1) ? $group->lineCount : ($txn->serial ? 1 : rtrim(rtrim(number_format((float) $txn->qty, 2, ',', '.'), '0'), ',')),
-                    'unit' => ($group->lineCount > 1) ? 'baris' : ($txn->serial ? 'unit' : $txn->item->unit),
+                    // Baris tunggal non-serial: qty dirender sebagai satu string lengkap
+                    // ("2 Pack (100 pcs)") lewat FormatHelper::qtyWithPack(), bukan
+                    // qty+unit terpisah — kalau dipecah lagi, info Pack yang sudah
+                    // dibenahi di baris list (ADHOC Pack-conversion) hilang lagi begitu
+                    // modal detail dibuka, karena modal ini baca $detailItemData, bukan
+                    // markup baris list. 'unit' dikosongkan di cabang ini supaya
+                    // template `${qty} ${unit}` di Alpine (sekitar baris 883) tidak
+                    // menyisakan spasi ganda.
+                    'qty' => ($group->lineCount > 1) ? $group->lineCount : ($txn->serial ? 1 : \App\Helpers\FormatHelper::qtyWithPack($txn)),
+                    'unit' => ($group->lineCount > 1) ? 'baris' : ($txn->serial ? 'unit' : ''),
                     'sn_list' => $group->lines->filter(fn ($l) => $l->serial)->pluck('serial.serial_number')->values()->all(),
                     'operator' => $txn->createdBy?->name ?? 'Sistem',
                     'role' => $txn->createdBy?->role?->name ?? 'Petugas Logistik',
@@ -614,7 +622,7 @@
                                         @if($group->lineCount > 1)
                                         {{ $group->lineCount }} baris
                                         @else
-                                        {{ $txn->serial ? '1 unit' : rtrim(rtrim(number_format((float) $txn->qty, 2, ',', '.'), '0'), ',').' '.$txn->item->unit }}
+                                        {{ $txn->serial ? '1 unit' : \App\Helpers\FormatHelper::qtyWithPack($txn) }}
                                         @endif
                                     </span>
                                 </div>
@@ -747,7 +755,7 @@
                         @if($group->lineCount > 1)
                         {{ $group->lineCount }} baris
                         @else
-                        {{ $txn->serial ? '1 unit' : rtrim(rtrim(number_format((float) $txn->qty, 2, ',', '.'), '0'), ',').' '.$txn->item->unit }}
+                        {{ $txn->serial ? '1 unit' : \App\Helpers\FormatHelper::qtyWithPack($txn) }}
                         @endif
                     </span>
                 </div>
@@ -880,7 +888,7 @@
                                 <p class="font-black text-sm text-slate-900 dark:text-slate-50" x-text="activeDetail?.item_name"></p>
                                 <p class="text-xs text-slate-400" x-text="activeDetail?.category"></p>
                             </div>
-                            <span class="font-mono text-base font-black text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950 px-3 py-1 rounded-lg border border-sky-200 dark:border-sky-800" x-text="`${activeDetail?.qty} ${activeDetail?.unit}`"></span>
+                            <span class="font-mono text-base font-black text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950 px-3 py-1 rounded-lg border border-sky-200 dark:border-sky-800" x-text="activeDetail?.unit ? `${activeDetail?.qty} ${activeDetail?.unit}` : `${activeDetail?.qty}`"></span>
                         </div>
                     </div>
                 </div>

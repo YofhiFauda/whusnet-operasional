@@ -7,7 +7,6 @@ use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
-use App\Models\InventoryBalance;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
@@ -16,6 +15,7 @@ use App\Models\TechnicianCustody;
 use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\InventoryAdjustmentService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -37,30 +37,75 @@ class WarehouseAdjustmentController extends Controller
 {
     use AuthorizesWarehousePop;
 
-    public function createBalance(Request $request, EffectiveAccessService $access): View
+    /**
+     * Pintu "Koreksi Stok" (spec 2026-10-31-koreksi-stok-gudang). Dulu ada 4
+     * halaman terpisah berdasar MEKANISME (opname qty, opname unit, delta
+     * manual, status SN) — end user gak bisa bedain. Sekarang user pilih
+     * berdasar SITUASI; form-nya yang menyesuaikan jenis barang.
+     */
+    public function index(): View
+    {
+        return view('warehouse.adjustments.index');
+    }
+
+    /** Kartu 1 — hitung fisik. Simpan ke `opname.store` / `unit-opname.store`. */
+    public function createCheck(Request $request, EffectiveAccessService $access): View
+    {
+        return view('warehouse.adjustments.check', $this->correctionFormData($request, $access));
+    }
+
+    /** Kartu 2 — barang bermasalah. Simpan ke `serial.store` / `balance.store`. */
+    public function createProblem(Request $request, EffectiveAccessService $access): View
+    {
+        return view('warehouse.adjustments.problem', $this->correctionFormData($request, $access));
+    }
+
+    /**
+     * Link lama "Penyesuaian Saldo" — inti form-nya (delta manual) sekarang
+     * kejadian di kartu "Ada barang bermasalah". Query dibawa supaya link
+     * yang terlewat diganti tetap terisi.
+     */
+    public function createBalance(Request $request): RedirectResponse
+    {
+        return redirect()->route('warehouse.adjustments.problem.create', $request->query());
+    }
+
+    /**
+     * Data bersama dua form Koreksi Stok. Prefill dari query (link "Sesuaikan"
+     * papan stok) cuma dipakai kalau gudangnya dalam scope — tanpa cek ini,
+     * pop_id gudang lain di URL bocorin saldo cabang lain.
+     *
+     * @return array{pops: Collection<int, Pop>, prefill: array{pop_id: ?int, q: ?string, lot_no: string}, resolveUrl: string}
+     */
+    private function correctionFormData(Request $request, EffectiveAccessService $access): array
     {
         $user = auth()->user();
 
         $pops = Pop::query()->warehouse()
             ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
             ->orderBy('type')->orderBy('name')->get();
-        $items = Item::active()->with('category')->orderBy('name')->get();
 
-        // Kalau kesini lewat link "Sesuaikan" Dashboard (bawa pop_id+item_id
-        // di query), tunjukin stok SAAT INI — sebelumnya form ini satu-satunya
-        // dari 3 form Adjustment yang gak nunjukin angka current (Custody &
-        // Serial nunjukin, Balance enggak, ketauan audit 2026-09-02). Kalau
-        // dropdown diganti manual sesudahnya, angka ini gak ikut update live
-        // (bukan AJAX) — cukup buat jalur paling umum (link dari Dashboard).
-        $currentBalance = null;
-        if ($request->filled('pop_id') && $request->filled('item_id')) {
-            $currentBalance = InventoryBalance::where('pop_id', $request->query('pop_id'))
-                ->where('item_id', $request->query('item_id'))
-                ->where('lot_no', $request->query('lot_no', ''))
-                ->first();
-        }
+        // ->integer()/->string() cast ke skalar — ->query() balikin array
+        // mentah kalau URL dirakit manual (?item_id[]=1), dan find($array)
+        // balik Collection, bukan Model (crash di $item?->code di bawah).
+        $popIdRaw = $request->integer('pop_id');
+        $popId = $popIdRaw && $pops->contains('id', $popIdRaw) ? $popIdRaw : null;
+        $itemId = $request->integer('item_id');
+        $item = $popId && $itemId
+            ? Item::active()->whereDoesntHave('category', fn ($query) => $query->where('is_operational', false))->find($itemId)
+            : null;
 
-        return view('warehouse.adjustments.balance', compact('pops', 'items', 'currentBalance'));
+        return [
+            'pops' => $pops,
+            'prefill' => [
+                'pop_id' => $popId,
+                // Kode barang, bukan id — kolom pencarian yang sama yang
+                // ngisi mode form, jadi prefill lewat jalur resolve juga.
+                'q' => $item?->code ?? (is_string($request->query('q')) ? $request->query('q') : null),
+                'lot_no' => is_string($request->query('lot_no')) ? $request->query('lot_no') : '',
+            ],
+            'resolveUrl' => route('warehouse.adjustments.resolve'),
+        ];
     }
 
     public function storeBalance(Request $request, InventoryAdjustmentService $service, EffectiveAccessService $access): RedirectResponse
@@ -101,29 +146,15 @@ class WarehouseAdjustmentController extends Controller
     }
 
     /**
-     * Stock Opname (Fase 2 P1, gap #3) — BEDA dari `createBalance()`/
-     * `storeBalance()`: opname input JUMLAH FISIK HASIL HITUNG (bukan
-     * delta), boleh hasilnya PAS (selisih nol) — `storeBalance()` sengaja
-     * menolak delta nol karena itu jalur koreksi manual, bukan opname.
+     * Stock Opname (Fase 2 P1, gap #3) — BEDA dari `storeBalance()`: opname
+     * input JUMLAH FISIK HASIL HITUNG (bukan delta), boleh hasilnya PAS
+     * (selisih nol) — `storeBalance()` sengaja menolak delta nol karena itu
+     * jalur koreksi manual, bukan opname. Form-nya sekarang kartu "Cek &
+     * cocokkan stok"; GET lama tinggal redirect.
      */
-    public function createOpname(Request $request, EffectiveAccessService $access): View
+    public function createOpname(Request $request): RedirectResponse
     {
-        $user = auth()->user();
-
-        $pops = Pop::query()->warehouse()
-            ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('id', $access->getAllowedPopIds($user)))
-            ->orderBy('type')->orderBy('name')->get();
-        $items = Item::active()->with('category')->orderBy('name')->get();
-
-        $currentBalance = null;
-        if ($request->filled('pop_id') && $request->filled('item_id')) {
-            $currentBalance = InventoryBalance::where('pop_id', $request->query('pop_id'))
-                ->where('item_id', $request->query('item_id'))
-                ->where('lot_no', $request->query('lot_no', ''))
-                ->first();
-        }
-
-        return view('warehouse.adjustments.opname', compact('pops', 'items', 'currentBalance'));
+        return redirect()->route('warehouse.adjustments.check.create', $request->query());
     }
 
     public function storeOpname(Request $request, InventoryAdjustmentService $service, EffectiveAccessService $access): RedirectResponse
@@ -155,14 +186,10 @@ class WarehouseAdjustmentController extends Controller
         return redirect()->route('warehouse.stock.index')->with('success', 'Stock opname tercatat.');
     }
 
-    public function createUnitOpname(EffectiveAccessService $access): View
+    /** Opname SN/Roll ikut kartu "Cek & cocokkan stok" (deteksi jenis otomatis). */
+    public function createUnitOpname(Request $request): RedirectResponse
     {
-        $user = auth()->user();
-        $pops = Pop::query()->warehouse()
-            ->when(! $access->hasAllPopAccess($user), fn ($query) => $query->whereIn('id', $access->getAllowedPopIds($user)))
-            ->orderBy('name')->get();
-
-        return view('warehouse.adjustments.unit-opname', compact('pops'));
+        return redirect()->route('warehouse.adjustments.check.create', $request->query());
     }
 
     public function storeUnitOpname(Request $request, InventoryAdjustmentService $service, EffectiveAccessService $access): RedirectResponse

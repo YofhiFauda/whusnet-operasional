@@ -252,6 +252,25 @@ class Pop extends Model
     }
 
     /**
+     * Nama Penanggung Jawab (PIC) gudang / POP:
+     * Prioritaskan user PIC Gudang aktif (tabel warehouse_pop_pics),
+     * fallback ke field pic_name master POP jika belum ada penunjukan user.
+     */
+    public function getPicDisplayNameAttribute(): ?string
+    {
+        if ($this->relationLoaded('gudangPics')) {
+            $names = $this->gudangPics->pluck('name')->filter()->values();
+            if ($names->isNotEmpty()) {
+                return $names->implode(', ');
+            }
+        } elseif ($this->hasActivePicGudang()) {
+            return $this->gudangPics()->pluck('name')->implode(', ');
+        }
+
+        return $this->pic_name ?: null;
+    }
+
+    /**
      * Scope a query to only include POPs accessible by the given user.
      *
      * @param  Builder  $query

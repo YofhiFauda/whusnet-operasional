@@ -88,6 +88,14 @@ class WarehouseTransferInvoiceSuratJalanTest extends TestCase
     }
 
     #[Test]
+    public function nomor_surat_jalan_memisahkan_tanggal_lengkap_dan_id_transfer(): void
+    {
+        $this->transfer->forceFill(['created_at' => '2026-10-17 10:00:00'])->saveQuietly();
+
+        $this->assertSame('SJ/WHUS/2026/10/17/TRF-'.$this->transfer->id, $this->transfer->suratJalanNumber());
+    }
+
+    #[Test]
     public function owner_bisa_cetak_invoice_dan_surat_jalan(): void
     {
         $this->actingAs($this->owner)->get(route('warehouse.transfers.invoice', $this->transfer))
@@ -130,6 +138,8 @@ class WarehouseTransferInvoiceSuratJalanTest extends TestCase
     #[Test]
     public function surat_jalan_tidak_pernah_diquery_dengan_kolom_harga(): void
     {
+        $this->transfer->forceFill(['created_at' => '2026-09-17 10:00:00'])->saveQuietly();
+
         $lines = $this->transfer->transactions()->whereNotNull('from_pop_id')
             ->with(['item'])
             ->get(['id', 'item_id', 'lot_no', 'serial_id', 'roll_id', 'qty', 'inventory_transfer_id'])
@@ -156,6 +166,8 @@ class WarehouseTransferInvoiceSuratJalanTest extends TestCase
         $this->assertStringContainsString('info@connexa.net.id', $html);
         $this->assertStringContainsString('082240003434', $html);
         $this->assertStringContainsString('SURAT JALAN TRANSFER PERALATAN GUDANG', $html);
+        $this->assertSame(2, substr_count($html, 'Tgl: 17/09/2026'));
+        $this->assertStringNotContainsString('____/____', $html);
     }
 
     #[Test]
@@ -181,6 +193,7 @@ class WarehouseTransferInvoiceSuratJalanTest extends TestCase
         $this->assertStringContainsString('Nama Barang', $html);
         $this->assertStringContainsString('Nadya Naralita Setiadi', $html);
         $this->assertStringContainsString('Rp', $html);
+        $this->assertMatchesRegularExpression('/Mengetahui,.*<img[^>]+src="data:image\/png;base64,iVBORw0KGgo[^\"]+"[^>]*>.*Nadya Naralita Setiadi/s', $html);
         // Daftar SN per-unit SENGAJA gak ada di Invoice (redundan sama
         // Surat Jalan, keputusan user 2026-09-17) — assert label-nya gak
         // pernah dicetak, walau fixture ini pakai item non-SN.

@@ -17,41 +17,47 @@
         <div><div class="text-xs uppercase text-slate-500">Dibuat</div><strong>{{ $sale->created_at->format('d/m/Y H:i') }}</strong></div>
         <div><div class="text-xs uppercase text-slate-500">Referensi transfer</div><strong>{{ $sale->transfer->reference_number }}</strong></div>
         @if($canSeePrice)
-            <div><div class="text-xs uppercase text-slate-500">Acuan cross-check pembayaran</div><strong>{{ $sale->posted_at ? 'Rp'.number_format($sale->posted_total, 2, ',', '.') : 'Belum final' }}</strong></div>
-            <div class="text-xs text-slate-500 dark:text-slate-400">Pembayaran internal dicocokkan melalui laporan; Gudang tidak mencatat status pembayaran.</div>
+            <div>
+                <div class="text-xs uppercase text-slate-500">Acuan cross-check pembayaran</div>
+                <strong>{{ $sale->posted_at ? 'Rp'.number_format($sale->posted_total, 2, ',', '.') : 'Belum final' }}</strong>
+                <div class="mt-1 text-xs text-slate-500 dark:text-slate-400">Pembayaran internal dicocokkan melalui laporan; Gudang tidak mencatat status pembayaran.</div>
+            </div>
         @endif
     </div>
-    @if($canReceive && $sale->transfer->isInTransit())
-        <form method="POST" action="{{ route('warehouse.branch-sales.receive', $sale) }}" id="receive-sale">@csrf</form>
-    @endif
     <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <table class="min-w-full text-sm">
-            <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500 dark:bg-slate-800"><tr><th class="p-3">SN</th><th class="p-3">Barang</th><th class="p-3">Status</th>@if($canSeePrice)<th class="p-3 text-right">HPP Penjual</th><th class="p-3 text-right">Harga jual</th>@endif @if($canReceive && $sale->transfer->isInTransit())<th class="p-3">Terima</th>@endif</tr></thead>
+            <thead class="bg-slate-50 text-left text-xs uppercase text-slate-500 dark:bg-slate-800"><tr><th class="p-3">SN</th><th class="p-3">Barang</th><th class="p-3">Kondisi</th><th class="p-3">Status</th>@if($canSeePrice)<th class="p-3 text-right">HPP Penjual</th><th class="p-3 text-right">Harga jual</th>@endif</tr></thead>
             <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
             @foreach($sale->lines as $line)
                 @php $received = in_array($line->inventory_serial_id, $receivedIds, true); @endphp
                 <tr>
                     <td class="p-3 font-mono">{{ $line->serial->serial_number }}</td>
                     <td class="p-3">{{ $line->serial->item->name }}</td>
-                    <td class="p-3">{{ $received ? 'Dibeli dan diterima' : ($sale->transfer->isInTransit() ? 'Dalam perjalanan' : 'Hilang') }}</td>
-                    @if($canSeePrice)<td class="p-3 text-right">Rp{{ number_format($dispatches->get($line->inventory_serial_id)?->unit_price_snapshot ?? 0, 2, ',', '.') }}</td><td class="p-3 text-right font-semibold">Rp{{ number_format($line->sale_price, 2, ',', '.') }}</td>@endif
-                    @if($canReceive && $sale->transfer->isInTransit())<td class="p-3">@unless($received)<input form="receive-sale" type="checkbox" name="serial_ids[]" value="{{ $line->inventory_serial_id }}" aria-label="Terima {{ $line->serial->serial_number }}">@endunless</td>@endif
-                </tr>
+                    <td class="p-3"><x-warehouse.condition-badge :condition="$line->serial->condition ?? \App\Enums\ItemCondition::NEW" :checked="$line->serial->condition_checked_at !== null" /></td>
+                    <td class="p-3">{{ $received ? 'Dibeli dan diterima' : 'Dalam perjalanan' }}</td>
+                    @if($canSeePrice)<td class="p-3 text-right">Rp{{ number_format($dispatches->get($line->inventory_serial_id)?->unit_price_snapshot ?? 0, 2, ',', '.') }}</td><td class="p-3 text-right font-semibold">Rp{{ number_format($line->sale_price, 2, ',', '.') }}</td>@endif                </tr>
             @endforeach
             </tbody>
         </table>
     </div>
     @if($canReceive && $sale->transfer->isInTransit())
-        <button form="receive-sale" class="rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white">Konfirmasi SN terpilih</button>
-    @endif
-    @if($canClose && $sale->transfer->isInTransit())
-        <form method="POST" enctype="multipart/form-data" action="{{ route('warehouse.branch-sales.close-missing', $sale) }}" class="space-y-3 rounded-xl border border-amber-200 bg-amber-50 p-5 dark:border-amber-900 dark:bg-slate-900">
+        <form x-data="{ help: false }" method="POST" action="{{ route('warehouse.branch-sales.receive', $sale) }}" class="space-y-3">
             @csrf
-            <h2 class="font-semibold">Tutup sisa SN yang hilang</h2>
-            <p class="text-sm text-slate-600 dark:text-slate-400">Hanya SN yang sudah diterima masuk nilai pembelian. Sisa yang hilang tetap tercatat sebagai kerugian pengirim.</p>
-            <textarea name="reason" required maxlength="500" placeholder="Alasan kehilangan" class="w-full rounded-lg border border-slate-300 bg-white p-2 dark:border-slate-700 dark:bg-slate-800"></textarea>
-            <input type="file" name="evidence" accept="image/*" required aria-label="Bukti kehilangan" class="block text-sm">
-            <button class="rounded-lg bg-amber-700 px-4 py-2 text-sm font-semibold text-white">Tutup sisa dengan bukti</button>
+            <div class="flex items-center gap-2">
+                <button class="rounded-lg bg-emerald-700 px-5 py-2.5 text-sm font-semibold text-white">Terima semua SN</button>
+                <button type="button" @click="help = ! help" :aria-expanded="help.toString()" aria-controls="bantuan-konfirmasi-sn" aria-label="Apa arti terima semua SN?"
+                        class="inline-flex h-5 w-5 items-center justify-center rounded-full border border-emerald-500 text-xs font-bold text-emerald-800 hover:bg-emerald-50 dark:text-emerald-300 dark:hover:bg-slate-800">?</button>
+            </div>
+            <p class="text-sm text-slate-600 dark:text-slate-400">Tekan setelah semua SN pada daftar di atas sudah Anda terima secara fisik.</p>
+            <div id="bantuan-konfirmasi-sn" x-show="help" x-collapse x-cloak class="space-y-2 rounded-lg border border-emerald-200 bg-white p-4 text-sm text-slate-700 dark:border-emerald-900 dark:bg-slate-800 dark:text-slate-300">
+                <p class="font-semibold">Apa yang terjadi bila diterima?</p>
+                <ul class="list-disc space-y-1 pl-5">
+                    <li>Semua SN pada dokumen masuk <strong>stok Cabang Anda</strong> dengan nilai sebesar <strong>harga jual</strong> pada dokumen ini, dan dihitung sebagai nilai pembelian.</li>
+                    <li>Dokumen menjadi final dan total nominalnya dihitung.</li>
+                    <li>Penerimaan tidak bisa diulang untuk SN yang sama.</li>
+                </ul>
+                <p class="font-semibold text-emerald-800 dark:text-emerald-300">Periksa fisik semua unit lebih dulu. Bila ada yang belum tiba, jangan tekan tombol ini dan hubungi Cabang pengirim.</p>
+            </div>
         </form>
     @endif
 </div>

@@ -150,6 +150,15 @@
                     @error('amount')<p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>@enderror
                 </div>
 
+                <div>
+                    <input type="hidden" name="is_advance_payment" value="0">
+                    <label class="flex items-start gap-2 rounded-lg border border-border bg-surface-muted px-3 py-2.5 text-xs text-text-main cursor-pointer">
+                        <input type="checkbox" name="is_advance_payment" value="1" @checked(old('is_advance_payment', $payment->is_advance_payment)) class="mt-0.5 rounded border-border text-primary focus:ring-primary/25">
+                        <span><span class="font-semibold">Bayar beberapa bulan di muka</span><span class="block text-text-muted mt-0.5">Koreksi penanda ini bila pembayaran sengaja disiapkan untuk bulan berikutnya.</span></span>
+                    </label>
+                    @error('is_advance_payment')<p class="mt-1 text-xs text-red-600">{{ $message }}</p>@enderror
+                </div>
+
                 <!-- Bukti Pembayaran -->
                 <div>
                     <label for="proof_file" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Bukti Pembayaran (Opsional)</label>

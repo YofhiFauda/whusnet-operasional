@@ -53,17 +53,19 @@ unset($__defined_vars, $__key, $__value); ?>
 
     
     <button type="button" @click="toggle()"
+        :aria-expanded="open ? 'true' : 'false'"
+        aria-label="Filter Wilayah Kecamatan dan Desa"
         class="h-[38px] w-full inline-flex items-center gap-2 px-3 rounded-lg border border-border bg-surface
                text-xs text-text-main hover:border-primary/60 focus:outline-none focus:border-primary
                focus:ring-2 focus:ring-primary-border transition-colors">
-        <svg class="h-3.5 w-3.5 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="h-3.5 w-3.5 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                   d="M17.657 16.657L13.414 20.9a2 2 0 01-2.828 0l-4.243-4.243a8 8 0 1111.314 0z"/>
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/>
         </svg>
         <span class="truncate" x-text="label()"></span>
         <svg class="h-3.5 w-3.5 text-text-muted transition-transform ml-auto flex-shrink-0" :class="open ? 'rotate-180' : ''"
-             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
         </svg>
     </button>
@@ -98,6 +100,7 @@ unset($__defined_vars, $__key, $__value); ?>
                     </svg>
                     <input type="text" x-model="dq" @input.debounce.300ms="searchD()" @focus="searchD()"
                            placeholder="Cari kecamatan..." autocomplete="off"
+                           aria-label="Cari kecamatan"
                            class="w-full rounded-md border border-border bg-surface pl-7 pr-3 py-1.5 text-sm text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-border">
                 </div>
             </div>
@@ -133,6 +136,7 @@ unset($__defined_vars, $__key, $__value); ?>
                         </svg>
                         <input type="text" x-model="vq" @input.debounce.300ms="searchV()" @focus="searchV()"
                                placeholder="Cari desa..." autocomplete="off"
+                               aria-label="Cari desa"
                                class="w-full rounded-md border border-border bg-surface pl-7 pr-3 py-1.5 text-sm text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-border">
                     </div>
                 </div>
@@ -168,7 +172,7 @@ unset($__defined_vars, $__key, $__value); ?>
     </div>
 </div>
 
-<?php if (! $__env->hasRenderedOnce('e0ed7376-0e4a-4f3d-899d-0cf4728e7453')): $__env->markAsRenderedOnce('e0ed7376-0e4a-4f3d-899d-0cf4728e7453'); ?>
+<?php if (! $__env->hasRenderedOnce('36f1d2f0-73fc-4566-a6f7-63e0d9b09711')): $__env->markAsRenderedOnce('36f1d2f0-73fc-4566-a6f7-63e0d9b09711'); ?>
 <script>
     /* Fase 5.4 - komponen filter wilayah (Kecamatan + Desa). Desa cascade dari
        kecamatan terpilih (mencegah desa senama lintas kecamatan). Registrasi

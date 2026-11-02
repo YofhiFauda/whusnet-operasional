@@ -32,7 +32,7 @@ use InvalidArgumentException;
 class InventoryIssueService
 {
     /**
-     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, serial_numbers?:list<string>, roll_codes?:list<string>}>  $lines
+     * @param  list<array{item_id:int, qty?:float, lot_no?:?string, entered_pack_qty?:?float, serial_numbers?:list<string>, roll_codes?:list<string>}>  $lines
      * @return list<InventoryTransaction>
      */
     public function issue(Pop $cabang, User $technician, array $lines, User $actor): array
@@ -57,11 +57,14 @@ class InventoryIssueService
 
             foreach ($lines as $line) {
                 $item = Item::findOrFail($line['item_id']);
+                if ($item->isNonOperational()) {
+                    throw new InvalidArgumentException('Barang nonoperasional tidak dapat diserahkan ke custody teknisi.');
+                }
 
                 $transactions[] = match ($item->tracking_type) {
                     TrackingType::SERIALIZED => $this->issueSerialized($referenceNumber, $cabang, $technician, $item, $line['serial_numbers'] ?? [], $actor),
                     TrackingType::ROLL => $this->issueRoll($referenceNumber, $cabang, $technician, $item, $line['roll_codes'] ?? [], $actor),
-                    default => $this->issueQuantity($referenceNumber, $cabang, $technician, $item, (float) ($line['qty'] ?? 0), $line['lot_no'] ?? null, $actor),
+                    default => $this->issueQuantity($referenceNumber, $cabang, $technician, $item, (float) ($line['qty'] ?? 0), $line['lot_no'] ?? null, $actor, isset($line['entered_pack_qty']) ? (float) $line['entered_pack_qty'] : null),
                 };
             }
 
@@ -188,7 +191,7 @@ class InventoryIssueService
     /**
      * @return list<InventoryTransaction>
      */
-    private function issueQuantity(string $referenceNumber, Pop $cabang, User $technician, Item $item, float $qty, ?string $lotNo, User $actor): array
+    private function issueQuantity(string $referenceNumber, Pop $cabang, User $technician, Item $item, float $qty, ?string $lotNo, User $actor, ?float $enteredPackQty = null): array
     {
         if ($qty <= 0) {
             throw new InvalidArgumentException("Qty issue {$item->name} harus lebih besar dari nol.");
@@ -234,6 +237,7 @@ class InventoryIssueService
             'item_id' => $item->id,
             'lot_no' => $lotNo === '' ? null : $lotNo,
             'qty' => $qty,
+            'entered_pack_qty' => $enteredPackQty,
             'unit_price_snapshot' => $unitPrice,
             'from_pop_id' => $cabang->id,
             'to_technician_id' => $technician->id,

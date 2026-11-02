@@ -10,7 +10,13 @@ export default defineConfig({
             // (getUserMedia) yang cuma relevan di halaman masing-masing
             // (Scan QR Internal / Lacak Barang-SN), gak perlu dikirim ke
             // SEMUA halaman.
-            input: ['resources/css/app.css', 'resources/js/app.js', 'resources/js/qr-scan.js', 'resources/js/barcode-scan.js'],
+            input: [
+                'resources/css/app.css',
+                'resources/js/app.js',
+                'resources/js/charts.js',
+                'resources/js/qr-scan.js',
+                'resources/js/barcode-scan.js',
+            ],
             refresh: true,
         }),
         tailwindcss(),

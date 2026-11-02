@@ -1028,6 +1028,16 @@
                                 <span class="block text-sm font-mono font-bold text-primary">Rp {{ number_format((float) $pendingInitialInvoice['billing']['total_amount'], 0, ',', '.') }}</span>
                             </div>
                         </div>
+                        {{-- Modem terjual (rancangan 2026-10-31 §4) — invoice yang terbit
+                             setelah form di bawah disubmit SELALU menyertakan baris Jual
+                             Modem ini juga (InitialInvoiceService::issue(), modem_sale_amount
+                             dari snapshot), di luar Biaya Instalasi yang BD isi sendiri. --}}
+                        @php $modemSaleAmount = (float) ($pendingInitialInvoice['billing']['modem_sale_amount'] ?? 0); @endphp
+                        @if($modemSaleAmount > 0)
+                        <div class="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-slate-800 dark:text-sky-300">
+                            Modem terjual: {{ $pendingInitialInvoice['billing']['modem_sale_description'] ?? 'Beli dari Gudang' }} — <strong>Rp {{ number_format($modemSaleAmount, 0, ',', '.') }}</strong> akan ikut masuk Invoice Awal bersama Biaya Instalasi di bawah.
+                        </div>
+                        @endif
                     </div>
                 </div>
                 @endif

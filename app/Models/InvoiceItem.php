@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'category_name_snapshot',
     'subcategory_name_snapshot',
     'description',
+    'inventory_serial_sale_id',
     'amount',
     'sort_order',
 ])]
@@ -63,5 +64,16 @@ class InvoiceItem extends Model
     public function subcategory(): BelongsTo
     {
         return $this->belongsTo(RevenueSubcategory::class, 'revenue_subcategory_id');
+    }
+
+    /**
+     * Penaut opsional ke `inventory_serial_sales` (rancangan 2026-10-31 §5)
+     * — hanya baris "Jual Modem" jalur Pemasangan yang mengisinya.
+     *
+     * @return BelongsTo<InventorySerialSale, $this>
+     */
+    public function inventorySerialSale(): BelongsTo
+    {
+        return $this->belongsTo(InventorySerialSale::class);
     }
 }

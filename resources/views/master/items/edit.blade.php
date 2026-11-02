@@ -15,7 +15,7 @@
 </div>
 
 <!-- Form Container -->
-<form action="{{ route('master.items.update', $item) }}" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto" x-data="{ trackingType: '{{ old('tracking_type', $item->tracking_type->value) }}', categoryId: '{{ old('item_category_id', $item->item_category_id) }}', modemCategoryId: '{{ $categories->firstWhere('code', 'modem_ont')?->id }}' }">
+<form action="{{ route('master.items.update', $item) }}" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto" x-data="{ trackingType: '{{ old('tracking_type', $item->tracking_type->value) }}', categoryId: '{{ old('item_category_id', $item->item_category_id) }}', modemCategoryId: '{{ $categories->firstWhere('code', 'modem_ont')?->id }}', nonOperationalCategoryIds: [{{ $categories->where('is_operational', false)->pluck('id')->implode(',') }}], get isOperational() { return !this.nonOperationalCategoryIds.includes(Number(this.categoryId)) } }">
     @csrf
     @method('PUT')
 
@@ -49,11 +49,21 @@
             </div>
         </div>
 
+        <div>
+            <label for="short_specification" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Spesifikasi Singkat (opsional)</label>
+            <input type="text" name="short_specification" id="short_specification" maxlength="255"
+                   value="{{ old('short_specification', $item->short_specification) }}" placeholder="Contoh: GPON, 4 port LAN, dual band"
+                   class="w-full px-3 py-2 border @error('short_specification') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1">
+            <p class="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Tampil di bawah nama barang pada Papan Kelola Stok.</p>
+            @error('short_specification')
+                <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+            @enderror
+        </div>
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
             <!-- Tipe -->
             <div>
                 <label for="item_category_id" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kategori <span class="text-rose-500">*</span></label>
-                <select name="item_category_id" id="item_category_id" x-model="categoryId" required
+                <select name="item_category_id" id="item_category_id" x-model="categoryId" x-effect="if (!isOperational) trackingType = 'quantity'" required
                         class="w-full px-3 py-2 border @error('item_category_id') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 bg-white dark:bg-slate-800">
                     @foreach($categories as $category)
                         <option value="{{ $category->id }}" {{ (int) old('item_category_id', $item->item_category_id) === $category->id ? 'selected' : '' }}>{{ $category->name }}{{ $category->is_active ? '' : ' (nonaktif)' }}</option>
@@ -106,7 +116,7 @@
         @if($trackingTypeLocked)
         <div class="flex items-center gap-2">
             <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->tracking_type->label() }}</span>
-            <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->ownership_mode->label() }}</span>
+            <span x-show="isOperational" x-cloak class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->ownership_mode->label() }}</span>
             @if($item->tracking_type->value === 'serialized')
             <span class="inline-flex px-2.5 py-1 rounded-md bg-slate-100 dark:bg-slate-700/50 text-xs font-semibold text-slate-600 dark:text-slate-300">{{ $item->auto_generate_serial ? 'SN Digenerate Sistem' : 'SN Manual' }}</span>
             @endif
@@ -115,7 +125,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             @foreach($trackingTypes as $tt)
             <label class="flex items-start gap-2 border rounded-md p-3 cursor-pointer transition-colors {{ old('tracking_type', $item->tracking_type->value) === $tt->value ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/30' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600' }}">
-                <input type="radio" name="tracking_type" value="{{ $tt->value }}" x-model="trackingType" {{ old('tracking_type', $item->tracking_type->value) === $tt->value ? 'checked' : '' }} class="mt-0.5">
+                <input type="radio" name="tracking_type" value="{{ $tt->value }}" x-model="trackingType" :disabled="!isOperational && '{{ $tt->value }}' !== 'quantity'" {{ old('tracking_type', $item->tracking_type->value) === $tt->value ? 'checked' : '' }} class="mt-0.5">
                 <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $tt->label() }}</span>
             </label>
             @endforeach
@@ -126,9 +136,9 @@
 
         {{-- Kepemilikan berlaku buat SEMUA cara lacak — lihat catatan di
              create.blade.php. Cuma opsi "Aset Perusahaan" yang SERIALIZED-only. --}}
-        <div class="pt-2">
+        <div class="pt-2" x-show="isOperational" x-cloak>
             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kepemilikan</label>
-            <select name="ownership_mode" x-effect="if ((trackingType !== 'serialized' && $el.value === 'company_asset') || (categoryId === modemCategoryId && $el.value !== 'installable')) { $el.value = 'installable' }" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <select name="ownership_mode" :disabled="!isOperational" x-effect="if ((trackingType !== 'serialized' && $el.value === 'company_asset') || (categoryId === modemCategoryId && $el.value !== 'installable')) { $el.value = 'installable' }" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
                 @foreach($ownershipModes as $om)
                 <option value="{{ $om->value }}" @if($om !== \App\Enums\OwnershipMode::INSTALLABLE) :disabled="categoryId === modemCategoryId{{ $om === \App\Enums\OwnershipMode::COMPANY_ASSET ? " || trackingType !== 'serialized'" : '' }}" @endif {{ old('ownership_mode', $item->ownership_mode->value) === $om->value ? 'selected' : '' }}>{{ $om->label() }}</option>
                 @endforeach
@@ -138,7 +148,7 @@
             <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">"Aset Perusahaan" buat alat kerja (OTDR, laptop) — cuma Bernomor Seri, gak pernah tercatat terpasang, dipinjam-pakaikan lalu wajib balik. "Aset Infrastruktur" buat barang yang dipasang netap ke titik jaringan (ODP, splitter, kabel feeder).</p>
         </div>
 
-        <div class="pt-2">
+        <div class="pt-2" x-show="isOperational" x-cloak>
             <div class="mb-1.5 flex items-center gap-1.5">
                 <label for="infrastructure_node_type_id" class="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300">Tipe Node Tujuan</label>
                 <details class="group relative">
@@ -148,7 +158,7 @@
                     </div>
                 </details>
             </div>
-            <select name="infrastructure_node_type_id" id="infrastructure_node_type_id" :disabled="categoryId === modemCategoryId" class="disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-slate-900 dark:disabled:text-slate-500 w-full sm:w-1/2 px-3 py-2 rounded-md border border-slate-300 bg-white text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+            <select name="infrastructure_node_type_id" id="infrastructure_node_type_id" :disabled="!isOperational || categoryId === modemCategoryId" class="disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-slate-900 dark:disabled:text-slate-500 w-full sm:w-1/2 px-3 py-2 rounded-md border border-slate-300 bg-white text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                 <option value="">Fleksibel (selain komponen OLT)</option>
                 @foreach($nodeTypes as $nodeType)
                     <option value="{{ $nodeType->id }}" @selected((int) old('infrastructure_node_type_id', $item->infrastructure_node_type_id) === $nodeType->id)>{{ $nodeType->name }}</option>
@@ -192,6 +202,19 @@
                     <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
                 @enderror
             </div>
+        </div>
+
+        {{-- Konversi Pack→pcs — nullable di SEMUA tracking_type (server yang
+             menolak kombinasi salah lewat validasi `prohibited`), bukan
+             di-hide JS seperti Roll. --}}
+        <div class="pt-2">
+            <label for="pack_size" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Jumlah per Pack (pcs)</label>
+            <input type="number" step="0.01" min="0.01" name="pack_size" id="pack_size" value="{{ old('pack_size', $item->pack_size) }}" placeholder="mis. 50"
+                   class="w-full sm:w-1/2 px-3 py-2 border @error('pack_size') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm font-mono text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1">
+            <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">Opsional — cuma berlaku buat barang Kuantitas yang dibeli per-Pack (mis. 1 Pack konektor RJ45 = 50 pcs).</p>
+            @error('pack_size')
+                <p class="text-[10px] text-rose-500 mt-1 font-semibold">{{ $message }}</p>
+            @enderror
         </div>
 
         <!-- Submit Actions -->

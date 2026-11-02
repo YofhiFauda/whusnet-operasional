@@ -258,6 +258,16 @@ class AppServiceProvider extends ServiceProvider
                 : Limit::perMinute(300)->by('portal-ip:'.PortalClientIp::resolve($request));
         });
 
+        // /ping = health-check tanpa secret: 120/menit per IP asli (tanpa
+        // header IP — di jalur ini header tak bisa dipercaya).
+        RateLimiter::for('customer-portal-ping', function (Request $request) {
+            if (app()->environment('local')) {
+                return Limit::none();
+            }
+
+            return Limit::perMinute(120)->by('portal-ping:'.$request->ip());
+        });
+
         // Pelindung server: SATU ember untuk seluruh lalu lintas Portal (semua
         // pelanggan digabung) ≈ 50 req/detik, sedikit di atas puncak 40 req/detik
         // yang diperkirakan. Di atas itu php-fpm antre dan staf ikut lambat.

@@ -155,7 +155,7 @@ class CustomerPackageService
      */
     public function assertAdditionalDevicesWithinLimit(Customer $customer, InternetPackage $newPackage): void
     {
-        $count = $customer->additionalDevices()->count();
+        $count = $customer->additionalDevices()->active()->count();
 
         if ($count > $newPackage->max_additional_devices) {
             throw new RuntimeException(
@@ -277,6 +277,8 @@ class CustomerPackageService
         // dikreditkan balik sebagai "deposit downgrade" — padahal modemnya
         // tetap milik pelanggan.
         $modemSaleAmount = $this->existingModemSaleAmount($invoice);
+        $modemSaleDescription = $this->existingModemSaleDescription($invoice);
+        $modemSaleId = $this->existingModemSaleId($invoice);
 
         $oneTimeFees = Money::sum([
             $invoice->extra_installation_fee ?? 0,
@@ -302,7 +304,7 @@ class CustomerPackageService
         $invoice->total_amount = $totalInvoicePeriode;
         $invoice->save();
 
-        $this->rebuildInvoiceItems($invoice, $subtotalPaket, $currentPeriod, $modemSaleAmount);
+        $this->rebuildInvoiceItems($invoice, $subtotalPaket, $currentPeriod, $modemSaleAmount, $modemSaleDescription, $modemSaleId);
 
         $invoice->recalculateFromPayments();
 
@@ -353,8 +355,12 @@ class CustomerPackageService
      * cuma porsi `prorate_amount`-nya yang diganti dengan `$subtotalPaket` baru.
      * Nominal "Jual Modem" tidak punya kolom invoice, jadi dioper dari
      * `existingModemSaleAmount()` yang dibaca sebelum baris lama dihapus.
+     * Keterangannya (merek/model/SN, rancangan 2026-10-31 §3) ikut dioper
+     * lewat `existingModemSaleDescription()` dengan alasan yang sama —
+     * tanpa ini, ganti paket menimpa baris "Jual Modem" jadi `description`
+     * kosong walau invoice-nya pertama kali terbit dengan keterangan lengkap.
      */
-    private function rebuildInvoiceItems(Invoice $invoice, float $subtotalPaket, string $billingPeriod, float $modemSaleAmount = 0.0): void
+    private function rebuildInvoiceItems(Invoice $invoice, float $subtotalPaket, string $billingPeriod, float $modemSaleAmount = 0.0, ?string $modemSaleDescription = null, ?int $modemSaleId = null): void
     {
         if ($invoice->invoice_type?->value === InvoiceType::AWAL->value) {
             $billing = [
@@ -364,6 +370,8 @@ class CustomerPackageService
                 'extra_pole_fee' => (float) ($invoice->extra_pole_fee ?? 0),
                 'other_fee' => (float) ($invoice->other_fee ?? 0),
                 'modem_sale_amount' => $modemSaleAmount,
+                'modem_sale_description' => $modemSaleDescription,
+                'modem_sale_id' => $modemSaleId,
             ];
 
             $this->itemBuilder->rebuildFor($invoice, $this->initialInvoiceService->lineSpecs($billing));
@@ -399,6 +407,41 @@ class CustomerPackageService
                 ->pluck('amount')
                 ->all()
         );
+    }
+
+    /**
+     * Keterangan baris "Jual Modem" yang SAAT INI tertulis di invoice ini —
+     * pasangan `existingModemSaleAmount()` di atas, alasan sama (rancangan
+     * 2026-10-31 §3): baris dihapus-tulis-ulang tiap ganti paket, jadi
+     * keterangannya harus dibaca sebelum baris lama hilang.
+     */
+    private function existingModemSaleDescription(Invoice $invoice): ?string
+    {
+        if ($invoice->invoice_type?->value !== InvoiceType::AWAL->value) {
+            return null;
+        }
+
+        return $invoice->items()
+            ->whereHas('subcategory', fn ($query) => $query->where('code', 'jual_modem'))
+            ->value('description');
+    }
+
+    /**
+     * Penaut `inventory_serial_sale_id` yang SAAT INI tertulis di invoice ini
+     * (rancangan 2026-10-31 §5) — pasangan `existingModemSaleAmount()` /
+     * `existingModemSaleDescription()` di atas, alasan sama: harus dibaca
+     * sebelum baris lama dihapus, atau laporan rekonsiliasi kehilangan
+     * penautnya tiap kali pelanggan ganti paket.
+     */
+    private function existingModemSaleId(Invoice $invoice): ?int
+    {
+        if ($invoice->invoice_type?->value !== InvoiceType::AWAL->value) {
+            return null;
+        }
+
+        return $invoice->items()
+            ->whereHas('subcategory', fn ($query) => $query->where('code', 'jual_modem'))
+            ->value('inventory_serial_sale_id');
     }
 
     /**

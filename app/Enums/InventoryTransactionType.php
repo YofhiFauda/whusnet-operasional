@@ -48,7 +48,8 @@ enum InventoryTransactionType: string
      * 'belum pernah opname' vs 'baru saja opname hasilnya pas' tetap beda
      * status yang kelihatan di ledger"). SATU-SATUNYA jalur yang boleh nulis
      * `qty` nol — dibuat lewat `InventoryAdjustmentService::recordStockOpname()`
-     * + form terpisah (`warehouse.adjustments.opname.create`), BUKAN numpang
+     * + form "Cek & cocokkan stok" (`warehouse.adjustments.check.create`,
+     * simpan ke `opname.store`), BUKAN numpang
      * form Penyesuaian Stok biasa (`adjustPopBalance()`, yang justru MENOLAK
      * delta nol — itu jalur koreksi manual, beda tujuan).
      */

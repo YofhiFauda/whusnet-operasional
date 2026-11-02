@@ -20,7 +20,8 @@
 
 
 
-<div class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden mb-6">
+<section aria-labelledby="heading-tabel-pelanggan" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden mb-6">
+    <h2 id="heading-tabel-pelanggan" class="sr-only">Tabel Data Pelanggan</h2>
     <?php if(!empty($statusGroup)): ?>
     
     <div class="border-b border-slate-200 dark:border-slate-800 px-6 py-3 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/30">
@@ -36,7 +37,7 @@
     <?php echo $__env->make('customers.partials._list_table', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 
     <?php echo $__env->make('customers.partials._list_pagination', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
-</div>
+</section>
 
 <?php echo $__env->make('customers.partials._quick_hub_modal', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
 <?php $__env->stopSection(); ?>

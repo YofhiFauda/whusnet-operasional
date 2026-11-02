@@ -30,6 +30,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'serial_id',
     'roll_id',
     'qty',
+    'entered_pack_qty',
     'unit_price_snapshot',
     'from_pop_id',
     'to_pop_id',
@@ -66,6 +67,7 @@ class InventoryTransaction extends Model
         return [
             'type' => InventoryTransactionType::class,
             'qty' => 'decimal:2',
+            'entered_pack_qty' => 'decimal:2',
             'unit_price_snapshot' => 'decimal:2',
             'from_network_node_id' => 'integer',
             'to_network_node_id' => 'integer',

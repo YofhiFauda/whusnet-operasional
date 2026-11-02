@@ -3,6 +3,7 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+    <meta name="description" content="Masuk ke Ruang Kerja Whusnet - Sistem Billing dan Operasional ISP Terpadu">
     <meta name="csrf-token" content="{{ csrf_token() }}">
     <meta name="theme-color" content="#081d32">
     <title>Login - Ruang Kerja Whusnet</title>
@@ -23,6 +24,7 @@
         })();
     </script>
 
+    @include('partials.web-fonts')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 
     <style>

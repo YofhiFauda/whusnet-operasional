@@ -37,12 +37,15 @@ enum OwnershipMode: string
      */
     case INFRASTRUCTURE_ASSET = 'infrastructure_asset';
 
+    case NOT_APPLICABLE = 'not_applicable';
+
     public function label(): string
     {
         return match ($this) {
             self::INSTALLABLE => 'Dipasang ke Pelanggan',
             self::COMPANY_ASSET => 'Aset Perusahaan (Alat Kerja)',
             self::INFRASTRUCTURE_ASSET => 'Aset Infrastruktur (Terpasang Netap)',
+            self::NOT_APPLICABLE => 'Tidak berlaku',
         };
     }
 }

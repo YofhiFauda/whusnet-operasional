@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 #[Fillable([
     'code',
     'name',
+    'short_specification',
     'item_category_id',
     'infrastructure_node_type_id',
     'infrastructure_location_kind',
@@ -40,6 +41,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'equipment_class_override',
     'meter_per_roll',
     'minimum_length',
+    'pack_size',
 ])]
 class Item extends Model
 {
@@ -56,6 +58,7 @@ class Item extends Model
             'equipment_class_override' => EquipmentClass::class,
             'meter_per_roll' => 'decimal:2',
             'minimum_length' => 'decimal:2',
+            'pack_size' => 'decimal:2',
             'infrastructure_location_kind' => InfrastructureLocationKind::class,
         ];
     }
@@ -68,6 +71,16 @@ class Item extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(ItemCategory::class, 'item_category_id');
+    }
+
+    public function isNonOperational(): bool
+    {
+        return $this->category?->is_operational === false;
+    }
+
+    public function isMarketing(): bool
+    {
+        return $this->category?->code === ItemCategory::CODE_MERCHANDISE_MARKETING;
     }
 
     public function scopeActive($query)

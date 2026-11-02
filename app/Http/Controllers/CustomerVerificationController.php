@@ -11,6 +11,7 @@ use App\Models\AuditLog;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\InternetPackage;
+use App\Models\InventorySerialSale;
 use App\Models\Task;
 use App\Models\User;
 use App\Notifications\AppNotification;
@@ -361,15 +362,32 @@ class CustomerVerificationController extends Controller
         // modem gak dijual (harga NULL), dan pelanggan 'sewa' kolom ini
         // selamanya null.
         $latestInstallation = $customer->installations()->latest()->first();
-        $modemSaleAmount = $latestInstallation && $latestInstallation->modem_acquisition_choice === 'beli_gudang'
-            ? (float) $latestInstallation->modem_sale_price
-            : 0.0;
+        $isModemBeliGudang = $latestInstallation && $latestInstallation->modem_acquisition_choice === 'beli_gudang';
+        $modemSaleAmount = $isModemBeliGudang ? (float) $latestInstallation->modem_sale_price : 0.0;
+        // Keterangan + penaut sale (rancangan 2026-10-31 §3/§5) — dibangun
+        // dari SN yang sama dipakai `installSerial()`/`recordSerialSale()`
+        // di laporan teknisi. SN pointer draft (`selectedInventorySerial`)
+        // masih ada di titik ini karena belum pernah dihapus dari
+        // CustomerInstallation. Sale dicari lewat `inventory_serial_id` +
+        // `customer_id` (bukan `fop_task_id`) — jalur Pemasangan tidak
+        // selalu punya FopTask (survey/PSB).
+        $modemSaleDescription = null;
+        $modemSaleId = null;
+        if ($isModemBeliGudang && $latestInstallation->selectedInventorySerial) {
+            $modemSaleDescription = $latestInstallation->selectedInventorySerial->modemSaleDescription();
+            $modemSaleId = InventorySerialSale::where('inventory_serial_id', $latestInstallation->selected_inventory_serial_id)
+                ->where('customer_id', $customer->id)
+                ->latest()
+                ->value('id');
+        }
 
         $billing = app(InitialInvoiceService::class)->calculate(
             $service,
             $validated['issue_date'],
             $validated,
-            $modemSaleAmount
+            $modemSaleAmount,
+            $modemSaleDescription,
+            $modemSaleId
         );
 
         $pop = $customer->pop;

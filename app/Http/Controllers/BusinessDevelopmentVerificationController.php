@@ -132,6 +132,12 @@ class BusinessDevelopmentVerificationController extends Controller
             // di dalam `issue()` dan baris tagihannya lenyap diam-diam padahal
             // SN-nya sudah kejual (ownership CUSTOMER, custody kepotong).
             $modemSaleAmount = (float) ($pending['billing']['modem_sale_amount'] ?? 0);
+            // Keterangan + penaut sale (rancangan 2026-10-31 §3/§5) — sama
+            // snapshot, sama alasan: diteruskan EKSPLISIT, bukan cuma dibaca
+            // otomatis dari `$billing` di dalam `issue()`, biar tujuannya
+            // terbaca di titik panggil ini juga.
+            $modemSaleDescription = $pending['billing']['modem_sale_description'] ?? null;
+            $modemSaleId = $pending['billing']['modem_sale_id'] ?? null;
 
             $initialInvoice = $initialInvoiceService->issue(
                 $customer,
@@ -139,7 +145,9 @@ class BusinessDevelopmentVerificationController extends Controller
                 $billing,
                 $pending['issue_date'],
                 auth()->id(),
-                $modemSaleAmount
+                $modemSaleAmount,
+                $modemSaleDescription,
+                $modemSaleId
             );
 
             $oldStatus = $customer->status;

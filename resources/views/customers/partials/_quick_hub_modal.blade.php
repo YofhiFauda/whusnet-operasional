@@ -19,7 +19,7 @@
 {{-- ────────────────────────────────────────────────────────────
      MODAL 2: CUSTOMER QUICK HUB & OPERATIONAL ACTIONS MODAL (5 TABS)
 ──────────────────────────────────────────────────────────── --}}
-<div id="actions-modal" class="fixed inset-0 z-50 overflow-y-auto flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 hidden">
+<div id="actions-modal" role="dialog" aria-modal="true" aria-labelledby="actions-modal-title" class="fixed inset-0 z-50 overflow-y-auto flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 hidden">
     <!-- Backdrop Blur -->
     <div onclick="closeActionsModal()" class="fixed inset-0 bg-slate-950/70 backdrop-blur-md transition-opacity"></div>
 
@@ -31,59 +31,62 @@
 
         <!-- Toast Notification inside modal -->
         <div id="modal-toast" class="hidden absolute top-4 left-1/2 -translate-x-1/2 z-30 px-4 py-2.5 rounded-2xl bg-slate-900/95 dark:bg-emerald-600 text-white font-semibold text-xs shadow-xl items-center gap-2.5 border border-slate-700 dark:border-emerald-500 animate-pop-in">
-            <svg class="w-4 h-4 text-emerald-400 dark:text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            <svg class="w-4 h-4 text-emerald-400 dark:text-white shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
             <span id="modal-toast-text"></span>
         </div>
 
         <!-- Header -->
         <div class="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-slate-100 dark:border-slate-800/80 flex items-center justify-between bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur shrink-0 gap-3">
             <div class="flex items-center gap-3 sm:gap-3.5 min-w-0">
-                <div id="actions-modal-avatar" class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shadow-sky-500/20 shrink-0 ring-2 ring-white dark:ring-slate-800">
+                <div id="actions-modal-avatar" class="w-10 h-10 sm:w-11 sm:h-11 rounded-2xl bg-gradient-to-tr from-sky-500 via-indigo-500 to-indigo-600 text-white flex items-center justify-center font-bold text-xs sm:text-sm shadow-md shadow-sky-500/20 shrink-0 ring-2 ring-white dark:ring-slate-800" aria-hidden="true">
                     CU
                 </div>
                 <div class="min-w-0">
                     <div class="flex items-center gap-2 flex-wrap">
-                        <h3 class="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-tight truncate max-w-[170px] sm:max-w-xs md:max-w-md" id="actions-modal-title">Nama Pelanggan</h3>
+                        <h2 class="font-bold text-slate-900 dark:text-white text-sm sm:text-base leading-tight truncate max-w-[170px] sm:max-w-xs md:max-w-md" id="actions-modal-title">Nama Pelanggan</h2>
                         <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold border inline-flex items-center gap-1.5 shrink-0 shadow-2xs" id="actions-modal-status-badge">
-                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse-glow"></span>
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse-glow" aria-hidden="true"></span>
                             <span>ACTIVE</span>
                         </span>
                     </div>
                     <div class="flex items-center gap-1.5 text-[11px] sm:text-xs mt-0.5">
                         <span class="font-mono text-sky-600 dark:text-sky-400 font-bold shrink-0 tracking-tight" id="actions-modal-code">CID-000</span>
-                        <span class="text-slate-300 dark:text-slate-600">•</span>
-                        <span class="text-slate-500 dark:text-slate-400 truncate max-w-[160px] sm:max-w-xs" id="actions-modal-location-text">POP Central</span>
+                        <span class="text-slate-300 dark:text-slate-600" aria-hidden="true">•</span>
+                        <span class="text-slate-600 dark:text-slate-400 truncate max-w-[160px] sm:max-w-xs" id="actions-modal-location-text">POP Central</span>
                     </div>
                 </div>
             </div>
-            <button type="button" onclick="closeActionsModal()" class="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 btn-interactive" title="Tutup Modal (Esc)">
-                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            <button type="button" onclick="closeActionsModal()"
+                    aria-label="Tutup modal aksi cepat"
+                    class="p-2 text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 rounded-xl hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors shrink-0 btn-interactive"
+                    title="Tutup Modal (Esc)">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
             </button>
         </div>
 
         <!-- MODAL TAB NAVIGATION (SCROLLABLE NO-SCROLLBAR) -->
-        <div class="px-2 sm:px-6 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 flex items-center gap-1 overflow-x-auto shrink-0 no-scrollbar snap-x snap-mandatory" id="modal-tab-header">
-            <button type="button" onclick="switchActionTab('profile')" id="tab-btn-profile" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-bold border-b-2 border-sky-600 text-sky-600 dark:text-sky-400 bg-white dark:bg-slate-800 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
-                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+        <div class="px-2 sm:px-6 border-b border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-900/50 flex items-center gap-1 overflow-x-auto shrink-0 no-scrollbar snap-x snap-mandatory" id="modal-tab-header" role="tablist" aria-label="Kategori Informasi Pelanggan">
+            <button type="button" role="tab" onclick="switchActionTab('profile')" id="tab-btn-profile" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-bold border-b-2 border-sky-600 text-sky-600 dark:text-sky-400 bg-white dark:bg-slate-800 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                 <span class="hidden sm:inline">Profil & Paket</span>
                 <span class="sm:hidden">Profil</span>
             </button>
-            <button type="button" onclick="switchActionTab('technical')" id="tab-btn-technical" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
-                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
+            <button type="button" role="tab" onclick="switchActionTab('technical')" id="tab-btn-technical" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 3v2m6-2v2M9 19v2m6-2v2M5 9H3m2 6H3m18-6h-2m2 6h-2M7 19h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v10a2 2 0 002 2zM9 9h6v6H9V9z"/></svg>
                 <span class="hidden sm:inline">Teknis & Perangkat</span>
                 <span class="sm:hidden">Teknis</span>
             </button>
-            <button type="button" onclick="switchActionTab('field')" id="tab-btn-field" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
-                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+            <button type="button" role="tab" onclick="switchActionTab('field')" id="tab-btn-field" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                 <span class="hidden sm:inline">Lokasi & Pemasangan</span>
                 <span class="sm:hidden">Lokasi</span>
             </button>
-            <button type="button" onclick="switchActionTab('documents')" id="tab-btn-documents" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
-                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+            <button type="button" role="tab" onclick="switchActionTab('documents')" id="tab-btn-documents" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 <span>Berkas</span>
             </button>
-            <button type="button" onclick="switchActionTab('finance')" id="tab-btn-finance" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
-                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+            <button type="button" role="tab" onclick="switchActionTab('finance')" id="tab-btn-finance" class="py-2.5 px-3 sm:px-4 text-[11px] sm:text-xs font-medium border-b-2 border-transparent text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 rounded-t-xl transition-all whitespace-nowrap shrink-0 flex items-center gap-1.5 touch-target btn-interactive snap-start">
+                <svg class="w-3.5 h-3.5 sm:w-4 sm:h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 9V7a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2m2 4h10a2 2 0 002-2v-6a2 2 0 00-2-2H9a2 2 0 00-2 2v6a2 2 0 002 2zm7-5a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                 <span class="hidden sm:inline">Ringkasan & Tagihan</span>
                 <span class="sm:hidden">Tagihan</span>
             </button>
@@ -107,38 +110,38 @@
                     <!-- Identitas Pelanggan -->
                     <div class="p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-3.5 text-xs shadow-2xs">
                         <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2.5">
-                            <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                            <h3 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
                                 <span class="p-1 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
-                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                                    <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                 </span>
                                 <span>Identitas Pelanggan</span>
-                            </h4>
+                            </h3>
                             <span id="hub-prof-completeness-status" class="px-2.5 py-0.5 rounded-full font-bold text-[10px] bg-amber-100 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-900/40">-</span>
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
                             <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
-                                <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Nama Lengkap</span>
+                                <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">Nama Lengkap</span>
                                 <span id="hub-prof-fullname" class="font-bold text-slate-900 dark:text-white truncate block text-xs mt-0.5">-</span>
                             </div>
                             <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
-                                <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">NIK / No. KTP</span>
+                                <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">NIK / No. KTP</span>
                                 <span id="hub-prof-nik" class="font-mono font-medium text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
                             <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
-                                <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Kode Pelanggan (CID)</span>
+                                <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">Kode Pelanggan (CID)</span>
                                 <span id="hub-prof-cid" class="font-mono font-bold text-sky-600 dark:text-sky-400 truncate block text-xs mt-0.5">-</span>
                             </div>
                             <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
-                                <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">No. HP / WhatsApp</span>
+                                <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">No. HP / WhatsApp</span>
                                 <span id="hub-prof-phone" class="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
                             <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
-                                <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Email</span>
+                                <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">Email</span>
                                 <span id="hub-prof-email" class="text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
                             <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
-                                <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Tanggal Registrasi</span>
+                                <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">Tanggal Registrasi</span>
                                 <span id="hub-prof-reg" class="font-mono font-medium text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
                         </div>
@@ -148,23 +151,23 @@
                     <div class="p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-3.5 text-xs shadow-2xs flex flex-col justify-between">
                         <div class="space-y-3.5">
                             <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2.5">
-                                <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                                <h3 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
                                     <span class="p-1 rounded-lg bg-indigo-100 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400">
-                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                                        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
                                     </span>
                                     <span>Paket Internet</span>
-                                </h4>
-                                <span class="text-[10px] font-semibold text-slate-400 uppercase">Langganan Aktif</span>
+                                </h3>
+                                <span class="text-[10px] font-semibold text-slate-600 dark:text-slate-400 uppercase">Langganan Aktif</span>
                             </div>
                             
                             <div class="space-y-3 pt-1">
                                 <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750 flex items-center justify-between">
                                     <div>
-                                        <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Nama Paket Layanan</span>
+                                        <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">Nama Paket Layanan</span>
                                         <span id="hub-prof-package" class="font-bold text-slate-900 dark:text-white text-sm sm:text-base mt-0.5 block">-</span>
                                     </div>
                                     <span class="p-2 rounded-xl bg-sky-50 dark:bg-sky-950/50 text-sky-600 dark:text-sky-400">
-                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
+                                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.111 16.404a5.5 5.5 0 017.778 0M12 20h.01m-7.08-7.071c3.904-3.905 10.236-3.905 14.141 0M1.394 9.393c5.857-5.857 15.355-5.857 21.213 0"/></svg>
                                     </span>
                                 </div>
 
@@ -180,7 +183,7 @@
                             </div>
                         </div>
 
-                        <p class="text-[11px] text-slate-400 dark:text-slate-500 italic mt-2">
+                        <p class="text-[11px] text-slate-600 dark:text-slate-400 italic mt-2">
                             *Untuk upgrade atau pergantian paket, gunakan tombol <strong>Paket</strong> pada menu aksi di bawah.
                         </p>
                     </div>
@@ -191,12 +194,12 @@
             <div id="tab-content-technical" class="tab-pane hidden space-y-4 sm:space-y-5">
                 <div class="p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-4 text-xs shadow-2xs">
                     <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-3 gap-2.5">
-                        <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                        <h3 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
                             <span class="p-1 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"/></svg>
                             </span>
                             <span>Konfigurasi Jaringan & Perangkat</span>
-                        </h4>
+                        </h3>
                         <div class="flex items-center gap-2 shrink-0">
                             <button type="button" onclick="copyTechInfo()" class="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors btn-interactive inline-flex items-center gap-1.5" title="Salin seluruh info teknis ke clipboard">
                                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
@@ -277,12 +280,12 @@
             <div id="tab-content-field" class="tab-pane hidden space-y-4 sm:space-y-5">
                 <div class="p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-4 text-xs shadow-2xs">
                     <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2.5">
-                        <h4 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
+                        <h3 class="font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider flex items-center gap-2">
                             <span class="p-1 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400">
-                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                             </span>
                             <span>Alamat Pemasangan & Navigasi</span>
-                        </h4>
+                        </h3>
                     </div>
 
                     <div class="space-y-3">
@@ -378,19 +381,19 @@
                 <!-- Ringkasan Billing Banner -->
                 <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-sky-50/30 dark:from-slate-850 dark:to-sky-950/20 border border-slate-200/80 dark:border-slate-800 space-y-3.5 max-w-lg shadow-2xs">
                     <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2.5">
-                        <h4 class="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
-                            <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
+                        <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
+                            <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>
                             <span>Ringkasan Tagihan</span>
-                        </h4>
+                        </h3>
                         <span id="hub-invoice-period-badge" class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 dark:bg-sky-950 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-900/40">Periode</span>
                     </div>
                     <div class="space-y-2.5 text-xs">
                         <div class="flex justify-between items-center">
-                            <span class="text-slate-500 dark:text-slate-400">Jatuh Tempo</span>
+                            <span class="text-slate-600 dark:text-slate-400">Jatuh Tempo</span>
                             <span id="hub-fin-due-date" class="font-mono font-medium text-slate-800 dark:text-slate-200">-</span>
                         </div>
                         <div class="flex justify-between items-center">
-                            <span class="text-slate-500 dark:text-slate-400">Total Piutang Tertunggak</span>
+                            <span class="text-slate-600 dark:text-slate-400">Total Piutang Tertunggak</span>
                             <span id="hub-fin-arrears" class="font-mono font-bold text-rose-600 dark:text-rose-400">Rp 0</span>
                         </div>
                         <div class="flex justify-between items-center pt-2.5 border-t border-slate-200/60 dark:border-slate-700/60">
@@ -402,24 +405,25 @@
 
                 <!-- Riwayat Pembayaran Terakhir -->
                 <div class="space-y-2.5">
-                    <h5 class="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <h4 class="text-xs font-bold text-slate-600 dark:text-slate-300 uppercase tracking-wider flex items-center gap-1.5">
+                        <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                         <span>Riwayat 3 Pembayaran Terakhir</span>
-                    </h5>
+                    </h4>
                     <div class="border border-slate-200/80 dark:border-slate-800 rounded-2xl overflow-x-auto shadow-2xs">
                         <table class="w-full min-w-[440px] text-left text-xs">
+                            <caption class="sr-only">Riwayat 3 Pembayaran Terakhir Pelanggan</caption>
                             <thead>
-                                <tr class="bg-slate-50/80 dark:bg-slate-800/60 text-slate-400 font-semibold border-b border-slate-200/80 dark:border-slate-800">
-                                    <th class="py-2.5 px-3.5">TANGGAL</th>
-                                    <th class="py-2.5 px-3">INVOICE</th>
-                                    <th class="py-2.5 px-3">METODE</th>
-                                    <th class="py-2.5 px-3 text-right">NOMINAL</th>
-                                    <th class="py-2.5 px-3.5 text-center">STRUK</th>
+                                <tr class="bg-slate-50/80 dark:bg-slate-800/60 text-slate-600 dark:text-slate-300 font-semibold border-b border-slate-200/80 dark:border-slate-800">
+                                    <th scope="col" class="py-2.5 px-3.5">TANGGAL</th>
+                                    <th scope="col" class="py-2.5 px-3">INVOICE</th>
+                                    <th scope="col" class="py-2.5 px-3">METODE</th>
+                                    <th scope="col" class="py-2.5 px-3 text-right">NOMINAL</th>
+                                    <th scope="col" class="py-2.5 px-3.5 text-center">STRUK</th>
                                 </tr>
                             </thead>
                             <tbody id="hub-recent-payments-body" class="divide-y divide-slate-100 dark:divide-slate-800">
                                 <tr>
-                                    <td colspan="5" class="py-4 text-center text-slate-400">Belum ada riwayat pembayaran.</td>
+                                    <td colspan="5" class="py-4 text-center text-slate-600 dark:text-slate-400">Belum ada riwayat pembayaran.</td>
                                 </tr>
                             </tbody>
                         </table>

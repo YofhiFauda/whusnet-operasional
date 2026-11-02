@@ -58,7 +58,7 @@ class ItemController extends Controller
     {
         $categories = ItemCategory::active()->ordered()->get();
         $trackingTypes = TrackingType::cases();
-        $ownershipModes = OwnershipMode::cases();
+        $ownershipModes = array_values(array_filter(OwnershipMode::cases(), fn ($mode) => $mode !== OwnershipMode::NOT_APPLICABLE));
         $nodeTypes = NetworkNodeType::where('is_active', true)->orderBy('sort_order')->get();
 
         return view('master.items.create', compact('categories', 'trackingTypes', 'ownershipModes', 'nodeTypes'));
@@ -85,7 +85,7 @@ class ItemController extends Controller
             ->ordered()
             ->get();
         $trackingTypes = TrackingType::cases();
-        $ownershipModes = OwnershipMode::cases();
+        $ownershipModes = array_values(array_filter(OwnershipMode::cases(), fn ($mode) => $mode !== OwnershipMode::NOT_APPLICABLE));
         $nodeTypes = NetworkNodeType::where('is_active', true)->orderBy('sort_order')->get();
         $trackingTypeLocked = $item->inventoryTransactions()->exists();
 
@@ -145,6 +145,7 @@ class ItemController extends Controller
                 Rule::unique('items', 'code')->ignore($item),
             ],
             'name' => ['required', 'string', 'max:150'],
+            'short_specification' => ['nullable', 'string', 'max:255'],
             'item_category_id' => ['required', 'integer', Rule::exists('item_categories', 'id')],
             'unit' => ['required', 'string', 'max:20'],
             'is_active' => 'required|boolean',
@@ -188,8 +189,49 @@ class ItemController extends Controller
             $rules['minimum_length'] = ['prohibited'];
         }
 
+        // Konversi Pack→pcs (mis. 1 Pack RJ45 = 50 pcs) — cuma berarti buat
+        // tracking_type QUANTITY: SERIALIZED dihitung per-SN, ROLL dihitung
+        // per-meter, keduanya gak punya konsep "Pack" sama sekali. Opsional
+        // (beda dari `meter_per_roll` yang WAJIB buat roll) — banyak barang
+        // QUANTITY (kabel potongan, ATK) emang gak pernah dibeli per-Pack.
+        $isQuantityType = $locked
+            ? $item?->tracking_type === TrackingType::QUANTITY
+            : ($request->input('tracking_type') === TrackingType::QUANTITY->value);
+
+        $rules['pack_size'] = $isQuantityType
+            ? ['nullable', 'numeric', 'min:0.01']
+            : ['prohibited'];
+
         $validated = $request->validate($rules);
         $category = ItemCategory::query()->findOrFail($validated['item_category_id']);
+        $isMarketing = $category->code === 'merchandise_marketing';
+        if ($item && $locked && (($item->category?->code === 'merchandise_marketing') !== $isMarketing)) {
+            throw ValidationException::withMessages([
+                'item_category_id' => 'Kategori Marketing tidak dapat diubah setelah barang memiliki riwayat stok.',
+            ]);
+        }
+        if ($item && $locked && ($item->category?->is_operational === false || ! $category->is_operational) && $item->item_category_id !== $category->id) {
+            throw ValidationException::withMessages(['item_category_id' => 'Kategori barang nonoperasional tidak dapat diubah setelah barang memiliki riwayat stok.']);
+        }
+        if ($item && $locked && $item->category?->is_operational !== $category->is_operational) {
+            throw ValidationException::withMessages(['item_category_id' => 'Jenis penggunaan kategori tidak dapat diubah setelah barang memiliki riwayat stok.']);
+        }
+        if (! $category->is_operational) {
+            foreach (['ownership_mode', 'infrastructure_node_type_id', 'infrastructure_location_kind'] as $field) {
+                if ($request->filled($field)) {
+                    throw ValidationException::withMessages([$field => 'Atribut ini tidak berlaku untuk barang non Operasional.']);
+                }
+            }
+            $validated['infrastructure_node_type_id'] = null;
+            $validated['infrastructure_location_kind'] = null;
+        } elseif (($validated['ownership_mode'] ?? null) === OwnershipMode::NOT_APPLICABLE->value) {
+            throw ValidationException::withMessages(['ownership_mode' => 'Pilih kepemilikan barang operasional.']);
+        }
+        if (! $category->is_operational && ($locked ? $item->tracking_type : TrackingType::from($validated['tracking_type'])) !== TrackingType::QUANTITY) {
+            throw ValidationException::withMessages([
+                'tracking_type' => 'Barang nonoperasional dengan alur Pusat ke Cabang harus menggunakan tracking Kuantitas.',
+            ]);
+        }
         $ownership = $locked
             ? $item->ownership_mode->value
             : ($validated['ownership_mode'] ?? OwnershipMode::INSTALLABLE->value);
@@ -198,7 +240,7 @@ class ItemController extends Controller
                 'ownership_mode' => 'Modem/ONT pelanggan harus menggunakan kepemilikan Dipasang ke Pelanggan.',
             ]);
         }
-        if ($item && ! $request->exists('infrastructure_node_type_id')) {
+        if ($item && $category->is_operational && ! $request->exists('infrastructure_node_type_id')) {
             $validated['infrastructure_node_type_id'] = $item->infrastructure_node_type_id;
         }
 
@@ -217,7 +259,7 @@ class ItemController extends Controller
         // infrastruktur atau aset perusahaan (Switch/SFP) bernomor seri. Untuk
         // aset perusahaan, kolom inilah satu-satunya izin eksplisit untuk netap
         // di jaringan (InventoryService::assertSerialItemFitsLocation()).
-        if ($item && ! $request->exists('infrastructure_location_kind')) {
+        if ($item && $category->is_operational && ! $request->exists('infrastructure_location_kind')) {
             $validated['infrastructure_location_kind'] = $item->infrastructure_location_kind?->value;
         }
         $locationKind = ($validated['infrastructure_location_kind'] ?? null) ?: null;
@@ -245,6 +287,10 @@ class ItemController extends Controller
             $validated['minimum_length'] = null;
         }
 
+        if (! $isQuantityType) {
+            $validated['pack_size'] = null;
+        }
+
         if (! $locked) {
             $trackingType = TrackingType::from($validated['tracking_type']);
             if ($trackingType === TrackingType::SERIALIZED) {
@@ -270,6 +316,10 @@ class ItemController extends Controller
             $validated['auto_generate_serial'] = $trackingType === TrackingType::SERIALIZED
                 ? (bool) $validated['auto_generate_serial']
                 : false;
+        }
+
+        if (! $category->is_operational) {
+            $validated['ownership_mode'] = OwnershipMode::NOT_APPLICABLE->value;
         }
 
         return $validated;

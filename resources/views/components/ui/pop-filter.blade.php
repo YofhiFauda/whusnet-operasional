@@ -34,15 +34,17 @@
 
     {{-- Pill trigger --}}
     <button type="button" @click="toggle()"
+        :aria-expanded="open ? 'true' : 'false'"
+        aria-label="Filter POP atau Cabang"
         class="h-[38px] w-full inline-flex items-center gap-2 px-3 rounded-lg border border-border bg-surface
                text-xs text-text-main hover:border-primary/60 focus:outline-none focus:border-primary
                focus:ring-2 focus:ring-primary-border transition-colors">
-        <svg class="h-3.5 w-3.5 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg class="h-3.5 w-3.5 text-text-muted flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4"/>
         </svg>
         <span class="truncate" x-text="label()"></span>
         <svg class="h-3.5 w-3.5 text-text-muted transition-transform ml-auto flex-shrink-0" :class="open ? 'rotate-180' : ''"
-             fill="none" stroke="currentColor" viewBox="0 0 24 24">
+             fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
         </svg>
     </button>
@@ -77,6 +79,7 @@
                     </svg>
                     <input type="text" x-model="cq" @input.debounce.300ms="searchC()" @focus="searchC()"
                            placeholder="Cari cabang..." autocomplete="off"
+                           aria-label="Cari cabang"
                            class="w-full rounded-md border border-border bg-surface pl-7 pr-3 py-1.5 text-sm text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-border">
                 </div>
             </div>
@@ -111,6 +114,7 @@
                         </svg>
                         <input type="text" x-model="mq" @input.debounce.300ms="searchM()" @focus="searchM()"
                                placeholder="Cari Mini POP..." autocomplete="off"
+                               aria-label="Cari Mini POP"
                                class="w-full rounded-md border border-border bg-surface pl-7 pr-3 py-1.5 text-sm text-text-main placeholder:text-text-muted focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary-border">
                     </div>
                 </div>

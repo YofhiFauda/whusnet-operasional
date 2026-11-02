@@ -67,10 +67,25 @@ class InitialInvoiceService
      * ini sengaja tidak tahu apa-apa soal entitas instalasi; ia hanya menerima
      * nominal jadi, sama seperti `extra_cable_fee` dkk.
      *
+     * `$modemSaleDescription` (rancangan 2026-10-31, `docs/plan/warehouse/
+     * rancangan-modem-terjual-visibilitas-dan-rekonsiliasi.md` §3) — teks
+     * siap pakai (mis. "Pembelian modem ZTE F670L · SN ABC123") yang
+     * ditempelkan ke baris "Jual Modem" di invoice. Dibangun pemanggil dari
+     * `InventorySerial`/`Item`, bukan di sini — service ini tetap tidak tahu
+     * soal entitas inventory. Ikut masuk ke array balikan supaya snapshot
+     * `customers.pending_initial_invoice` (jalur BD) membawanya tanpa query
+     * ulang SN saat `verify()`.
+     *
+     * `$modemSaleId` — FK `inventory_serial_sales.id` (rancangan 2026-10-31
+     * §5), ditulis ke `invoice_items.inventory_serial_sale_id` oleh
+     * `issue()`. Penaut pasti dipakai laporan rekonsiliasi "SN terjual belum
+     * ditagih" — tanpa ini laporan hanya bisa menebak lewat pelanggan +
+     * subkategori, yang meleset kalau satu pelanggan beli modem dua kali.
+     *
      * @param  array{extra_installation_fee?: mixed, extra_cable_fee?: mixed, extra_pole_fee?: mixed, other_fee?: mixed, prorate_amount_override?: mixed}  $fees
-     * @return array{prorate_amount: float, prorate_days: int, days_in_month: int, subtotal: float, discount: float, ppn: float, ppn_amount: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_amount: float, total_amount: float, next_month_amount: float}
+     * @return array{prorate_amount: float, prorate_days: int, days_in_month: int, subtotal: float, discount: float, ppn: float, ppn_amount: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_amount: float, modem_sale_description: ?string, modem_sale_id: ?int, total_amount: float, next_month_amount: float}
      */
-    public function calculate(CustomerServiceModel $service, string $issueDate, array $fees = [], float $modemSaleAmount = 0.0): array
+    public function calculate(CustomerServiceModel $service, string $issueDate, array $fees = [], float $modemSaleAmount = 0.0, ?string $modemSaleDescription = null, ?int $modemSaleId = null): array
     {
         $issue = Carbon::parse($issueDate);
         $daysInMonth = $issue->daysInMonth;
@@ -130,6 +145,8 @@ class InitialInvoiceService
             'extra_pole_fee' => $poleFee,
             'other_fee' => $otherFee,
             'modem_sale_amount' => $modemSale,
+            'modem_sale_description' => $modemSale > 0 ? $modemSaleDescription : null,
+            'modem_sale_id' => $modemSale > 0 ? $modemSaleId : null,
             'total_amount' => Money::add($afterDiscount, $ppnAmount),
             'next_month_amount' => $nextMonthAmount,
         ];
@@ -159,9 +176,16 @@ class InitialInvoiceService
      * `$modemSaleAmount` yang SAMA, invarian subtotal di `InvoiceItemBuilder`
      * tetap terjaga; kalau beda, builder akan menolak menulis.
      *
-     * @param  array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, total_amount: float}  $billing
+     * `$modemSaleDescription`/`$modemSaleId` default `null` berarti "pakai
+     * yang sudah ada di snapshot" (`$billing['modem_sale_description']` /
+     * `['modem_sale_id']`, diisi `calculate()`) — pemanggil cukup kirim ulang
+     * kalau mau menimpa. Rancangan 2026-10-31 §3/§5: keterangan modem
+     * (merek/model/SN) dan penaut `inventory_serial_sale_id` ikut tercatat
+     * di baris invoice, bukan cuma nominal polos.
+     *
+     * @param  array{prorate_amount: float, subtotal: float, discount: float, ppn: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_description?: ?string, modem_sale_id?: ?int, total_amount: float}  $billing
      */
-    public function issue(Customer $customer, CustomerServiceModel $service, array $billing, string $issueDateStr, int $createdByUserId, float $modemSaleAmount = 0.0): Invoice
+    public function issue(Customer $customer, CustomerServiceModel $service, array $billing, string $issueDateStr, int $createdByUserId, float $modemSaleAmount = 0.0, ?string $modemSaleDescription = null, ?int $modemSaleId = null): Invoice
     {
         $issueDate = Carbon::parse($issueDateStr);
         $billingPeriod = $issueDate->format('Y-m');
@@ -201,6 +225,8 @@ class InitialInvoiceService
         // ketimpangan rumus ketahuan di sini, bukan diam-diam masuk laporan.
         $lineBilling = $billing;
         $lineBilling['modem_sale_amount'] = $modemSaleAmount;
+        $lineBilling['modem_sale_description'] = $modemSaleDescription ?? ($billing['modem_sale_description'] ?? null);
+        $lineBilling['modem_sale_id'] = $modemSaleId ?? ($billing['modem_sale_id'] ?? null);
         app(InvoiceItemBuilder::class)->rebuildFor($invoice, $this->lineSpecs($lineBilling));
 
         return $invoice;
@@ -288,8 +314,15 @@ class InitialInvoiceService
      * modem) — `InvoiceItemBuilder::rebuildFor()` sudah otomatis skip baris
      * bernominal 0, jadi tidak perlu guard tambahan di sini.
      *
-     * @param  array{prorate_amount: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_amount?: float}  $billing
-     * @return list<array{category_code: string, subcategory_code?: string|null, custom_name?: string|null, description?: string|null, amount: mixed}>
+     * `description` baris ini dibaca dari `modem_sale_description` (rancangan
+     * 2026-10-31 §3) — teks siap pakai "Pembelian modem {merek model} · SN
+     * {serial}". `null` kalau pemanggil lama belum mengirim key itu, atau
+     * kalau baris ini memang nol (lihat `calculate()`). `inventory_serial_sale_id`
+     * (§5) dibaca dari `modem_sale_id`, penaut pasti ke `inventory_serial_sales`
+     * dipakai laporan rekonsiliasi.
+     *
+     * @param  array{prorate_amount: float, extra_installation_fee: float, extra_cable_fee: float, extra_pole_fee: float, other_fee: float, modem_sale_amount?: float, modem_sale_description?: ?string, modem_sale_id?: ?int}  $billing
+     * @return list<array{category_code: string, subcategory_code?: string|null, custom_name?: string|null, description?: string|null, inventory_serial_sale_id?: int|null, amount: mixed}>
      */
     public function lineSpecs(array $billing): array
     {
@@ -327,7 +360,8 @@ class InitialInvoiceService
             [
                 'category_code' => RevenueCategory::CODE_JASA_PERBAIKAN,
                 'subcategory_code' => 'jual_modem',
-                'description' => null,
+                'description' => $billing['modem_sale_description'] ?? null,
+                'inventory_serial_sale_id' => $billing['modem_sale_id'] ?? null,
                 'amount' => $billing['modem_sale_amount'] ?? 0,
             ],
         ];

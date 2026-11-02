@@ -7,6 +7,10 @@
 
 <x-warehouse.header active="stock-requests" title="Permintaan Stok Cabang" subtitle="Antrean permintaan barang dari Gudang Cabang — sinyal aktif biar Pusat gak perlu nunggu notice sendiri lewat badge Stok Rendah." />
 
+<div class="mb-5 rounded-lg border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 dark:border-sky-900 dark:bg-sky-950 dark:text-sky-100">
+    Barang merchandise Marketing memakai permintaan langsung ke Cabang.
+    <a href="{{ route('warehouse.marketing.index') }}" class="font-semibold underline">Buka Barang Nonoperasional</a>
+</div>
 <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-5 mb-6 shadow-xs">
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
         <form method="GET" action="{{ route('warehouse.stock-requests.index') }}" class="flex items-center gap-2">

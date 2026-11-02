@@ -41,6 +41,8 @@ class GantiPaketBulanAktivasiTidakMenghapusBarisJualModemTest extends TestCase
 
     private const MODEM_PRICE = 300000.0;
 
+    private const MODEM_DESCRIPTION = 'Pembelian modem ZTE F670L · SN SN-JMD-TEST-001';
+
     private const INSTALLATION_FEE = 50000.0;
 
     private Pop $pop;
@@ -124,8 +126,8 @@ class GantiPaketBulanAktivasiTidakMenghapusBarisJualModemTest extends TestCase
         ]);
 
         $initial = app(InitialInvoiceService::class);
-        $billing = $initial->calculate($service, '2026-09-10', ['extra_installation_fee' => self::INSTALLATION_FEE], self::MODEM_PRICE);
-        $invoice = $initial->issue($customer, $service, $billing, '2026-09-10', $admin->id, self::MODEM_PRICE);
+        $billing = $initial->calculate($service, '2026-09-10', ['extra_installation_fee' => self::INSTALLATION_FEE], self::MODEM_PRICE, self::MODEM_DESCRIPTION);
+        $invoice = $initial->issue($customer, $service, $billing, '2026-09-10', $admin->id, self::MODEM_PRICE, self::MODEM_DESCRIPTION);
 
         $this->assertEqualsWithDelta(self::MODEM_PRICE, $this->jualModemAmount($invoice), 0.01, 'Prasyarat: invoice AWAL punya baris Jual Modem.');
 
@@ -153,6 +155,13 @@ class GantiPaketBulanAktivasiTidakMenghapusBarisJualModemTest extends TestCase
             ->sum('amount');
     }
 
+    private function jualModemDescription(Invoice $invoice): ?string
+    {
+        return $invoice->items()
+            ->whereHas('subcategory', fn ($query) => $query->where('code', 'jual_modem'))
+            ->value('description');
+    }
+
     /**
      * Porsi paket hasil prorate ulang (rumus CustomerPackageService untuk AWAL:
      * harga / hari-jendela × hari-terpakai; lama Sep11-14 = 4 hari, baru
@@ -170,6 +179,9 @@ class GantiPaketBulanAktivasiTidakMenghapusBarisJualModemTest extends TestCase
         $this->assertEqualsWithDelta(self::MODEM_PRICE, $this->jualModemAmount($invoice), 0.01, 'Baris Jual Modem wajib tetap ada dengan nominal aslinya.');
         $this->assertEqualsWithDelta($expectedTotal, (float) $invoice->total_amount, 1.0);
         $this->assertEqualsWithDelta((float) $invoice->subtotal, (float) $invoice->items()->sum('amount'), 0.01);
+        // Rancangan 2026-10-31 §3 — ganti paket menulis ulang invoice_items,
+        // keterangan modem (bukan cuma nominal) wajib ikut bertahan.
+        $this->assertSame(self::MODEM_DESCRIPTION, $this->jualModemDescription($invoice));
     }
 
     #[Test]

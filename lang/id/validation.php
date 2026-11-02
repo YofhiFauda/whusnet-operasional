@@ -34,6 +34,7 @@ return [
     'date' => ':attribute bukan tanggal yang valid.',
     'date_equals' => ':attribute harus berupa tanggal yang sama dengan :date.',
     'date_format' => ':attribute tidak cocok dengan format :format.',
+    'decimal' => ':attribute harus memiliki :decimal angka di belakang koma.',
     'different' => ':attribute dan :other harus berbeda.',
     'digits' => ':attribute harus berupa angka :digits.',
     'digits_between' => ':attribute harus antara angka :min dan :max.',

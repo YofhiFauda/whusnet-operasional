@@ -40,6 +40,7 @@ use Database\Seeders\RoleSeeder;
 use Database\Seeders\TaskFeatureSeeder;
 use Database\Seeders\WarehouseFeatureSeeder;
 use Database\Seeders\WorkflowTransitionPermissionSeeder;
+use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Gate;
@@ -441,5 +442,37 @@ class WarehouseReturnToPusatTest extends TestCase
             ->get(route('warehouse.returns.dispatch.index'))
             ->assertOk()
             ->assertSee('RTP-SN-PERM');
+    }
+
+    #[Test]
+    public function halaman_kirim_retur_ke_pusat_memiliki_pagination(): void
+    {
+        for ($i = 1; $i <= 30; $i++) {
+            InventorySerial::create([
+                'item_id' => $this->modem->id,
+                'serial_number' => sprintf('RTP-PAGINATE-%03d', $i),
+                'status' => SerialStatus::RETURNED->value,
+                'condition' => ItemCondition::USED_GOOD->value,
+                'current_pop_id' => $this->cabang->id,
+                'current_technician_id' => null,
+            ]);
+        }
+
+        $responsePage1 = $this->actingAs($this->owner)
+            ->get(route('warehouse.returns.dispatch.index'))
+            ->assertOk();
+
+        $serialsPage1 = $responsePage1->viewData('serials');
+        $this->assertInstanceOf(LengthAwarePaginator::class, $serialsPage1);
+        $this->assertSame(25, $serialsPage1->perPage());
+        $this->assertSame(30, $serialsPage1->total());
+        $this->assertSame(25, $serialsPage1->count());
+
+        $responsePage2 = $this->actingAs($this->owner)
+            ->get(route('warehouse.returns.dispatch.index', ['page' => 2]))
+            ->assertOk();
+
+        $serialsPage2 = $responsePage2->viewData('serials');
+        $this->assertSame(5, $serialsPage2->count());
     }
 }

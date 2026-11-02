@@ -3,6 +3,7 @@
 .env
 .env.backup
 .env.production
+.env.staging
 .phpactor.json
 .phpunit.result.cache
 /.fleet
@@ -36,3 +37,7 @@ Thumbs.db
 
 # Subagent-driven-development scratch workspace (per-plan, not project artifacts)
 /.superpowers/
+
+# Lighthouse CI — laporan hasil audit lokal, gak perlu dicommit.
+/lighthouse-reports/
+/.lighthouseci/

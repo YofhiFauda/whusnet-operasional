@@ -5,7 +5,7 @@
 
 @section('content')
 
-<x-warehouse.header active="returns" title="Kirim Retur ke Pusat" subtitle="Modem hasil retur yang sudah diterima Cabang dari teknisi/pelanggan (Tahap 1), menunggu dikirim ke Gudang Pusat untuk verifikasi final." />
+<x-warehouse.header active="dispatch" title="Kirim Retur ke Pusat" subtitle="Modem hasil retur yang sudah diterima Cabang dari teknisi/pelanggan (Tahap 1), menunggu dikirim ke Gudang Pusat untuk verifikasi final." />
 
 <x-warehouse.returns-nav active="dispatch" />
 
@@ -73,6 +73,12 @@
             </button>
         </div>
     </form>
+
+    @if($serials->hasPages())
+    <div class="px-4 py-3.5 border-t border-slate-100 dark:border-slate-700/60 bg-slate-50/50 dark:bg-slate-900/30">
+        {{ $serials->links() }}
+    </div>
+    @endif
     @endif
 </div>
 
