@@ -230,4 +230,40 @@ class WarehousePackConversionTest extends TestCase
         $this->get(route('warehouse.history.index'))
             ->assertSee('2 Pack (100 pcs)');
     }
+
+    /**
+     * Modal detail Riwayat baca data terpisah ($detailItemData, dirender ke
+     * JSON lewat openDetail()), bukan markup baris list — baris list bisa
+     * benar sementara modalnya masih nampilin "100 pcs" polos kalau cuma
+     * baris list yang dibenahi. Cek langsung payload JSON `qty`/`unit` yang
+     * dikirim ke Alpine, bukan cuma assertSee teks biasa (yang sudah pasti
+     * ketemu dari baris list test di atas, gak membedakan modal).
+     */
+    #[Test]
+    public function riwayat_modal_detail_menampilkan_jumlah_pack_untuk_barang_berpack_size(): void
+    {
+        $this->loginAsAdmin();
+        $pusat = Pop::factory()->create(['type' => 'pusat']);
+        $item = Item::create([
+            'code' => 'PACK-TEST-07',
+            'name' => 'RJ45 Connector Modal',
+            'unit' => 'pcs',
+            'tracking_type' => TrackingType::QUANTITY,
+            'pack_size' => 50,
+        ]);
+
+        $this->post(route('warehouse.receive.store'), [
+            'pop_id' => $pusat->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 2, 'unit_price' => 1000],
+            ],
+        ]);
+
+        // $detailItemData di-json_encode() lalu dituang ke atribut @click Blade
+        // ({{ }}) — otomatis di-HTML-escape, jadi tanda kutip JSON muncul
+        // sebagai &quot; di markup mentah, bukan tanda kutip biasa.
+        $this->get(route('warehouse.history.index'))
+            ->assertSee('&quot;qty&quot;:&quot;2 Pack (100 pcs)&quot;', false)
+            ->assertSee('&quot;unit&quot;:&quot;&quot;', false);
+    }
 }
