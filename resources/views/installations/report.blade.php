@@ -765,29 +765,28 @@
                                     </div>
                                     @endif
 
-                                    @php
-                                        $oldSelectedSerialId = old('selected_inventory_serial_id', $installation->selected_inventory_serial_id ?? null);
-                                        $serialCountsByItem = $eligibleSerials->groupBy(fn ($serial) => $serial->item->name)->map->count();
-                                        $serialOptions = $eligibleSerials->map(fn ($serial) => [
-                                            'value' => $serial->id,
-                                            'label' => 'SN ' . $serial->serial_number . ' — ' . $serial->item->name,
-                                            'search' => $serial->serial_number . ' ' . $serial->item->name,
-                                            'hint' => 'Sisa custody tim: ' . $serialCountsByItem[$serial->item->name] . ' unit',
-                                        ])->values();
-                                    @endphp
-
                                     <div class="sm:col-span-2" x-show="modemAcquisition !== 'beli_sendiri'" x-cloak>
                                         <fieldset class="min-w-0" :disabled="modemAcquisition === 'beli_sendiri'">
-                                        <label for="selected_inventory_serial_id-search" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Serial Number (SN) — Custody Gudang <span class="text-rose-500">*</span></label>
-                                        <div class="mb-2"><x-estimasi-patokan :rows="$estimasiPerangkatAktif" title="Estimasi Perangkat Aktif" /></div>
-                                        @if($eligibleSerials->isNotEmpty())
-                                            <x-combobox id="selected_inventory_serial_id" name="selected_inventory_serial_id" :options-expr="json_encode($serialOptions)" :value-expr="json_encode((string) $oldSelectedSerialId)" placeholder="Ketik SN atau nama perangkat..." />
-                                        @else
-                                            <select disabled class="w-full text-xs font-mono px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-md bg-slate-100 dark:bg-slate-800 text-slate-400 dark:text-slate-500 cursor-not-allowed">
-                                                <option>Tidak ada SN di custody Anda</option>
-                                            </select>
-                                            <p class="text-[11px] text-rose-500 mt-1 leading-relaxed">Anda belum mengambil barang dari Gudang — hubungi Admin/FOP.</p>
+                                        <label class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Barang Dipasang (Modem / Roll Kabel / Pasif) <span class="text-rose-500">*</span></label>
+                                        <div class="mb-2 space-y-1">
+                                            <x-estimasi-patokan :rows="$estimasiPerangkatAktif" title="Estimasi Perangkat Aktif" />
+                                            <x-estimasi-patokan :rows="$estimasiRoll" title="Estimasi Roll Kabel" />
+                                            <x-estimasi-patokan :rows="$estimasiPasif" title="Estimasi Perangkat Pasif" />
+                                        </div>
+                                        @if($eligibleSerials->isEmpty() && $eligibleRolls->isEmpty() && $eligiblePassiveCustody->isEmpty())
+                                            <p class="text-[11px] text-rose-500 leading-relaxed">Tim ini belum punya custody apa pun — ambil barang dari Gudang terlebih dahulu sebelum bisa mengisi Laporan Pemasangan.</p>
                                         @endif
+                                        <x-installation-item-rows
+                                            :serial-options="$eligibleSerials"
+                                            :roll-options="$eligibleRolls"
+                                            :custody-options="$eligiblePassiveCustody"
+                                            :initial-serial-id="old('selected_inventory_serial_id', $installation->selected_inventory_serial_id ?? null)"
+                                            :initial-roll-id="old('selected_inventory_roll_id', $installation->selected_inventory_roll_id ?? null)"
+                                            :initial-roll-meters="old('roll_meters_used', $installation->roll_meters_used ?? null)"
+                                            :initial-material-rows="old('materials', $materialRows)"
+                                            modem-acquisition-expr="modemAcquisition"
+                                            empty-label="Belum ada barang dipilih. Klik Tambah Barang."
+                                        />
 
                                         <div x-show="modemAcquisition === 'beli_gudang'" x-cloak class="mt-2.5">
                                             <label for="modem_sale_price" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Harga Jual Modem <span class="text-rose-500">*</span></label>
@@ -813,28 +812,10 @@
                                         <p class="col-span-1 sm:col-span-3 text-[10px] text-slate-500 dark:text-slate-400">Modem milik pelanggan sendiri — tidak lewat Gudang, tidak ada SN custody yang terpakai.</p>
                                     </div>
 
-                                    @php
-                                        $oldSelectedRollId = old('selected_inventory_roll_id', $installation->selected_inventory_roll_id ?? null);
-                                        $rollOptions = collect([['value' => '', 'label' => '— Tidak Pakai Roll Kabel —', 'search' => 'tidak pakai roll']])->concat($eligibleRolls->map(fn ($roll) => [
-                                            'value' => $roll->id,
-                                            'label' => ($roll->item->name ?? '(barang dihapus)') . ' — ' . $roll->roll_code,
-                                            'search' => $roll->roll_code . ' ' . ($roll->item->name ?? ''),
-                                            'hint' => 'Sisa ' . rtrim(rtrim(number_format((float) $roll->length_remaining, 2, ',', '.'), '0'), ',') . ' m',
-                                        ]))->values();
-                                    @endphp
-
-                                    <div class="sm:col-span-2">
-                                        <label for="selected_inventory_roll_id-search" class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Roll Kabel (Opsional) — Sisa Meter Gudang</label>
-                                        <div class="mb-2"><x-estimasi-patokan :rows="$estimasiRoll" title="Estimasi Roll Kabel" /></div>
-                                        @if($eligibleRolls->isNotEmpty())
-                                            <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                                                <x-combobox id="selected_inventory_roll_id" name="selected_inventory_roll_id" :options-expr="json_encode($rollOptions)" :value-expr="json_encode((string) $oldSelectedRollId)" placeholder="Ketik kode roll atau nama kabel..." />
-                                                <input type="number" step="0.01" min="0.01" name="roll_meters_used" id="roll_meters_used" value="{{ old('roll_meters_used', $installation->roll_meters_used ?? '') }}" placeholder="Meter terpakai (cth: 150)" class="w-full text-xs font-mono px-3 py-2 border @error('roll_meters_used') border-rose-500 @else border-slate-300 dark:border-slate-700 @enderror rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
-                                            </div>
-                                        @else
-                                            <p class="text-[11px] text-slate-400 mt-1">Tidak ada roll kabel di custody Anda — lewati jika kabel belum ditrack per roll.</p>
-                                        @endif
-                                    </div>
+                                    {{-- Roll Kabel & Material Pasif — sudah digabung ke
+                                         komponen installation-item-rows di atas (lihat blok
+                                         "Barang Dipasang"). Jangan tambah input terpisah
+                                         lagi di sini, nama field-nya akan dobel. --}}
 
                                     {{-- Kabel Melintang Jalan (ADHOC-205). Rute dicatat di sini (draft, disinkron
                                          tiap simpan); Deact wajib menyelesaikannya. Lokasi = titik awal → rumah pelanggan. --}}
@@ -1054,30 +1035,13 @@
                             {{-- Perangkat Tambahan (ADHOC-190) — di bawah Aktivasi; submit-nya lewat form shell di luar form-pemasangan --}}
                             @include('installations.partials._additional_devices_step')
 
-                            <!-- Section: Material Realita Terpakai -->
-                            <div class="p-3.5 sm:p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800 space-y-2.5">
-                                <label class="block font-semibold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">
-                                    Perangkat Pasif / Material Terpakai Realita (Opsional)
-                                </label>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400 leading-relaxed">Material yang benar-benar dipakai di lokasi dari custody tim Anda.</p>
-                                <x-estimasi-patokan :rows="$estimasiPasif" title="Estimasi Perangkat Pasif" />
-                                
-                                @if($eligiblePassiveCustody->isEmpty())
-                                    <p class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">⚠ Tim ini belum punya custody Perangkat Pasif — ambil barang dari Gudang dulu.</p>
-                                @endif
-                                @if($droppedFreeformEstimateNames->isNotEmpty())
-                                    <p class="text-[11px] text-amber-600 dark:text-amber-400 font-medium">⚠ Estimasi survey "Lainnya" tidak bisa diprefill: {{ $droppedFreeformEstimateNames->implode(', ') }}.</p>
-                                @endif
-                                
-                                <x-material-rows
-                                    name="materials"
-                                    :categories="$itemCategories"
-                                    :rows="$materialRows"
-                                    :restrict-to-custody="true"
-                                    :custody-options="$eligiblePassiveCustody"
-                                    empty-label="Belum ada material dicatat. Klik Tambah Barang."
-                                />
-                            </div>
+                            {{-- Material Pasif — sudah digabung ke komponen installation-item-rows
+                                 di Section "Informasi Perangkat Aktif" di atas. Section ini
+                                 dihapus (ADHOC unify-dropdown-item-psb, 2026-11-02) supaya
+                                 tidak ada 2 input dengan name="materials[...]" yang sama. --}}
+                            @if($droppedFreeformEstimateNames->isNotEmpty())
+                                <p class="text-[11px] text-amber-600 dark:text-amber-400 font-medium px-1">⚠ Estimasi survey "Lainnya" tidak bisa diprefill: {{ $droppedFreeformEstimateNames->implode(', ') }}.</p>
+                            @endif
 
                             <!-- Section: Alat Kerja Terpakai -->
                             <div class="p-3.5 sm:p-4 rounded-lg bg-slate-50/50 dark:bg-slate-950/40 border border-slate-200 dark:border-slate-800">

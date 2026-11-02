@@ -252,9 +252,11 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
 
     /**
      * Combobox (bukan <select>): SN dirender sebagai nilai hidden + opsi
-     * JSON yang bisa dicari, dan kategori barang pasif ikut combobox.
-     * Regresi: komponen combobox harus tetap menaruh `id` di input hidden,
-     * karena validasi wajib isi di JS membaca nilai dari id itu.
+     * JSON yang bisa dicari. Regresi: komponen dropdown gabungan
+     * (installation-item-rows, ADHOC unify-dropdown-item-psb 2026-11-02)
+     * harus tetap menaruh `id="selected_inventory_serial_id"` di input
+     * hidden-nya, karena validasi wajib isi di JS (getMissingFieldsFrom())
+     * membaca nilai lewat id itu, bukan name.
      */
     #[Test]
     public function laporan_pemasangan_render_combobox_sn_roll_dan_kategori_barang(): void
@@ -279,7 +281,6 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
         $response->assertOk();
         $response->assertSee('<input type="hidden" id="selected_inventory_serial_id" name="selected_inventory_serial_id"', false);
         $response->assertSee('ZTE-COMBO-001');
-        $response->assertSee('Semua Kategori');
         $response->assertDontSee('updateSnStockHint', false);
     }
 
