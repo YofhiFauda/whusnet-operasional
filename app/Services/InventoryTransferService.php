@@ -293,7 +293,7 @@ class InventoryTransferService
                 throw new InvalidArgumentException('Pengiriman retur dikonfirmasi per SN lewat halaman Retur ke Pusat.');
             }
 
-            $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['serial', 'roll'])->get();
+            $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['serial', 'roll', 'item'])->get();
             $confirmedLines = $transfer->transactions()->whereNotNull('to_pop_id')->get();
             $isPartial = false;
 
@@ -422,6 +422,16 @@ class InventoryTransferService
                     );
                 $balance->increment('qty', $confirmedQty);
 
+                // Form confirm sekarang cuma "Terima Semua" (partial dihapus,
+                // ADHOC-250 lanjutan 2026-11-01) — tidak ada input Pack dari
+                // staf di sisi ini, jadi entered_pack_qty SELALU diturunkan
+                // balik dari qty pcs yang dikonfirmasi ÷ pack_size, bukan
+                // dibaca dari request (lih. docs/superpowers/specs/
+                // 2026-11-01-pack-pcs-conversion-design.md).
+                $enteredPackQty = $line->item->pack_size
+                    ? round($confirmedQty / $line->item->pack_size, 2)
+                    : null;
+
                 InventoryTransaction::create([
                     'type' => InventoryTransactionType::TRANSFER,
                     'reference_number' => $transfer->reference_number,
@@ -430,6 +440,7 @@ class InventoryTransferService
                     'lot_no' => $lotNo === '' ? null : $lotNo,
                     'source_inventory_transaction_id' => $line->id,
                     'qty' => $confirmedQty,
+                    'entered_pack_qty' => $enteredPackQty,
                     'unit_price_snapshot' => $line->unit_price_snapshot,
                     'to_pop_id' => $transfer->to_pop_id,
                     'created_by' => $actor->id,

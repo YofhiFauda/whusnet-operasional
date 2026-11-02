@@ -159,4 +159,51 @@ class WarehousePackConversionTest extends TestCase
         $this->get(route('warehouse.transfers.show', $transaction->inventory_transfer_id))
             ->assertSee('4 Pack (200 pcs)');
     }
+
+    /**
+     * Confirm Transfer sekarang cuma satu mode "Terima Semua" (partial
+     * receive dihapus, ADHOC-250 lanjutan 2026-11-01 — lihat
+     * docs/superpowers/specs/2026-11-01-pack-pcs-conversion-design.md).
+     * `entered_pack_qty` sisi confirm diturunkan balik dari qty pcs yang
+     * dikonfirmasi ÷ pack_size, karena tidak ada lagi input Pack dari staf
+     * di form ini.
+     */
+    #[Test]
+    public function confirm_terima_semua_transfer_barang_berpack_size_hitung_entered_pack_qty(): void
+    {
+        $this->loginAsAdmin();
+        $pusat = Pop::factory()->create(['type' => 'pusat']);
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $item = Item::create([
+            'code' => 'PACK-TEST-05',
+            'name' => 'Barang Berpack Uji Confirm Transfer',
+            'unit' => 'pcs',
+            'tracking_type' => TrackingType::QUANTITY,
+            'pack_size' => 50,
+        ]);
+        InventoryBalance::create(['pop_id' => $pusat->id, 'item_id' => $item->id, 'lot_no' => '', 'qty' => 500]);
+
+        $this->post(route('warehouse.transfers.store'), [
+            'from_pop_id' => $pusat->id,
+            'to_pop_id' => $cabang->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 3], // 3 Pack = 150 pcs
+            ],
+        ]);
+        $dispatchLine = InventoryTransaction::where('item_id', $item->id)->whereNotNull('from_pop_id')->first();
+        $transfer = $dispatchLine->transfer;
+
+        $response = $this->post(route('warehouse.transfers.receive', $transfer));
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('inventory_transactions', [
+            'item_id' => $item->id,
+            'to_pop_id' => $cabang->id,
+            'qty' => 150,
+            'entered_pack_qty' => 3,
+        ]);
+
+        $this->get(route('warehouse.transfers.show', $transfer))
+            ->assertSee('3 Pack (150 pcs)');
+    }
 }
