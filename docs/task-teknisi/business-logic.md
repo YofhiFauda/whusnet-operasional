@@ -154,6 +154,21 @@ Beda dari `PINDAH_LOKASI`: `PINDAH_LOKASI` = alamat baru, POP pelanggan tetap sa
 
 Rancangan lengkap: [`docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md`](../plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md).
 
+## 7c. Ganti Perangkat Tambahan (AP/STB) pasca-pemasangan (2026-10-31)
+
+Bagian opsional **"Ganti Perangkat Tambahan (AP/STB)"** di form §7/§7b (task `MAINTENANCE` & `C-REQ` yang punya pelanggan). Dipakai saat AP/STB pelanggan rusak/bermasalah dan teknisi memasang pengganti dari custody. Tidak tampil untuk `O-REQ`/`INFR REQ` (pekerjaan jaringan) maupun Pemasangan (punya langkah Perangkat Tambahan sendiri).
+
+- **Satu sumber logic:** `AdditionalDeviceReplacementService::replace()`, dipanggil `TaskMaintenanceController::store()` di dalam transaksi laporan yang sama — gagal di mana pun me-rollback seluruh laporan (task tidak selesai).
+- **Input** (`extra_replacements[i]`, maks 5 baris): `old_device_id` (baris `customer_additional_devices` berstatus `terpasang` milik pelanggan task ini), `new_serial_id` (SN AP/STB di custody tim — query `AdditionalDeviceCustodyService::eligibleSerialsForTask()`, sama dengan langkah Perangkat Tambahan Pemasangan), `old_condition` (`rusak`|`baik`), `note` opsional.
+- **Perangkat lama dari Gudang** (`inventory_serial_id` terisi): SN pengganti harus **sejenis** (kategori item sama; AP diganti AP). SN lama → `RETURNED` di tangan teknisi (`condition` rusak/baik, `condition_checked_at` kosong = Gudang periksa saat Terima Retur), ledger `RETURN`, dan `DeviceRetrievalLog` (`source=creq_swap`). Pola persis retur modem lama di `InventoryService::installSerial()`.
+- **Perangkat lama data legacy** (baris teks bebas / badge `Tanpa Stok`, tanpa `inventory_serial_id`): **boleh diganti**, karena data legacy sering tidak cocok dengan perangkat nyata di lapangan. Tidak ada kategori yang dicek dan **tidak ada** `RETURN`/`DeviceRetrievalLog` — unit lama memang tidak pernah tercatat di Gudang; barisnya cukup ditandai `ditarik` dengan catatan "Unit lama tidak tercatat di Gudang (data legacy), tidak masuk alur Terima Retur".
+- **Pengganti dipasang** lewat `installSerial(returnExistingSerial: false, COMPANY)` — `true` akan meretur ONT utama. Guard custody/cabang/status tetap di service itu dan dijalankan SEBELUM SN lama dicabut.
+- **Detail Pelanggan:** baris lama `status=ditarik` (+`retrieved_at`, `technical_note` berisi SN pengganti & catatan), baris baru `terpasang`. `customer_devices`/`ont_sn` **tidak disentuh** (AP bukan perangkat utama).
+- **Jatah paket:** semua hitungan jatah memakai scope `CustomerAdditionalDevice::active()` (`status != ditarik`). Tanpa itu tiap penggantian menggerus jatah (baris lama + baru) dan memblok Tambah Perangkat/ganti paket padahal jumlah fisik tetap.
+- **Hapus manual dikunci:** perangkat Gudang berstatus `terpasang` tidak bisa dihapus dari Detail (`CustomerAdditionalDeviceController::destroy()`) — menghapus baris tidak mengubah `inventory_serials`. Jalur resmi: penggantian di atas, atau Ambil Alat (DEAC). Baris teks bebas dan baris `ditarik` tetap bisa dihapus.
+- **Belum tercakup:** koreksi SN baris legacy tanpa penggantian fisik (hapus lalu tambah ulang lewat modal); test end-to-end khusus C-REQ (memakai `store()` yang sama dengan Maintenance).
+- Test: `MaintenanceGantiPerangkatTambahanTest`, `CustomerAdditionalDeviceTest`.
+
 ## 8. Audit
 
 - `Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` (otomatis dari Eloquent events) **plus** manual `AuditLog::log()` untuk peristiwa bisnis bernama yang tidak bisa disimpulkan dari perubahan kolom: `completed`, `cancelled`, `reassigned` (TaskService), `pending`/`reschedule`/`approved`/`rejected` (TaskController).

@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Enums\StockRequestKind;
 use App\Enums\StockRequestStatus;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
@@ -21,6 +22,9 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'decided_by',
     'decided_at',
     'decision_notes',
+    'request_kind',
+    'inventory_transfer_id',
+    'request_key',
 ])]
 class StockRequest extends Model
 {
@@ -28,8 +32,14 @@ class StockRequest extends Model
     {
         return [
             'status' => StockRequestStatus::class,
+            'request_kind' => StockRequestKind::class,
             'decided_at' => 'datetime',
         ];
+    }
+
+    public function inventoryTransfer(): BelongsTo
+    {
+        return $this->belongsTo(InventoryTransfer::class);
     }
 
     public function cabangPop(): BelongsTo

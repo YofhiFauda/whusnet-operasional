@@ -47,7 +47,13 @@ class InvoiceItemBuilder
      * Baris bernominal nol dilewati — biaya tambahan yang tidak dipakai tidak
      * perlu jadi baris kosong di kwitansi pelanggan.
      *
-     * @param  list<array{category_code: string, subcategory_code?: string|null, custom_name?: string|null, description?: string|null, amount: mixed}>  $lines
+     * `inventory_serial_sale_id` (rancangan 2026-10-31, `docs/plan/warehouse/
+     * rancangan-modem-terjual-visibilitas-dan-rekonsiliasi.md` §5) — penaut
+     * opsional ke `inventory_serial_sales`, dipakai laporan rekonsiliasi "SN
+     * terjual belum ditagih" untuk tahu baris mana yang sudah menagih sale
+     * mana. Hanya baris "Jual Modem" jalur Pemasangan yang mengisinya.
+     *
+     * @param  list<array{category_code: string, subcategory_code?: string|null, custom_name?: string|null, description?: string|null, inventory_serial_sale_id?: int|null, amount: mixed}>  $lines
      * @return Collection<int, InvoiceItem>
      */
     public function rebuildFor(Invoice $invoice, array $lines): Collection
@@ -101,6 +107,7 @@ class InvoiceItemBuilder
                 'category_name_snapshot' => $category->name,
                 'subcategory_name_snapshot' => $customName,
                 'description' => $line['description'] ?? null,
+                'inventory_serial_sale_id' => $line['inventory_serial_sale_id'] ?? null,
                 'amount' => $amount,
                 'sort_order' => $sortOrder,
             ];
@@ -118,6 +125,7 @@ class InvoiceItemBuilder
             'category_name_snapshot' => $category->name,
             'subcategory_name_snapshot' => $subcategory->name,
             'description' => $line['description'] ?? null,
+            'inventory_serial_sale_id' => $line['inventory_serial_sale_id'] ?? null,
             'amount' => $amount,
             'sort_order' => $sortOrder,
         ];

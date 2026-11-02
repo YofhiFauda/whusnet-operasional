@@ -53,6 +53,7 @@ use App\Services\CableCrossingService;
 use App\Services\CustomerBalanceService;
 use App\Services\CustomerCidService;
 use App\Services\CustomerDeviceProfileService;
+use App\Services\CustomerDeviceSerialGuard;
 use App\Services\CustomerPackageService;
 use App\Services\CustomerRelocationService;
 use App\Services\CustomerValidationService;
@@ -1029,6 +1030,18 @@ class CustomerController extends Controller
 
         $validated['updated_by'] = auth()->id();
 
+        // SN perangkat: tolak kalau tabrakan dengan pelanggan lain / perangkat
+        // utama Gudang, peringatkan kalau tercatat di stok Gudang. Sebelum
+        // upload file supaya penolakan tidak meninggalkan berkas yatim.
+        $serialWarning = null;
+        if (array_key_exists('serial_number', $validated)) {
+            $serialCheck = app(CustomerDeviceSerialGuard::class)->check($customer, $validated['serial_number']);
+            if ($serialCheck['blocking']) {
+                return back()->withErrors(['serial_number' => $serialCheck['blocking']])->withInput();
+            }
+            $serialWarning = $serialCheck['warning'];
+        }
+
         // Skema 3 (2026-09-12) — sama seperti store(): actor ber-role
         // restricted paket gak boleh pindahkan sales_user_id pelanggan ke
         // orang lain (berbasis `is_package_restricted`, bukan hardcode
@@ -1142,6 +1155,18 @@ class CustomerController extends Controller
                 }
                 if ($deviceFields !== [] && (array_filter($deviceFields) || $deviceExists)) {
                     $customer->customerDevice()->updateOrCreate(['customer_id' => $customer->id], $deviceFields);
+                }
+
+                // Sinkron dua salinan SN lain supaya ketiganya sama — pembaca
+                // lama (Peta Infrastruktur, kolom "SN ONT", webhook cadangan)
+                // masih baca `ont_sn`/`router_or_ont_serial`. Cuma kalau field
+                // dikirim (tidak dikirim = tidak disentuh); dikosongkan di Edit
+                // ikut mengosongkan. Baris detail teknis TIDAK dibuat baru —
+                // kolom wajib lainnya milik alur Pemasangan.
+                if (array_key_exists('serial_number', $validated)) {
+                    $customer->update(['ont_sn' => $validated['serial_number']]);
+                    CustomerTechnicalDetail::where('customer_id', $customer->id)->first()
+                        ?->update(['router_or_ont_serial' => $validated['serial_number']]);
                 }
 
                 $technicalFields = [
@@ -1289,6 +1314,12 @@ class CustomerController extends Controller
                     File::delete($absolutePath);
                 }
             }
+        }
+
+        if ($serialWarning) {
+            // Digabung, bukan ditimpa: flash 'warning' kelengkapan data di atas
+            // memakai key yang sama.
+            session()->flash('warning', trim(session('warning', '').' '.$serialWarning));
         }
 
         return $this->redirectToCustomer($customer)->with('success', "Data pelanggan {$customer->full_name} berhasil diperbarui!");

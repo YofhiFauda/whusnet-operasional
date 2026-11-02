@@ -19,6 +19,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 ])]
 class BranchInventorySale extends Model
 {
+    /**
+     * Satu-satunya nilai `payment_status`. Gudang sengaja TIDAK mencatat status
+     * bayar (keputusan 2026-10-26, tanpa integrasi Finance); kolom dipertahankan
+     * supaya migrasi tetap aditif. Jangan tambah nilai lain: `posted_total` nol
+     * (semua SN hilang) bukan "tidak ada tagihan" yang bisa dibaca sebagai status.
+     */
+    public const PAYMENT_NOT_TRACKED = 'not_tracked';
+
     protected function casts(): array
     {
         return [

@@ -1,7 +1,7 @@
 # Rancangan Stok Merchandise Marketing Pusat ke Cabang
 
 Tanggal: 2026-10-30  
-Status: Rancangan yang dikoreksi sesuai arahan pengguna; belum diimplementasikan.
+Status: Diimplementasikan pada 2026-10-31; migration diterapkan pada database aplikasi lokal.
 
 ## Tujuan dan batas riwayat
 
@@ -9,6 +9,14 @@ Merchandise Marketing seperti kaos branding, mug, goodie bag, dan kaos polo disi
 
 Sistem Marketing ini tidak mencatat pembagian hadiah, penerima akhir, pelanggan, teknisi, PIC kegiatan, pengembalian barang, atau opsi selisih stok. Cabang adalah titik akhir pencatatan distribusi Marketing.
 
+## Aturan pengurangan stok menurut jenis barang
+
+| Jenis barang | Peristiwa yang mengurangi stok Gudang asal | Posisi setelah peristiwa |
+|---|---|---|
+| Operasional | Dipakai dalam pekerjaan atau dikeluarkan sebagai custody teknisi sesuai alur Gudang operasional | Tercatat sebagai pemakaian atau berada pada custody teknisi |
+| Merchandise Marketing | Permintaan perpindahan Pusat ke Cabang berhasil dicatat | Stok Pusat berkurang dan stok Cabang tujuan bertambah; riwayat Marketing berhenti di Cabang |
+
+Untuk merchandise Marketing, perpindahan Pusat ke Cabang adalah titik keluar dari stok Pusat, bukan klaim bahwa barang telah diberikan kepada penerima akhir. Stok gabungan Pusat dan Cabang tidak berkurang hanya karena perpindahan antarlokasi. Modul Marketing tidak mengikuti barang setelah sampai di Cabang.
 ## Data yang dicatat
 
 - Master barang: kode, nama, kategori merchandise, satuan, dan varian yang perlu dihitung terpisah, misalnya Polo L dan Polo XL.
@@ -63,8 +71,20 @@ Filter laporan: periode, barang/varian, dan Cabang yang boleh diakses. Total sto
 5. Laporan posisi, permintaan/distribusi, dan mutasi per lokasi menampilkan angka yang cocok dengan perpindahan yang dicatat.
 6. Pengguna tidak dapat melihat atau membuat permintaan untuk Cabang di luar POP scope-nya.
 
+## Implementasi
+
+- Master Barang memakai kategori sistem `merchandise_marketing`. Varian seperti ukuran kaos dibuat sebagai SKU terpisah. Tracking wajib kuantitas; kategori tidak dapat dipindah ke/dari Marketing setelah barang memiliki riwayat stok.
+- Halaman `/warehouse/marketing` menampilkan posisi stok, riwayat permintaan, barang masuk Pusat, dan mutasi. Laporan dapat difilter menurut periode, barang, dan Cabang serta diekspor ke CSV tanpa harga.
+- Barang Masuk Marketing dicatat dari form khusus tanpa harga dan hanya ke Gudang Pusat. Permintaan dari Cabang langsung menulis permintaan, transfer, pengurangan Pusat, serta penambahan Cabang dalam satu transaksi database. Kunci permintaan mencegah submit ulang mengurangi stok dua kali.
+- Permintaan operasional, transfer biasa, issue teknisi, penyesuaian/opname, dan form Barang Masuk operasional tidak menerima barang berkategori Marketing. Hak akses dan filter data mengikuti POP scope Gudang.
+- Kunci permintaan hanya dapat dipakai ulang untuk permintaan yang identik; benturan submit serentak mengambil hasil transaksi pertama. Laporan mutasi menampilkan saldo awal, masuk, keluar, dan akhir per lokasi/periode. Riwayat barang masuk Pusat memakai filter, pagination, referensi, dan pencatat. Transfer Marketing tidak menyalin snapshot harga dari stok lama.
+- Migration `2026_10_30_161227_add_marketing_fields_to_stock_requests_table.php` telah diterapkan pada database aplikasi lokal. Tidak ada data stok lama yang diubah oleh migration.
+## Ekstensi kategori nonoperasional
+
+Kategori baru dapat dipilih sebagai nonoperasional pada Master Kategori Barang. Atribut kepemilikan dan pemasangan jaringan tidak ditampilkan untuk item kategori tersebut; tracking stok memakai kuantitas. Seluruh kategori nonoperasional memakai alur pencatatan Pusat ke Cabang yang sama, sedangkan laporan dan ekspor dapat difilter per kategori. Kategori item nonoperasional tidak dapat diganti setelah ada riwayat stok agar laporan lama tetap konsisten. Perpindahan dengan aturan khusus per kategori memerlukan rancangan tersendiri.
+
 ## Scope pencatatan
 
-Revisi ini mengikuti koreksi langsung pengguna atas rancangan sebelumnya. Task aktif ADHOC-202 pada docs/TASKS.md tetap aktif. Tidak ada perubahan kode, skema, transaksi, atau data stok.
+Implementasi mengikuti koreksi langsung pengguna atas rancangan sebelumnya. Task aktif ADHOC-202 pada docs/TASKS.md tetap aktif. Penerimaan Marketing memakai formulir tanpa harga; permintaan Cabang memindahkan stok secara atomik dan langsung selesai. Data stok lama tidak diubah oleh migration.
 
 Rujukan: docs/warehouse/README.md, docs/warehouse/user-flow.md, docs/warehouse/business-logic.md.

@@ -47,6 +47,7 @@ class InventoryReceiveService
         ?float $enteredPackQty = null,
     ): InventoryTransaction {
         $this->assertPusat($pusat);
+        $this->assertOperationalItem($item);
         $this->assertPositiveQty($qty);
         $this->assertPositivePrice($unitPrice);
         $this->assertQuantityTracking($item);
@@ -101,6 +102,7 @@ class InventoryReceiveService
         ?string $referenceNumber = null,
     ): array {
         $this->assertPusat($pusat);
+        $this->assertOperationalItem($item);
         $this->assertPositivePrice($unitPrice);
 
         if ($item->tracking_type !== TrackingType::SERIALIZED) {
@@ -178,6 +180,7 @@ class InventoryReceiveService
         ?string $referenceNumber = null,
     ): array {
         $this->assertPusat($pusat);
+        $this->assertOperationalItem($item);
         $this->assertPositivePrice($unitPrice);
 
         if ($item->tracking_type !== TrackingType::SERIALIZED) {
@@ -244,6 +247,7 @@ class InventoryReceiveService
         ?string $referenceNumber = null,
     ): array {
         $this->assertPusat($pusat);
+        $this->assertOperationalItem($item);
         $this->assertPositivePrice($unitPrice);
 
         if ($item->tracking_type !== TrackingType::ROLL) {
@@ -396,6 +400,18 @@ class InventoryReceiveService
             ->max() ?? 0;
 
         return sprintf('%s-%s-%06d', $prefix, $today, $lastNum + 1);
+    }
+
+    /**
+     * Merchandise Marketing masuk lewat MarketingMerchandiseService (tanpa harga).
+     * Guard ada di service, bukan controller: import, command, atau controller baru
+     * yang memanggil service ini tidak boleh menembus pemisahan alur Marketing.
+     */
+    private function assertOperationalItem(Item $item): void
+    {
+        if ($item->isNonOperational()) {
+            throw new InvalidArgumentException('Barang nonoperasional dicatat melalui halaman Barang Nonoperasional.');
+        }
     }
 
     private function assertPusat(Pop $pop): void

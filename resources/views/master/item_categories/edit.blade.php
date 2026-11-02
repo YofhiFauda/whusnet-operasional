@@ -74,6 +74,17 @@
                 @enderror
             </div>
 
+            <div>
+                <label for="is_operational" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Jenis Penggunaan <span class="text-rose-500">*</span></label>
+                <select name="is_operational" id="is_operational" required
+                        class="w-full px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800">
+                    <option value="1" @selected(old('is_operational', $category->is_operational ? '1' : '0') == '1')>Operasional jaringan</option>
+                    <option value="0" @selected(old('is_operational', $category->is_operational ? '1' : '0') == '0')>Non Operasional</option>
+                </select>
+                <p class="mt-1 text-[10px] text-slate-500 dark:text-slate-400">Kategori Non Operasional tidak memakai kepemilikan dan atribut pemasangan jaringan.</p>
+                @error('is_operational')<p class="mt-1 text-[10px] font-semibold text-rose-500">{{ $message }}</p>@enderror
+            </div>
+
             <!-- Status -->
             <div>
                 <label for="is_active" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Status <span class="text-rose-500">*</span></label>

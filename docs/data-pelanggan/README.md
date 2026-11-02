@@ -213,6 +213,37 @@ Distribusi → 4 Dokumen → 5 Layanan & Paket → 6 Referral → 7 Parameter Te
      error 500): jenis lama dipertahankan, perangkat baru jadi "Lainnya".
    - Keterangan "Nomor OLT dipakai generator CID" dibetulkan — sejak
      ADHOC-107 `olt_number` tidak lagi dipakai membentuk CID.
+8. **SN perangkat divalidasi dan disinkronkan (2026-10-31).** Dulu
+   `customer_devices.serial_number` hanya `nullable string` — dua pelanggan
+   bisa memegang modem yang sama, dan Edit hanya menulis satu dari tiga salinan
+   SN. Sekarang `CustomerDeviceSerialGuard` (service baca-saja) dipanggil
+   `CustomerController::update()` sebelum upload file. SN dinormalisasi
+   (`trim` + huruf besar) lalu dibandingkan **hanya kalau SN berubah** dari nilai
+   efektif/tersimpan — duplikat legacy lama tidak memblokir edit field lain.
+   - **Ditolak:** SN sudah di `customer_devices` pelanggan lain; serial Gudang
+     `installed` di pelanggan lain; SN yang sama dengan **perangkat tambahan**
+     (milik siapa pun, termasuk pelanggan ini) atau AP/STB Gudang terpasang;
+     pelanggan yang perangkat utamanya dikelola Gudang (serial `installed`) tapi
+     SN diganti dari Edit — `resolve()` mendahulukan serial Gudang, jadi SN
+     yang diketik tidak akan pernah tampil. Ganti lewat Penggantian Modem/retur.
+   - **Peringatan saja (flash `warning`, digabung dengan peringatan kelengkapan
+     data):** SN tercatat di Gudang dengan status lain. Stok Gudang **tidak**
+     berubah oleh Edit.
+   - **Sinkron:** bila field `serial_number` dikirim, `customers.ont_sn` dan
+     `customer_technical_details.router_or_ont_serial` ikut ditulis dalam
+     transaksi yang sama (dikosongkan → ketiganya dikosongkan). Baris detail
+     teknis tidak dibuat baru. Field tidak dikirim = tidak disentuh.
+   - **Pengecualian sadar dari POP scope:** pencarian pemegang SN lintas cabang
+     (untuk mendeteksi tabrakan global); yang muncul di pesan hanya ID + nama.
+   - Arah sebaliknya: modal "Tambah Perangkat Tambahan" di Detail memakai
+     `checkAdditional()` — menolak SN yang sudah jadi perangkat utama siapa pun,
+     perangkat tambahan aktif, atau serial Gudang terpasang; SN stok Gudang hanya
+     peringatan; SN baris `ditarik` boleh dipakai lagi. Penolakan dikirim sebagai
+     flash `error` karena modal tidak punya tempat menampilkan error per field.
+   - Rancangan & keputusan: `docs/superpowers/specs/2026-10-31-validasi-sn-perangkat-pelanggan-design.md`.
+   - Perangkat tambahan (AP/STB) pelanggan legacy: dicatat teks bebas
+     (`Tanpa Stok`) lewat modal tadi; boleh diganti lewat Laporan Maintenance/C-REQ
+     tanpa retur stok — lihat `docs/task-teknisi/business-logic.md` §7c.
 
-Test: `tests/Feature/CustomerEditTest.php`, `tests/Feature/CustomerRegistrationTest.php`, `tests/Feature/CustomerPindahPopResetMiniPopTest.php`, `tests/Feature/CustomerEditJaringanButuhIzinValidasiTest.php`, `tests/Feature/CustomerEditDistribusiLegacyTidakHilangTest.php`, `tests/Feature/CidSatuRumusEditModalApiTest.php`, `tests/Feature/PindahPopDitolakSelamaAdaPiutangTest.php`, `tests/Feature/EditPelangganMenampilkanDataPerangkatLamaTest.php`, `tests/Feature/CustomerDistributionEditTest.php`.
+Test: `tests/Feature/CustomerEditSerialNumberTest.php`, `tests/Feature/CustomerAdditionalDeviceTest.php`, `tests/Feature/CustomerEditTest.php`, `tests/Feature/CustomerRegistrationTest.php`, `tests/Feature/CustomerPindahPopResetMiniPopTest.php`, `tests/Feature/CustomerEditJaringanButuhIzinValidasiTest.php`, `tests/Feature/CustomerEditDistribusiLegacyTidakHilangTest.php`, `tests/Feature/CidSatuRumusEditModalApiTest.php`, `tests/Feature/PindahPopDitolakSelamaAdaPiutangTest.php`, `tests/Feature/EditPelangganMenampilkanDataPerangkatLamaTest.php`, `tests/Feature/CustomerDistributionEditTest.php`.
 

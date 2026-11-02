@@ -9,9 +9,12 @@
 <div class="space-y-5">
     <div class="flex flex-wrap items-center justify-between gap-3">
         <p class="text-sm text-slate-600 dark:text-slate-400">Hanya barang ber-SN pabrikan atau SN sistem yang dapat dijual antar Cabang.</p>
-        @if(auth()->user()->hasPermission('warehouse_branch_sale.create'))
-            <a href="{{ route('warehouse.branch-sales.create') }}" class="rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800">Buat jual beli</a>
-        @endif
+        <div class="flex items-center gap-2">
+            <a href="{{ route('warehouse.branch-sales.report') }}" class="rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Laporan per SN</a>
+            @if(auth()->user()->hasPermission('warehouse_branch_sale.create'))
+                <a href="{{ route('warehouse.branch-sales.create') }}" class="rounded-lg bg-sky-700 px-4 py-2 text-sm font-semibold text-white hover:bg-sky-800">Buat jual beli</a>
+            @endif
+        </div>
     </div>
     <form method="GET" class="grid gap-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-2 lg:grid-cols-5">
         <select name="from_pop_id" aria-label="Cabang penjual" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800">
@@ -26,12 +29,14 @@
         <input type="date" name="date_to" value="{{ request('date_to') }}" aria-label="Tanggal akhir" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800">
         <button class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white">Terapkan filter</button>
     </form>
-    @if($canSeePrice)
+    @if($crossCheck !== null)
         <div class="rounded-xl border border-sky-200 bg-sky-50 p-4 text-sm text-slate-700 dark:border-sky-900 dark:bg-slate-900 dark:text-slate-200">
             <h2 class="font-semibold">Cross-check pembayaran internal</h2>
             <p class="mt-1">Cocokkan nomor dokumen, Cabang, periode, dan nominal di laporan ini dengan pembayaran internal. Sistem Gudang tidak mencatat status atau transaksi pembayaran.</p>
-            <p class="mt-3 text-xs uppercase tracking-wide text-slate-500">Total nominal final sesuai filter</p>
-            <p class="text-xl font-bold tabular-nums">Rp{{ number_format($totalForCrossCheck, 2, ',', '.') }}</p>
+            @foreach($crossCheck as $label => $total)
+                <p class="mt-3 text-xs uppercase tracking-wide text-slate-500">{{ $label }}</p>
+                <p class="text-xl font-bold tabular-nums">Rp{{ number_format($total, 2, ',', '.') }}</p>
+            @endforeach
         </div>
     @endif
     <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">

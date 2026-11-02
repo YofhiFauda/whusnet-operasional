@@ -84,6 +84,8 @@ class RolePermissionSeeder extends Seeder
                 'master_distribusi.view',
                 'master_status_pelanggan.view',
                 'master_wilayah.view',
+                'modem_sale_reconciliation.export',
+                'modem_sale_reconciliation.view',
                 'noc_dashboard.performance.view', // Atasan evaluasi performa individu Helpdesk/NOC
                 'noc_dashboard.view', // Monitoring tracking NOC, gak akses Worksheet NOC (itu kerjaan NOC)
                 'package_restrictions.view',
@@ -155,6 +157,8 @@ class RolePermissionSeeder extends Seeder
                 'master_rekening.view',
                 'master_status_pelanggan.view',
                 'master_wilayah.view',
+                'modem_sale_reconciliation.export',
+                'modem_sale_reconciliation.view',
                 'packages.view',
                 'payments.approve',
                 'payments.create',
@@ -504,12 +508,12 @@ class RolePermissionSeeder extends Seeder
                 // cuma sisi Pusat). Issue/reassign ke DIRI SENDIRI ditolak di
                 // service (InventoryIssueService/InventoryReassignService),
                 // bukan lewat pencabutan permission — barang untuk PIC
-                // dikeluarkan POP Admin.
+                // dikeluarkan POP Admin. TANPA warehouse_branch_sale.* — jual
+                // beli SN antar Cabang dijalankan petugas Gudang Pusat
+                // (owner + admin_gudang), keputusan user 2026-10-31.
                 'warehouse.view',
                 'warehouse_transfer.view',
                 'warehouse_transfer.receive',
-                'warehouse_branch_sale.view',
-                'warehouse_branch_sale.receive',
                 'warehouse_issue.view',
                 'warehouse_issue.create',
                 'warehouse_custody.view',
@@ -715,10 +719,6 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_traceability.view',
                 'warehouse_transfer.receive',
                 'warehouse_transfer.view',
-                'warehouse_branch_sale.view',
-                'warehouse_branch_sale.create',
-                'warehouse_branch_sale.receive',
-                'warehouse_branch_sale_price.view',
             ],
 
             'kolektor' => [

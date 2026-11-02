@@ -797,11 +797,6 @@ class InventoryReassignService
                 throw new InvalidArgumentException("SN {$serial->serial_number} statusnya '{$serial->status->value}', bukan ISSUED — gak bisa dialihkan.");
             }
 
-            if (! ($serial->issued_from_pop_id ?? $serial->current_pop_id)
-                || (int) ($serial->issued_from_pop_id ?? $serial->current_pop_id) !== $cabang->id) {
-                throw new InvalidArgumentException('SN hanya boleh kembali ke cabang asal Issue.');
-            }
-
             $fromTechnicianId = $serial->current_technician_id;
 
             $serial->update(['current_technician_id' => $newTechnician->id]);

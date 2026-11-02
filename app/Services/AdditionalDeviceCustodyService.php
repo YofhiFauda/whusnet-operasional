@@ -5,7 +5,6 @@ namespace App\Services;
 use App\Enums\OwnershipMode;
 use App\Enums\SerialStatus;
 use App\Models\InventorySerial;
-use App\Models\Pop;
 use App\Models\Task;
 use Illuminate\Support\Collection;
 
@@ -32,16 +31,14 @@ class AdditionalDeviceCustodyService
             return collect();
         }
 
-        $targetCabangId = Pop::resolveCabangId($task?->pop_id);
-
+        // Filter cabang DICABUT (keputusan user 2026-10-31) — teknisi flexible
+        // lintas cabang, gak di-strict scope POP (sama dengan
+        // CustomerInstallationController::eligibleSerialsForTeam()).
         return InventorySerial::query()
             ->whereIn('current_technician_id', $teamTechnicianIds)
             ->where('status', SerialStatus::ISSUED->value)
             ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
             ->whereHas('item.category', fn ($q) => $q->where('is_customer_extra_device', true))
-            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
-                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
-            }))
             ->with('item.category')
             ->orderBy('serial_number')
             ->get();

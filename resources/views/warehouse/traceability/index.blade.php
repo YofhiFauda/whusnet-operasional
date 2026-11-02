@@ -338,6 +338,11 @@
                             <span>Gudang: {{ $serial->currentPop->name ?? '-' }}</span>
                         </div>
                         <p class="text-[10px] text-slate-400 font-normal mt-0.5">Stok fisik tersedia</p>
+                        @if($purchase)
+                        <p class="mt-1 inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300">
+                            Dibeli dari {{ $purchase->transfer->fromPop?->name ?? '-' }} · {{ $purchase->transfer->branchSale->reference_number }}
+                        </p>
+                        @endif
                         @else
                         <span class="text-slate-500">{{ $serial->status->label() }}</span>
                         @endif
@@ -396,7 +401,12 @@
                         <!-- Timeline Content Box -->
                         <div class="bg-slate-50/80 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-700/60 rounded-lg p-3.5 sm:p-4 transition-all hover:bg-slate-100/70 dark:hover:bg-slate-900/70 hover:shadow-xs">
                             @php
+                                // Jual beli antar Cabang bukan transfer Pusat→Cabang: label "(Pusat)"
+                                // di bawah akan menyesatkan audit asal SN.
+                                $isBranchSaleEvent = $event->type->value === 'transfer' && $event->transfer?->branchSale !== null;
                                 $eventLabel = match(true) {
+                                    $isBranchSaleEvent && $event->from_pop_id !== null => 'Jual Beli Dikirim (Cabang Penjual)',
+                                    $isBranchSaleEvent && $event->to_pop_id !== null => 'Dibeli — Diterima (Cabang Pembeli)',
                                     $event->type->value === 'transfer' && $event->from_pop_id !== null => 'Transfer Dikirim (Pusat)',
                                     $event->type->value === 'transfer' && $event->to_pop_id !== null => 'Transfer Diterima (Cabang)',
                                     default => $event->type->label(),

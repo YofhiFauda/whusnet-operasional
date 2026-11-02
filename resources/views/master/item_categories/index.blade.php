@@ -107,6 +107,7 @@
                     <td class="px-6 py-4">
                         <div class="text-sm font-bold text-slate-900 dark:text-slate-100">{{ $category->name }}</div>
                         <div class="text-xs font-mono text-slate-400 mt-0.5">{{ $category->code }}</div>
+                        <div class="mt-1 text-[10px] font-semibold text-slate-500 dark:text-slate-400">{{ $category->is_operational ? 'Operasional jaringan' : 'Non Operasional' }}</div>
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <span class="text-xs font-mono font-bold text-slate-700 dark:text-slate-300">{{ $category->default_unit }}</span>

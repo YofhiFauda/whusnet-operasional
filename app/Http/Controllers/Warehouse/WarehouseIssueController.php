@@ -63,7 +63,7 @@ class WarehouseIssueController extends Controller
             ->orderBy('name')
             ->get();
 
-        $items = Item::active()->with('category')->orderBy('name')->get();
+        $items = Item::active()->whereDoesntHave('category', fn ($query) => $query->where('is_operational', false))->with('category')->orderBy('name')->get();
 
         return view('warehouse.issues.create', compact('cabangPops', 'technicians', 'items'));
     }

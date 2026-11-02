@@ -12,6 +12,7 @@ use App\Models\InventoryBalance;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
+use App\Models\Item;
 use App\Models\Pop;
 use App\Models\TechnicianCustody;
 use App\Models\User;
@@ -30,6 +31,13 @@ use InvalidArgumentException;
  */
 class InventoryAdjustmentService
 {
+    private function assertOperationalItem(int $itemId): void
+    {
+        if (Item::findOrFail($itemId)->isNonOperational()) {
+            throw new InvalidArgumentException('Barang nonoperasional tidak memakai penyesuaian atau opsi selisih stok.');
+        }
+    }
+
     /**
      * Kategori `reason` terarah (Fase 2 P1, kontrol-anti-manipulasi.md §2) —
      * dropdown di UI, BUKAN enum baru (keputusan eksplisit di
@@ -65,6 +73,7 @@ class InventoryAdjustmentService
      */
     public function adjustPopBalance(Pop $pop, int $itemId, float $qtyDelta, string $reason, User $actor, ?string $lotNo = null, ?string $notes = null): InventoryTransaction
     {
+        $this->assertOperationalItem($itemId);
         $this->assertReason($reason);
 
         // `InventoryBalance` docblock: pop_id gak boleh mini_pop, ditegakkan
@@ -579,6 +588,7 @@ class InventoryAdjustmentService
      */
     public function recordStockOpname(Pop $pop, int $itemId, float $countedQty, User $actor, ?string $lotNo = null, ?string $notes = null): InventoryTransaction
     {
+        $this->assertOperationalItem($itemId);
         if (! $pop->isWarehouse()) {
             throw new InvalidArgumentException("Stock Opname cuma boleh di Gudang Pusat/Cabang — {$pop->name} bertipe '{$pop->type}'.");
         }

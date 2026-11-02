@@ -380,6 +380,12 @@ class CustomerInstallationOwnershipTest extends TestCase
         $jualModemItem = $invoice->items()->whereHas('subcategory', fn ($q) => $q->where('code', 'jual_modem'))->first();
         $this->assertNotNull($jualModemItem, 'Invoice AWAL wajib punya baris Jual Modem.');
         $this->assertEquals(150000.00, (float) $jualModemItem->amount);
+        // Rancangan 2026-10-31 §3 — baris Jual Modem wajib punya keterangan
+        // SN, bukan cuma nominal polos.
+        $this->assertStringContainsString('SN-OWN-BELI-GUDANG-001', $jualModemItem->description);
+        // §5 — penaut pasti ke inventory_serial_sales, dipakai laporan
+        // rekonsiliasi "SN terjual belum ditagih".
+        $this->assertEquals($sale->id, $jualModemItem->inventory_serial_sale_id);
     }
 
     /**
@@ -440,6 +446,14 @@ class CustomerInstallationOwnershipTest extends TestCase
         $this->assertDatabaseMissing('invoices', ['customer_id' => $customer->id, 'invoice_type' => 'awal']);
         $this->assertEqualsWithDelta(150000.00, (float) $customer->pending_initial_invoice['billing']['modem_sale_amount'], 0.01);
 
+        // Rancangan 2026-10-31 §4 — antrean & halaman BD menampilkan modem
+        // yang sudah terjual, biar BD tahu invoice yang akan terbit bukan
+        // cuma Biaya Instalasi.
+        $this->actingAs($admin)->get(route('business-development-verifications.index'))
+            ->assertOk()->assertSee('Modem terjual');
+        $this->actingAs($admin)->get(route('business-development-verifications.show', $customer))
+            ->assertOk()->assertSee('Modem terjual')->assertSee('SN-OWN-BISNIS-001');
+
         // BD verify() — menerbitkan SATU invoice AWAL yang menyatukan biaya
         // CS + BD. modem_sale_amount harus ikut nyampe ke invoice_items di
         // sini juga, bukan cuma di jalur finalVerify() langsung.
@@ -452,6 +466,9 @@ class CustomerInstallationOwnershipTest extends TestCase
         $jualModemItem = $invoice->items()->whereHas('subcategory', fn ($q) => $q->where('code', 'jual_modem'))->first();
         $this->assertNotNull($jualModemItem, 'Invoice AWAL kategori Bisnis wajib tetap punya baris Jual Modem lewat jalur BD.');
         $this->assertEquals(150000.00, (float) $jualModemItem->amount);
+        // Rancangan 2026-10-31 §3 — keterangan ikut nyampe lewat snapshot
+        // pending_initial_invoice sampai jalur BD, bukan cuma nominal.
+        $this->assertStringContainsString('SN-OWN-BISNIS-001', $jualModemItem->description);
 
         // Modem beneran kejual di sisi Gudang juga — regresi sisi Task 4
         // tidak berubah hanya karena kategori paketnya Bisnis.

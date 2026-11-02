@@ -39,3 +39,29 @@ Alpine.plugin(focus);
 window.Alpine = Alpine;
 Alpine.data('infrastructureReport', infrastructureReport);
 Alpine.start();
+
+/* Safety net: di beberapa browser/kondisi nyata (ketemu di halaman Detail
+   Pelanggan — tab lazy-mount lewat `<template x-if>` tetap blank walau HTML
+   & store sudah benar), walk otomatis `Alpine.start()` atas `document.body`
+   kadang tidak sampai mem-bind semua node sebelum event `load`. Manual
+   `Alpine.initTree(document.body)` di console selalu berhasil membereskannya
+   — initTree aman dipanggil ulang, directive bawaan Alpine sudah dijaga
+   idempoten (node yang sudah di-bind dilewati). Panggil sekali lagi di
+   `load` sebagai jaring pengaman, bukan pengganti walk awal. */
+window.addEventListener('load', () => {
+    Alpine.initTree(document.body);
+});
+
+/* `<input type="number">` yang lagi fokus ikut geser nilainya kalau kena
+   scroll wheel mouse/trackpad (perilaku bawaan Chrome/Edge) — user gak
+   sadar, nilainya diam-diam berubah per `step` (mis. kabel roll "Meter
+   Terpakai" step=0.01, scroll kepencet 29x pas isi form = 1000 jadi
+   999.71, ketauan 2026-11-01). Blur begitu wheel nyentuh input number
+   yang fokus — scroll halaman tetap jalan normal, cuma inputnya lepas
+   fokus duluan sebelum browser sempat ubah value. */
+document.addEventListener('wheel', () => {
+    const active = document.activeElement;
+    if (active instanceof HTMLInputElement && active.type === 'number') {
+        active.blur();
+    }
+}, { passive: true });

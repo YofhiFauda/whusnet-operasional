@@ -40,6 +40,7 @@ Gudang **direpresentasikan lewat `pops`** (`type` = `pusat`/`cabang`) — sengaj
 - Adjustment: `warehouse.adjustments.{balance,opname,custody,serial}.create`
 - Reassign custody: `warehouse.reassign.{custody,serial}.create`
 - Permintaan Stok Cabang→Pusat: `warehouse.stock-requests.*`
+- Barang Nonoperasional (merchandise Marketing dan kategori lain): `warehouse.marketing.index` — penerimaan Pusat, permintaan Cabang, posisi stok, dan laporan.
 - Custody aktif (read-only): `warehouse.custody.index` — termasuk tab **Return dari Pelanggan** (modem transit di tangan teknisi)
 - Terima Retur (konfirmasi modem hasil task Ambil Modem): `warehouse.returns.index` → `warehouse.returns.receive.create`
 - Terima modem dari pelanggan (diantar sendiri, tanpa task): `warehouse.returns.from-customer.create`
@@ -52,6 +53,7 @@ Gudang **direpresentasikan lewat `pops`** (`type` = `pusat`/`cabang`) — sengaj
 
 ## Dokumen Terkait
 
+- [barang-nonoperasional.md](barang-nonoperasional.md) — panduan stok Pusat, distribusi Cabang, kategori, dan laporan nonoperasional
 - [business-logic.md](business-logic.md) — aturan bisnis lengkap per alur
 - [database-schema.md](database-schema.md) — struktur tabel & relasi
 - [user-flow.md](user-flow.md) — langkah UI per peran/halaman

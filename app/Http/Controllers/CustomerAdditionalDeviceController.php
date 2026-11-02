@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Customer;
 use App\Models\CustomerAdditionalDevice;
+use App\Services\CustomerDeviceSerialGuard;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
@@ -34,13 +35,23 @@ class CustomerAdditionalDeviceController extends Controller
         $package = $customer->customerService?->internetPackage;
         $limit = $package?->max_additional_devices ?? 0;
 
-        if ($customer->additionalDevices()->count() >= $limit) {
+        if ($customer->additionalDevices()->active()->count() >= $limit) {
             return back()->withErrors(['device_type' => "Sudah mencapai batas {$limit} perangkat tambahan untuk paket pelanggan ini."]);
+        }
+
+        // SN ganda: modal ini hidden dan tidak menampilkan error validasi per
+        // field, jadi penolakan dikirim sebagai flash 'error' (terlihat di
+        // halaman) dengan input dipertahankan.
+        $serialCheck = app(CustomerDeviceSerialGuard::class)->checkAdditional($customer, $validated['serial_number'] ?? null);
+        if ($serialCheck['blocking']) {
+            return redirect()->back()->withInput()->with('error', $serialCheck['blocking']);
         }
 
         $customer->additionalDevices()->create($validated);
 
-        return redirect()->back()->with('success', 'Perangkat tambahan berhasil ditambahkan.');
+        $response = redirect()->back()->with('success', 'Perangkat tambahan berhasil ditambahkan.');
+
+        return $serialCheck['warning'] ? $response->with('warning', $serialCheck['warning']) : $response;
     }
 
     public function destroy(Customer $customer, CustomerAdditionalDevice $additionalDevice): RedirectResponse
@@ -49,6 +60,15 @@ class CustomerAdditionalDeviceController extends Controller
         abort_unless(Customer::query()->applyUserScope()->whereKey($customer->id)->exists(), 403);
 
         abort_unless($additionalDevice->customer_id === $customer->id, 404);
+
+        // AP/STB dari Gudang yang masih terpasang tidak boleh dihapus dari
+        // sini: menghapus baris tidak mengubah `inventory_serials` (tetap
+        // INSTALLED ke pelanggan ini) dan tidak ada retur fisik, jadi stok
+        // dan Detail Pelanggan langsung menyimpang. Lewat jalur resmi
+        // (Ambil Alat/DEAC) barisnya ditandai 'ditarik', baru boleh dihapus.
+        if ($additionalDevice->inventory_serial_id !== null && $additionalDevice->status === 'terpasang') {
+            return redirect()->back()->with('error', 'Perangkat tambahan dari Gudang yang masih terpasang tidak bisa dihapus dari sini. Tarik lewat "Ambil Alat" (Putus Langganan) supaya stok Gudang ikut kembali.');
+        }
 
         $additionalDevice->delete();
 

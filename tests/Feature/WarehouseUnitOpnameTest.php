@@ -87,8 +87,8 @@ class WarehouseUnitOpnameTest extends TestCase
         [$serial] = app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $item, ['UOP-SN-UI'], 200000, $this->owner);
         Storage::fake('public');
 
-        $this->actingAs($this->owner)->get(route('warehouse.adjustments.unit-opname.create'))
-            ->assertOk()->assertSee('Opname SN / Roll');
+        $this->actingAs($this->owner)->get(route('warehouse.adjustments.check.create'))
+            ->assertOk()->assertSee(route('warehouse.adjustments.unit-opname.store'), false);
         $this->post(route('warehouse.adjustments.unit-opname.store'), [
             'pop_id' => $this->pusat->id,
             'tracking_type' => 'serialized',

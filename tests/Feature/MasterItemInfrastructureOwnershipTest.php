@@ -118,11 +118,11 @@ class MasterItemInfrastructureOwnershipTest extends TestCase
     {
         $html = $this->actingAs($this->owner)->get(route('master.items.create'))->assertOk()->getContent();
 
-        $this->assertDoesNotMatchRegularExpression('/<select name="ownership_mode"[^>]*:disabled/', $html);
+        $this->assertMatchesRegularExpression('/<select name="ownership_mode"[^>]*:disabled="!isOperational"/', $html);
         $this->assertMatchesRegularExpression('/<option value="company_asset"[^>]*:disabled=/', $html);
         $this->assertMatchesRegularExpression('/<option value="infrastructure_asset"[^>]*:disabled=/', $html);
         $this->assertStringContainsString('categoryId === modemCategoryId', $html);
-        $this->assertMatchesRegularExpression('/<select name="infrastructure_node_type_id"[^>]*:disabled="categoryId === modemCategoryId"/', $html);
+        $this->assertMatchesRegularExpression('/<select name="infrastructure_node_type_id"[^>]*:disabled="!isOperational \|\| categoryId === modemCategoryId"/', $html);
         $this->assertStringContainsString('Penjelasan Tipe Node Tujuan', $html);
         $this->assertStringContainsString('bukan lokasi tertentu', $html);
     }

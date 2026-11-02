@@ -31,4 +31,39 @@ class CustomerListResponsiveTabletLaptopTest extends TestCase
         // Verifikasi grid multi-filter 3 kolom di laptop (xl:grid-cols-3) dan 6 di widescreen (2xl:grid-cols-6)
         $response->assertSee('grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-3 2xl:grid-cols-6', false);
     }
+
+    public function test_card_indikator_dan_filter_collapsible_di_mobile(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $response = $this->get(route('customers.index'));
+        $response->assertStatus(200);
+
+        // Verifikasi toggle Card Indikator untuk mobile
+        $response->assertSee('mobileStatsOpen', false);
+        $response->assertSee('id="customer-stats-content"', false);
+        $response->assertSee('Ringkasan Statistik', false);
+
+        // Verifikasi toggle Card Filter untuk mobile
+        $response->assertSee('mobileFilterOpen', false);
+        $response->assertSee('id="customer-filters-content"', false);
+        $response->assertSee('Filter &amp; Pencarian', false);
+
+        // Verifikasi animasi collapse Alpine terpasang
+        $response->assertSee('x-collapse', false);
+    }
+
+    public function test_card_filter_menampilkan_indikator_filter_aktif(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $response = $this->get(route('customers.index', ['search' => 'Budi', 'status' => 'active']));
+        $response->assertStatus(200);
+
+        // Menampilkan badge filter aktif di mobile header
+        $response->assertSee('Filter Aktif', false);
+        $response->assertSee('Reset', false);
+    }
 }

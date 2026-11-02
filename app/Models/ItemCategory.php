@@ -26,6 +26,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
     'name',
     'default_unit',
     'is_active',
+    'is_operational',
     'sort_order',
     'equipment_class',
     'is_customer_extra_device',
@@ -45,6 +46,14 @@ class ItemCategory extends Model
     public const CODE_LAINNYA = 'lainnya';
 
     /**
+     * Kategori merchandise Marketing — stok kuantitas tanpa harga yang hanya
+     * bergerak lewat halaman Merchandise Marketing. Semua guard "bukan
+     * Marketing" memakai konstanta ini; salah ketik di satu tempat membuat
+     * guard diam-diam tidak berlaku. Lihat [[Item::isMarketing()]].
+     */
+    public const CODE_MERCHANDISE_MARKETING = 'merchandise_marketing';
+
+    /**
      * @return array<string, string>
      */
     protected function casts(): array
@@ -52,6 +61,7 @@ class ItemCategory extends Model
         return [
             'is_system' => 'boolean',
             'is_active' => 'boolean',
+            'is_operational' => 'boolean',
             'is_customer_extra_device' => 'boolean',
             'equipment_class' => EquipmentClass::class,
         ];

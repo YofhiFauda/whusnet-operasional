@@ -247,14 +247,10 @@ class CustomerInstallationController extends Controller
             return collect();
         }
 
-        // Cuma tampilkan SN yang asal cabangnya SAMA dengan cabang task ini
-        // (laporan user: modem Jetis kepakai di Sandya) — teknisi yang pegang
-        // custody dari 2 cabang beda (mis. scope lintas cabang) gak boleh
-        // lihat/pilih SN cabang lain buat task ini. Penegakan SEBENARNYA
-        // tetap di `InventoryService::installSerial()` — filter ini cuma
-        // UX, biar teknisi gak ketolak belakangan pas sudah isi laporan.
-        $targetCabangId = Pop::resolveCabangId($task?->pop_id);
-
+        // Filter cabang DICABUT (keputusan user 2026-10-31) — teknisi di sini
+        // bersifat flexible lintas cabang, gak bisa di-strict scope POP kayak
+        // sebelumnya. Dulu dibatasi karena laporan user "modem Jetis kepakai
+        // di Sandya"; sekarang itu risiko yang diterima sadar, bukan bug.
         return InventorySerial::query()
             ->whereIn('current_technician_id', $teamTechnicianIds)
             ->where('status', SerialStatus::ISSUED->value)
@@ -264,9 +260,6 @@ class CustomerInstallationController extends Controller
             // ditawarkan di sini, AP bisa terpilih jadi perangkat UTAMA dan
             // ditimpa ke customer_devices/ont_sn lewat installSerial(true).
             ->whereDoesntHave('item.category', fn ($q) => $q->where('is_customer_extra_device', true))
-            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
-                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
-            }))
             ->with('item')
             ->get();
     }
@@ -307,17 +300,11 @@ class CustomerInstallationController extends Controller
             return collect();
         }
 
-        // Sama filter cabang dengan `eligibleSerialsForTeam()` — lot custody
-        // dari cabang lain gak ditampilkan di sini (UX; penegakan sebenarnya
-        // di `InventoryService::consumeFromCustody()`).
-        $targetCabangId = Pop::resolveCabangId($task?->pop_id);
-
+        // Filter cabang DICABUT (keputusan user 2026-10-31), sama dengan
+        // `eligibleSerialsForTeam()` — teknisi flexible lintas cabang.
         return TechnicianCustody::query()
             ->whereIn('technician_id', $teamTechnicianIds)
             ->active()
-            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
-                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
-            }))
             ->with('item.category')
             ->get()
             // Aset infrastruktur dikecualikan — `consumeFromCustody()`
@@ -359,11 +346,8 @@ class CustomerInstallationController extends Controller
             return collect();
         }
 
-        // Sama filter cabang dengan `eligibleSerialsForTeam()` — roll dari
-        // cabang lain gak ditampilkan di sini (UX; penegakan sebenarnya di
-        // `InventoryService::consumeFromRoll()`).
-        $targetCabangId = Pop::resolveCabangId($task?->pop_id);
-
+        // Filter cabang DICABUT (keputusan user 2026-10-31), sama dengan
+        // `eligibleSerialsForTeam()` — teknisi flexible lintas cabang.
         return InventoryRoll::query()
             ->whereIn('current_technician_id', $teamTechnicianIds)
             ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
@@ -371,9 +355,6 @@ class CustomerInstallationController extends Controller
             // Roll infrastruktur (feeder) gak boleh dipotong ke pelanggan —
             // `consumeFromRoll()` menolaknya (jalurnya deployRoll()).
             ->whereHas('item', fn ($q) => $q->where('ownership_mode', '!=', OwnershipMode::INFRASTRUCTURE_ASSET->value))
-            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
-                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
-            }))
             ->with('item')
             ->get();
     }

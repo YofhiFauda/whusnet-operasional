@@ -127,6 +127,16 @@ Relasi: `Task::billingItems()` (HasMany), `TaskBillingItem::task()`, `::invoice(
 - `inventory_serials.ownership` — string(20), default `company` (enum `App\Enums\DeviceOwnership`: `company`/`customer`). Penanda SATU-SATUNYA "modem ini wajib balik pas putus atau tidak". Data lama dibiarkan default `company` (tanpa backfill).
 - `customer_devices.acquisition_source` — string(20), default `sewa` (enum `App\Enums\DeviceAcquisitionSource`: `sewa`/`beli_sendiri`/`beli_gudang`). Dipakai untuk badge Sewa/Beli Sendiri/Beli dari Gudang.
 - `inventory_serial_sales` — ledger penjualan modem ke pelanggan. Kolom: `inventory_serial_id`, `customer_id`, `fop_task_id` (nullable), `price` decimal(12,2), `created_by`, timestamps. Semua FK `restrictOnDelete()`. Ditulis lewat `InventoryService::recordSerialSale()` (harga harus > 0). Sumber Laporan Barang Terjual ke Pelanggan.
+## Tabel `customer_additional_devices` — status & penggantian (2026-10-31)
+
+Perangkat tambahan (AP/STB) pelanggan. Kolom relevan: `customer_id`, `inventory_serial_id` (nullable — kosong = baris teks bebas/legacy, badge `Tanpa Stok`), `device_type`, `brand`, `model`, `serial_number`, `status` (string; `terpasang` default / `ditarik`), `retrieved_at`, `technical_note`.
+
+- `ditarik` = riwayat (DEAC "Ambil Alat" atau diganti lewat Laporan Maintenance/C-REQ). Semua hitungan **jatah paket** memakai scope `active()` (`status != ditarik`), bukan `count()` polos.
+- Scope lain: `installedFromWarehouse()` (`inventory_serial_id` terisi + `terpasang`), `terpasang()` (semua yang terpasang, termasuk teks bebas — kandidat "yang diganti").
+- Penggantian menulis dua baris sekaligus (lama → `ditarik`, baru → `terpasang`) di `AdditionalDeviceReplacementService`; lihat `business-logic.md` §7c.
+- `customer_installations.extra_device_shortage` (bool) + `extra_device_shortage_reason` (string 500) — kekurangan perangkat yang dilaporkan teknisi di Laporan Pemasangan; kini ditampilkan di Detail Pelanggan & langkah Perangkat Tambahan.
+- SN tidak punya unique index (data legacy sudah berisi duplikat); keunikan ditegakkan di aplikasi oleh `CustomerDeviceSerialGuard` hanya saat SN berubah.
+
 ## Tabel `task_device_retrievals` (ADHOC-86)
 
 Migrasi: `2026_09_19_100000_create`. 1:1 dengan `tasks` (**hanya** task tipe Ambil Modem / `DEAC`) — laporan lapangan pengambilan alat. Tabel sendiri, bukan numpang `task_maintenances`, karena form DEAC tidak punya kendala teknis / foto OPM / speedtest — memaksa kolom itu terisi berarti data palsu.

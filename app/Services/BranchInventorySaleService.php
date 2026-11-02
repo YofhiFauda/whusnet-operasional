@@ -74,7 +74,7 @@ class BranchInventorySaleService
                 'inventory_transfer_id' => $transfer->id,
                 'from_pop_id' => $fromCabang->id,
                 'to_pop_id' => $toCabang->id,
-                'payment_status' => 'not_tracked',
+                'payment_status' => BranchInventorySale::PAYMENT_NOT_TRACKED,
                 'created_by' => $actor->id,
             ]);
             foreach ($serials as $serialId => $serial) {
@@ -103,27 +103,45 @@ class BranchInventorySaleService
             $numbers = $sale->lines->whereIn('inventory_serial_id', $serialIds)
                 ->map(fn ($line) => $line->serial->serial_number)->values()->all();
             app(InventoryTransferService::class)->receiveTransfer($sale->transfer, $numbers, [], $actor);
-            $this->postWhenClosed($sale);
+            $this->postWhenReceived($sale);
 
             return $sale->fresh(['transfer', 'lines']);
         });
     }
 
-    public function closeMissing(BranchInventorySale $sale, string $reason, string $evidencePath, User $actor): BranchInventorySale
+    /**
+     * Terima SEMUA SN yang belum diterima dalam satu aksi — satu-satunya jalur dari UI
+     * (tanpa pilih per SN). `receive()` tetap menerima subset untuk pemanggil lain.
+     */
+    public function receiveAll(BranchInventorySale $sale, User $actor): BranchInventorySale
     {
-        return DB::transaction(function () use ($sale, $reason, $evidencePath, $actor) {
+        return DB::transaction(function () use ($sale, $actor) {
             $sale = BranchInventorySale::query()->lockForUpdate()->findOrFail($sale->id);
-            app(InventoryTransferService::class)->closeMissingTransfer($sale->transfer, $reason, $evidencePath, $actor);
-            $this->postWhenClosed($sale);
+            $receivedIds = InventoryTransaction::query()
+                ->where('inventory_transfer_id', $sale->inventory_transfer_id)
+                ->where('type', InventoryTransactionType::TRANSFER->value)
+                ->where('to_pop_id', $sale->to_pop_id)
+                ->whereNotNull('serial_id')
+                ->pluck('serial_id')->all();
+            $pendingIds = $sale->lines()->whereNotIn('inventory_serial_id', $receivedIds)
+                ->pluck('inventory_serial_id')->map(fn ($id) => (int) $id)->all();
+            if ($pendingIds === []) {
+                throw new InvalidArgumentException('Semua SN pada dokumen ini sudah diterima.');
+            }
 
-            return $sale->fresh(['transfer', 'lines']);
+            return $this->receive($sale, $pendingIds, $actor);
         });
     }
 
-    private function postWhenClosed(BranchInventorySale $sale): void
+    /**
+     * Dokumen baru final (`posted_*` terisi) setelah SEMUA SN diterima. Tidak ada
+     * jalur "tutup sisa hilang": SN yang belum tiba tetap menunggu penerimaan, dan
+     * dokumennya tetap terbuka sampai itu terjadi (keputusan user 2026-10-31).
+     */
+    private function postWhenReceived(BranchInventorySale $sale): void
     {
         $transfer = $sale->transfer->fresh();
-        if (! in_array($transfer->status, [TransferStatus::RECEIVED, TransferStatus::CLOSED_LOST], true)) {
+        if ($transfer->status !== TransferStatus::RECEIVED) {
             return;
         }
 
@@ -136,7 +154,7 @@ class BranchInventorySaleService
         $total = Money::sum($sale->lines()->whereIn('inventory_serial_id', $receivedIds)->pluck('sale_price'));
         $sale->update([
             'posted_total' => Money::decimalString($total),
-            'payment_status' => $total > 0 ? 'not_tracked' : 'not_due',
+            'payment_status' => BranchInventorySale::PAYMENT_NOT_TRACKED,
             'posted_at' => now(),
         ]);
     }

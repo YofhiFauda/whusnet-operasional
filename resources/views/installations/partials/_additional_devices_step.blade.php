@@ -63,6 +63,9 @@
         @if($installation?->extra_devices_reported_at)
             <p class="text-[11px] text-emerald-700 dark:text-emerald-400 font-semibold">✓ Sudah dilaporkan {{ $installation->extra_devices_reported_at->format('d/m/Y H:i') }}.</p>
         @endif
+        @if($installation?->extra_device_shortage)
+            <p class="text-[11px] text-amber-700 dark:text-amber-400 font-semibold">⚠ Kekurangan perangkat dilaporkan: {{ $installation->extra_device_shortage_reason }}</p>
+        @endif
         @error('extra_devices')
             <p class="text-[11px] text-rose-600 dark:text-rose-400 font-semibold">{{ $message }}</p>
         @enderror
@@ -76,7 +79,7 @@
         @if($installedExtraDevices->isNotEmpty())
             <ul class="text-[11px] text-emerald-700 dark:text-emerald-400 space-y-0.5">
                 @foreach($installedExtraDevices as $device)
-                    <li>✓ {{ $device->device_type }} — SN {{ $device->serial_number }} (sudah terpasang)</li>
+                    <li>✓ {{ $device->device_type }}{{ trim(' '.$device->brand.' '.$device->model) !== '' ? ' — '.trim($device->brand.' '.$device->model) : '' }} — SN {{ $device->serial_number }} (sudah terpasang)</li>
                 @endforeach
             </ul>
         @endif

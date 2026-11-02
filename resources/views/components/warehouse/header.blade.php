@@ -230,25 +230,15 @@
                     @endif
 
                     @if($canAdjust)
-                    <p class="px-3.5 pt-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700/60 mt-1">Penyesuaian</p>
+                    <p class="px-3.5 pt-2.5 pb-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 border-t border-slate-100 dark:border-slate-700/60 mt-1">Koreksi</p>
                     <div class="flex items-center px-3.5 hover:bg-amber-50 dark:hover:bg-amber-950/30 group">
-                        <a href="{{ route('warehouse.adjustments.balance.create') }}"
-                           class="flex-1 flex items-center gap-2.5 py-2 text-slate-700 dark:text-slate-200 group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors">
-                            <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                            <div><p class="font-semibold">Penyesuaian Saldo</p><p class="text-[11px] text-slate-500 dark:text-slate-400">Koreksi manual stok rusak/susut</p></div>
-                        </a>
-                        <x-warehouse.info-tip align="left">
-                            Input manual kalau ada kerugian yang <strong>SUDAH diketahui sebabnya</strong> (barang hilang/rusak). Wajib pilih alasan + lampirkan bukti foto. Beda dari Stock Opname — ini buat kasus yang udah jelas, bukan hasil hitung ulang fisik.
-                        </x-warehouse.info-tip>
-                    </div>
-                    <div class="flex items-center px-3.5 hover:bg-amber-50 dark:hover:bg-amber-950/30 group">
-                        <a href="{{ route('warehouse.adjustments.opname.create') }}"
+                        <a href="{{ route('warehouse.adjustments.index') }}"
                            class="flex-1 flex items-center gap-2.5 py-2 text-slate-700 dark:text-slate-200 group-hover:text-amber-700 dark:group-hover:text-amber-400 transition-colors">
                             <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                            <div><p class="font-semibold">Stock Opname</p><p class="text-[11px] text-slate-500 dark:text-slate-400">Catat hasil hitung fisik gudang</p></div>
+                            <div><p class="font-semibold">Koreksi Stok</p><p class="text-[11px] text-slate-500 dark:text-slate-400">Hitung fisik atau barang bermasalah</p></div>
                         </a>
                         <x-warehouse.info-tip align="left">
-                            Catat hasil <strong>hitung fisik</strong> stok gudang (jumlah beneran di rak) — sistem otomatis hitung selisih vs catatan sendiri, staf gak input selisihnya manual. Dipakai buat audit stok berkala, bukan koreksi kasus tunggal (itu Penyesuaian Saldo).
+                            Satu pintu untuk semua koreksi stok gudang: <strong>cek &amp; cocokkan</strong> hasil hitung fisik, atau catat barang <strong>hilang/rusak/salah catat</strong>. Jenis barang (qty, SN, roll) dikenali otomatis.
                         </x-warehouse.info-tip>
                     </div>
                     @endif
@@ -788,14 +778,10 @@
                     </div>
                     @if($canAdjust)
                     <div class="px-2 pt-1.5 pb-1 space-y-1">
-                        <p class="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Penyesuaian & Opname</p>
-                        <a href="{{ route('warehouse.adjustments.balance.create') }}" class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/30">
-                            <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
-                            <div><p class="font-semibold text-xs">Penyesuaian Saldo</p><p class="text-[11px] text-slate-500 dark:text-slate-400">Koreksi rusak / susut</p></div>
-                        </a>
-                        <a href="{{ route('warehouse.adjustments.opname.create') }}" class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/30">
+                        <p class="px-2 text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Koreksi</p>
+                        <a href="{{ route('warehouse.adjustments.index') }}" class="flex items-center gap-2.5 px-2.5 py-2 rounded-lg text-slate-700 dark:text-slate-200 hover:bg-amber-50 dark:hover:bg-amber-950/30">
                             <svg class="w-4 h-4 text-amber-500 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z"/></svg>
-                            <div><p class="font-semibold text-xs">Stock Opname</p><p class="text-[11px] text-slate-500 dark:text-slate-400">Audit hitung fisik rak</p></div>
+                            <div><p class="font-semibold text-xs">Koreksi Stok</p><p class="text-[11px] text-slate-500 dark:text-slate-400">Hitung fisik / barang bermasalah</p></div>
                         </a>
                     </div>
                     @endif

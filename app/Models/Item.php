@@ -73,6 +73,16 @@ class Item extends Model
         return $this->belongsTo(ItemCategory::class, 'item_category_id');
     }
 
+    public function isNonOperational(): bool
+    {
+        return $this->category?->is_operational === false;
+    }
+
+    public function isMarketing(): bool
+    {
+        return $this->category?->code === ItemCategory::CODE_MERCHANDISE_MARKETING;
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

@@ -371,13 +371,14 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
     }
 
     /**
-     * Laporan user: modem yang diissue dari Cabang Jetis kepakai buat
-     * pemasangan di Cabang Sandya. SN ini di custody TIM task ini (bukan
-     * teknisi lain seperti test di atas), tapi berasal dari cabang BEDA
-     * dengan cabang task — tetap wajib ditolak.
+     * Keputusan user 2026-10-31: teknisi flexible lintas cabang, gak di-strict
+     * scope POP. SN yang diissue dari Cabang Lain tapi ada di custody TIM
+     * task ini (bukan teknisi lain seperti test di atas) WAJIB diterima —
+     * guard lintas-cabang yang dulu ada (laporan "modem Jetis kepakai di
+     * Sandya") DICABUT PERMANEN. Jangan dipasang balik sebagian.
      */
     #[Test]
-    public function sn_dropdown_dari_cabang_lain_ditolak(): void
+    public function sn_dropdown_dari_cabang_lain_tetap_diterima(): void
     {
         Storage::fake('public');
         [$customer, $technician, , $pusat, $cabangTask] = $this->setupInProgressInstallation();
@@ -401,6 +402,10 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
             'selected_inventory_serial_id' => $serial->id,
         ]);
 
-        $response->assertSessionHasErrors('selected_inventory_serial_id');
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect();
+
+        $installation = $customer->installations()->latest()->first();
+        $this->assertEquals($serial->id, $installation->selected_inventory_serial_id);
     }
 }

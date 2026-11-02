@@ -55,76 +55,76 @@ class="space-y-6" id="live-content">
     @endif
 
     {{-- Summary Stat Cards --}}
-    <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 sm:gap-4">
+    <div class="grid grid-cols-3 gap-2 sm:gap-4">
         {{-- Total Pelanggan --}}
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 shadow-xs relative overflow-hidden transition-all hover:border-violet-300 dark:hover:border-violet-600/50">
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-2.5 sm:p-4 shadow-xs relative overflow-hidden transition-all hover:border-violet-300 dark:hover:border-violet-600/50">
             <div class="flex items-center justify-between">
-                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Pelanggan</span>
-                <div class="w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 flex items-center justify-center shrink-0">
+                <span class="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Pelanggan</span>
+                <div class="hidden sm:flex w-9 h-9 rounded-xl bg-violet-50 dark:bg-violet-500/10 text-violet-600 dark:text-violet-400 items-center justify-center shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                 </div>
             </div>
-            <div class="mt-2 flex items-baseline gap-2 min-w-0">
-                <span class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono truncate">{{ number_format($jumlahPelanggan, 0, ',', '.') }}</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">Orang</span>
+            <div class="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 min-w-0">
+                <span class="text-base sm:text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono truncate">{{ number_format($jumlahPelanggan, 0, ',', '.') }}</span>
+                <span class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">Org</span>
             </div>
-            <div class="mt-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+            <div class="hidden sm:block mt-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">
                 Target penagihan rute
             </div>
         </div>
 
         {{-- Total Tagihan --}}
-        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-4 shadow-xs relative overflow-hidden transition-all hover:border-sky-300 dark:hover:border-sky-600/50">
+        <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-2xl p-2.5 sm:p-4 shadow-xs relative overflow-hidden transition-all hover:border-sky-300 dark:hover:border-sky-600/50">
             <div class="flex items-center justify-between">
-                <span class="text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Jumlah Tagihan</span>
-                <div class="w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                <span class="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500">Tagihan</span>
+                <div class="hidden sm:flex w-9 h-9 rounded-xl bg-sky-50 dark:bg-sky-500/10 text-sky-600 dark:text-sky-400 items-center justify-center shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
                 </div>
             </div>
-            <div class="mt-2 flex items-baseline gap-2 min-w-0">
-                <span class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono truncate">{{ number_format($invoices->total(), 0, ',', '.') }}</span>
-                <span class="text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">Lembar</span>
+            <div class="mt-1 sm:mt-2 flex items-baseline gap-1 sm:gap-2 min-w-0">
+                <span class="text-base sm:text-2xl font-bold text-slate-900 dark:text-slate-100 font-mono truncate">{{ number_format($invoices->total(), 0, ',', '.') }}</span>
+                <span class="text-[10px] sm:text-xs text-slate-500 dark:text-slate-400 font-medium shrink-0">Lbr</span>
             </div>
-            <div class="mt-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+            <div class="hidden sm:block mt-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">
                 Invoice aktif rute ini
             </div>
         </div>
 
         {{-- Nilai Tunggakan Halaman Ini --}}
-        <div class="bg-white dark:bg-slate-800/90 border border-amber-200/80 dark:border-amber-500/30 rounded-2xl p-4 shadow-xs relative overflow-hidden transition-all hover:border-amber-400 dark:hover:border-amber-500/60">
+        <div class="bg-white dark:bg-slate-800/90 border border-amber-200/80 dark:border-amber-500/30 rounded-2xl p-2.5 sm:p-4 shadow-xs relative overflow-hidden transition-all hover:border-amber-400 dark:hover:border-amber-500/60">
             <div class="flex items-center justify-between">
-                <span class="text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Nilai di Halaman Ini</span>
-                <div class="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                <span class="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-amber-600 dark:text-amber-400">Tunggakan</span>
+                <div class="hidden sm:flex w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-500/10 text-amber-600 dark:text-amber-400 items-center justify-center shrink-0">
                     <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                 </div>
             </div>
-            <div class="mt-2 min-w-0">
-                <span class="text-lg sm:text-2xl font-bold text-amber-700 dark:text-amber-400 font-mono truncate block">Rp {{ number_format((float) $totalTunggakan, 0, ',', '.') }}</span>
+            <div class="mt-1 sm:mt-2 min-w-0">
+                <span class="text-xs sm:text-2xl font-bold text-amber-700 dark:text-amber-400 font-mono truncate block">Rp {{ number_format((float) $totalTunggakan, 0, ',', '.') }}</span>
             </div>
-            <div class="mt-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium">
+            <div class="hidden sm:block mt-1 text-[11px] text-slate-400 dark:text-slate-500 font-medium truncate">
                 Total sisa tagihan tertera
             </div>
         </div>
     </div>
 
     {{-- Financial Status & Setoran (Kas di Tangan) --}}
-    <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 sm:gap-4">
         {{-- Card Saldo Kas di Tangan --}}
-        <div class="lg:col-span-2 bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-4 sm:p-5 shadow-sm relative overflow-hidden flex flex-col justify-between">
-            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <div class="min-w-0">
+        <div class="{{ $outstandingShortfall > 0 ? 'lg:col-span-2' : 'lg:col-span-3' }} bg-gradient-to-br from-slate-900 to-slate-800 text-white rounded-2xl p-3.5 sm:p-5 shadow-sm relative overflow-hidden flex flex-col justify-between">
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
+                <div class="min-w-0 flex-1">
                     <div class="flex items-center gap-2">
                         <span class="w-2 h-2 rounded-full bg-emerald-400 shrink-0"></span>
-                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-300 truncate">Saldo Belum Disetor (Kas di Tangan)</span>
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-slate-300 truncate">Kas di Tangan</span>
+                        <span class="px-2 py-0.5 rounded-full bg-slate-700/80 text-emerald-300 text-[10px] font-semibold border border-slate-600 shrink-0">
+                            {{ $unsettledCount }} trx
+                        </span>
                     </div>
-                    <div class="font-bold text-xl sm:text-3xl text-white font-mono mt-2 tracking-tight truncate">
+                    <div class="font-bold text-xl sm:text-3xl text-white font-mono mt-1 sm:mt-2 tracking-tight truncate">
                         Rp {{ number_format($balance, 0, ',', '.') }}
                     </div>
-                    <div class="text-xs text-slate-300 mt-1 flex flex-wrap items-center gap-2">
-                        <span class="px-2 py-0.5 rounded-full bg-slate-700/80 text-emerald-300 text-[11px] font-semibold border border-slate-600">
-                            {{ $unsettledCount }} transaksi
-                        </span>
-                        <span>belum diserahkan ke admin</span>
+                    <div class="hidden sm:block text-xs text-slate-300 mt-1">
+                        Saldo belum diserahkan ke admin
                     </div>
                 </div>
 
@@ -133,7 +133,7 @@ class="space-y-6" id="live-content">
                           data-confirm="Setorkan seluruh saldo Rp{{ number_format($balance, 0, ',', '.') }} ({{ $unsettledCount }} pembayaran) ke admin? Saldo Anda jadi nol dan menunggu verifikasi.">
                         @csrf
                         <input type="hidden" name="idempotency_key" value="{{ 'deposit-'.auth()->id().'-'.now()->timestamp.'-'.\Illuminate\Support\Str::random(8) }}">
-                        <button type="submit" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm px-5 py-3 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer">
+                        <button type="submit" class="w-full sm:w-auto inline-flex items-center justify-center gap-2 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs sm:text-sm px-4 sm:px-5 py-2.5 sm:py-3 rounded-xl transition-all shadow-md active:scale-95 cursor-pointer">
                             <svg class="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8"/></svg>
                             <span>Setor ke Admin</span>
                         </button>
@@ -142,20 +142,20 @@ class="space-y-6" id="live-content">
             </div>
 
             @if ($pendingDeposits->isNotEmpty())
-                <div class="mt-4 pt-4 border-t border-slate-700/80 space-y-2">
-                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Riwayat Pending Setoran</div>
+                <div class="mt-3 pt-3 sm:mt-4 sm:pt-4 border-t border-slate-700/80 space-y-1.5 sm:space-y-2">
+                    <div class="text-[10px] font-bold uppercase tracking-wider text-slate-400">Riwayat Pending Setoran ({{ $pendingDeposits->count() }})</div>
                     @foreach ($pendingDeposits as $deposit)
-                        <div class="flex flex-wrap items-center justify-between gap-2 text-xs bg-slate-800/80 p-2.5 rounded-xl border border-slate-700/60">
+                        <div class="flex flex-wrap items-center justify-between gap-2 text-xs bg-slate-800/80 p-2 sm:p-2.5 rounded-xl border border-slate-700/60">
                             <div class="flex items-center gap-2 min-w-0">
-                                <span class="font-mono text-slate-300 font-semibold truncate">{{ $deposit->deposit_number }}</span>
+                                <span class="font-mono text-slate-300 font-semibold truncate text-[11px] sm:text-xs">{{ $deposit->deposit_number }}</span>
                             </div>
                             @if ($deposit->status === \App\Enums\DepositStatus::MENUNGGU_VERIFIKASI)
-                                <span class="px-2.5 py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[11px] font-semibold flex items-center gap-1.5 shrink-0">
+                                <span class="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-amber-500/20 text-amber-300 border border-amber-500/30 text-[10px] sm:text-[11px] font-semibold flex items-center gap-1.5 shrink-0">
                                     <span class="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping shrink-0"></span>
                                     Menunggu Verifikasi Admin
                                 </span>
                             @else
-                                <span class="px-2.5 py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[11px] font-semibold shrink-0">
+                                <span class="px-2 py-0.5 sm:px-2.5 sm:py-1 rounded-lg bg-rose-500/20 text-rose-300 border border-rose-500/30 text-[10px] sm:text-[11px] font-semibold shrink-0">
                                     Kurang setor Rp {{ number_format($deposit->outstandingShortfall(), 0, ',', '.') }}
                                 </span>
                             @endif
@@ -165,23 +165,25 @@ class="space-y-6" id="live-content">
             @endif
         </div>
 
-        {{-- Card Status Kurang Setor --}}
-        <div class="rounded-2xl p-4 sm:p-5 border shadow-xs flex flex-col justify-between transition-all {{ $outstandingShortfall > 0 ? 'bg-rose-50/80 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30' : 'bg-white dark:bg-slate-800/90 border-slate-200/80 dark:border-slate-700/80' }}">
-            <div class="min-w-0">
-                <div class="flex items-center justify-between">
-                    <span class="text-[11px] font-bold uppercase tracking-wider {{ $outstandingShortfall > 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-400 dark:text-slate-500' }}">Kurang Setor</span>
-                    <div class="w-8 h-8 rounded-xl {{ $outstandingShortfall > 0 ? 'bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400' : 'bg-slate-100 dark:bg-slate-700 text-slate-400' }} flex items-center justify-center shrink-0">
-                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+        {{-- Card Status Kurang Setor (Hanya tampil jika ada kurang setor, atau di layar besar lg:) --}}
+        @if ($outstandingShortfall > 0)
+            <div class="rounded-2xl p-3.5 sm:p-5 border shadow-xs flex flex-col justify-between transition-all bg-rose-50/80 dark:bg-rose-500/10 border-rose-200 dark:border-rose-500/30">
+                <div class="min-w-0">
+                    <div class="flex items-center justify-between">
+                        <span class="text-[11px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">Kurang Setor</span>
+                        <div class="w-8 h-8 rounded-xl bg-rose-100 dark:bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
+                        </div>
+                    </div>
+                    <div class="font-bold text-xl sm:text-3xl mt-1 sm:mt-2 font-mono truncate text-rose-700 dark:text-rose-400">
+                        Rp {{ number_format($outstandingShortfall, 0, ',', '.') }}
                     </div>
                 </div>
-                <div class="font-bold text-xl sm:text-3xl mt-2 font-mono truncate {{ $outstandingShortfall > 0 ? 'text-rose-700 dark:text-rose-400' : 'text-slate-900 dark:text-slate-100' }}">
-                    Rp {{ number_format($outstandingShortfall, 0, ',', '.') }}
-                </div>
+                <p class="text-xs text-rose-600 dark:text-rose-400/90 mt-2 sm:mt-3">
+                    Nominal ini tidak otomatis nol saat Anda menyetor. Lunasi lewat setoran berikutnya.
+                </p>
             </div>
-            <p class="text-xs {{ $outstandingShortfall > 0 ? 'text-rose-600 dark:text-rose-400/90' : 'text-slate-400 dark:text-slate-500' }} mt-3">
-                Nominal ini tidak otomatis nol saat Anda menyetor. Lunasi lewat setoran berikutnya.
-            </p>
-        </div>
+        @endif
     </div>
 
     {{-- Kunjungan Hari Ini (Summary Pill List - Collapsible & Compact) --}}

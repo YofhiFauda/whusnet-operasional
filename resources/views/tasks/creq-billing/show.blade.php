@@ -72,7 +72,7 @@
     // $reportFopTask dipakai lagi (SAMA anchor dengan material/SN di atas)
     // biar gak ada dua cara berbeda nebak FopTask mana yang relevan.
     $modemSale = $reportFopTask
-        ? \App\Models\InventorySerialSale::where('fop_task_id', $reportFopTask->id)->first()
+        ? \App\Models\InventorySerialSale::where('fop_task_id', $reportFopTask->id)->with('inventorySerial.item')->first()
         : null;
 
     // Breakdown per-item generik (Task 4, 2026-10-10) — bukan lagi satu
@@ -90,8 +90,12 @@
             'locked' => $modemSale && (string) ($item['inventory_serial_sale_id'] ?? '') === (string) $modemSale->id,
         ])->all();
     } elseif ($modemSale) {
+        // Keterangan modem (rancangan 2026-10-31 §3) — nama baris terkunci
+        // ini SEKALIGUS jadi `description` yang tercatat di
+        // `task_billing_items.name`, karena jalur ini tidak punya kolom
+        // description terpisah seperti InitialInvoiceService::lineSpecs().
         $initialItems = [[
-            'name' => 'Jual Modem',
+            'name' => $modemSale->inventorySerial?->modemSaleDescription() ?? 'Jual Modem',
             // FormatHelper::rupiahInput(), BUKAN (string) $modemSale->price
             // mentah (final review 2026-10-10, finding #2) — kolom DB
             // berbentuk desimal mesin (mis. "150000.00"), sementara mask

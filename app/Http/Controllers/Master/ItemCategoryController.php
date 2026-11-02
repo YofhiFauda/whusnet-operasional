@@ -9,6 +9,7 @@ use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
 
 /**
@@ -74,6 +75,13 @@ class ItemCategoryController extends Controller
     {
         $validated = $this->validateCategory($request, $itemCategory);
 
+        if ($itemCategory->items()->exists() && $itemCategory->is_operational !== $validated['is_operational']) {
+            throw ValidationException::withMessages(['is_operational' => 'Jenis penggunaan kategori tidak dapat diubah setelah kategori memiliki barang.']);
+        }
+        if ($itemCategory->code === ItemCategory::CODE_MERCHANDISE_MARKETING && $validated['is_operational']) {
+            throw ValidationException::withMessages(['is_operational' => 'Merchandise Marketing harus Non Operasional.']);
+        }
+
         // Code kategori bawaan dikunci: nilainya sudah tersimpan sebagai snapshot
         // di baris material lama dan di-hardcode di alur dropcore otomatis.
         // Mengubahnya memutus dua-duanya sekaligus tanpa error yang kelihatan.
@@ -128,7 +136,7 @@ class ItemCategoryController extends Controller
      */
     private function validateCategory(Request $request, ?ItemCategory $category = null): array
     {
-        return $request->validate([
+        $validated = $request->validate([
             'code' => [
                 'required',
                 'string',
@@ -143,8 +151,15 @@ class ItemCategoryController extends Controller
             'default_unit' => ['required', 'string', 'max:20'],
             'sort_order' => ['nullable', 'integer', 'min:0', 'max:9999'],
             'is_active' => ['required', 'boolean'],
+            'is_operational' => ['sometimes', 'boolean'],
         ], [
             'code.regex' => 'Kode kategori hanya boleh huruf kecil, angka, dan underscore.',
         ]);
+
+        $validated['is_operational'] = isset($validated['is_operational'])
+            ? (bool) $validated['is_operational']
+            : ($category?->is_operational ?? true);
+
+        return $validated;
     }
 }

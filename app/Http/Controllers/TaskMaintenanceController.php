@@ -18,6 +18,7 @@ use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\TrackingType;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
+use App\Models\CustomerAdditionalDevice;
 use App\Models\FopTask;
 use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
@@ -33,6 +34,8 @@ use App\Models\TaskMaintenanceBillingDetail;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Models\WorkTool;
+use App\Services\AdditionalDeviceCustodyService;
+use App\Services\AdditionalDeviceReplacementService;
 use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskInfrastructureScopeService;
@@ -48,6 +51,7 @@ use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
 use App\Support\InfrastructureCutover;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Str;
@@ -78,11 +82,10 @@ class TaskMaintenanceController extends Controller
             return collect();
         }
 
-        // Cuma tampilkan SN yang asal cabangnya sama dengan cabang task ini
-        // (laporan user: modem Jetis kepakai di Sandya). Penegakan SEBENARNYA
-        // tetap di `InventoryService::installSerial()` — ini cuma UX.
-        $targetCabangId = Pop::resolveCabangId($task->pop_id);
-
+        // Filter cabang DICABUT (keputusan user 2026-10-31) — teknisi di sini
+        // bersifat flexible lintas cabang, gak bisa di-strict scope POP kayak
+        // sebelumnya. Dulu dibatasi karena laporan user "modem Jetis kepakai
+        // di Sandya"; sekarang itu risiko yang diterima sadar, bukan bug.
         return InventorySerial::query()
             ->whereIn('current_technician_id', $teamTechnicianIds)
             ->where('status', SerialStatus::ISSUED->value)
@@ -96,10 +99,37 @@ class TaskMaintenanceController extends Controller
             // whereDoesntHave (bukan whereHas is_extra=false) supaya item tanpa
             // kategori tetap muncul.
             ->whereDoesntHave('item.category', fn ($q) => $q->where('is_customer_extra_device', true))
-            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
-                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
-            }))
             ->with('item.infrastructureNodeType')
+            ->get();
+    }
+
+    /**
+     * Ganti Perangkat Tambahan hanya relevan untuk pekerjaan perbaikan di
+     * pelanggan yang sudah punya layanan: Maintenance & C-REQ. O-REQ/INFR REQ
+     * adalah pekerjaan jaringan; Pemasangan punya langkah Perangkat Tambahannya
+     * sendiri.
+     */
+    private function supportsExtraReplacement(Task $task): bool
+    {
+        return $task->customer_id !== null
+            && in_array($task->task_type, [TaskType::MAINTENANCE, TaskType::CREQ], true);
+    }
+
+    /**
+     * AP/STB yang sedang terpasang di pelanggan task ini — kandidat "yang
+     * diganti". Baris teks bebas (legacy, tanpa SN Gudang) ikut: data legacy
+     * sering tak cocok dengan perangkat nyata, jadi teknisi harus bisa
+     * menggantinya (tanpa retur stok, lihat AdditionalDeviceReplacementService).
+     *
+     * @return Collection<int, CustomerAdditionalDevice>
+     */
+    private function replaceableExtraDevices(Task $task)
+    {
+        return CustomerAdditionalDevice::query()
+            ->where('customer_id', $task->customer_id)
+            ->terpasang()
+            ->with('inventorySerial.item.category')
+            ->orderBy('id')
             ->get();
     }
 
@@ -121,14 +151,11 @@ class TaskMaintenanceController extends Controller
             return collect();
         }
 
-        $targetCabangId = Pop::resolveCabangId($task->pop_id);
-
+        // Filter cabang DICABUT (keputusan user 2026-10-31) — teknisi flexible
+        // lintas cabang, gak di-strict scope POP.
         return TechnicianCustody::query()
             ->whereIn('technician_id', $teamTechnicianIds)
             ->active()
-            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
-                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
-            }))
             ->with('item.category')
             ->get()
             // Aset infrastruktur dikecualikan — punya picker sendiri
@@ -168,8 +195,8 @@ class TaskMaintenanceController extends Controller
             return collect();
         }
 
-        $targetCabangId = Pop::resolveCabangId($task->pop_id);
-
+        // Filter cabang DICABUT (keputusan user 2026-10-31) — teknisi flexible
+        // lintas cabang, gak di-strict scope POP.
         return InventoryRoll::query()
             ->whereIn('current_technician_id', $teamTechnicianIds)
             ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
@@ -177,9 +204,6 @@ class TaskMaintenanceController extends Controller
             // Roll infrastruktur (feeder) punya picker sendiri
             // (`eligibleInfraRollsForTeam()`); `consumeFromRoll()` menolaknya.
             ->whereHas('item', fn ($q) => $q->where('ownership_mode', '!=', OwnershipMode::INFRASTRUCTURE_ASSET->value))
-            ->when($targetCabangId !== null, fn ($q) => $q->where(function ($q2) use ($targetCabangId) {
-                $q2->whereNull('issued_from_pop_id')->orWhere('issued_from_pop_id', $targetCabangId);
-            }))
             ->with('item')
             ->get();
     }
@@ -411,6 +435,10 @@ class TaskMaintenanceController extends Controller
         $eligiblePassiveCustody = $this->eligiblePassiveCustodyForTeam($task);
         $eligibleRolls = $this->eligibleRollsForTeam($task);
 
+        $supportsExtraReplacement = $this->supportsExtraReplacement($task);
+        $replaceableExtraDevices = $supportsExtraReplacement ? $this->replaceableExtraDevices($task) : collect();
+        $eligibleExtraSerials = $supportsExtraReplacement ? app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task) : collect();
+
         // Seksi "Pasang/Ganti Infrastruktur" — cuma ditampilkan view untuk
         // O-REQ/INFR REQ, jadi query-nya juga cuma jalan di dua tipe itu
         // (form ini dipakai MTN/C-REQ juga, gak ada gunanya nge-query pohon
@@ -462,7 +490,7 @@ class TaskMaintenanceController extends Controller
         $cabangPops = Pop::query()->where('type', 'cabang')->where('status', 'active')
             ->orderBy('name')->get(['id', 'name']);
 
-        return view($showsInfraSection ? 'tasks.infrastructure-report' : 'tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'creqCategories', 'cabangPops', 'eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions', 'infraPortOptions', 'infraMaterialSources', 'infraMaterialActionKey', 'infraScope'));
+        return view($showsInfraSection ? 'tasks.infrastructure-report' : 'tasks.maintenance-report', compact('task', 'items', 'itemCategories', 'materialRows', 'workTools', 'workToolRows', 'eligibleSerials', 'eligiblePassiveCustody', 'eligibleRolls', 'replaceableExtraDevices', 'eligibleExtraSerials', 'creqCategories', 'cabangPops', 'eligibleInfraSerials', 'eligibleInfraCustody', 'eligibleInfraRolls', 'eligibleInfraRetrievableSerials', 'infraNodeOptions', 'infraPortOptions', 'infraMaterialSources', 'infraMaterialActionKey', 'infraScope'));
     }
 
     public function store(Request $request, Task $task, TaskService $taskService)
@@ -483,6 +511,14 @@ class TaskMaintenanceController extends Controller
         // NULLABLE di sini (lihat eligibleSerialsForTeam()).
         $eligibleSerialIds = $this->eligibleSerialsForTeam($task)->pluck('id');
         $eligibleRollIds = $this->eligibleRollsForTeam($task)->pluck('id');
+
+        // Ganti Perangkat Tambahan (AP/STB) — cuma MTN & C-REQ. Dua daftar ini
+        // jadi batas `Rule::in` di bawah: yang diganti HARUS AP Gudang yang
+        // sedang terpasang di pelanggan task ini, penggantinya HARUS custody
+        // tim (query yang sama dengan langkah Perangkat Tambahan Pemasangan).
+        $supportsExtraReplacement = $this->supportsExtraReplacement($task);
+        $replaceableExtraDeviceIds = $supportsExtraReplacement ? $this->replaceableExtraDevices($task)->pluck('id') : collect();
+        $eligibleExtraSerialIds = $supportsExtraReplacement ? app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task)->pluck('id') : collect();
 
         // Kategori C-REQ dibaca SEBELUM validate() supaya rule kondisional
         // (tikor wajib, custom name wajib, dst — docs/plan/task-teknisi/
@@ -642,6 +678,23 @@ class TaskMaintenanceController extends Controller
             $messages['selected_inventory_serial_id.required'] = 'Kategori Tambah Modem wajib memilih SN modem dari custody tim.';
             $messages['creq_target_pop_id.required'] = 'Kategori Migrasi wajib memilih POP tujuan.';
             $messages['creq_target_pop_id.exists'] = 'POP tujuan tidak valid.';
+        }
+
+        // Ganti Perangkat Tambahan: rule SENGAJA hanya didaftarkan untuk MTN &
+        // C-REQ ber-pelanggan — field `extra_replacements` yang ikut ter-POST
+        // di tipe lain tidak lolos ke $validated, jadi blok eksekusi tidak
+        // pernah jalan di sana. Baris tanpa SN pengganti dibuang UI (name-nya
+        // dilepas), jadi tidak ada baris setengah terisi yang sampai ke sini.
+        if ($supportsExtraReplacement) {
+            $rules['extra_replacements'] = ['nullable', 'array', 'max:5'];
+            $rules['extra_replacements.*.old_device_id'] = ['required', 'integer', 'distinct', Rule::in($replaceableExtraDeviceIds)];
+            $rules['extra_replacements.*.new_serial_id'] = ['required', 'integer', 'distinct', Rule::in($eligibleExtraSerialIds)];
+            $rules['extra_replacements.*.old_condition'] = ['required', Rule::in([AdditionalDeviceReplacementService::CONDITION_BAIK, AdditionalDeviceReplacementService::CONDITION_RUSAK])];
+            $rules['extra_replacements.*.note'] = ['nullable', 'string', 'max:255'];
+
+            $messages['extra_replacements.*.old_device_id.in'] = 'Perangkat tambahan yang diganti harus perangkat Gudang yang sedang terpasang di pelanggan ini.';
+            $messages['extra_replacements.*.new_serial_id.in'] = 'SN pengganti bukan bagian dari custody tim Anda saat ini, atau bukan perangkat tambahan (AP/STB).';
+            $messages['extra_replacements.*.old_condition.required'] = 'Pilih kondisi perangkat lama (baik/rusak).';
         }
 
         // Seksi "Pasang/Ganti Infrastruktur" — cuma O-REQ/INFR REQ. Rule-nya
@@ -1071,6 +1124,23 @@ class TaskMaintenanceController extends Controller
                         if ($modemOwnershipChoice === 'beli_gudang') {
                             app(InventoryService::class)->recordSerialSale($serial, $task->customer, $fopTask, (float) $validated['modem_sale_price'], auth()->user());
                         }
+                    }
+
+                    // Ganti Perangkat Tambahan (AP/STB) — OPSIONAL. Pasang
+                    // pengganti + cabut yang lama + perbarui Detail Pelanggan
+                    // dalam satu service; gagal di mana pun me-rollback seluruh
+                    // laporan (transaksi store() ini).
+                    foreach ($validated['extra_replacements'] ?? [] as $replacement) {
+                        app(AdditionalDeviceReplacementService::class)->replace(
+                            $task->customer,
+                            CustomerAdditionalDevice::findOrFail($replacement['old_device_id']),
+                            InventorySerial::findOrFail($replacement['new_serial_id']),
+                            $fopTask,
+                            $teamTechnicians,
+                            auth()->user(),
+                            $replacement['old_condition'],
+                            $replacement['note'] ?? null,
+                        );
                     }
 
                     // Roll kabel — OPSIONAL sama pola SN di atas, one-shot

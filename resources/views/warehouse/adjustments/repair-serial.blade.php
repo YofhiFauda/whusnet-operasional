@@ -23,16 +23,15 @@
 
     <form method="POST" action="{{ route('warehouse.adjustments.serial.repair.store', $serial) }}" enctype="multipart/form-data" class="space-y-4">
         @csrf
-        <div>
-            <label for="reason" class="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-200">Hasil pemeriksaan dan alasan dinyatakan layak <span class="text-rose-500">*</span></label>
-            <textarea id="reason" name="reason" rows="3" required maxlength="500" class="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2.5 text-xs text-slate-800 focus:border-sky-500 focus:outline-none dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200">{{ old('reason') }}</textarea>
-            @error('reason') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-        </div>
-        <div>
-            <label for="evidence" class="mb-1.5 block text-xs font-bold text-slate-700 dark:text-slate-200">Foto bukti pemeriksaan <span class="text-rose-500">*</span></label>
-            <input id="evidence" type="file" name="evidence" accept="image/*" required class="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 file:mr-3 file:rounded-lg file:border-0 file:bg-sky-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-sky-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200 dark:file:bg-sky-900/40 dark:file:text-sky-300">
-            @error('evidence') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
-        </div>
+        @include('warehouse.adjustments.partials._reason-evidence', [
+            'idPrefix' => 'repair',
+            'reasonLabel' => 'Hasil pemeriksaan dan alasan dinyatakan layak',
+            'reasonMultiline' => true,
+            'reasonMax' => 500,
+            'withNotes' => false,
+            'evidence' => 'required',
+            'evidenceLabel' => 'Foto bukti pemeriksaan',
+        ])
         <div class="flex items-center justify-between gap-3 border-t border-slate-100 pt-4 dark:border-slate-700/60">
             <a href="{{ route('warehouse.damaged.index') }}" class="rounded-lg px-4 py-2.5 text-xs font-semibold text-slate-500 hover:bg-slate-100 dark:text-slate-400 dark:hover:bg-slate-700">Batal</a>
             <button type="submit" class="rounded-lg bg-sky-600 px-5 py-2.5 text-xs font-bold text-white hover:bg-sky-700">Nyatakan Layak Pakai</button>

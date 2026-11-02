@@ -16,7 +16,6 @@ use App\Models\InventoryTransfer;
 use App\Models\Item;
 use App\Models\Pop;
 use App\Services\EffectiveAccessService;
-use App\Services\FileUploadService;
 use App\Services\InventoryTransferService;
 use App\Services\WarehouseTransferActionQueue;
 use Barryvdh\DomPDF\Facade\Pdf;
@@ -24,7 +23,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\View\View;
 use InvalidArgumentException;
 use Symfony\Component\HttpFoundation\Response as HttpResponse;
@@ -108,7 +106,7 @@ class WarehouseTransferController extends Controller
             ->orderBy('name')
             ->get();
 
-        $items = Item::active()->with('category')->orderBy('name')->get();
+        $items = Item::active()->whereDoesntHave('category', fn ($query) => $query->where('is_operational', false))->with('category')->orderBy('name')->get();
 
         return view('warehouse.transfers.create', compact('fromPops', 'toPops', 'items', 'direction'));
     }
@@ -285,7 +283,6 @@ class WarehouseTransferController extends Controller
         $user = auth()->user();
         $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['item.category', 'serial', 'roll', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician'])->get();
         $confirmedLines = $transfer->transactions()->whereNotNull('to_pop_id')->with(['item.category', 'serial', 'roll', 'fromPop', 'toPop', 'fromTechnician', 'toTechnician'])->get();
-        $remainingByLine = $this->remainingByLine($dispatchLines, $confirmedLines);
 
         // Tombol "Konfirmasi Penerimaan" cuma buat sisi Cabang TUJUAN — beda
         // dari show() di atas yang boleh dua sisi. Sebelumnya view cuma cek
@@ -297,18 +294,14 @@ class WarehouseTransferController extends Controller
         $canReceive = ! $transfer->branchSale()->exists()
             && str_starts_with($transfer->reference_number, 'TRF-')
             && in_array($transfer->to_pop_id, $actionQueue->receivablePopIds($user), true);
-        $canCloseMissing = ! $transfer->branchSale()->exists()
-            && str_starts_with($transfer->reference_number, 'TRF-')
-            && $transfer->isInTransit()
-            && $user->hasPermission('warehouse_adjustment.create')
-            && ($access->hasAllPopAccess($user) || in_array($transfer->from_pop_id, $access->getAllowedPopIds($user), true));
 
-        return view('warehouse.transfers.show', compact('transfer', 'dispatchLines', 'confirmedLines', 'remainingByLine', 'canReceive', 'canCloseMissing'));
+        return view('warehouse.transfers.show', compact('transfer', 'dispatchLines', 'confirmedLines', 'canReceive'));
     }
 
     /**
-     * Terima seluruh sisa atau jumlah fisik per baris. Setiap penerimaan
-     * dicatat terpisah dan transfer tetap terbuka selama ada sisa.
+     * Terima seluruh sisa transfer sekaligus — internal Pusat↔Cabang,
+     * tanpa mode partial/tutup-hilang (disederhanakan 2026-11-01, ADHOC-250
+     * lanjutan: dianggap semua internal, rugi-kirim tidak ditracking di sini).
      */
     public function receive(Request $request, InventoryTransfer $transfer, InventoryTransferService $service, EffectiveAccessService $access): RedirectResponse
     {
@@ -317,40 +310,24 @@ class WarehouseTransferController extends Controller
         $this->assertPopAdminNotBlockedByActivePicGudang($transfer->toPop, auth()->user());
         $this->assertPicGudangCanActOnPop($transfer->toPop, auth()->user());
 
-        $validated = $request->validate([
-            'receive_mode' => ['sometimes', 'in:all,partial'],
-            'confirmed_serial_numbers' => ['sometimes', 'array'],
-            'confirmed_serial_numbers.*' => ['string'],
-            'confirmed_roll_codes' => ['sometimes', 'array'],
-            'confirmed_roll_codes.*' => ['string'],
-            'confirmed_quantities' => ['sometimes', 'array'],
-            'confirmed_quantities.*' => ['numeric', 'min:0'],
-        ]);
-
         $dispatchLines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['serial', 'roll'])->get();
         $confirmedLines = $transfer->transactions()->whereNotNull('to_pop_id')->get();
         $remainingByLine = $this->remainingByLine($dispatchLines, $confirmedLines);
 
-        if (($validated['receive_mode'] ?? 'all') === 'partial') {
-            $confirmedSerialNumbers = $validated['confirmed_serial_numbers'] ?? [];
-            $confirmedRollCodes = $validated['confirmed_roll_codes'] ?? [];
-            $confirmedQuantities = ['_lines' => $validated['confirmed_quantities'] ?? []];
-        } else {
-            $confirmedSerialNumbers = [];
-            $confirmedRollCodes = [];
-            $confirmedQuantities = ['_lines' => []];
-            foreach ($dispatchLines as $line) {
-                $remaining = $remainingByLine[$line->id];
-                if ($remaining <= 0) {
-                    continue;
-                }
-                if ($line->serial_id !== null) {
-                    $confirmedSerialNumbers[] = $line->serial->serial_number;
-                } elseif ($line->roll_id !== null) {
-                    $confirmedRollCodes[] = $line->roll->roll_code;
-                } else {
-                    $confirmedQuantities['_lines'][$line->id] = $remaining;
-                }
+        $confirmedSerialNumbers = [];
+        $confirmedRollCodes = [];
+        $confirmedQuantities = ['_lines' => []];
+        foreach ($dispatchLines as $line) {
+            $remaining = $remainingByLine[$line->id];
+            if ($remaining <= 0) {
+                continue;
+            }
+            if ($line->serial_id !== null) {
+                $confirmedSerialNumbers[] = $line->serial->serial_number;
+            } elseif ($line->roll_id !== null) {
+                $confirmedRollCodes[] = $line->roll->roll_code;
+            } else {
+                $confirmedQuantities['_lines'][$line->id] = $remaining;
             }
         }
 
@@ -368,31 +345,6 @@ class WarehouseTransferController extends Controller
 
         return redirect()->route('warehouse.transfers.show', $transfer)
             ->with('success', "Transfer {$transfer->reference_number} dikonfirmasi: {$transfer->status->label()}.");
-    }
-
-    public function closeMissing(Request $request, InventoryTransfer $transfer, InventoryTransferService $service, EffectiveAccessService $access): RedirectResponse
-    {
-        abort_if($transfer->branchSale()->exists(), 403);
-        $this->assertPopInScope($transfer->fromPop, auth()->user(), $access);
-        $this->assertPopAdminNotBlockedByActivePicGudang($transfer->fromPop, auth()->user());
-        $this->assertPicGudangCanActOnPop($transfer->fromPop, auth()->user());
-
-        $validated = $request->validate([
-            'reason' => ['required', 'string', 'max:500'],
-            'evidence' => ['required', 'image', 'max:4096'],
-        ]);
-        $evidencePath = FileUploadService::uploadWarehouseEvidence($request->file('evidence'), 'lost-transfer');
-
-        try {
-            $service->closeMissingTransfer($transfer, $validated['reason'], $evidencePath, auth()->user());
-        } catch (InvalidArgumentException $e) {
-            Storage::disk('public')->delete($evidencePath);
-
-            return back()->withInput()->with('error', $e->getMessage());
-        }
-
-        return redirect()->route('warehouse.transfers.show', $transfer)
-            ->with('success', "Sisa transfer {$transfer->reference_number} ditutup sebagai barang hilang.");
     }
 
     /**

@@ -648,6 +648,12 @@
                                     <span>Laporan Bayar Kolektor</span>
                                 </a>
                                 @endif
+                                @if(auth()->user()->hasPermission('modem_sale_reconciliation.view'))
+                                <a href="{{ route('reports.modem-sale-reconciliation.index') }}"
+                                   class="flex items-center justify-between sidebar-subitem {{ Request::is('reports/modem-sale-reconciliation*') ? 'sidebar-subitem-active' : '' }}">
+                                    <span>Rekonsiliasi Modem Terjual</span>
+                                </a>
+                                @endif
                                 <a href="{{ route('reports.imports.index') }}"
                                    class="flex items-center justify-between sidebar-subitem {{ Request::is('reports/imports*') ? 'sidebar-subitem-active' : '' }}">
                                     <span>Laporan Import Data</span>
@@ -846,6 +852,8 @@
                                 </a>
                                 @endif
                                 @if(auth()->user()->hasPermission('warehouse_stock_request.view'))
+                                <a href="{{ route('warehouse.marketing.index') }}" class="flex items-center sidebar-subitem {{ Request::is('warehouse/marketing*') ? 'sidebar-subitem-active' : '' }}"><span>Barang Nonoperasional</span></a>
+                                @endif                                @if(auth()->user()->hasPermission('warehouse_stock_request.view'))
                                 <a href="{{ route('warehouse.stock-requests.index', ['status' => 'open']) }}" class="flex items-center justify-between sidebar-subitem {{ Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : '' }}"><span>Permintaan Stok</span>
                                     @if(($badge_stock_request_count ?? 0) > 0)<span data-badge="stock-request" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">{{ $badge_stock_request_count }}</span>@endif
                                 </a>

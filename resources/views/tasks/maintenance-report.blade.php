@@ -367,6 +367,9 @@
                 </div>
             </div>
 
+            {{-- ── Section 2b-2: Ganti Perangkat Tambahan (AP/STB, Opsional) ── --}}
+            @include('tasks.partials.extra-device-replacement')
+
             {{-- ── Section 2c: Roll Kabel (Opsional) ─────────────────────
                  Sama pola Modem/Perangkat Aktif di atas — OPSIONAL, teknisi
                  gak selalu potong kabel dari roll ter-track saat maintenance. --}}

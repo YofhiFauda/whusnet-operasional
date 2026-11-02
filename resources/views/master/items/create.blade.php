@@ -15,7 +15,7 @@
 </div>
 
 <!-- Form Container -->
-<form action="{{ route('master.items.store') }}" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto" x-data="{ trackingType: '{{ old('tracking_type', 'quantity') }}', categoryId: '{{ old('item_category_id') }}', modemCategoryId: '{{ $categories->firstWhere('code', 'modem_ont')?->id }}' }">
+<form action="{{ route('master.items.store') }}" method="POST" class="grid grid-cols-1 lg:grid-cols-2 gap-6 max-w-4xl mx-auto" x-data="{ trackingType: '{{ old('tracking_type', 'quantity') }}', categoryId: '{{ old('item_category_id') }}', modemCategoryId: '{{ $categories->firstWhere('code', 'modem_ont')?->id }}', nonOperationalCategoryIds: [{{ $categories->where('is_operational', false)->pluck('id')->implode(',') }}], get isOperational() { return !this.nonOperationalCategoryIds.includes(Number(this.categoryId)) } }">
     @csrf
 
     <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 shadow-sm col-span-1 lg:col-span-2 space-y-5">
@@ -60,7 +60,7 @@
             <!-- Tipe -->
             <div>
                 <label for="item_category_id" class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kategori <span class="text-rose-500">*</span></label>
-                <select name="item_category_id" id="item_category_id" x-model="categoryId" required
+                <select name="item_category_id" id="item_category_id" x-model="categoryId" x-effect="if (!isOperational) trackingType = 'quantity'" required
                         class="w-full px-3 py-2 border @error('item_category_id') border-rose-500 focus:ring-rose-500 @else border-slate-300 dark:border-slate-600 focus:ring-sky-500 focus:border-sky-500 @enderror rounded-md text-sm text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-1 bg-white dark:bg-slate-800">
                     <option value="">-- Pilih Kategori --</option>
                     @foreach($categories as $category)
@@ -119,7 +119,7 @@
         <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
             @foreach($trackingTypes as $tt)
             <label class="flex items-start gap-2 border rounded-md p-3 cursor-pointer transition-colors {{ old('tracking_type', 'quantity') === $tt->value ? 'border-sky-500 bg-sky-50 dark:bg-sky-950/30' : 'border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600' }}">
-                <input type="radio" name="tracking_type" value="{{ $tt->value }}" x-model="trackingType" {{ old('tracking_type', 'quantity') === $tt->value ? 'checked' : '' }} class="mt-0.5">
+                <input type="radio" name="tracking_type" value="{{ $tt->value }}" x-model="trackingType" :disabled="!isOperational && '{{ $tt->value }}' !== 'quantity'" {{ old('tracking_type', 'quantity') === $tt->value ? 'checked' : '' }} class="mt-0.5">
                 <span class="text-xs font-semibold text-slate-700 dark:text-slate-300">{{ $tt->label() }}</span>
             </label>
             @endforeach
@@ -133,9 +133,9 @@
              jaringan). Cuma "Aset Perusahaan" yang SERIALIZED-only — opsinya
              dimatikan per-opsi, bukan seluruh select (dulu seluruh select
              disabled → QUANTITY/ROLL gak pernah bisa jadi infrastruktur). --}}
-        <div class="pt-2">
+        <div class="pt-2" x-show="isOperational" x-cloak>
             <label class="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase tracking-wide mb-1.5">Kepemilikan</label>
-            <select name="ownership_mode" x-effect="if ((trackingType !== 'serialized' && $el.value === 'company_asset') || (categoryId === modemCategoryId && $el.value !== 'installable')) { $el.value = 'installable' }" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
+            <select name="ownership_mode" :disabled="!isOperational" x-effect="if ((trackingType !== 'serialized' && $el.value === 'company_asset') || (categoryId === modemCategoryId && $el.value !== 'installable')) { $el.value = 'installable' }" class="w-full sm:w-1/2 px-3 py-2 border border-slate-300 dark:border-slate-600 rounded-md text-sm text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-800 focus:outline-none focus:ring-1 focus:ring-sky-500">
                 @foreach($ownershipModes as $om)
                 <option value="{{ $om->value }}" @if($om !== \App\Enums\OwnershipMode::INSTALLABLE) :disabled="categoryId === modemCategoryId{{ $om === \App\Enums\OwnershipMode::COMPANY_ASSET ? " || trackingType !== 'serialized'" : '' }}" @endif {{ old('ownership_mode', 'installable') === $om->value ? 'selected' : '' }}>{{ $om->label() }}</option>
                 @endforeach
@@ -145,7 +145,7 @@
             <p class="text-[10px] text-slate-400 dark:text-slate-500 mt-1">"Aset Perusahaan" buat alat kerja (OTDR, laptop) — cuma Bernomor Seri, gak pernah tercatat terpasang, dipinjam-pakaikan lalu wajib balik. "Aset Infrastruktur" buat barang yang dipasang netap ke titik jaringan (ODP, splitter, kabel feeder).</p>
         </div>
 
-        <div class="pt-2">
+        <div class="pt-2" x-show="isOperational" x-cloak>
             <div class="mb-1.5 flex items-center gap-1.5">
                 <label for="infrastructure_node_type_id" class="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300">Tipe Node Tujuan</label>
                 <details class="group relative">
@@ -155,7 +155,7 @@
                     </div>
                 </details>
             </div>
-            <select name="infrastructure_node_type_id" id="infrastructure_node_type_id" :disabled="categoryId === modemCategoryId" class="disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-slate-900 dark:disabled:text-slate-500 w-full sm:w-1/2 px-3 py-2 rounded-md border border-slate-300 bg-white text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+            <select name="infrastructure_node_type_id" id="infrastructure_node_type_id" :disabled="!isOperational || categoryId === modemCategoryId" class="disabled:cursor-not-allowed disabled:bg-slate-100 disabled:text-slate-400 dark:disabled:bg-slate-900 dark:disabled:text-slate-500 w-full sm:w-1/2 px-3 py-2 rounded-md border border-slate-300 bg-white text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
                 <option value="">Fleksibel (selain komponen OLT)</option>
                 @foreach($nodeTypes as $nodeType)
                     <option value="{{ $nodeType->id }}" @selected((int) old('infrastructure_node_type_id') === $nodeType->id)>{{ $nodeType->name }}</option>

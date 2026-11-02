@@ -3,7 +3,6 @@
 namespace Tests\Feature;
 
 use App\Enums\SerialStatus;
-use App\Exceptions\InsufficientCustodyException;
 use App\Models\Customer;
 use App\Models\FopTask;
 use App\Models\InventoryRoll;
@@ -15,16 +14,17 @@ use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Services\InventoryService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use InvalidArgumentException;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
 /**
- * Barang (SN/roll/custody QUANTITY) yang diissue dari Cabang A gak boleh
- * dipakai (install/consume) untuk Task di Cabang B — laporan user: "modem
- * Jetis dapat digunakan Sandya, seharusnya itu tidak bisa". Sebelum ini
- * `installSerial()`/`consumeFromCustody()`/`consumeFromRoll()` cuma mengecek
- * custody (siapa pegang), gak pernah mengecek cabang asal vs cabang task.
+ * Barang (SN/roll/custody QUANTITY) yang diissue dari Cabang A BOLEH dipakai
+ * (install/consume) untuk Task di Cabang B — keputusan user 2026-10-31:
+ * teknisi di sini bersifat flexible lintas cabang, gak bisa di-strict scope
+ * POP. Guard lintas-cabang yang tadinya ada di `installSerial()`/
+ * `consumeFromCustody()`/`consumeFromRoll()` (dipasang gara-gara laporan
+ * "modem Jetis kepakai di Sandya") DICABUT PERMANEN — jangan dipasang balik
+ * sebagian, lihat CLAUDE.md.
  */
 class InventoryServiceCrossBranchGuardTest extends TestCase
 {
@@ -89,7 +89,7 @@ class InventoryServiceCrossBranchGuardTest extends TestCase
     }
 
     #[Test]
-    public function install_serial_menolak_sn_dari_cabang_lain(): void
+    public function install_serial_lolos_walau_sn_dari_cabang_lain(): void
     {
         $serial = InventorySerial::create([
             'item_id' => $this->modem->id,
@@ -102,9 +102,9 @@ class InventoryServiceCrossBranchGuardTest extends TestCase
         $fopTaskSandya = $this->fopTaskAt($this->cabangSandya);
         $customerSandya = $this->customerAt($this->cabangSandya);
 
-        $this->expectException(InvalidArgumentException::class);
-
         app(InventoryService::class)->installSerial($serial, $customerSandya, $fopTaskSandya, [$this->technician], $this->actor);
+
+        $this->assertSame(SerialStatus::INSTALLED, $serial->refresh()->status);
     }
 
     #[Test]
@@ -165,7 +165,7 @@ class InventoryServiceCrossBranchGuardTest extends TestCase
     }
 
     #[Test]
-    public function consume_from_custody_skip_lot_dari_cabang_lain(): void
+    public function consume_from_custody_pakai_lot_cabang_lain_kalau_itu_yang_duluan_diambil(): void
     {
         TechnicianCustody::create([
             'technician_id' => $this->technician->id,
@@ -178,19 +178,20 @@ class InventoryServiceCrossBranchGuardTest extends TestCase
 
         $fopTaskJetis = $this->fopTaskAt($this->cabangJetis);
 
-        $this->expectException(InsufficientCustodyException::class);
+        $consumed = app(InventoryService::class)->consumeFromCustody([$this->technician], $this->kabel, 10, $fopTaskJetis, null, $this->actor);
 
-        app(InventoryService::class)->consumeFromCustody([$this->technician], $this->kabel, 10, $fopTaskJetis, null, $this->actor);
+        $this->assertCount(1, $consumed);
+        $this->assertEquals(10, $consumed[0]['qty']);
     }
 
     #[Test]
-    public function consume_from_custody_pakai_lot_cabang_sama_walau_ada_lot_cabang_lain(): void
+    public function consume_from_custody_fifo_lintas_cabang_tetap_urut_issued_at(): void
     {
-        TechnicianCustody::create([
+        $lotSandya = TechnicianCustody::create([
             'technician_id' => $this->technician->id,
             'issued_from_pop_id' => $this->cabangSandya->id,
             'item_id' => $this->kabel->id,
-            'qty_remaining' => 50,
+            'qty_remaining' => 5,
             'status' => 'issued',
             'issued_at' => now(),
         ]);
@@ -207,12 +208,14 @@ class InventoryServiceCrossBranchGuardTest extends TestCase
 
         $consumed = app(InventoryService::class)->consumeFromCustody([$this->technician], $this->kabel, 10, $fopTaskJetis, null, $this->actor);
 
-        $this->assertCount(1, $consumed);
-        $this->assertEquals(10, $consumed[0]['qty']);
+        $this->assertCount(2, $consumed);
+        $this->assertSame($lotSandya->id, $consumed[0]['custody_id']);
+        $this->assertEquals(5, $consumed[0]['qty']);
+        $this->assertEquals(5, $consumed[1]['qty']);
     }
 
     #[Test]
-    public function consume_from_roll_menolak_roll_dari_cabang_lain(): void
+    public function consume_from_roll_lolos_walau_roll_dari_cabang_lain(): void
     {
         $roll = InventoryRoll::create([
             'item_id' => $this->kabel->id,
@@ -226,8 +229,8 @@ class InventoryServiceCrossBranchGuardTest extends TestCase
 
         $fopTaskJetis = $this->fopTaskAt($this->cabangJetis);
 
-        $this->expectException(InvalidArgumentException::class);
-
         app(InventoryService::class)->consumeFromRoll($roll, 10, [$this->technician], $fopTaskJetis, null, $this->actor);
+
+        $this->assertEquals(90, $roll->refresh()->length_remaining);
     }
 }

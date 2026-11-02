@@ -1,5 +1,5 @@
 {{-- Posisi Pemasangan aset berserial (rancangan hierarki infrastruktur §10.4/§16.1). --}}
-<div class="pt-2">
+<div class="pt-2" x-show="isOperational" x-cloak>
     <div class="mb-1.5 flex items-center gap-1.5">
         <label for="infrastructure_location_kind" class="text-xs font-bold uppercase tracking-wide text-slate-700 dark:text-slate-300">Posisi Pemasangan</label>
         <details class="group relative">
@@ -9,7 +9,7 @@
             </div>
         </details>
     </div>
-    <select name="infrastructure_location_kind" id="infrastructure_location_kind" class="w-full sm:w-1/2 px-3 py-2 rounded-md border border-slate-300 bg-white text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
+    <select name="infrastructure_location_kind" id="infrastructure_location_kind" :disabled="!isOperational" class="w-full sm:w-1/2 px-3 py-2 rounded-md border border-slate-300 bg-white text-sm text-slate-800 dark:border-slate-600 dark:bg-slate-800 dark:text-slate-200">
         <option value="">Node/perangkat (bawaan)</option>
         @foreach(\App\Enums\InfrastructureLocationKind::cases() as $locationKind)
             <option value="{{ $locationKind->value }}" @selected($selectedLocationKind === $locationKind->value)>{{ $locationKind->label() }}</option>

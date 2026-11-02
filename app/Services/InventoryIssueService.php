@@ -57,6 +57,9 @@ class InventoryIssueService
 
             foreach ($lines as $line) {
                 $item = Item::findOrFail($line['item_id']);
+                if ($item->isNonOperational()) {
+                    throw new InvalidArgumentException('Barang nonoperasional tidak dapat diserahkan ke custody teknisi.');
+                }
 
                 $transactions[] = match ($item->tracking_type) {
                     TrackingType::SERIALIZED => $this->issueSerialized($referenceNumber, $cabang, $technician, $item, $line['serial_numbers'] ?? [], $actor),

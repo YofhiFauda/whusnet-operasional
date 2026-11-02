@@ -8,6 +8,24 @@
 @source '../**/*.blade.php';
 @source '../**/*.js';
 
+/* `<input type="number">` scroll/klik spinner (▲▼) bikin nilai ter-geser
+   diam-diam tanpa teknisi sadar — kasus nyata: "Meter Terpakai" roll kabel
+   1000 jadi 999.71 cuma kena scroll wheel pas ngisi form (ketauan
+   2026-11-01). Spinner dimatiin total di sini (bukan cuma wheel-blur di
+   app.js) karena klik langsung tombol ▲▼ juga mengubah nilai per `step`
+   dan gak ketangkep guard wheel. Field numerik tetap bisa diketik manual
+   — cuma tombol/scroll stepper-nya yang dihilangkan. */
+input[type='number'] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+input[type='number']::-webkit-outer-spin-button,
+input[type='number']::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
 :root {
   /* Colors — Sky Blue (skybrand) sesuai Design.md */
   --color-primary: #0284C7;         /* sky-600 */

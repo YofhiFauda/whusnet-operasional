@@ -120,7 +120,7 @@ class StockBoardActionsTest extends StockBoardTestCase
         $this->assertSame($this->url('warehouse.transfers.create', $this->pusat, $modem), $pusat['transferUrl']);
         $this->assertNull($pusat['requestStockUrl']);
         $this->assertNull($pusat['issueUrl']);
-        $this->assertSame($this->url('warehouse.adjustments.balance.create', $this->pusat, $modem), $pusat['adjustUrl']);
+        $this->assertSame($this->url('warehouse.adjustments.check.create', $this->pusat, $modem), $pusat['adjustUrl']);
         $this->assertSame($this->url('warehouse.stock.threshold.create', $this->pusat, $modem), $pusat['thresholdUrl']);
         $this->assertHref($pusat['transferUrl'], $fragmen);
         $this->assertHref($pusat['adjustUrl'], $fragmen);
@@ -159,7 +159,7 @@ class StockBoardActionsTest extends StockBoardTestCase
         $withLot = ['lot_no' => $lot];
         $this->assertSame($this->url('warehouse.stock-requests.create', $this->cabangA, $kabel, $withLot), $cabang['actions']['requestStockUrl']);
         $this->assertSame($this->url('warehouse.issues.create', $this->cabangA, $kabel, $withLot), $cabang['actions']['issueUrl']);
-        $this->assertSame($this->url('warehouse.adjustments.balance.create', $this->cabangA, $kabel, $withLot), $cabang['actions']['adjustUrl']);
+        $this->assertSame($this->url('warehouse.adjustments.check.create', $this->cabangA, $kabel, $withLot), $cabang['actions']['adjustUrl']);
         // Atur Ambang SENGAJA tanpa lot_no: ambang disimpan & dibaca papan di
         // lot_no '' — membawa lot X akan menyimpan minimum yang tak pernah dibaca.
         $this->assertSame($this->url('warehouse.stock.threshold.create', $this->cabangA, $kabel), $cabang['actions']['thresholdUrl']);
@@ -212,12 +212,12 @@ class StockBoardActionsTest extends StockBoardTestCase
         $this->assertNull($detail['actions']['adjustUrl']);
         $this->assertHref($detail['actions']['requestStockUrl'], $fragmen);
         $this->assertHref($detail['actions']['issueUrl'], $fragmen);
-        $this->assertNoHref($this->url('warehouse.adjustments.balance.create', $this->cabangA, $dua), $fragmen);
+        $this->assertNoHref($this->url('warehouse.adjustments.check.create', $this->cabangA, $dua), $fragmen);
 
         $byLot = collect($detail['priceTiers'])->keyBy('lotNo');
         $this->assertCount(2, $byLot);
         foreach (['', $lotBaru] as $lot) {
-            $this->assertSame($this->url('warehouse.adjustments.balance.create', $this->cabangA, $dua, ['lot_no' => $lot]), $byLot[$lot]['opnameUrl']);
+            $this->assertSame($this->url('warehouse.adjustments.check.create', $this->cabangA, $dua, ['lot_no' => $lot]), $byLot[$lot]['opnameUrl']);
         }
     }
 
@@ -240,7 +240,7 @@ class StockBoardActionsTest extends StockBoardTestCase
         $this->assertSame($this->url('warehouse.stock.threshold.create', $this->pusat, $dua), $detail['actions']['thresholdUrl']);
         $this->assertHref($detail['actions']['transferUrl'], $fragmen);
         $this->assertHref($detail['actions']['thresholdUrl'], $fragmen);
-        $this->assertNoHref($this->url('warehouse.adjustments.balance.create', $this->pusat, $dua), $fragmen);
+        $this->assertNoHref($this->url('warehouse.adjustments.check.create', $this->pusat, $dua), $fragmen);
         $this->assertStringContainsString('Opname per harga', $fragmen);
 
         // Drawer: tiap tingkat harga punya Opname sendiri dengan lot_no-nya.
@@ -248,7 +248,7 @@ class StockBoardActionsTest extends StockBoardTestCase
         $byLot = collect($detail['priceTiers'])->keyBy('lotNo');
         foreach ($lots as $lot) {
             $this->assertTrue($byLot->has($lot), "tingkat harga {$lot} tidak ada di payload");
-            $this->assertSame($this->url('warehouse.adjustments.balance.create', $this->pusat, $dua, ['lot_no' => $lot]), $byLot[$lot]['opnameUrl']);
+            $this->assertSame($this->url('warehouse.adjustments.check.create', $this->pusat, $dua, ['lot_no' => $lot]), $byLot[$lot]['opnameUrl']);
         }
         $this->assertEqualsCanonicalizing([250000.0, 260000.0], collect($detail['priceTiers'])->pluck('price')->map(fn ($p) => (float) $p)->all());
         $this->assertEqualsCanonicalizing([12.0, 10.0], collect($detail['priceTiers'])->pluck('qty')->map(fn ($q) => (float) $q)->all());
@@ -272,7 +272,7 @@ class StockBoardActionsTest extends StockBoardTestCase
                     $this->assertStringNotContainsString('lot_no', $url, "{$key} {$item->code} tidak boleh membawa lot_no");
                 }
             }
-            $this->assertSame($this->url('warehouse.adjustments.balance.create', $this->pusat, $item), $detail['actions']['adjustUrl']);
+            $this->assertSame($this->url('warehouse.adjustments.check.create', $this->pusat, $item), $detail['actions']['adjustUrl']);
         }
     }
 
@@ -305,7 +305,7 @@ class StockBoardActionsTest extends StockBoardTestCase
                 $this->assertNull($tier['opnameUrl']);
             }
         }
-        foreach (['warehouse.transfers.create', 'warehouse.stock-requests.create', 'warehouse.issues.create', 'warehouse.adjustments.balance.create', 'warehouse.stock.threshold.create'] as $route) {
+        foreach (['warehouse.transfers.create', 'warehouse.stock-requests.create', 'warehouse.issues.create', 'warehouse.adjustments.check.create', 'warehouse.stock.threshold.create'] as $route) {
             $this->assertStringNotContainsString('href="'.e(route($route)), $fragmen, "{$route} dirender tanpa permission");
         }
         $this->assertStringNotContainsString('⋮ Aksi', $fragmen);

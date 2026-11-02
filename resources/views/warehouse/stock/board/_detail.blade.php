@@ -26,6 +26,7 @@
 --}}
 @php
     $item = $row['item'];
+    $isNonOperational = $item->isNonOperational();
     $tracking = $row['tracking'];
     $isQuantity = $tracking === \App\Enums\TrackingType::QUANTITY;
     $isPusat = $pop->isPusat();
@@ -37,13 +38,13 @@
     $hasTwoPrices = $isQuantity && count($row['price_tiers']) > 1;
     $singleLot = $isQuantity && ! $hasTwoPrices ? $row['lot_no'] : null;
     $params = $singleLot !== null ? $base + ['lot_no' => $singleLot] : $base;
-    $opnameUrl = fn (array $query) => $canAdjust ? route('warehouse.adjustments.balance.create', $query) : null;
+    $opnameUrl = fn (array $query) => $canAdjust && ! $isNonOperational ? route('warehouse.adjustments.check.create', $query) : null;
 
     // Dua tingkat harga: yang lebih lama = lot_no '' (atau yang pertama), sisanya
     // harga baru — ADHOC-75 membatasi maksimal 2 per barang. Istilah "lot" tidak
     // pernah tampil; pengguna mengenalnya sebagai harga lama/baru.
     $priceTiers = [];
-    if ($hasTwoPrices) {
+    if (! $isNonOperational && $hasTwoPrices) {
         $tiers = collect($row['price_tiers']);
         $old = $tiers->firstWhere('lot_no', '') ?? $tiers->first();
         $ordered = collect([$old])->merge($tiers->reject(fn ($tier) => $tier === $old));
@@ -56,7 +57,7 @@
                 'opnameUrl' => $opnameUrl($base + ['lot_no' => $tier['lot_no']]),
             ];
         }
-    } elseif ($singleLot !== null) {
+    } elseif (! $isNonOperational && $singleLot !== null) {
         // Satu harga: harga dari `row.price` (last-cost RECEIVE). Null bila
         // ledger tidak punya harga — drawer menulis "—" dan tidak menghitung
         // Nilai, bukan menebak.
@@ -103,9 +104,11 @@
         'rollsUrl' => $tracking === \App\Enums\TrackingType::ROLL ? route('warehouse.stock.rolls', $base) : null,
         'priceTiers' => $priceTiers,
         'actions' => [
-            'transferUrl' => $canTransfer && $isPusat ? route('warehouse.transfers.create', $params) : null,
-            'requestStockUrl' => $canRequestStock && $isCabang ? route('warehouse.stock-requests.create', $params) : null,
-            'issueUrl' => $canIssue && $isCabang ? route('warehouse.issues.create', $params) : null,
+            'transferUrl' => ! $isNonOperational && $canTransfer && $isPusat ? route('warehouse.transfers.create', $params) : null,
+            'requestStockUrl' => $isNonOperational
+                ? ($canRequestStock && $isCabang ? route('warehouse.marketing.create', $params) : null)
+                : ($canRequestStock && $isCabang ? route('warehouse.stock-requests.create', $params) : null),
+            'issueUrl' => ! $isNonOperational && $canIssue && $isCabang ? route('warehouse.issues.create', $params) : null,
             'adjustUrl' => $hasTwoPrices ? null : $opnameUrl($params),
             // Atur Ambang SELALU tanpa lot_no: ambang hanya dibaca dari baris
             // lot_no '' (WarehouseStockBoardService::thresholds()), sedangkan
@@ -116,7 +119,7 @@
             'thresholdUrl' => $canAdjust ? route('warehouse.stock.threshold.create', $base) : null,
         ],
         // Tanda untuk menu: Opname ada, tapi hanya per tingkat harga di drawer.
-        'opnamePerTier' => $hasTwoPrices && $canAdjust,
+        'opnamePerTier' => ! $isNonOperational && $hasTwoPrices && $canAdjust,
     ];
 @endphp
 {!! json_encode($detail, JSON_THROW_ON_ERROR) !!}

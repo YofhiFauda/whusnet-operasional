@@ -821,6 +821,8 @@
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_stock_request.view')): ?>
+                                <a href="<?php echo e(route('warehouse.marketing.index')); ?>" class="flex items-center sidebar-subitem <?php echo e(Request::is('warehouse/marketing*') ? 'sidebar-subitem-active' : ''); ?>"><span>Barang Nonoperasional</span></a>
+                                <?php endif; ?>                                <?php if(auth()->user()->hasPermission('warehouse_stock_request.view')): ?>
                                 <a href="<?php echo e(route('warehouse.stock-requests.index', ['status' => 'open'])); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : ''); ?>"><span>Permintaan Stok</span>
                                     <?php if(($badge_stock_request_count ?? 0) > 0): ?><span data-badge="stock-request" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600"><?php echo e($badge_stock_request_count); ?></span><?php endif; ?>
                                 </a>
