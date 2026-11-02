@@ -88,6 +88,41 @@ class WarehousePackConversionTest extends TestCase
     }
 
     #[Test]
+    public function receive_barang_berpack_size_konversi_unit_price_ke_per_pcs(): void
+    {
+        // Harga yang diketik staf itu harga-per-Pack (dibaca dari faktur
+        // supplier) — unit_price_snapshot yang tersimpan WAJIB sudah
+        // per-pcs, sama seperti qty. Kalau tidak dikonversi, nilai stok
+        // menggelembung sebesar pack_size kali lipat (lihat receiveRoll()
+        // yang sudah menerapkan pola konversi harga yang sama untuk Roll).
+        $this->loginAsAdmin();
+        $pusat = Pop::factory()->create(['type' => 'pusat']);
+        $item = Item::create([
+            'code' => 'PACK-TEST-03',
+            'name' => 'Barang Berpack Harga Uji',
+            'unit' => 'pcs',
+            'tracking_type' => TrackingType::QUANTITY,
+            'pack_size' => 50,
+        ]);
+
+        $response = $this->post(route('warehouse.receive.store'), [
+            'pop_id' => $pusat->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 2, 'unit_price' => 10000],
+            ],
+        ]);
+
+        $response->assertRedirect();
+        $this->assertDatabaseHas('inventory_transactions', [
+            'item_id' => $item->id,
+            'type' => InventoryTransactionType::RECEIVE->value,
+            'qty' => 100,
+            'entered_pack_qty' => 2,
+            'unit_price_snapshot' => 200,
+        ]);
+    }
+
+    #[Test]
     public function issue_barang_berpack_size_dikonversi_ke_pcs(): void
     {
         $this->loginAsAdmin();
@@ -161,12 +196,14 @@ class WarehousePackConversionTest extends TestCase
     }
 
     /**
-     * Confirm Transfer sekarang cuma satu mode "Terima Semua" (partial
-     * receive dihapus, ADHOC-250 lanjutan 2026-11-01 — lihat
-     * docs/superpowers/specs/2026-11-01-pack-pcs-conversion-design.md).
-     * `entered_pack_qty` sisi confirm diturunkan balik dari qty pcs yang
-     * dikonfirmasi ÷ pack_size, karena tidak ada lagi input Pack dari staf
-     * di form ini.
+     * Test ini menguji mode "Terima Semua" (default, tanpa `receive_mode`
+     * di body request) — partial receive (`receive_mode=partial` +
+     * `confirmed_quantities`) masih ada di controller, tidak disentuh di
+     * sini. `entered_pack_qty` sisi confirm diturunkan balik dari qty pcs
+     * yang dikonfirmasi ÷ pack_size — hitungan yang sama berlaku baik untuk
+     * jalur "Terima Semua" maupun partial, karena keduanya sampai ke
+     * Service dalam satuan pcs (lihat docs/superpowers/specs/
+     * 2026-11-01-pack-pcs-conversion-design.md).
      */
     #[Test]
     public function confirm_terima_semua_transfer_barang_berpack_size_hitung_entered_pack_qty(): void

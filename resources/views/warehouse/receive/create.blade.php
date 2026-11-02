@@ -516,7 +516,9 @@
                                                     </div>
 
                                                     <div>
-                                                        <label class="block mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">Harga Satuan (Rp) <span class="text-rose-500">*</span></label>
+                                                        <label class="block mb-1 text-[10px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300">
+                                                            <span x-text="row.unit === 'Pack' ? 'Harga per Pack (Rp)' : 'Harga Satuan (Rp)'"></span> <span class="text-rose-500">*</span>
+                                                        </label>
                                                         <div class="relative">
                                                             <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-xs font-mono font-semibold text-slate-400">Rp</span>
                                                             <input type="text" inputmode="decimal" data-rupiah :name="`lines[${index}][unit_price]`" x-model="row.unit_price" required placeholder="5.000"
