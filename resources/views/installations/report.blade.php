@@ -781,8 +781,8 @@
                                              kalau ikut digerbang, teknisi kontrak Beli + pilihan "Beli Sendiri" jadi
                                              TIDAK BISA SAMA SEKALI mencatat roll/material pasif (regresi, keduanya
                                              dulu independen & selalu aktif). Pengecualian modem untuk beli_sendiri
-                                             sudah ditangani SENDIRI di dalam <x-installation-item-rows> lewat
-                                             modem-acquisition-expr (opsi "Modem" disembunyikan dari dropdown +
+                                             sudah ditangani SENDIRI di dalam komponen installation-item-rows lewat
+                                             modem-blocked-expr (opsi "Modem" disembunyikan dari dropdown +
                                              hidden input SN-nya didisable), tanpa perlu gerbang di luar. --}}
                                         <x-installation-item-rows
                                             :serial-options="$eligibleSerials"
@@ -792,7 +792,7 @@
                                             :initial-roll-id="old('selected_inventory_roll_id', $installation->selected_inventory_roll_id ?? null)"
                                             :initial-roll-meters="old('roll_meters_used', $installation->roll_meters_used ?? null)"
                                             :initial-material-rows="old('materials', $materialRows)"
-                                            modem-acquisition-expr="modemAcquisition"
+                                            modem-blocked-expr="modemAcquisition === 'beli_sendiri'"
                                             empty-label="Belum ada barang dipilih. Klik Tambah Barang."
                                         />
 

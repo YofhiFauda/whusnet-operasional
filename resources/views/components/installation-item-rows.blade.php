@@ -1,9 +1,10 @@
 {{--
     Komponen: Baris Barang Dipasang (Modem + Roll Kabel + Pasif, gabungan)
     =======================================================================
-    Dipakai HANYA Laporan Pemasangan PSB (Form 1 / storePemasangan()) — ganti
-    3 picker terpisah (combobox SN Modem, combobox Roll Kabel, komponen
-    material-rows Pasif) jadi 1 dropdown growable. Lihat
+    Dipakai Laporan Pemasangan PSB (Form 1 / storePemasangan()) DAN Laporan
+    Maintenance/C-REQ (TaskMaintenanceController::store()) — ganti 3 picker
+    terpisah (combobox SN Modem, combobox Roll Kabel, komponen material-rows
+    Pasif) jadi 1 dropdown growable. Lihat
     docs/superpowers/specs/2026-11-02-unify-dropdown-item-psb-design.md.
 
     PENTING: komponen ini TIDAK mengubah backend sama sekali. Tiap baris
@@ -21,11 +22,14 @@
       $initialRollId   (int|null) — prefill, $installation->selected_inventory_roll_id.
       $initialRollMeters (float|null) — prefill, $installation->roll_meters_used.
       $initialMaterialRows (array) — prefill baris pasif, format sama $rows di material-rows.blade.php.
-      $modemAcquisitionExpr (string) — ekspresi Alpine yang mengevaluasi nilai radio
-        "Cara Pemilikan Modem" di scope luar (biasanya cuma `modemAcquisition`, lihat
-        x-data di report.blade.php). Opsi "Modem" disembunyikan & input SN-nya
-        didisable saat ekspresi ini === 'beli_sendiri' — identik perilaku lama
-        (fieldset disabled), tidak menduplikasi aturan di backend.
+      $modemBlockedExpr (string) — ekspresi Alpine BOOLEAN (bukan nilai mentah)
+        yang menentukan kapan opsi "Modem" disembunyikan & input SN-nya
+        didisable — identik perilaku lama (fieldset disabled), tidak
+        menduplikasi aturan di backend. Tiap pemanggil beda jumlah pilihan
+        ownership modem-nya (PSB cuma 2: radio acquisition === 'beli_sendiri';
+        Maintenance/C-REQ ada 4: ownership === 'tidak_ganti' || === 'beli_sendiri'),
+        jadi komponen ini SENGAJA menerima ekspresi boolean jadi, bukan nilai
+        mentah + perbandingan hardcode di dalam.
 --}}
 
 @props([
@@ -36,7 +40,7 @@
     'initialRollId' => null,
     'initialRollMeters' => null,
     'initialMaterialRows' => [],
-    'modemAcquisitionExpr' => 'null',
+    'modemBlockedExpr' => 'false',
     'emptyLabel' => 'Belum ada barang dipilih.',
 ])
 
@@ -95,7 +99,7 @@
             <div class="col-span-8 md:col-span-7">
                 <label class="block mb-1 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Barang (custody tim)</label>
                 <x-combobox
-                    options-expr="() => comboOptionsFor(index, {{ $modemAcquisitionExpr }})"
+                    options-expr="() => comboOptionsFor(index, ({{ $modemBlockedExpr }}))"
                     value-expr="() => selectedComboValue(row)"
                     on-select-expr="onChoose(index, value)"
                     placeholder="Ketik nama barang / SN / kode roll..."
@@ -106,7 +110,7 @@
                  (validasi klien tombol Aktivasi, report.blade.php) baca nilai lewat
                  document.getElementById('selected_inventory_serial_id'), bukan name. --}}
             <template x-if="row.mechanism === 'modem'">
-                <input type="hidden" id="selected_inventory_serial_id" name="selected_inventory_serial_id" :value="row.option_id" :disabled="({{ $modemAcquisitionExpr }}) === 'beli_sendiri'">
+                <input type="hidden" id="selected_inventory_serial_id" name="selected_inventory_serial_id" :value="row.option_id" :disabled="({{ $modemBlockedExpr }})">
             </template>
 
             <template x-if="row.mechanism === 'roll'">
@@ -237,11 +241,11 @@ function installationItemRows(itemOptions, initialRows) {
             return this._mechanismOwnersCache;
         },
 
-        optionsFor(index, modemAcquisition) {
+        optionsFor(index, modemBlocked) {
             const owners = this.mechanismOwners();
 
             return this.itemOptionsWithLegacy(this.rows[index]).filter(opt => {
-                if (modemAcquisition === 'beli_sendiri' && opt.mechanism === 'modem') {
+                if (modemBlocked && opt.mechanism === 'modem') {
                     return false;
                 }
                 if (this.singularMechanisms.includes(opt.mechanism)) {
@@ -277,8 +281,8 @@ function installationItemRows(itemOptions, initialRows) {
             );
         },
 
-        comboOptionsFor(index, modemAcquisition) {
-            return this.optionsFor(index, modemAcquisition).map(opt => ({
+        comboOptionsFor(index, modemBlocked) {
+            return this.optionsFor(index, modemBlocked).map(opt => ({
                 value: `${opt.mechanism}:${opt.option_id}`,
                 label: opt.label,
                 search: opt.label,
