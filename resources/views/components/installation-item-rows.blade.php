@@ -70,14 +70,14 @@
 
     $initialRows = collect();
     if ($initialSerialId) {
-        $initialRows->push(['mechanism' => 'modem', 'option_id' => (string) $initialSerialId, 'qty' => '']);
+        $initialRows->push(['mechanism' => 'modem', 'option_id' => (string) $initialSerialId, 'qty' => '', 'note' => '']);
     }
     if ($initialRollId) {
-        $initialRows->push(['mechanism' => 'roll', 'option_id' => (string) $initialRollId, 'qty' => (string) ($initialRollMeters ?? '')]);
+        $initialRows->push(['mechanism' => 'roll', 'option_id' => (string) $initialRollId, 'qty' => (string) ($initialRollMeters ?? ''), 'note' => '']);
     }
     foreach ($initialMaterialRows as $row) {
         if (! empty($row['item_id'])) {
-            $initialRows->push(['mechanism' => 'pasif', 'option_id' => (string) $row['item_id'], 'qty' => (string) ($row['qty'] ?? '')]);
+            $initialRows->push(['mechanism' => 'pasif', 'option_id' => (string) $row['item_id'], 'qty' => (string) ($row['qty'] ?? ''), 'note' => (string) ($row['note'] ?? '')]);
         }
     }
 @endphp
@@ -124,7 +124,7 @@
             </template>
 
             <template x-if="row.mechanism === 'pasif'">
-                <div class="col-span-4 md:col-span-3">
+                <div class="col-span-4 md:col-span-2">
                     <label class="block mb-1 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Jumlah</label>
                     <input type="hidden" :name="`materials[${index}][item_id]`" :value="row.option_id">
                     <input type="hidden" :name="`materials[${index}][item_type]`" :value="typeFor(row)">
@@ -135,6 +135,18 @@
                         :max="availableFor(row)"
                         placeholder="cth: 10"
                         class="w-full text-xs font-mono px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 dark:focus:border-sky-400"
+                    >
+                </div>
+            </template>
+
+            <template x-if="row.mechanism === 'pasif'">
+                <div class="col-span-8 md:col-span-2">
+                    <label class="block mb-1 text-[10px] uppercase tracking-wide text-slate-500 dark:text-slate-400">Catatan</label>
+                    <input
+                        type="text"
+                        :name="`materials[${index}][note]`" x-model="row.note"
+                        placeholder="opsional"
+                        class="w-full text-xs font-sans px-2 py-1.5 border border-slate-200 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 dark:focus:border-sky-400"
                     >
                 </div>
             </template>
@@ -179,7 +191,7 @@ function installationItemRows(itemOptions, initialRows) {
         rows: initialRows.length ? initialRows : [],
 
         addRow() {
-            this.rows.push({ mechanism: '', option_id: '', qty: '' });
+            this.rows.push({ mechanism: '', option_id: '', qty: '', note: '' });
         },
 
         removeRow(index) {
@@ -191,18 +203,26 @@ function installationItemRows(itemOptions, initialRows) {
         // singular di DB, lihat komentar header komponen). Baris Pasif TIDAK
         // difilter dobel — item yang sama boleh muncul di >1 baris, sama
         // perilaku komponen material-rows sekarang (server yang menjumlah qty).
+        // Mekanisme "singular" (maks 1 baris aktif) — satu tempat, dipakai
+        // optionsFor() di bawah. Field tujuannya singular di DB (lihat
+        // komentar header komponen), jadi SEMUA opsi mekanisme ini wajib
+        // hilang dari baris lain begitu SATU baris manapun sudah memakainya
+        // — bukan cuma opsi yang persis sama option_id-nya (itu bug: 2 SN
+        // BEDA tetap bisa lolos jadi 2 baris modem sekaligus).
+        singularMechanisms: ['modem', 'roll'],
+
         optionsFor(index, modemAcquisition) {
             const row = this.rows[index];
-            const takenSingular = this.rows
-                .filter((r, i) => i !== index && (r.mechanism === 'modem' || r.mechanism === 'roll'))
-                .map(r => `${r.mechanism}:${r.option_id}`);
+            const usedSingularMechanisms = this.rows
+                .filter((r, i) => i !== index && this.singularMechanisms.includes(r.mechanism))
+                .map(r => r.mechanism);
 
             return this.itemOptionsWithLegacy(row).filter(opt => {
                 if (modemAcquisition === 'beli_sendiri' && opt.mechanism === 'modem') {
                     return false;
                 }
-                if (opt.mechanism === 'modem' || opt.mechanism === 'roll') {
-                    return ! takenSingular.includes(`${opt.mechanism}:${opt.option_id}`);
+                if (this.singularMechanisms.includes(opt.mechanism)) {
+                    return ! usedSingularMechanisms.includes(opt.mechanism);
                 }
                 return true;
             });
@@ -251,6 +271,7 @@ function installationItemRows(itemOptions, initialRows) {
             this.rows[index].mechanism = mechanism ?? '';
             this.rows[index].option_id = optionId ?? '';
             this.rows[index].qty = '';
+            this.rows[index].note = '';
         },
 
         findOption(row) {

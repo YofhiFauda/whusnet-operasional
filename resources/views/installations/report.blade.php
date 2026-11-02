@@ -765,8 +765,7 @@
                                     </div>
                                     @endif
 
-                                    <div class="sm:col-span-2" x-show="modemAcquisition !== 'beli_sendiri'" x-cloak>
-                                        <fieldset class="min-w-0" :disabled="modemAcquisition === 'beli_sendiri'">
+                                    <div class="sm:col-span-2">
                                         <label class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Barang Dipasang (Modem / Roll Kabel / Pasif) <span class="text-rose-500">*</span></label>
                                         <div class="mb-2 space-y-1">
                                             <x-estimasi-patokan :rows="$estimasiPerangkatAktif" title="Estimasi Perangkat Aktif" />
@@ -776,6 +775,15 @@
                                         @if($eligibleSerials->isEmpty() && $eligibleRolls->isEmpty() && $eligiblePassiveCustody->isEmpty())
                                             <p class="text-[11px] text-rose-500 leading-relaxed">Tim ini belum punya custody apa pun — ambil barang dari Gudang terlebih dahulu sebelum bisa mengisi Laporan Pemasangan.</p>
                                         @endif
+                                        {{-- TIDAK digerbang x-show/fieldset "beli_sendiri" lagi (koreksi review
+                                             2026-11-02): dulu SN modem SATU-SATUNYA isi blok ini, jadi gerbang itu
+                                             aman. Sekarang Roll Kabel & Material Pasif ikut di komponen yang sama —
+                                             kalau ikut digerbang, teknisi kontrak Beli + pilihan "Beli Sendiri" jadi
+                                             TIDAK BISA SAMA SEKALI mencatat roll/material pasif (regresi, keduanya
+                                             dulu independen & selalu aktif). Pengecualian modem untuk beli_sendiri
+                                             sudah ditangani SENDIRI di dalam <x-installation-item-rows> lewat
+                                             modem-acquisition-expr (opsi "Modem" disembunyikan dari dropdown +
+                                             hidden input SN-nya didisable), tanpa perlu gerbang di luar. --}}
                                         <x-installation-item-rows
                                             :serial-options="$eligibleSerials"
                                             :roll-options="$eligibleRolls"
@@ -793,7 +801,6 @@
                                             <input type="number" step="0.01" min="0.01" name="modem_sale_price" id="modem_sale_price" value="{{ old('modem_sale_price', $installation->modem_sale_price ?? '') }}" placeholder="Contoh: 150000" class="w-full text-xs font-mono px-3 py-2 border border-slate-300 dark:border-slate-700 rounded-md bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-1 focus:ring-sky-500 focus:border-sky-500 shadow-xs">
                                             <p class="text-[10px] mt-1 text-slate-500 dark:text-slate-400">Modem ini dijual ke pelanggan — dicatat sebagai penjualan SN, ditagihkan di tagihan AWAL.</p>
                                         </div>
-                                        </fieldset>
                                     </div>
 
                                     <div class="sm:col-span-2 grid grid-cols-1 sm:grid-cols-3 gap-2.5" x-show="modemAcquisition === 'beli_sendiri'" x-cloak>
