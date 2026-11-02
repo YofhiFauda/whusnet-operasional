@@ -206,4 +206,28 @@ class WarehousePackConversionTest extends TestCase
         $this->get(route('warehouse.transfers.show', $transfer))
             ->assertSee('3 Pack (150 pcs)');
     }
+
+    #[Test]
+    public function riwayat_menampilkan_jumlah_pack_untuk_barang_berpack_size(): void
+    {
+        $this->loginAsAdmin();
+        $pusat = Pop::factory()->create(['type' => 'pusat']);
+        $item = Item::create([
+            'code' => 'PACK-TEST-06',
+            'name' => 'RJ45 Connector',
+            'unit' => 'pcs',
+            'tracking_type' => TrackingType::QUANTITY,
+            'pack_size' => 50,
+        ]);
+
+        $this->post(route('warehouse.receive.store'), [
+            'pop_id' => $pusat->id,
+            'lines' => [
+                ['item_id' => $item->id, 'qty' => 2, 'unit_price' => 1000],
+            ],
+        ]);
+
+        $this->get(route('warehouse.history.index'))
+            ->assertSee('2 Pack (100 pcs)');
+    }
 }

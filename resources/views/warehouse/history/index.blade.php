@@ -614,7 +614,7 @@
                                         @if($group->lineCount > 1)
                                         {{ $group->lineCount }} baris
                                         @else
-                                        {{ $txn->serial ? '1 unit' : rtrim(rtrim(number_format((float) $txn->qty, 2, ',', '.'), '0'), ',').' '.$txn->item->unit }}
+                                        {{ $txn->serial ? '1 unit' : \App\Helpers\FormatHelper::qtyWithPack($txn) }}
                                         @endif
                                     </span>
                                 </div>
@@ -747,7 +747,7 @@
                         @if($group->lineCount > 1)
                         {{ $group->lineCount }} baris
                         @else
-                        {{ $txn->serial ? '1 unit' : rtrim(rtrim(number_format((float) $txn->qty, 2, ',', '.'), '0'), ',').' '.$txn->item->unit }}
+                        {{ $txn->serial ? '1 unit' : \App\Helpers\FormatHelper::qtyWithPack($txn) }}
                         @endif
                     </span>
                 </div>
