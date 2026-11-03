@@ -24,6 +24,7 @@ use App\Services\FopUnifiedDashboardService;
 use App\Services\TaskService;
 use App\Services\TeknisiWorkloadService;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -101,53 +102,7 @@ class FopDashboardController extends Controller
         // __PHP_Incomplete_Class (reproduksi independen di luar dashboard
         // ini: Cache::put pada collect([1,2,3]) polos pun korup). Sampai bug
         // itu ditelusuri terpisah, jangan cache Eloquent Collection/Model.
-        $statsCacheKey = sprintf('dashboard:fop:stats:%d:%s', $user->id, $today->toDateString());
-
-        $stats = Cache::remember(
-            $statsCacheKey,
-            30,
-            function () use ($hasAllPopAccess, $allowedPopIds, $startOfToday, $endOfToday, $user) {
-                $surveyStatuses = ['calon_pelanggan', 'waiting_survey'];
-
-                return [
-                    'antrian_survey' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
-                        ->whereIn('status', $surveyStatuses)
-                        ->count(),
-                    'perlu_aksi_fop' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
-                        ->whereIn('status', ['waiting_acc', 'surveyed'])
-                        ->count(),
-                    'berjalan' => Task::applyUserScope($user)
-                        ->where('status', TaskStatus::IN_PROGRESS->value)
-                        ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
-                        ->count(),
-                    'selesai_hari_ini' => Task::applyUserScope($user)
-                        ->where('status', TaskStatus::SELESAI->value)
-                        ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
-                        ->count(),
-                    // Lapor Nanti ikut dihitung: task hari ini yang kerjanya
-                    // beres tapi laporannya menyusul tetap beban kerja hari
-                    // ini — dulu (pending + flag) ia hilang dari total.
-                    'total_hari_ini' => Task::applyUserScope($user)
-                        ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::LAPOR_NANTI->value, TaskStatus::SELESAI->value])
-                        ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
-                        ->count(),
-                    // Overdue Survey: created_at + 1 hari < sekarang (SLA 1×24 jam)
-                    'overdue_survey' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
-                        ->whereIn('status', $surveyStatuses)
-                        ->where('created_at', '<', now()->subDay())
-                        ->count(),
-                    // Overdue Installation: survey completed_at + 3 hari < sekarang (SLA 3×24 jam)
-                    'overdue_installation' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
-                        ->whereIn('status', ['waiting_installation', 'installation_in_progress', 'verification_admin', 'waiting_acc', 'surveyed'])
-                        ->whereHas('tasks', function ($q) {
-                            $q->where('task_type', TaskType::SURVEY->value)
-                                ->where('status', TaskStatus::SELESAI->value)
-                                ->where('completed_at', '<', now()->subDays(3));
-                        })
-                        ->count(),
-                ];
-            }
-        );
+        $stats = $this->computeStats($hasAllPopAccess, $allowedPopIds, $startOfToday, $endOfToday, $user, $today);
 
         // ── Pemakaian Alat Gudang (ADHOC, 2026-09-10) ───────────────
         // Backend link Gudang↔Task material udah ada sejak ADHOC-54
@@ -400,6 +355,102 @@ class FopDashboardController extends Controller
             'emergencyAlerts',
             'materialUsageDetail',
         ));
+    }
+
+    /**
+     * Stat cards /fop — diekstrak dari `index()` biar dipanggil ulang DARI
+     * `panels()` (live-refresh) pakai cache key YANG SAMA (`dashboard:fop:
+     * stats:{user}:{tanggal}`, TTL 30s), bukan duplikasi logic. Request
+     * live-refresh yang masuk dalam 30 detik dari load awal cuma kena cache
+     * hit, gak query ulang.
+     *
+     * @param  array<int, int>  $allowedPopIds
+     */
+    private function computeStats(bool $hasAllPopAccess, array $allowedPopIds, Carbon $startOfToday, Carbon $endOfToday, User $user, Carbon $today): array
+    {
+        $statsCacheKey = sprintf('dashboard:fop:stats:%d:%s', $user->id, $today->toDateString());
+
+        return Cache::remember(
+            $statsCacheKey,
+            30,
+            function () use ($hasAllPopAccess, $allowedPopIds, $startOfToday, $endOfToday, $user) {
+                $surveyStatuses = ['calon_pelanggan', 'waiting_survey'];
+
+                return [
+                    'antrian_survey' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+                        ->whereIn('status', $surveyStatuses)
+                        ->count(),
+                    'perlu_aksi_fop' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+                        ->whereIn('status', ['waiting_acc', 'surveyed'])
+                        ->count(),
+                    'berjalan' => Task::applyUserScope($user)
+                        ->where('status', TaskStatus::IN_PROGRESS->value)
+                        ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
+                        ->count(),
+                    'selesai_hari_ini' => Task::applyUserScope($user)
+                        ->where('status', TaskStatus::SELESAI->value)
+                        ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
+                        ->count(),
+                    // Lapor Nanti ikut dihitung: task hari ini yang kerjanya
+                    // beres tapi laporannya menyusul tetap beban kerja hari
+                    // ini — dulu (pending + flag) ia hilang dari total.
+                    'total_hari_ini' => Task::applyUserScope($user)
+                        ->whereIn('status', [TaskStatus::TERJADWAL->value, TaskStatus::IN_PROGRESS->value, TaskStatus::LAPOR_NANTI->value, TaskStatus::SELESAI->value])
+                        ->whereBetween('scheduled_at', [$startOfToday, $endOfToday])
+                        ->count(),
+                    // Overdue Survey: created_at + 1 hari < sekarang (SLA 1×24 jam)
+                    'overdue_survey' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+                        ->whereIn('status', $surveyStatuses)
+                        ->where('created_at', '<', now()->subDay())
+                        ->count(),
+                    // Overdue Installation: survey completed_at + 3 hari < sekarang (SLA 3×24 jam)
+                    'overdue_installation' => Customer::when(! $hasAllPopAccess, fn ($q) => $q->whereIn('pop_id', $allowedPopIds))
+                        ->whereIn('status', ['waiting_installation', 'installation_in_progress', 'verification_admin', 'waiting_acc', 'surveyed'])
+                        ->whereHas('tasks', function ($q) {
+                            $q->where('task_type', TaskType::SURVEY->value)
+                                ->where('status', TaskStatus::SELESAI->value)
+                                ->where('completed_at', '<', now()->subDays(3));
+                        })
+                        ->count(),
+                ];
+            }
+        );
+    }
+
+    /**
+     * Endpoint sempit buat live-refresh stat-cards/status-teknisi (dengar
+     * TaskStarted/TaskCompleted dkk di fop/dashboard.blade.php) — TIDAK
+     * merender seluruh index(), cuma container yang diminta `targets`.
+     * `targets` cuma dukung 'stat-cards' & 'status-teknisi' — container
+     * lain (antrian-survey, emergency-ticker, customer-pipeline) BELUM
+     * dikonversi ke endpoint ini (di luar scope task ini), tetap lewat
+     * fetch(window.location.href) seperti sebelumnya.
+     */
+    public function panels(Request $request): Response
+    {
+        $this->authorize('viewAll', Task::class);
+
+        $user = auth()->user();
+        $hasAllPopAccess = $this->accessService->hasAllPopAccess($user);
+        $allowedPopIds = $this->accessService->getAllowedPopIds($user);
+        $today = Carbon::today();
+        $startOfToday = $today->copy()->startOfDay();
+        $endOfToday = $today->copy()->endOfDay();
+
+        $targets = array_filter(explode(',', (string) $request->query('targets', '')));
+        $html = '';
+
+        if (in_array('stat-cards', $targets, true)) {
+            $stats = $this->computeStats($hasAllPopAccess, $allowedPopIds, $startOfToday, $endOfToday, $user, $today);
+            $html .= view('fop.partials._hero_metrics', ['stats' => $stats])->render();
+        }
+
+        if (in_array('status-teknisi', $targets, true)) {
+            $teknisiList = $this->teknisiWorkload->summarize($hasAllPopAccess, $allowedPopIds, $today);
+            $html .= view('fop.partials._technician_radar', ['teknisiList' => $teknisiList])->render();
+        }
+
+        return response($html);
     }
 
     /**

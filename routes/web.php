@@ -1287,6 +1287,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:task.view.all')->group(function () {
         Route::get('/fop', [FopDashboardController::class, 'index'])->name('fop.dashboard');
+        Route::get('/fop/dashboard/panels', [FopDashboardController::class, 'panels'])->name('fop.dashboard.panels');
         Route::get('/api/fop/pipeline', [FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
     });
 
