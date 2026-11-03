@@ -17,6 +17,14 @@
 @include('customers.partials._package_change_modal')
 
 {{-- ────────────────────────────────────────────────────────────
+     MODAL 1c: REQUEST PUTUS LANGGANAN
+     Versi AJAX dari panel inline di customers/show.blade.php (id="terminate")
+     — lihat komentar di _termination_modal.blade.php kenapa harus AJAX,
+     bukan form POST+referer biasa.
+──────────────────────────────────────────────────────────── --}}
+@include('customers.partials._termination_modal')
+
+{{-- ────────────────────────────────────────────────────────────
      MODAL 2: CUSTOMER QUICK HUB & OPERATIONAL ACTIONS MODAL (5 TABS)
 ──────────────────────────────────────────────────────────── --}}
 <div id="actions-modal" role="dialog" aria-modal="true" aria-labelledby="actions-modal-title" class="fixed inset-0 z-50 overflow-y-auto flex items-end sm:items-center justify-center p-0 sm:p-4 md:p-6 hidden">

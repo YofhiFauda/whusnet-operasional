@@ -579,4 +579,105 @@ class CustomerPackageChangeTest extends TestCase
         $this->assertEqualsWithDelta($expectedTotal, (float) $items->sum('amount'), 1.0);
         $this->assertGreaterThanOrEqual(2, $items->count());
     }
+
+    /**
+     * Pratinjau breakdown prorate (`customers.package.preview`, GET view-only)
+     * — laporan user 2026-11-02 "110k kok jadi 109.645" bersumber dari
+     * nominal prorate yang gak kelihatan sebelum submit. Endpoint ini TIDAK
+     * boleh menulis apa pun ke DB (beda dari `update()`).
+     */
+    public function test_preview_tidak_ada_invoice_periode_berjalan(): void
+    {
+        $this->loginAsAdmin();
+        $customer = $this->makeActiveCustomerWithService();
+
+        $response = $this->getJson(route('customers.package.preview', $customer).'?internet_package_id='.$this->paketBaru->id);
+
+        $response->assertOk();
+        $response->assertJson(['has_current_invoice' => false]);
+
+        // Read-only — paket pelanggan TIDAK berubah cuma karena preview.
+        $this->assertSame($this->paketLama->id, $customer->fresh()->customerService->internet_package_id);
+        $this->assertSame(0, CustomerPackageChange::count());
+    }
+
+    public function test_preview_invoice_belum_dibayar_breakdown_dua_segmen_dan_sisa_tagih(): void
+    {
+        $this->loginAsAdmin();
+        $customer = $this->makeActiveCustomerWithService();
+        $this->makeCurrentPeriodInvoice($customer, 150000);
+
+        $response = $this->get(route('customers.package.preview', $customer).'?internet_package_id='.$this->paketBaru->id);
+
+        $response->assertOk();
+        $data = $response->json();
+
+        $this->assertTrue($data['has_current_invoice']);
+        $this->assertSame('2026-09', $data['billing_period']);
+        $this->assertCount(2, $data['segments']);
+
+        // 2026-09-15: hari lama Sep1-14 (14 hari, Rp150.000/bulan), hari baru
+        // Sep15-30 (16 hari, Rp250.000/bulan) — sama persis skenario `update()`
+        // di test_upgrade_invoice_belum_dibayar_total_diupdate_jumlah_dua_prorate.
+        $this->assertSame('Paket A 10 Mbps', $data['segments'][0]['package_name']);
+        $this->assertSame(14, $data['segments'][0]['days']);
+        $this->assertSame('Paket B 20 Mbps', $data['segments'][1]['package_name']);
+        $this->assertSame(16, $data['segments'][1]['days']);
+
+        $expectedTotal = round((150000 / 30) * 14 + (250000 / 30) * 16, 2);
+        $this->assertEqualsWithDelta($expectedTotal, (float) $data['total_invoice_periode'], 1.0);
+        $this->assertEqualsWithDelta($expectedTotal, (float) $data['sisa_tagih'], 1.0);
+        $this->assertEqualsWithDelta(0.0, (float) $data['deposit_baru'], 0.01);
+
+        // Read-only — tidak ada efek samping ke DB.
+        $this->assertSame($this->paketLama->id, $customer->fresh()->customerService->internet_package_id);
+        $this->assertSame(0, CustomerPackageChange::count());
+    }
+
+    public function test_preview_downgrade_prepaid_lunas_tampilkan_deposit(): void
+    {
+        $this->loginAsAdmin();
+        $customer = $this->makeActiveCustomerWithService();
+        $invoice = $this->makeCurrentPeriodInvoice($customer, 150000);
+        $this->payInFull($invoice);
+
+        // Downgrade ke paket yang lebih murah dari paket lama (150000) —
+        // dari fixture yang ada, pakai service dulu diganti dulu ke paketBaru
+        // via update supaya $service->monthly_price sekarang 250000, lalu
+        // preview downgrade balik ke paketLama (150000) sebagai target.
+        $this->put(route('customers.package.update', $customer), [
+            'internet_package_id' => $this->paketBaru->id,
+        ]);
+        $invoice->refresh();
+        $this->payInFull($invoice);
+
+        $response = $this->get(route('customers.package.preview', $customer).'?internet_package_id='.$this->paketLama->id);
+
+        $response->assertOk();
+        $data = $response->json();
+
+        $this->assertTrue($data['has_current_invoice']);
+        $this->assertFalse($data['is_upgrade']);
+        $this->assertGreaterThan(0.0, (float) $data['deposit_baru']);
+        $this->assertEqualsWithDelta(0.0, (float) $data['sisa_tagih'], 0.01);
+    }
+
+    public function test_preview_tanpa_permission_change_ditolak_403(): void
+    {
+        $role = Role::create(['name' => 'Helpdesk Tanpa Ganti Paket Preview', 'code' => 'helpdesk-no-change-preview-'.uniqid(), 'is_system' => false]);
+        $role->permissions()->attach(Permission::whereIn('code', [
+            'customers.view',
+            'customers.detail.view',
+            'customers.detail.packages.view',
+        ])->get());
+
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $this->actingAs($user);
+
+        $customer = $this->makeActiveCustomerWithService();
+
+        $response = $this->get(route('customers.package.preview', $customer).'?internet_package_id='.$this->paketBaru->id);
+
+        $response->assertForbidden();
+    }
 }

@@ -2,7 +2,7 @@
 
 namespace Tests\Unit;
 
-use App\Console\Commands\MigrateLegacyDataCommand;
+use App\Console\Commands\Operational\MigrateLegacyDataCommand;
 use PHPUnit\Framework\Attributes\DataProvider;
 use ReflectionMethod;
 use Tests\TestCase;

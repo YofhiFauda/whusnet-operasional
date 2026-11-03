@@ -222,48 +222,29 @@
             </div>
             @endif
 
-            {{-- ── Section 2: Material Terpakai ────────────────────────
-                 Menggantikan lima kolom teks lama (kabel/modem/patchcord/
-                 sleeve/lainnya) — satu kolom per jenis barang, hardcode, tidak
-                 bisa dijumlah dan tidak bisa disambung ke master. Kolomnya
-                 masih ada di DB untuk laporan lama, tapi tidak lagi diisi dari
-                 form ini. --}}
+            {{-- ── Section 2: Barang Dipasang (Modem + Roll Kabel + Material
+                 Pasif, gabungan) ───────────────────────────────────────────
+                 Dulu 3 blok terpisah (Material Terpakai / Modem/Perangkat
+                 Aktif / Roll Kabel) — digabung jadi 1 dropdown growable
+                 (komponen installation-item-rows, sama yang dipakai Laporan
+                 Pemasangan PSB). Radio ownership modem TETAP di luar
+                 dropdown — 4 pilihan (Tidak Ganti/Sewa Gudang/Beli Sendiri/
+                 Beli dari Gudang), beda dari PSB yang cuma 2. Dropdown cuma
+                 nyembunyiin opsi "Modem" & men-disable hidden input SN-nya
+                 sendiri lewat modem-blocked-expr saat ownership = Tidak
+                 Ganti ATAU Beli Sendiri — identik perilaku fieldset disabled
+                 yang lama, server (TaskMaintenanceController::store) sama
+                 sekali tidak berubah. --}}
             <div class="px-6 py-4 text-xs" style="border-bottom:1px solid var(--color-border)">
                 <p class="mb-1" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
-                    Material Terpakai
+                    Barang Dipasang <span class="font-normal normal-case" style="color:var(--color-text-muted)">(opsional)</span>
                 </p>
                 <p class="text-[10px] mb-3 leading-relaxed font-normal" style="color:var(--color-text-muted)">
-                    Barang yang <b>habis dipakai</b> dan ditinggal di pelanggan — patch cord diganti, splitter diganti, kabel sambungan. Peralatan kerja yang dibawa pulang dicatat terpisah di bawah. Cuma barang yang beneran ada di custody tim ini (sudah di-<i>issue</i> Gudang) yang bisa dipilih; sisa custody tercantum di tiap baris.
+                    Modem/ONT pengganti, kabel dari roll ter-track, dan material pasif yang <b>habis dipakai</b> dan ditinggal di pelanggan. Peralatan kerja yang dibawa pulang dicatat terpisah di bawah. Cuma barang yang beneran ada di custody tim ini (sudah di-<i>issue</i> Gudang) yang bisa dipilih; sisa custody tercantum di tiap baris.
                 </p>
-                {{-- Sengaja TANPA ringkasan statis "Sisa custody tim" (dicoba
-                     2026-09-12, langsung direvisi user hari sama — makan tempat).
-                     Sisa custody per-item CUMA tampil kalau barangnya lagi
-                     dipilih di salah satu baris — lihat itemOptionLabel() &
-                     availableFor() di material-rows.blade.php. --}}
-                @if($eligiblePassiveCustody->isEmpty())
-                    <p class="text-[11px] mb-2 font-semibold" style="color:var(--color-warning,#d97706)">⚠ Tim ini belum punya custody Perangkat Pasif apa pun — ambil barang dari Gudang dulu kalau perbaikan ini butuh material, atau baris di bawah cuma bisa nampilin material yang sudah tersimpan sebelumnya.</p>
+                @if($eligiblePassiveCustody->isEmpty() && $eligibleSerials->isEmpty() && $eligibleRolls->isEmpty())
+                    <p class="text-[11px] mb-2 font-semibold" style="color:var(--color-warning,#d97706)">⚠ Tim ini belum punya custody apa pun (modem/roll/material pasif) — ambil barang dari Gudang dulu kalau perbaikan ini butuh barang, atau dropdown di bawah cuma bisa nampilin yang sudah tersimpan sebelumnya.</p>
                 @endif
-                <x-material-rows
-                    name="materials"
-                    :categories="$itemCategories"
-                    :rows="$materialRows"
-                    :restrict-to-custody="true"
-                    :custody-options="$eligiblePassiveCustody"
-                    empty-label="Belum ada material dicatat. Kalau perbaikan ini tidak memakai material, biarkan kosong."
-                />
-            </div>
-
-            {{-- ── Section 2b: Modem/Perangkat Aktif (Opsional) ────────
-                 Beda dari Laporan Pemasangan: SN di sini OPSIONAL. Maintenance
-                 gak selalu ganti modem — kalau gak bawa/ganti, biarkan
-                 "Tidak ganti modem" (default) dan SN gak akan tersimpan. --}}
-            <div class="px-6 py-4 text-xs" style="border-bottom:1px solid var(--color-border)">
-                <p class="mb-1" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
-                    Modem/Perangkat Aktif <span class="font-normal normal-case" style="color:var(--color-text-muted)">(opsional)</span>
-                </p>
-                <p class="text-[10px] mb-3 leading-relaxed font-normal" style="color:var(--color-text-muted)">
-                    Isi HANYA kalau teknisi membawa &amp; memasang modem/ONT pengganti dari Gudang. Kalau tidak bawa/ganti modem, biarkan kosong.
-                </p>
 
                 {{-- Radio ownership modem (rancangan ownership modem sewa/beli,
                      2026-10-09) — menentukan cara pemilikan modem yang
@@ -290,55 +271,32 @@
                     @endforeach
                 </div>
 
-                {{-- fieldset :disabled — x-show cuma menyembunyikan; tanpa ini SN
-                     yang sempat dipilih tetap ter-POST walau radio sudah pindah,
-                     dan server (TaskMaintenanceController::store) menolaknya. --}}
-                <div x-show="modemOwnership === 'sewa_gudang' || modemOwnership === 'beli_gudang'" x-cloak>
-                    <fieldset class="min-w-0" :disabled="!(modemOwnership === 'sewa_gudang' || modemOwnership === 'beli_gudang')">
-                    @if($eligibleSerials->isNotEmpty())
-                        @php
-                            // Sisa stok Perangkat Aktif per jenis barang (koreksi lanjutan
-                            // ADHOC-54, 2026-09-12) — sama pola installations/report.blade.php:
-                            // SERIALIZED gak punya qty, jadi dihitung dari JUMLAH SN yang masih
-                            // ISSUED di custody tim, dikelompokkan per nama barang.
-                            $serialCountsByItem = $eligibleSerials->groupBy(fn ($serial) => $serial->item->name)
-                                ->map->count();
-                            // Combobox (components/combobox.blade.php): SN dicari lewat
-                            // ketikan, bukan scroll <select>. Opsi "Tidak ganti modem"
-                            // (value kosong) = default, jadi SN tidak tersimpan.
-                            $serialOptions = collect([['value' => '', 'label' => 'Tidak ganti modem', 'search' => 'tidak ganti modem']])
-                                ->concat($eligibleSerials->map(fn ($serial) => [
-                                    'value' => $serial->id,
-                                    'label' => 'SN ' . $serial->serial_number . ' — ' . $serial->item->name,
-                                    'search' => $serial->serial_number . ' ' . $serial->item->name,
-                                    'hint' => 'Sisa custody tim: ' . $serialCountsByItem[$serial->item->name] . ' unit',
-                                ]))->values();
-                        @endphp
-                        <x-combobox id="selected_inventory_serial_id" name="selected_inventory_serial_id" :options-expr="json_encode($serialOptions)" :value-expr="json_encode((string) old('selected_inventory_serial_id', ''))" placeholder="Ketik SN atau nama perangkat..." />
-                        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Perangkat yang diambil lewat Gudang (custody Anda) — SN yang tersimpan otomatis sama persis dengan yang dipilih di sini.</p>
-                    @else
-                        <select disabled class="w-full rounded-md text-sm" style="border:1px solid var(--color-border);background:var(--color-surface-muted);color:var(--color-text-muted);padding:10px 12px">
-                            <option>Tidak ada SN di custody Anda</option>
-                        </select>
-                        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Anda belum mengambil modem dari Gudang — kalau maintenance ini gak perlu ganti modem, abaikan saja.</p>
-                    @endif
+                <x-installation-item-rows
+                    :serial-options="$eligibleSerials"
+                    :roll-options="$eligibleRolls"
+                    :custody-options="$eligiblePassiveCustody"
+                    :initial-serial-id="old('selected_inventory_serial_id')"
+                    :initial-roll-id="old('selected_inventory_roll_id')"
+                    :initial-roll-meters="old('roll_meters_used')"
+                    :initial-material-rows="old('materials', $materialRows)"
+                    modem-blocked-expr="modemOwnership === 'tidak_ganti' || modemOwnership === 'beli_sendiri'"
+                    empty-label="Belum ada barang dipilih. Kalau maintenance ini tidak pakai modem/roll/material, biarkan kosong."
+                />
 
-                    {{-- Harga jual — wajib untuk "Beli dari Gudang" saja. --}}
-                    <div x-show="modemOwnership === 'beli_gudang'" x-cloak class="mt-3">
-                        <label class="block mb-1.5" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
-                            Harga Jual Modem <span style="color:var(--color-error)">*</span>
-                        </label>
-                        <input type="number" step="0.01" min="0.01" name="modem_sale_price" value="{{ old('modem_sale_price') }}" placeholder="Contoh: 150000"
-                               class="w-full rounded-md text-sm"
-                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
-                        <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Modem ini dijual ke pelanggan — dicatat sebagai penjualan SN, bukan sewa.</p>
-                    </div>
-                    </fieldset>
+                {{-- Harga jual — wajib untuk "Beli dari Gudang" saja. --}}
+                <div x-show="modemOwnership === 'beli_gudang'" x-cloak class="mt-3">
+                    <label class="block mb-1.5" style="font-size:13px;font-weight:500;color:var(--color-text-secondary)">
+                        Harga Jual Modem <span style="color:var(--color-error)">*</span>
+                    </label>
+                    <input type="number" step="0.01" min="0.01" name="modem_sale_price" value="{{ old('modem_sale_price') }}" placeholder="Contoh: 150000"
+                           class="w-full rounded-md text-sm"
+                           style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
+                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Modem ini dijual ke pelanggan — dicatat sebagai penjualan SN, bukan sewa.</p>
                 </div>
 
                 {{-- Beli Sendiri — modem milik pelanggan sendiri, gak pernah lewat
                      gudang. Input manual, BUKAN dari custody/SN gudang. --}}
-                <div x-show="modemOwnership === 'beli_sendiri'" x-cloak class="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
+                <div x-show="modemOwnership === 'beli_sendiri'" x-cloak class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 mt-3">
                     <div>
                         <label class="block mb-1.5" style="font-size:12px;font-weight:500;color:var(--color-text-secondary)">
                             Brand <span style="color:var(--color-error)">*</span>
@@ -369,37 +327,6 @@
 
             {{-- ── Section 2b-2: Ganti Perangkat Tambahan (AP/STB, Opsional) ── --}}
             @include('tasks.partials.extra-device-replacement')
-
-            {{-- ── Section 2c: Roll Kabel (Opsional) ─────────────────────
-                 Sama pola Modem/Perangkat Aktif di atas — OPSIONAL, teknisi
-                 gak selalu potong kabel dari roll ter-track saat maintenance. --}}
-            <div class="px-6 py-4 text-xs" style="border-bottom:1px solid var(--color-border)">
-                <p class="mb-1" style="font-size:11px;font-weight:600;letter-spacing:0.08em;text-transform:uppercase;color:var(--color-text-muted)">
-                    Roll Kabel <span class="font-normal normal-case" style="color:var(--color-text-muted)">(opsional)</span>
-                </p>
-                <p class="text-[10px] mb-3 leading-relaxed font-normal" style="color:var(--color-text-muted)">
-                    Isi HANYA kalau teknisi potong kabel dari roll yang ke-track per-roll. Kalau tidak, biarkan kosong.
-                </p>
-                @if($eligibleRolls->isNotEmpty())
-                    @php
-                        $rollOptions = collect([['value' => '', 'label' => 'Tidak pakai roll kabel', 'search' => 'tidak pakai roll']])->concat($eligibleRolls->map(fn ($roll) => [
-                            'value' => $roll->id,
-                            'label' => ($roll->item->name ?? '(barang dihapus)') . ' — ' . $roll->roll_code,
-                            'search' => $roll->roll_code . ' ' . ($roll->item->name ?? ''),
-                            'hint' => 'Sisa ' . rtrim(rtrim(number_format((float) $roll->length_remaining, 2, ',', '.'), '0'), ',') . ' m',
-                        ]))->values();
-                    @endphp
-                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                        <x-combobox id="selected_inventory_roll_id" name="selected_inventory_roll_id" :options-expr="json_encode($rollOptions)" :value-expr="json_encode((string) old('selected_inventory_roll_id', ''))" placeholder="Ketik kode roll atau nama kabel..." />
-                        <input type="number" step="0.01" min="0.01" name="roll_meters_used" id="roll_meters_used" value="{{ old('roll_meters_used') }}" placeholder="Meter terpakai"
-                               class="w-full rounded-md text-sm"
-                               style="border:1px solid var(--color-border);background:var(--color-background);color:var(--color-text-main);padding:10px 12px;outline:none">
-                    </div>
-                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Pilih roll yang lagi di custody Anda, isi berapa meter dipakai.</p>
-                @else
-                    <p class="text-[10px] mt-1 leading-relaxed" style="color:var(--color-text-muted)">Tidak ada roll kabel di custody Anda — abaikan kalau gak perlu.</p>
-                @endif
-            </div>
 
             {{-- ── Section 2d: Pasang/Ganti Infrastruktur (O-REQ/INFR REQ) ──
                  Aset yang dipasang NETAP di titik jaringan (ODC/ODP/splitter),

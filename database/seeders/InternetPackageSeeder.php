@@ -49,8 +49,12 @@ class InternetPackageSeeder extends Seeder
             $this->home('NetTC165', 'Broadband Internet + TV', '100 Mbps', 100, 165000, 'Dualband', ['IPTV'], 50000, 6, 'Rp 50.000', 'Kontrak 6'),
             $this->home('NetTC198', 'Broadband Internet + TV', '150 Mbps', 150, 198000, 'Dualband Wifi6', ['IPTV', 'CCTV 1CH'], 250000, 6, 'Rp 200.000 CCTV + Rp 50.000 IPTV', 'Kontrak 6'),
 
-            $this->home('NetP110', 'Penawaran Khusus', '25 Mbps', 25, 110000, null, [], null, null, '-', 'Khusus pelanggan lama, minimal langganan 6 bulan'),
-            $this->home('NetP125', 'Penawaran Khusus', '30 Mbps', 30, 125000, null, [], null, null, '-', 'Khusus pelanggan lama, minimal langganan 6 bulan'),
+            // Speed dikoreksi dari 25/30 Mbps ke 35/40 Mbps (2026-11-02) —
+            // cocok dengan kolom "Speed" rekap Excel Sambit Okt 2026 yang
+            // KONSISTEN di seluruh baris berkode sama (17 baris NetP110 semua
+            // 35, 7 baris NetP125 semua 40), bukan tebakan satu baris.
+            $this->home('NetP110', 'Penawaran Khusus', '35 Mbps', 35, 110000, null, [], null, null, '-', 'Khusus pelanggan lama, minimal langganan 6 bulan'),
+            $this->home('NetP125', 'Penawaran Khusus', '40 Mbps', 40, 125000, null, [], null, null, '-', 'Khusus pelanggan lama, minimal langganan 6 bulan'),
 
             $this->businessBroadband('NetSoLite75', '70 Mbps 1:8', 70, 8, 450000, ['Unlimited', '1 AP + 1 Router'], 'IP Private', 500000, 1),
             $this->businessBroadband('NetSoLite100', '100 Mbps 1:8', 100, 8, 550000, ['Unlimited', '1 AP + 1 Router'], 'IP Private', 500000, 1),

@@ -2,7 +2,7 @@
 
 namespace Tests\Feature;
 
-use App\Console\Commands\MeasurePagesCommand;
+use App\Console\Commands\DevOnly\MeasurePagesCommand;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Artisan;

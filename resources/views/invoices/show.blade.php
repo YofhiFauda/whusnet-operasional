@@ -134,7 +134,7 @@
             @else
             <tr>
                 <td class="py-3 px-3">
-                    <p class="font-bold text-slate-900">{{ $invoice->customerService->package_name_snapshot ?? $invoice->internetPackage->name ?? 'Paket Internet' }}</p>
+                    <p class="font-bold text-slate-900">{{ $invoice->internetPackage?->name ?? $invoice->customerService?->package_name_snapshot ?? 'Paket Internet' }}</p>
                     <p class="text-[11px] text-slate-500">Langganan Internet Dedicated — DL/UL: {{ $invoice->customerService->download_speed_snapshot ?? '-' }} / {{ $invoice->customerService->upload_speed_snapshot ?? '-' }}</p>
                 </td>
                 <td class="py-3 px-3 text-center font-mono">{{ $invoice->billing_period }}</td>
@@ -452,7 +452,7 @@
                         <div class="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
                             <div class="space-y-0.5">
                                 <p class="font-semibold text-slate-900 dark:text-slate-100">Harga Paket Internet (Subtotal)</p>
-                                <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ $invoice->customerService->package_name_snapshot ?? $invoice->internetPackage->name ?? 'Paket Internet' }} &bull; Periode {{ $invoice->billing_period }}</p>
+                                <p class="text-[11px] text-slate-500 dark:text-slate-400">{{ $invoice->internetPackage?->name ?? $invoice->customerService?->package_name_snapshot ?? 'Paket Internet' }} &bull; Periode {{ $invoice->billing_period }}</p>
                             </div>
                             <span class="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">Rp {{ number_format((float) $invoice->subtotal, 0, ',', '.') }}</span>
                         </div>
@@ -701,7 +701,7 @@
                         <div>
                             <span class="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-wider">Nama Paket</span>
                             <p class="font-bold text-slate-900 dark:text-slate-100 text-sm mt-0.5">
-                                {{ $invoice->customerService->package_name_snapshot ?? $invoice->internetPackage->name ?? 'Paket Internet ISP' }}
+                                {{ $invoice->internetPackage?->name ?? $invoice->customerService?->package_name_snapshot ?? 'Paket Internet ISP' }}
                             </p>
                         </div>
 

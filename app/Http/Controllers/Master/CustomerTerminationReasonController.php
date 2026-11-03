@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\CustomerTerminationReason;
 use App\Support\LikeSearch;
 use App\Support\RupiahInput;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -46,11 +47,19 @@ class CustomerTerminationReasonController extends Controller
         return view('master.customer-termination-reasons.create');
     }
 
-    public function store(Request $request): RedirectResponse
+    public function store(Request $request): RedirectResponse|JsonResponse
     {
         $validated = $this->validateReason($request);
 
-        CustomerTerminationReason::create($validated);
+        $reason = CustomerTerminationReason::create($validated);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Alasan putus langganan "'.$validated['name'].'" berhasil ditambahkan.',
+                'data' => $reason,
+            ]);
+        }
 
         return redirect()
             ->route('master.termination-reasons.index')
@@ -62,11 +71,19 @@ class CustomerTerminationReasonController extends Controller
         return view('master.customer-termination-reasons.edit', compact('reason'));
     }
 
-    public function update(Request $request, CustomerTerminationReason $reason): RedirectResponse
+    public function update(Request $request, CustomerTerminationReason $reason): RedirectResponse|JsonResponse
     {
         $validated = $this->validateReason($request, $reason);
 
         $reason->update($validated);
+
+        if ($request->wantsJson()) {
+            return response()->json([
+                'success' => true,
+                'message' => 'Alasan putus langganan "'.$reason->name.'" berhasil diperbarui.',
+                'data' => $reason,
+            ]);
+        }
 
         return redirect()
             ->route('master.termination-reasons.index')

@@ -91,27 +91,13 @@ class CustomerInstallationAdditionalDeviceController extends Controller
         // ikut dihitung — SN-nya sudah INSTALLED jadi tidak muncul lagi di
         // daftar custody; tanpa ini submit ulang (mis. revisi) bakal selalu
         // dianggap kurang.
+        // Jenis perangkat (AP/STB/dll) TIDAK dibatasi per kategori — teknisi
+        // bebas pilih barang apa pun dari custody tim yang ditandai
+        // `is_customer_extra_device`, selama total yang dipenuhi pas dengan
+        // `max_additional_devices` paket. Ketentuan jenis barang bisa beda
+        // di kemudian hari; cuma jumlahnya yang tetap (lihat cek $required
+        // di bawah).
         $alreadyInstalled = $customer->additionalDevices()->installedFromWarehouse()->count();
-        $requirements = $customer->customerService?->internetPackage?->additionalDeviceRequirements() ?? [];
-        if ($requirements !== []) {
-            $selectedByCategory = $decisions->countBy(
-                fn (array $decision) => $eligibleSerials[(int) $decision['inventory_serial_id']]->item?->category?->code
-            );
-            $installedByCategory = $customer->additionalDevices()
-                ->installedFromWarehouse()
-                ->with('inventorySerial.item.category')
-                ->get()
-                ->countBy(fn (CustomerAdditionalDevice $device) => $device->inventorySerial?->item?->category?->code);
-
-            foreach ($requirements as $categoryCode => $count) {
-                $reported = ($selectedByCategory[$categoryCode] ?? 0) + ($installedByCategory[$categoryCode] ?? 0);
-                if ($reported > $count || (! $shortage && $reported < $count)) {
-                    throw ValidationException::withMessages([
-                        'decisions' => 'Paket ini membutuhkan '.($requirements['access_point'] ?? 0).' AP sebagai perangkat tambahan.',
-                    ]);
-                }
-            }
-        }
 
         // Spec §4.2: keputusan wajib untuk SETIAP perangkat yang diatur paket
         // (apa pun outcome-nya), bukan cuma minimal satu. Jalur kekurangan +

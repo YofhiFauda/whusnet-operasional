@@ -2,7 +2,8 @@
 
 Panduan kapan dan dengan urutan apa tiap command dijalankan. Ditulis 2026-07-21,
 diperbarui 2026-08-10 (langkah tambal bulan + cek scheduler di kelompok C,
-kelompok C-2 go-live "pelanggan saja").
+kelompok C-2 go-live "pelanggan saja"), 2026-11-02 (struktur folder per
+kategori pakai + tabel rekap semua command).
 
 Aturan umum sebelum mulai:
 
@@ -12,6 +13,28 @@ Aturan umum sebelum mulai:
 - Command terjadwal (kelompok A) tidak perlu dijalankan manual dalam keadaan
   normal — scheduler yang memanggilnya.
 - Cek daftar lengkap kapan saja: `php artisan list`.
+
+---
+
+## Struktur folder `app/Console/Commands/` — per kategori pakai
+
+Command difisikkan ke subfolder sesuai kategori pakai (2026-11-02), bukan
+ditumpuk rata di `app/Console/Commands/`. Laravel men-scan subfolder secara
+rekursif (`Illuminate\Foundation\Console\Kernel::load()` lewat Symfony
+`Finder`) — pindah folder **tidak** mengubah nama command (`$signature`/
+atribut `#[Signature(...)]`), cuma `namespace` tiap file yang ikut
+menyesuaikan path (`App\Console\Commands\<Folder>`). Jalankan `php artisan
+list` buat memastikan command yang dipindah tetap kedaftar.
+
+| Folder | Kriteria | Isi |
+|---|---|---|
+| `Scheduled/` | Dipanggil scheduler (`routes/console.php`) lewat `Schedule::command(...)`. **Jangan jalankan manual** dalam keadaan normal. | `CheckCountdownStatus`, `GenerateMonthlyInvoicesCommand`, `ClosePeriodCommand`, `AutoWriteOffTerminatedCustomersCommand`, `PruneReadNotifications`, `CheckFopTaskSlaBreach`, `PruneWebhookOutbox`, `ReleaseOverdueTasksToPending`, `NotifyUnsettledTechnicianCommand` |
+| `Operational/` | Manual, situasional, **benar-benar dipakai ke depan** — perawatan rutin billing/RBAC, atau rangkaian migrasi cabang baru yang masih akan dipakai tiap ada cabang baru. | `CustomerPackageReconcileFromExcelCommand`, `AuditDuplicateInvoicesCommand`, `ReconcileInvoiceStatusCommand`, `ApplyCustomerBalanceCommand`, `BackfillActivationDateCommand`, `GeneratePermissionsCommand`, `CustomersBackfillPortalLoginId`, `MigrateLegacyDataCommand`, `BackfillLegacyDeviceAndPaymentDataCommand`, `BackfillDeviceRetrievedStatusCommand`, `FixLegacyBillingBatch2Command`, `VerifyPersonBackfill`, `BackfillLegacyServiceBillingFieldsCommand` |
+| `OneOff/` | Sudah dieksekusi buat nambal bug/insiden historis tertentu. Dibiarkan di repo buat jejak & referensi kalau bug sejenis muncul lagi, tapi **tidak diharapkan dijalankan lagi** di kondisi normal. | `BackfillCidDefaultDistributionSegmentCommand`, `BackfillStatusTimestamps`, `BackfillNotificationType`, `BackfillCustomerBalanceFromOverpay`, `BackfillRetrievalLogWarehousePopCommand`, `BackfillRollUnitPriceSnapshotCommand`, `BackfillInvoiceItemsCommand`, `CleanupLegacyDuplicateInvoicesCommand` |
+| `DevOnly/` | **Jangan pernah jalankan di produksi.** Alat bantu development/benchmark/debugging. | `CustomersPortalSetPasswordForTesting`, `SeedVolumeForBenchmark`, `FindPolicy`, `MeasurePagesCommand` |
+
+Trait bersama (`ParsesLegacySqlDump`) tetap di `app/Console/Commands/Concerns/`
+— bukan command, jadi tidak ikut kategori di atas.
 
 ---
 
@@ -47,6 +70,31 @@ Tanpa `--period`, yang diterbitkan adalah **bulan berjalan**. Bulan yang sudah
 lewat (scheduler mati saat tanggal 1, atau data baru diimpor pertengahan bulan)
 hanya bisa ditambal dengan `--period=YYYY-MM` eksplisit. Format selain `YYYY-MM`
 ditolak.
+
+**Batasi ke satu Pop** — `--pop-id=<id>` atau `--pop-name=<nama persis>`. Tanpa
+keduanya = semua Pop (default). Cek id/nama: `php artisan tinker --execute
+'App\Models\Pop::orderBy("name")->get(["id","name"])->each(fn($p)=>print("{$p->id}\t{$p->name}\n"));'`
+
+```bash
+php artisan billing:generate-monthly-invoices --period=2026-11 --pop-id=5
+php artisan billing:generate-monthly-invoices --period=2026-11 --pop-name=Sambit
+```
+
+**Tahan satu Pop sementara data belum rapi** (mis. sedang membenarkan massal
+paket/pelanggan Pop itu, takut keburu digenerate pas cron tanggal 1 jalan).
+Pause berlaku untuk cron (run penuh) **dan** `--pop-id`/`--pop-name` eksplisit —
+Pop yang dipause ditolak eksplisit, bukan diam-diam dilewati:
+
+```bash
+php artisan billing:pause-pop --pop-id=5 --note="data paket sedang dibenarkan"
+php artisan billing:paused-pops                 # cek Pop mana saja yang sedang ditahan
+php artisan billing:resume-pop --pop-id=5       # cabut setelah data rapi, baru generate lagi
+```
+
+State pause disimpan di cache (`Cache::forever`, store `database` — persist
+antar proses, gak hilang sampai di-`resume`), bukan kolom baru di `pops`. Cron
+`monthlyOn(1, '01:00')` otomatis baca state ini tiap jalan — gak perlu matikan
+scheduler buat nahan satu Pop.
 
 Jatuh tempo selalu tanggal 10 periodenya — bukan "tanggal jalan + 10 hari" —
 jadi menambal bulan lampau tetap menghasilkan tanggal tempo yang benar
@@ -437,6 +485,107 @@ sama. Kolom **Sumber**:
 
 Tidak pernah menulis apa pun. Cocok dijalankan rutin (mingguan) atau setiap
 selesai migrasi.
+
+### `app:customer-package-reconcile-excel` — migrasi/rekonsiliasi paket & harga dari Excel tagihan cabang
+
+> **UI web buat command ini DICOBA lalu DIHAPUS (2026-11-03)** — user: lebih susah dipahami lewat UI dibanding langsung di terminal (istilah teknisnya — CID, kode paket katalog, config alias/skip — tetap kelihatan teknis walau sudah dibungkus form). Command ini TETAP cuma lewat terminal. Kalau ide UI muncul lagi, baca dulu kenapa percobaan sebelumnya dibatalkan sebelum mencoba ulang.
+
+Dipakai saat data `internet_package_id`/`monthly_price` di `customer_services`
+(hasil migrasi legacy, atau salah input manual) tidak sesuai dengan Excel
+tagihan resmi cabang (mis. "Tagihan Sambit Oktober 2026.xlsx"). Dalam SATU
+transaksi: membetulkan paket + harga pelanggan, menyinkronkan
+`customers.internet_package_id` (kolom duplikat yang dibaca List/Detail
+Pelanggan), **dan** menghitung ulang invoice BULANAN `belum_dibayar` yang
+nominalnya sudah sempat terbit stale sebelum harga dibetulkan. Satu command
+untuk ketiganya — jangan bikin command terpisah buat salah satunya (keputusan
+user 2026-11-02, "1 command aja biar semuanya teratasi").
+
+```bash
+php artisan app:customer-package-reconcile-excel "docs/database/excel/<file>.xlsx" --pop-name="<Nama POP>" --dry-run
+php artisan app:customer-package-reconcile-excel "docs/database/excel/<file>.xlsx" --pop-name="<Nama POP>" --apply
+```
+
+**Selalu `--dry-run` dulu** (default tanpa `--apply` — cetak daftar perubahan,
+tidak menulis apa pun), baca hasilnya, baru `--apply`.
+
+**Syarat kolom Excel** (header harus ada, nama kolom paket punya trailing
+space di sumbernya — `"paket "`):
+
+| Kolom | Isi |
+|---|---|
+| `Nama` | Nama pelanggan — dicocokkan EXACT (dinormalisasi) ke `customers.full_name` di dalam `pop_id` yang sama. Nama ganda/ambigu (>1 match) dilewati, dilaporkan, TIDAK ditebak. |
+| `Paket` | Nominal harga bulanan (angka) |
+| `paket ` (ada spasi di belakang) | Kode paket katalog (`package_code`), mis. `NetP110`, `Net138` |
+
+**Diskriminator paket**: dibandingkan HARGA **+** SPEED paket saat ini vs
+target hasil resolve kode Excel — reassign cuma kalau salah satu beda. Jangan
+disederhanakan jadi "beda harga saja" atau "beda id baris katalog saja" —
+keduanya sudah pernah salah (lihat ADHOC-258/`CustomerPackageReconcileFromExcelCommandTest`
+untuk kasus false negative & false positifnya).
+
+**Kalau ada kasus khusus** (alias nama beda format, kode paket typo di
+Excel, baris yang harus dilewati) — pakai `--config=path/ke/config.json`,
+pola (lihat contoh nyata `docs/database/excel/sambit-okt2026-config.json`):
+
+```json
+{
+  "name_aliases": { "Nama Di Excel": "Nama Di Sistem" },
+  "skip_names": ["Nama Yang Dilewatin"],
+  "package_code_typo_fixes": { "KodeTypo": "KodeBenar" },
+  "manual_overrides": { "CID-PELANGGAN": "KodePaketBenar" }
+}
+```
+
+#### `manual_overrides` — koreksi migrasi skala besar yang gak bisa dicocokkan otomatis
+
+**Kapan dipakai**: migrasi cabang besar (ribuan pelanggan), sebagian nama gak
+bisa dicocokkan otomatis dari Excel (ambigu, typo parah, atau memang gak ada
+baris Excel-nya) dan masuk daftar `skip_names`/"dilewati" — butuh review
+manual satu-satu buat mastiin identitas pelanggannya.
+
+**JANGAN betulin kasus ini lewat tombol "Ganti Paket" di UI** — itu lewat
+`CustomerPackageService::change()`, yang MEMANG DIRANCANG reprorate invoice
+periode berjalan (blend hari-paket-lama + hari-paket-baru) kalau tagihan
+bulan itu sudah terbit. Itu benar untuk event ganti paket SUNGGUHAN, tapi
+**salah untuk koreksi migrasi**: pelanggan migrasi gak pernah beneran pakai
+"paket lama" yang salah itu — itu cuma kesalahan data, bukan hari yang
+beneran mereka jalani di paket lama. Mem-prorate koreksi migrasi berarti
+menagih pelanggan sebagian pakai harga yang gak pernah mereka pakai sungguhan.
+
+**Skenario nyata yang wajib dihindari**: migrasi cabang 5.000 pelanggan,
+2.000 auto-match lewat Excel (aman — lihat di bawah), 3.000 sisanya masih
+direview manual. Review itu bisa makan waktu berminggu-minggu, sementara
+`billing:generate-monthly-invoices` tetap jalan tiap tanggal 1 — kalau salah
+satu dari 3.000 itu dibetulin lewat "Ganti Paket" SETELAH tagihan bulan itu
+terbit, pelanggan itu kena prorate yang gak seharusnya.
+
+**Solusinya**: setelah identitas pelanggan dipastikan manual (CID-nya, bukan
+tebakan nama), tambahkan ke `manual_overrides` (`cid => package_code`) di
+config yang sama, lalu jalankan command ini lagi (dry-run dulu). Baris
+`manual_overrides` diproses lewat jalur koreksi **yang sama persis** dengan
+baris Excel — timpa langsung ke harga target + sinkron `customers.internet_package_id`
++ koreksi invoice BULANAN `belum_dibayar`/`paid_amount=0` yang stale, **tanpa
+prorate** — satu-satunya jalur migrasi yang aman dari skema upgrade/downgrade,
+berapa lama pun migrasinya berjalan.
+
+```json
+"manual_overrides": {
+  "G00RQ000024": "NetP110",
+  "G1X1BRQ000031": "Net138"
+}
+```
+
+Kalau CID gak ketemu di Pop ini, atau kode paketnya gak ada di katalog —
+dilaporkan di tabel "Dilewati", TIDAK ditebak/dipaksa.
+
+**Tidak pernah disentuh**: invoice `sebagian`/`lunas` (cuma `belum_dibayar`
+`paid_amount=0`), kolom Collector, pelanggan yang namanya ambigu/tidak
+ketemu. Aman diulang — dry-run ulang pasca-apply harus hasilnya 0 diubah.
+
+```bash
+# Verifikasi idempoten setelah apply:
+php artisan app:customer-package-reconcile-excel "docs/database/excel/<file>.xlsx" --pop-name="<Nama POP>" --dry-run   # harus 0 diubah
+```
 
 ### `billing:backfill-activation-date` — betulkan tanggal aktivasi lama
 

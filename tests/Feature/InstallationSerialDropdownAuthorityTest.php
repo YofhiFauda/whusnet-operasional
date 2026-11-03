@@ -5,12 +5,14 @@ namespace Tests\Feature;
 use App\Enums\FopTaskPriority;
 use App\Enums\MaterialKind;
 use App\Enums\OwnershipMode;
+use App\Enums\RollStatus;
 use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
 use App\Models\FopTask;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -252,9 +254,11 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
 
     /**
      * Combobox (bukan <select>): SN dirender sebagai nilai hidden + opsi
-     * JSON yang bisa dicari, dan kategori barang pasif ikut combobox.
-     * Regresi: komponen combobox harus tetap menaruh `id` di input hidden,
-     * karena validasi wajib isi di JS membaca nilai dari id itu.
+     * JSON yang bisa dicari. Regresi: komponen dropdown gabungan
+     * (installation-item-rows, ADHOC unify-dropdown-item-psb 2026-11-02)
+     * harus tetap menaruh `id="selected_inventory_serial_id"` di input
+     * hidden-nya, karena validasi wajib isi di JS (getMissingFieldsFrom())
+     * membaca nilai lewat id itu, bukan name.
      */
     #[Test]
     public function laporan_pemasangan_render_combobox_sn_roll_dan_kategori_barang(): void
@@ -279,8 +283,58 @@ class InstallationSerialDropdownAuthorityTest extends TestCase
         $response->assertOk();
         $response->assertSee('<input type="hidden" id="selected_inventory_serial_id" name="selected_inventory_serial_id"', false);
         $response->assertSee('ZTE-COMBO-001');
-        $response->assertSee('Semua Kategori');
         $response->assertDontSee('updateSnStockHint', false);
+    }
+
+    /**
+     * Regresi review (ADHOC unify-dropdown-item-psb, 2026-11-02): dropdown
+     * gabungan <x-installation-item-rows> harus memuat opsi dari KETIGA
+     * sumber sekaligus (SN modem, roll kabel, custody pasif) — bukan cuma
+     * SN. Tanpa test ini, salah satu prop (:roll-options / :custody-options)
+     * bisa putus (nama prop salah, custody kosong, dst) tanpa ketahuan.
+     */
+    #[Test]
+    public function laporan_pemasangan_render_dropdown_gabungan_modem_roll_dan_pasif(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInProgressInstallation();
+
+        $catAktif = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
+        $ont = Item::create([
+            'code' => 'ONT-SN-GABUNG', 'name' => 'ONT Gabungan Test', 'item_category_id' => $catAktif->id,
+            'unit' => 'unit', 'tracking_type' => 'serialized', 'ownership_mode' => OwnershipMode::INSTALLABLE->value,
+        ]);
+        $admin = User::factory()->create();
+        app(InventoryReceiveService::class)->receiveSerialized($pusat, $ont, ['ZTE-GABUNG-001'], 250000, $admin);
+        $transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-GABUNG-001']]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($transfer, ['ZTE-GABUNG-001'], [], $admin);
+        app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $ont->id, 'serial_numbers' => ['ZTE-GABUNG-001']]], $admin);
+
+        $catKabel = ItemCategory::where('code', 'kabel_dropcore')->firstOrFail();
+        $kabelItem = Item::create(['code' => 'IRC-ROLL-GABUNG', 'name' => 'Kabel FO Gabungan Test', 'item_category_id' => $catKabel->id, 'unit' => 'meter', 'tracking_type' => 'roll', 'meter_per_roll' => 500]);
+        InventoryRoll::create([
+            'item_id' => $kabelItem->id,
+            'roll_code' => 'IRC-ROLL-GABUNG-'.date('Ymd').'-000001',
+            'length_total' => 500,
+            'length_remaining' => 500,
+            'unit_price_snapshot' => 1600000,
+            'status' => RollStatus::ISSUED,
+            'current_technician_id' => $technician->id,
+            'issued_from_pop_id' => $cabang->id,
+        ]);
+
+        $rj45 = Item::create(['code' => 'IRC-RJ45-GABUNG', 'name' => 'RJ45 Gabungan Test', 'item_category_id' => $catKabel->id, 'unit' => 'pcs', 'tracking_type' => 'quantity']);
+        app(InventoryReceiveService::class)->receiveQuantity($pusat, $rj45, 50, 2000, $admin);
+        $rj45Transfer = app(InventoryTransferService::class)->createTransfer($pusat, $cabang, [['item_id' => $rj45->id, 'qty' => 50]], $admin);
+        app(InventoryTransferService::class)->receiveTransfer($rj45Transfer, [], [$rj45->id => 50], $admin);
+        app(InventoryIssueService::class)->issue($cabang, $technician, [['item_id' => $rj45->id, 'qty' => 10]], $admin);
+
+        $response = $this->actingAs($technician)->get(route('customers.installation.report', $customer->id));
+
+        $response->assertOk();
+        $response->assertSee('ZTE-GABUNG-001');
+        $response->assertSee('IRC-ROLL-GABUNG-'.date('Ymd').'-000001', false);
+        $response->assertSee('RJ45 Gabungan Test');
     }
 
     /**

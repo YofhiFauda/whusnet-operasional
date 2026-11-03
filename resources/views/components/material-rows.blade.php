@@ -289,24 +289,22 @@ function materialRows(itemOptions, categoryOptions, initialRows, fieldName, fall
         // baris itu sendiri, ditandai jelas "tersimpan" biar teknisi ngerti
         // ini bukan pilihan baru yang bisa diklaim ulang.
         itemOptionsFor(row) {
-            if (! this.restrictToCustody) {
+            if (! this.restrictToCustody || ! row.item_id) {
                 return this.itemOptions;
             }
 
-            const known = this.itemOptions.some(o => String(o.id) === String(row.item_id));
-
-            if (known || ! row.item_id) {
-                return this.itemOptions;
-            }
-
-            return [...this.itemOptions, {
-                id: row.item_id,
-                name: `${row.item_name || 'Barang #' + row.item_id} (tersimpan, sisa custody sekarang tidak diketahui)`,
-                code: null,
-                type: row.item_type,
-                unit: row.unit,
-                available: null,
-            }];
+            return withLegacyOption(
+                this.itemOptions,
+                o => String(o.id) === String(row.item_id),
+                () => ({
+                    id: row.item_id,
+                    name: `${row.item_name || 'Barang #' + row.item_id} (tersimpan, sisa custody sekarang tidak diketahui)`,
+                    code: null,
+                    type: row.item_type,
+                    unit: row.unit,
+                    available: null,
+                })
+            );
         },
 
         itemOptionLabel(opt) {

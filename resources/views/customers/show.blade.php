@@ -784,30 +784,78 @@
                     @endif
 
                     @if($customer->customerService && auth()->user()->hasPermission('customers.detail.packages.change'))
-                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30" x-data="{ gantiPaketOpen: false }">
+                    {{-- Rincian prorate (babak "kenapa nominalnya gak bulat?", 2026-11-02):
+                         `CustomerPackageService::change()` (ADHOC-68) menimpa ULANG invoice
+                         periode berjalan kalau sudah terbit — bukan "berlaku bulan depan
+                         doang" seperti teks lama di sini. Panel di bawah manggil
+                         `customers.package.preview` (GET, view-only) tiap pilihan paket
+                         berubah, nunjukin breakdown "Prorate Paket Lama + Prorate Paket
+                         Baru" (docs/plan/billing/upgrade-downgrade/Skema-downgrade-dan-upgrade.md)
+                         SEBELUM submit — biar gak kaget kayak laporan user "110k kok jadi
+                         109.645". --}}
+                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30"
+                         x-data="gantiPaketPanel('{{ route('customers.package.preview', $customer) }}')">
                         <div class="flex items-center justify-between">
                             <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">GANTI PAKET INTERNET</span>
-                            <template x-if="!gantiPaketOpen">
-                                <button type="button" @click="gantiPaketOpen = true" class="text-[11px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400">Ganti Paket</button>
+                            <template x-if="!open">
+                                <button type="button" @click="open = true" class="text-[11px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400">Ganti Paket</button>
                             </template>
                         </div>
-                        <template x-if="gantiPaketOpen">
-                            <form action="{{ route('customers.package.update', $customer) }}" method="POST" class="mt-3 flex flex-col sm:flex-row gap-2">
-                                @csrf
-                                @method('PUT')
-                                <select name="internet_package_id" required class="flex-1 text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
-                                    <option value="">Pilih paket baru...</option>
-                                    @foreach($availablePackages as $package)
-                                    <option value="{{ $package->id }}" @selected($customer->customerService->internet_package_id === $package->id)>{{ $package->name }} — {{ $package->download_speed_mbps }}/{{ $package->upload_speed_mbps }} Mbps — Rp {{ number_format((float) $package->monthly_price, 0, ',', '.') }}</option>
-                                    @endforeach
-                                </select>
-                                <div class="flex gap-2">
-                                    <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Simpan</button>
-                                    <button type="button" @click="gantiPaketOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                        <template x-if="open">
+                            <div class="mt-3 space-y-2">
+                                <form action="{{ route('customers.package.update', $customer) }}" method="POST" class="flex flex-col sm:flex-row gap-2">
+                                    @csrf
+                                    @method('PUT')
+                                    <select name="internet_package_id" required x-model="selectedId" @change="loadPreview()" class="flex-1 text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
+                                        <option value="">Pilih paket baru...</option>
+                                        @foreach($availablePackages as $package)
+                                        <option value="{{ $package->id }}" @selected($customer->customerService->internet_package_id === $package->id)>{{ $package->name }} — {{ $package->download_speed_mbps }}/{{ $package->upload_speed_mbps }} Mbps — Rp {{ number_format((float) $package->monthly_price, 0, ',', '.') }}</option>
+                                        @endforeach
+                                    </select>
+                                    <div class="flex gap-2">
+                                        <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Simpan</button>
+                                        <button type="button" @click="open = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                                    </div>
+                                </form>
+
+                                <div x-show="selectedId" x-cloak>
+                                    <button type="button" @click="showDetail = !showDetail" class="text-[10px] font-bold text-slate-500 hover:text-sky-600 dark:text-slate-400 dark:hover:text-sky-400 inline-flex items-center gap-1">
+                                        <svg class="w-3 h-3 transition-transform" :class="showDetail ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                        <span x-show="loading">Menghitung rincian tagihan…</span>
+                                        <span x-show="!loading">Lihat rincian tagihan periode ini</span>
+                                    </button>
+
+                                    <div x-show="showDetail && preview" x-cloak class="mt-2 p-3 rounded-lg border border-sky-100 dark:border-sky-900/40 bg-sky-50/60 dark:bg-sky-950/20 text-[11px] text-slate-700 dark:text-slate-300 space-y-1.5">
+                                        <template x-if="preview && !preview.has_current_invoice">
+                                            <p>Belum ada tagihan periode ini — harga baru langsung berlaku penuh mulai tagihan periode berikutnya, tanpa prorate.</p>
+                                        </template>
+                                        <template x-if="preview && preview.has_current_invoice">
+                                            <div class="space-y-1.5">
+                                                <p class="font-bold text-slate-900 dark:text-white">Tagihan periode <span x-text="preview.billing_period"></span> (prorate ganti paket):</p>
+                                                <template x-for="segment in preview.segments" :key="segment.package_name + '-' + segment.days + '-' + segment.monthly_price">
+                                                    <div class="flex items-center justify-between gap-2">
+                                                        <span x-text="segment.package_name + ' — ' + segment.days + ' hari'"></span>
+                                                        <span class="font-mono shrink-0" x-text="formatRupiah(segment.amount)"></span>
+                                                    </div>
+                                                </template>
+                                                <div class="flex items-center justify-between gap-2 border-t border-sky-200 dark:border-sky-900/50 pt-1 font-bold">
+                                                    <span>Total tagihan periode ini</span>
+                                                    <span class="font-mono shrink-0" x-text="formatRupiah(preview.total_invoice_periode)"></span>
+                                                </div>
+                                                <template x-if="preview.deposit_baru > 0">
+                                                    <p class="text-emerald-600 dark:text-emerald-400">Tagihan ini sudah lunas lebih bayar — kelebihan <span x-text="formatRupiah(preview.deposit_baru)"></span> jadi deposit pengurang tagihan berikutnya.</p>
+                                                </template>
+                                                <template x-if="preview.deposit_baru <= 0 && preview.sisa_tagih > 0">
+                                                    <p>Sisa yang harus dibayar: <span class="font-mono font-bold" x-text="formatRupiah(preview.sisa_tagih)"></span></p>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <p x-show="error" x-text="error" class="mt-2 text-rose-600 dark:text-rose-400"></p>
                                 </div>
-                            </form>
+                            </div>
                         </template>
-                        <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-2" x-show="gantiPaketOpen" x-cloak>Perubahan harga baru berlaku mulai tagihan periode berikutnya — tagihan bulan berjalan tidak berubah.</p>
+                        <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-2" x-show="open" x-cloak>Kalau tagihan periode ini sudah terbit, nominalnya dihitung ulang prorata (pilih paket di atas buat lihat rinciannya) — bukan otomatis full harga baru.</p>
                     </div>
                     @endif
 
@@ -1638,6 +1686,56 @@
      jadi cuma badge status & tombol Bayar yang perlu di-patch. --}}
 @push('scripts')
     <script>
+        /* Panel rincian prorate "Ganti Paket" (tab Paket & Layanan) — fetch
+           GET view-only `customers.package.preview`, dirender server-side per
+           pelanggan lewat route() di x-data (ADHOC-20 langkah 3, bukan rakitan
+           client). Global function, bukan Alpine.data(), konsisten pola
+           materialRows()/comboBox() di komponen lain repo ini. */
+        function gantiPaketPanel(previewUrl) {
+            return {
+                open: false,
+                showDetail: false,
+                loading: false,
+                selectedId: '',
+                preview: null,
+                error: null,
+                loadPreview() {
+                    this.preview = null;
+                    this.error = null;
+                    if (!this.selectedId) {
+                        return;
+                    }
+                    this.loading = true;
+                    fetch(previewUrl + '?internet_package_id=' + encodeURIComponent(this.selectedId), {
+                        headers: { Accept: 'application/json' },
+                    })
+                        .then((res) => {
+                            if (!res.ok) {
+                                throw new Error('Gagal memuat rincian');
+                            }
+                            return res.json();
+                        })
+                        .then((data) => {
+                            this.preview = data;
+                            this.showDetail = true;
+                        })
+                        .catch(() => {
+                            this.error = 'Gagal memuat rincian tagihan. Coba pilih ulang paketnya.';
+                        })
+                        .finally(() => {
+                            this.loading = false;
+                        });
+                },
+            };
+        }
+
+        function formatRupiah(value) {
+            if (value === null || value === undefined) {
+                return '-';
+            }
+            return 'Rp ' + Number(value).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+        }
+
         const CUSTOMER_INVOICE_STATUS_LABELS = {
             belum_dibayar: 'Belum Dibayar',
             sebagian: 'Sebagian',
