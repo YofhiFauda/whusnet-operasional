@@ -14,6 +14,7 @@ use App\Models\TicketHistory;
 use App\Models\User;
 use App\Services\NocAnalyticsService;
 use Closure;
+use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -50,51 +51,8 @@ class NocDashboardController extends Controller
         $canViewPerformance = $user->hasPermission('noc_dashboard.performance.view');
 
         // Filter Param Handling (Default preset: month_to_date)
-        $datePreset = $request->query('date_preset', 'month_to_date');
         $selectedPopId = $request->query('pop_id');
-        $dateFromInput = $request->query('date_from');
-        $dateToInput = $request->query('date_to');
-
-        $now = Carbon::now();
-        $dateFrom = null;
-        $dateTo = null;
-
-        switch ($datePreset) {
-            case '7_days':
-                $dateFrom = $now->copy()->subDays(6)->startOfDay();
-                $dateTo = $now->copy()->endOfDay();
-                break;
-            case '30_days':
-                $dateFrom = $now->copy()->subDays(29)->startOfDay();
-                $dateTo = $now->copy()->endOfDay();
-                break;
-            case 'this_month':
-                $dateFrom = $now->copy()->startOfMonth()->startOfDay();
-                $dateTo = $now->copy()->endOfMonth()->endOfDay();
-                break;
-            case 'last_month':
-                $dateFrom = $now->copy()->subMonth()->startOfMonth()->startOfDay();
-                $dateTo = $now->copy()->subMonth()->endOfMonth()->endOfDay();
-                break;
-            case 'all_time':
-                $dateFrom = null;
-                $dateTo = null;
-                break;
-            case 'custom':
-                if ($dateFromInput) {
-                    $dateFrom = Carbon::parse($dateFromInput)->startOfDay();
-                }
-                if ($dateToInput) {
-                    $dateTo = Carbon::parse($dateToInput)->endOfDay();
-                }
-                break;
-            case 'month_to_date':
-            default:
-                $datePreset = 'month_to_date';
-                $dateFrom = $now->copy()->startOfMonth()->startOfDay();
-                $dateTo = $now->copy()->endOfDay();
-                break;
-        }
+        ['datePreset' => $datePreset, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo] = $this->resolveDateRange($request);
 
         // Base Query with User Scope (RBAC) & POP Filter
         $baseQuery = Ticket::query()->applyUserScope();
@@ -556,6 +514,97 @@ class NocDashboardController extends Controller
             '8_24' => $bucket8_24,
             '24_plus' => $bucket24Plus,
         ];
+    }
+
+    /**
+     * Resolusi preset tanggal filter dashboard — SATU-SATUNYA sumber,
+     * dipakai `index()` DAN `leaderboardStats()` (live-refresh partial),
+     * biar query periode leaderboard tetap identik walau dipanggil lewat
+     * endpoint beda. Nama query param & semantik preset HARUS sama dgn
+     * yang dulu inline di `index()`.
+     *
+     * @return array{datePreset: string, dateFrom: ?Carbon, dateTo: ?Carbon}
+     */
+    private function resolveDateRange(Request $request): array
+    {
+        $datePreset = $request->query('date_preset', 'month_to_date');
+        $dateFromInput = $request->query('date_from');
+        $dateToInput = $request->query('date_to');
+
+        $now = Carbon::now();
+        $dateFrom = null;
+        $dateTo = null;
+
+        switch ($datePreset) {
+            case '7_days':
+                $dateFrom = $now->copy()->subDays(6)->startOfDay();
+                $dateTo = $now->copy()->endOfDay();
+                break;
+            case '30_days':
+                $dateFrom = $now->copy()->subDays(29)->startOfDay();
+                $dateTo = $now->copy()->endOfDay();
+                break;
+            case 'this_month':
+                $dateFrom = $now->copy()->startOfMonth()->startOfDay();
+                $dateTo = $now->copy()->endOfMonth()->endOfDay();
+                break;
+            case 'last_month':
+                $dateFrom = $now->copy()->subMonth()->startOfMonth()->startOfDay();
+                $dateTo = $now->copy()->subMonth()->endOfMonth()->endOfDay();
+                break;
+            case 'all_time':
+                $dateFrom = null;
+                $dateTo = null;
+                break;
+            case 'custom':
+                if ($dateFromInput) {
+                    $dateFrom = Carbon::parse($dateFromInput)->startOfDay();
+                }
+                if ($dateToInput) {
+                    $dateTo = Carbon::parse($dateToInput)->endOfDay();
+                }
+                break;
+            case 'month_to_date':
+            default:
+                $datePreset = 'month_to_date';
+                $dateFrom = $now->copy()->startOfMonth()->startOfDay();
+                $dateTo = $now->copy()->endOfDay();
+                break;
+        }
+
+        return ['datePreset' => $datePreset, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo];
+    }
+
+    /**
+     * Endpoint sempit buat live-refresh leaderboard (dengar TicketQueueUpdated
+     * di noc/dashboard.blade.php) — TIDAK merender seluruh index(), cuma
+     * hitung ulang leaderboard & render partial `_leaderboard.blade.php` yang
+     * sama dipakai index() (lewat deep-analytics.blade.php). HTML, bukan
+     * JSON — UI leaderboard server-rendered (loop Blade), bukan Alpine
+     * reactive state. Query berat `buildPerformanceLeaderboard()` (full scan
+     * ticket_histories) TETAP berat di sini — itu optimasi terpisah
+     * (analisa-performa-seeder-15k.md kategori 2), bukan scope endpoint ini.
+     * Yang dihilangkan di sini cuma overhead render ~90 query lain punya
+     * index() + parsing HTML penuh di klien.
+     */
+    public function leaderboardStats(Request $request): View
+    {
+        $user = auth()->user();
+        abort_unless($user->hasPermission('noc_dashboard.view'), 403);
+
+        $canViewPerformance = $user->hasPermission('noc_dashboard.performance.view');
+        $leaderboard = ['helpdesk' => [], 'noc' => []];
+
+        if ($canViewPerformance) {
+            $selectedPopId = $request->query('pop_id');
+            ['dateFrom' => $dateFrom, 'dateTo' => $dateTo] = $this->resolveDateRange($request);
+            $leaderboard = $this->buildPerformanceLeaderboard($selectedPopId, $dateFrom, $dateTo);
+        }
+
+        return view('noc.partials._leaderboard', [
+            'leaderboard' => $leaderboard,
+            'canViewPerformance' => $canViewPerformance,
+        ]);
     }
 
     /**

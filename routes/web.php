@@ -1620,6 +1620,7 @@ Route::middleware('auth')->group(function () {
     Route::redirect('/noc/worksheet/diproses', '/noc/worksheet');
     Route::middleware('permission:noc_dashboard.view')->group(function () {
         Route::get('/noc/dashboard', [NocDashboardController::class, 'index'])->name('noc.dashboard');
+        Route::get('/noc/dashboard/leaderboard-stats', [NocDashboardController::class, 'leaderboardStats'])->name('noc.dashboard.leaderboard-stats');
     });
 
     // Location APIs (used in forms)

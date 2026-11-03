@@ -528,7 +528,7 @@
                     'stat-cards-container', 'region-stats-container', 'issue-stats-container',
                     'trend-matrix-container', 'daily-trend-container', 'sla-compliance-container',
                     'aging-buckets-container', 'monthly-complaint-region-container', 'monthly-complaint-issue-container',
-                    'per-pop-analytics-container', 'leaderboard-container', 'active-tickets-container', 'activity-feed-container',
+                    'per-pop-analytics-container', 'active-tickets-container', 'activity-feed-container',
                 ].forEach(id => {
                     const el = document.getElementById(id);
                     const newEl = doc.getElementById(id);
@@ -544,6 +544,32 @@
             }
         }
 
+        /**
+         * Leaderboard DIKELUARKAN dari refetchAndSwap() di atas — endpoint
+         * sendiri (noc.dashboard.leaderboard-stats), bukan ikut fetch
+         * window.location.href. Query filter (pop_id/date_preset/dst) ikut
+         * window.location.search biar konsisten sama filter yang lagi aktif
+         * di halaman. Lihat analisa-performa-seeder-15k.md §12.
+         */
+        async function refreshLeaderboard() {
+            const el = document.getElementById('leaderboard-container');
+            if (!el) return;
+
+            try {
+                const res = await fetch(`{{ route('noc.dashboard.leaderboard-stats') }}${window.location.search}`);
+                const html = await res.text();
+                if (!html.trim()) return;
+
+                el.outerHTML = html;
+                const fresh = document.getElementById('leaderboard-container');
+                if (fresh && window.Alpine) {
+                    window.Alpine.initTree(fresh);
+                }
+            } catch (e) {
+                // Diam-diam gagal — leaderboard tetap nampilin data lama.
+            }
+        }
+
         window.nocDashboardRefresh = refetchAndSwap;
 
         window.initNocDashboardEcho = function () {
@@ -555,7 +581,10 @@
                     return;
                 }
                 allowedPopIds.forEach(popId => {
-                    window.Echo.private(`tickets.${popId}`).listen('.TicketQueueUpdated', () => refetchAndSwap());
+                    window.Echo.private(`tickets.${popId}`).listen('.TicketQueueUpdated', () => {
+                        refetchAndSwap();
+                        refreshLeaderboard();
+                    });
                 });
             };
             setupEcho();
