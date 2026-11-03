@@ -1573,6 +1573,10 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('ticket')
             ->name('tickets.detail-json');
 
+        Route::get('/tickets/{ticket}/status-panel', [TicketController::class, 'statusPanel'])
+            ->whereNumber('ticket')
+            ->name('tickets.status-panel');
+
         Route::get('/tickets/{ticket}', [TicketController::class, 'show'])
             ->whereNumber('ticket')
             ->name('tickets.show');
