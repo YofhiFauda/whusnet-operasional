@@ -11,6 +11,19 @@ window.addEventListener('beforeunload', () => {
 import './bootstrap';
 import './image-source-picker';
 
+/* htmx — nav instant lintas semua halaman lewat hx-boost="true" di <body>
+   (layouts/app.blade.php). Dibundel lokal lewat Vite sama seperti Alpine,
+   bukan CDN — alasan sama: app operasional internal, jaringan luar gak
+   boleh jadi titik gagal buat interaksi dasar (lihat catatan Alpine di atas). */
+import 'htmx.org';
+
+/* Fetch boost gagal (network/4xx/5xx) → fallback navigasi native, biar
+   gak nyangkut blank/stuck di halaman lama. Lihat docs/superpowers/specs/
+   2026-11-03-spa-feel-htmx-design.md § Error Handling. */
+window.addEventListener('htmx:responseError', (e) => {
+    window.location.href = e.detail.requestConfig.path;
+});
+
 /* ── Alpine.js — dibundel lokal lewat Vite, BUKAN CDN ──
    Dulu dimuat dari cdn.jsdelivr.net di layouts/app.blade.php. Tiga alasan
    pindah: (1) bundle CDN cuma berisi core, jadi `x-collapse` di 6 titik
