@@ -198,6 +198,19 @@ class TaskController extends Controller
     }
 
     /**
+     * Partial status badge buat live-refresh tanpa reload (dengar event
+     * TaskStarted/TaskCompleted di tasks/show.blade.php, channel fop.{pop_id}
+     * sudah ada). Query ulang dari DB ($task->fresh()), bukan percaya payload
+     * event — status bisa berubah lagi antara event terkirim & fetch ini jalan.
+     */
+    public function statusPanel(Task $task): View
+    {
+        $this->authorize('view', $task);
+
+        return view('tasks.partials._status-panel', ['task' => $task->fresh()]);
+    }
+
+    /**
      * Detail task.
      */
     public function show(Task $task): View

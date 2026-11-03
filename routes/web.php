@@ -1370,6 +1370,7 @@ Route::middleware('auth')->group(function () {
 
     // Task detail — FOP (view.all) atau Teknisi (view.own + member)
     Route::middleware('permission:task.view.all|task.view.own')->group(function () {
+        Route::get('/tasks/{task}/status-panel', [TaskController::class, 'statusPanel'])->name('tasks.status-panel');
         Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
     });
 
