@@ -449,8 +449,13 @@ class CustomerPackageService
      * `customer_package_changes` + segmen baru yang baru terjadi — dipakai
      * jumlah total (§2.8, n-segmen), BUKAN cuma "paket sekarang vs sebelumnya".
      *
+     * `package_id` per segmen SENGAJA ikut disimpan walau
+     * `recomputeInvoiceForPackageChange()` cuma pakai `price`/`days` — dipakai
+     * `previewChange()` buat kasih label nama paket di breakdown pratinjau
+     * (lihat docs/plan/billing/upgrade-downgrade/Skema-downgrade-dan-upgrade.md).
+     *
      * @param  Collection<int, CustomerPackageChange>  $history
-     * @return array{0: list<array{price: float, start: Carbon, end: Carbon, days: int}>, 1: array{package_id: int, price: float, days: int}}
+     * @return array{0: list<array{price: float, start: Carbon, end: Carbon, days: int, package_id: int}>, 1: array{package_id: int, price: float, days: int}}
      */
     private function buildSegments(
         Collection $history,
@@ -463,9 +468,9 @@ class CustomerPackageService
     ): array {
         $segments = [];
 
-        $addSegment = function (float $price, Carbon $start, Carbon $end) use (&$segments) {
+        $addSegment = function (float $price, Carbon $start, Carbon $end, int $packageId) use (&$segments) {
             $days = $end->gte($start) ? $start->diffInDays($end) + 1 : 0;
-            $segments[] = ['price' => $price, 'start' => $start, 'end' => $end, 'days' => $days];
+            $segments[] = ['price' => $price, 'start' => $start, 'end' => $end, 'days' => $days, 'package_id' => $packageId];
         };
 
         if ($history->isEmpty()) {
@@ -474,7 +479,7 @@ class CustomerPackageService
             $localOldPrice = $oldMonthlyPrice;
         } else {
             $first = $history->first();
-            $addSegment((float) $first->old_monthly_price, $periodStart, Carbon::parse($first->effective_date)->subDay());
+            $addSegment((float) $first->old_monthly_price, $periodStart, Carbon::parse($first->effective_date)->subDay(), $first->old_internet_package_id);
 
             for ($i = 0; $i < $history->count() - 1; $i++) {
                 $current = $history[$i];
@@ -483,6 +488,7 @@ class CustomerPackageService
                     (float) $current->new_monthly_price,
                     Carbon::parse($current->effective_date),
                     Carbon::parse($next->effective_date)->subDay(),
+                    $current->new_internet_package_id,
                 );
             }
 
@@ -493,18 +499,165 @@ class CustomerPackageService
         }
 
         // Segmen lokal paket yang baru saja "ditutup" oleh perubahan ini.
-        $addSegment($localOldPrice, $localOldStart, $effectiveDate->copy()->subDay());
+        $addSegment($localOldPrice, $localOldStart, $effectiveDate->copy()->subDay(), $localOldPackageId);
         $localOldDays = $effectiveDate->copy()->subDay()->gte($localOldStart)
             ? $localOldStart->diffInDays($effectiveDate->copy()->subDay()) + 1
             : 0;
 
         // Segmen paket baru, dari hari efektif sampai akhir periode.
-        $addSegment((float) $newPackage->monthly_price, $effectiveDate, $periodEnd);
+        $addSegment((float) $newPackage->monthly_price, $effectiveDate, $periodEnd, $newPackage->id);
 
         return [$segments, [
             'package_id' => $localOldPackageId,
             'price' => $localOldPrice,
             'days' => $localOldDays,
         ]];
+    }
+
+    /**
+     * Pratinjau breakdown prorate TANPA menulis apa pun ke DB — dipakai
+     * modal/form "Ganti Paket" buat nunjukin rincian
+     * "Prorate Paket Lama + Prorate Paket Baru" (Skema-downgrade-dan-upgrade.md)
+     * SEBELUM admin klik Simpan, biar nominal gak bulat (karena ganti di
+     * tengah periode) gak bikin kaget seperti laporan user 2026-11-02.
+     *
+     * Rumus HARUS identik `recomputeInvoiceForPackageChange()` — method ini
+     * sengaja tidak reuse kode (yang satu menulis DB, yang satu tidak), tapi
+     * kalau rumus di sana berubah, method ini wajib disamakan manual.
+     *
+     * @return array{
+     *   has_current_invoice: bool,
+     *   is_upgrade: bool,
+     *   billing_period: string,
+     *   days_in_period: int,
+     *   segments: list<array{package_name: string, days: int, monthly_price: float, amount: float}>,
+     *   subtotal_paket: float,
+     *   one_time_fees: float,
+     *   discount: float,
+     *   ppn_percent: float,
+     *   total_invoice_periode: float,
+     *   previously_paid: float,
+     *   sisa_tagih: float,
+     *   deposit_baru: float,
+     * }
+     */
+    public function previewChange(Customer $customer, InternetPackage $newPackage): array
+    {
+        $service = $customer->customerService;
+
+        if (! $service) {
+            throw new RuntimeException('Pelanggan belum punya layanan aktif.');
+        }
+
+        $isUpgrade = (float) $newPackage->monthly_price > (float) $service->monthly_price;
+        $currentPeriod = now()->format('Y-m');
+
+        $invoice = Invoice::query()
+            ->where('customer_service_id', $service->id)
+            ->where('billing_period', $currentPeriod)
+            ->whereIn('invoice_type', Invoice::SUBSCRIPTION_TYPES)
+            ->where('invoice_status', '!=', InvoiceStatus::BATAL->value)
+            ->first();
+
+        if (! $invoice) {
+            return [
+                'has_current_invoice' => false,
+                'is_upgrade' => $isUpgrade,
+                'billing_period' => $currentPeriod,
+                'days_in_period' => 0,
+                'segments' => [],
+                'subtotal_paket' => 0.0,
+                'one_time_fees' => 0.0,
+                'discount' => (float) ($service->discount ?? 0),
+                'ppn_percent' => (float) ($service->ppn ?? 0),
+                'total_invoice_periode' => null,
+                'previously_paid' => 0.0,
+                'sisa_tagih' => null,
+                'deposit_baru' => null,
+            ];
+        }
+
+        $oldPackageId = $service->internet_package_id;
+        $oldMonthlyPrice = (float) $service->monthly_price;
+
+        [$periodStart, $periodEnd, $daysInPeriod] = $this->resolvePeriodWindow($invoice);
+
+        $effectiveDate = Carbon::today()->startOfDay();
+        if ($effectiveDate->lt($periodStart)) {
+            $effectiveDate = $periodStart->copy();
+        }
+        if ($effectiveDate->gt($periodEnd)) {
+            $effectiveDate = $periodEnd->copy();
+        }
+
+        $history = CustomerPackageChange::query()
+            ->where('customer_service_id', $service->id)
+            ->where('billing_period', $currentPeriod)
+            ->orderBy('effective_date')
+            ->orderBy('id')
+            ->get();
+
+        [$segments] = $this->buildSegments(
+            $history, $periodStart, $periodEnd, $oldPackageId, $oldMonthlyPrice, $effectiveDate, $newPackage,
+        );
+
+        $packageNames = InternetPackage::query()
+            ->whereIn('id', array_unique(array_column($segments, 'package_id')))
+            ->pluck('name', 'id');
+
+        $segmentsOut = array_values(array_filter(array_map(function (array $segment) use ($daysInPeriod, $packageNames) {
+            if ($segment['days'] <= 0) {
+                return null;
+            }
+
+            return [
+                'package_name' => $packageNames[$segment['package_id']] ?? 'Paket tidak diketahui',
+                'days' => $segment['days'],
+                'monthly_price' => $segment['price'],
+                'amount' => Money::of(($segment['price'] / $daysInPeriod) * $segment['days']),
+            ];
+        }, $segments)));
+
+        $subtotalPaket = Money::sum(array_map(
+            fn (array $segment) => ($segment['price'] / $daysInPeriod) * $segment['days'],
+            $segments,
+        ));
+
+        $modemSaleAmount = $this->existingModemSaleAmount($invoice);
+        $oneTimeFees = Money::sum([
+            $invoice->extra_installation_fee ?? 0,
+            $invoice->extra_cable_fee ?? 0,
+            $invoice->extra_pole_fee ?? 0,
+            $invoice->other_fee ?? 0,
+            $modemSaleAmount,
+        ]);
+
+        $fullSubtotal = Money::add($subtotalPaket, $oneTimeFees);
+
+        $discount = (float) ($service->discount ?? 0);
+        $ppnPercent = (float) ($service->ppn ?? 0);
+
+        $afterDiscount = Money::atLeastZero(Money::sub($fullSubtotal, $discount));
+        $totalInvoicePeriode = $afterDiscount * (1 + $ppnPercent / 100);
+
+        $previouslyPaid = (float) $invoice->paid_amount;
+        $sisaTagih = Money::atLeastZero(Money::sub($totalInvoicePeriode, $previouslyPaid));
+        $depositBaru = Money::atLeastZero(Money::sub($previouslyPaid, $totalInvoicePeriode));
+
+        return [
+            'has_current_invoice' => true,
+            'is_upgrade' => $isUpgrade,
+            'billing_period' => $currentPeriod,
+            'days_in_period' => $daysInPeriod,
+            'segments' => $segmentsOut,
+            'subtotal_paket' => $subtotalPaket,
+            'one_time_fees' => $oneTimeFees,
+            'discount' => $discount,
+            'ppn_percent' => $ppnPercent,
+            'total_invoice_periode' => $totalInvoicePeriode,
+            'previously_paid' => $previouslyPaid,
+            'sisa_tagih' => $sisaTagih,
+            'deposit_baru' => $depositBaru,
+        ];
     }
 }

@@ -51,7 +51,7 @@
             <!-- Pilih Paket Baru -->
             <div>
                 <label for="pkg-select" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1.5">Paket Baru</label>
-                <select id="pkg-select" name="internet_package_id" required class="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
+                <select id="pkg-select" name="internet_package_id" required onchange="loadPackagePreview()" class="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
                     <option value="">Pilih paket baru...</option>
                     @foreach($packages as $package)
                     <option value="{{ $package->id }}">{{ $package->name }} — Rp {{ number_format((float) $package->monthly_price, 0, ',', '.') }}</option>
@@ -59,8 +59,21 @@
                 </select>
             </div>
 
+            {{-- Rincian prorate (babak "kenapa nominalnya gak bulat?", 2026-11-02):
+                 teks lama di sini bilang "tagihan bulan berjalan tidak berubah" — SALAH
+                 sejak ADHOC-68, `CustomerPackageService::change()` menimpa ULANG invoice
+                 periode berjalan kalau sudah terbit. Diganti toggle yang nge-fetch
+                 `customers.package.preview` (GET view-only) tiap pilih paket, nunjukin
+                 breakdown "Prorate Paket Lama + Prorate Paket Baru"
+                 (Skema-downgrade-dan-upgrade.md) SEBELUM submit. --}}
+            <button type="button" id="pkg-preview-toggle" onclick="togglePackagePreviewDetail()" class="hidden text-[11px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400 inline-flex items-center gap-1">
+                <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                <span id="pkg-preview-status"></span>
+            </button>
+            <div id="pkg-preview-detail" class="hidden text-[11px] text-slate-700 dark:text-slate-300 bg-sky-50/60 dark:bg-sky-950/20 p-2.5 rounded-xl border border-sky-100 dark:border-sky-900/40 space-y-1"></div>
+
             <p class="text-[11px] text-slate-600 dark:text-slate-400 bg-slate-50 dark:bg-slate-800/60 p-2.5 rounded-xl border border-slate-100 dark:border-slate-800">
-                Harga baru berlaku mulai tagihan periode berikutnya — tagihan bulan berjalan yang sudah terbit tidak berubah.
+                Kalau tagihan periode ini sudah terbit, nominalnya dihitung ulang prorata (pilih paket di atas buat lihat rinciannya) — bukan otomatis full harga baru.
             </p>
 
             <!-- Footer Buttons -->

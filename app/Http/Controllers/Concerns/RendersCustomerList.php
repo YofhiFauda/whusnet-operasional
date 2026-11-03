@@ -374,6 +374,13 @@ trait RendersCustomerList
             ? CustomerTerminationReason::orderBy('name')->get(['id', 'name'])
             : collect();
 
+        // Dropdown alasan Request Putus Langganan di modal Quick Hub List —
+        // aturan sama dengan CustomerController::show() (cuma alasan aktif,
+        // digerbang permission customers.deactivate yang sama dengan tombolnya).
+        $terminationReasons = auth()->user()->hasPermission('customers.deactivate')
+            ? CustomerTerminationReason::active()->orderBy('name')->get()
+            : collect();
+
         // Customer count by status (for badge list / submenus)
         $statusCounts = Customer::applyUserScope()->selectRaw('status, count(*) as count')
             ->groupBy('status')
@@ -415,6 +422,7 @@ trait RendersCustomerList
             'collectorOptions',
             'terminationReasonId',
             'terminationReasonOptions',
+            'terminationReasons',
             'sort',
             'dir',
             'columns',

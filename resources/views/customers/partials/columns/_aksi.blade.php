@@ -39,8 +39,12 @@
                                     data-network-update-url="{{ route('customers.network-assignment.update', $customer->id) }}"
                                     data-network-data-url="{{ route('customers.network-assignment.data', $customer->id) }}"
                                     data-package-update-url="{{ route('customers.package.update', $customer->id) }}"
+                                    data-package-preview-url="{{ route('customers.package.preview', $customer->id) }}"
                                     data-current-package-id="{{ $customer->customerService->internet_package_id ?? '' }}"
                                     data-toggle-suspend-url="{{ route('customers.toggle-suspend', $customer->id) }}"
+                                    data-terminate-url="{{ route('customers.terminate', $customer->id) }}"
+                                    data-can-terminate="{{ ($customer->customerService && in_array($customer->status, ['active', 'suspended'], true)) ? '1' : '0' }}"
+                                    data-penalty-eligible="{{ (! $customer->customerService?->activation_date || now()->lessThanOrEqualTo(\Carbon\Carbon::parse($customer->customerService->activation_date)->addYear())) ? '1' : '0' }}"
                                     class="w-9 h-9 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-sky-50 dark:hover:bg-slate-700 hover:border-sky-300 text-slate-500 hover:text-sky-600 inline-flex items-center justify-center transition-all shadow-sm cursor-pointer"
                                     aria-label="Aksi cepat untuk {{ $customer->full_name }} ({{ $displayId }})"
                                     title="Buka Modal Hub Aksi Cepat">

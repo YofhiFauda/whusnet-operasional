@@ -1224,6 +1224,7 @@ Route::middleware('auth')->group(function () {
     });
 
     Route::middleware('permission:customers.detail.packages.change')->group(function () {
+        Route::get('/customers/{customer}/package/preview', [CustomerPackageController::class, 'preview'])->name('customers.package.preview');
         Route::put('/customers/{customer}/package', [CustomerPackageController::class, 'update'])->name('customers.package.update');
     });
 

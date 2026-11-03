@@ -200,8 +200,12 @@
                                     data-network-update-url="{{ route('customers.network-assignment.update', $customer->id) }}"
                                     data-network-data-url="{{ route('customers.network-assignment.data', $customer->id) }}"
                                     data-package-update-url="{{ route('customers.package.update', $customer->id) }}"
+                                    data-package-preview-url="{{ route('customers.package.preview', $customer->id) }}"
                                     data-current-package-id="{{ $customer->customerService->internet_package_id ?? '' }}"
                                     data-toggle-suspend-url="{{ route('customers.toggle-suspend', $customer->id) }}"
+                                    data-terminate-url="{{ route('customers.terminate', $customer->id) }}"
+                                    data-can-terminate="{{ ($customer->customerService && in_array($customer->status, ['active', 'suspended'], true)) ? '1' : '0' }}"
+                                    data-penalty-eligible="{{ (! $customer->customerService?->activation_date || now()->lessThanOrEqualTo(\Carbon\Carbon::parse($customer->customerService->activation_date)->addYear())) ? '1' : '0' }}"
                                 class="flex-1 py-1.5 px-2.5 rounded-xl bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold flex items-center justify-center gap-1 shadow-md shadow-sky-600/20 transition-all btn-interactive touch-target min-w-0">
                             <span class="truncate">Detail Pelanggan</span>
                             <svg class="w-3.5 h-3.5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>

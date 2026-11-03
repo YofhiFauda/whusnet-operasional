@@ -127,4 +127,53 @@ class CustomerTerminationReasonMasterTest extends TestCase
         $reason = CustomerTerminationReason::create(['name' => 'Test']);
         $this->actingAs($user)->delete(route('master.termination-reasons.destroy', $reason))->assertForbidden();
     }
+
+    #[Test]
+    public function index_menampilkan_modal_alasan_hanya_untuk_user_berhak(): void
+    {
+        $this->loginAsAdmin();
+        CustomerTerminationReason::create(['name' => 'Test Edit']);
+
+        $response = $this->get(route('master.termination-reasons.index'));
+        $response->assertOk();
+        $response->assertSee('reason-modal-wrapper');
+        $response->assertSee("openReasonModal('create')", false);
+        $response->assertSee("openReasonModal('edit'", false);
+
+        $role = Role::where('code', 'pop_admin')->firstOrFail();
+        $user = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
+        $responseNonAdmin = $this->actingAs($user)->get(route('master.termination-reasons.index'));
+        $responseNonAdmin->assertOk();
+        $responseNonAdmin->assertDontSee('reason-modal-wrapper');
+    }
+
+    #[Test]
+    public function ajax_store_dan_update_mengembalikan_json(): void
+    {
+        $this->loginAsAdmin();
+
+        $storeResponse = $this->postJson(route('master.termination-reasons.store'), [
+            'name' => 'Alasan Ajax',
+            'default_penalty_amount' => 25000,
+            'is_active' => 1,
+        ]);
+        $storeResponse->assertOk()->assertJson(['success' => true]);
+        $this->assertDatabaseHas('customer_termination_reasons', ['name' => 'Alasan Ajax']);
+
+        $reason = CustomerTerminationReason::where('name', 'Alasan Ajax')->firstOrFail();
+
+        $updateResponse = $this->putJson(route('master.termination-reasons.update', $reason), [
+            'name' => 'Alasan Ajax Diubah',
+            'default_penalty_amount' => 35000,
+            'is_active' => 1,
+        ]);
+        $updateResponse->assertOk()->assertJson(['success' => true]);
+        $this->assertDatabaseHas('customer_termination_reasons', ['name' => 'Alasan Ajax Diubah']);
+
+        $failResponse = $this->postJson(route('master.termination-reasons.store'), [
+            'name' => '',
+            'is_active' => 1,
+        ]);
+        $failResponse->assertStatus(422)->assertJsonValidationErrors('name');
+    }
 }

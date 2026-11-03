@@ -228,8 +228,12 @@
             networkDataUrl: button.getAttribute('data-network-data-url') || '',
             detailUrl: button.getAttribute('data-detail-url') || '',
             packageUpdateUrl: button.getAttribute('data-package-update-url') || '',
+            packagePreviewUrl: button.getAttribute('data-package-preview-url') || '',
             currentPackageId: button.getAttribute('data-current-package-id') || '',
             toggleSuspendUrl: button.getAttribute('data-toggle-suspend-url') || '',
+            terminateUrl: button.getAttribute('data-terminate-url') || '',
+            canTerminate: button.getAttribute('data-can-terminate') === '1',
+            penaltyEligible: button.getAttribute('data-penalty-eligible') === '1',
         };
 
         const setElemText = (id, txt) => {
@@ -615,6 +619,7 @@ ODP/Distribusi: ${dist}`;
         closeActionsModal();
         openPackageChangeModal(
             selectedCustomerData.packageUpdateUrl,
+            selectedCustomerData.packagePreviewUrl,
             selectedCustomerData.currentPackageId,
             selectedCustomerData.package,
             selectedCustomerData.price,
@@ -625,8 +630,12 @@ ODP/Distribusi: ${dist}`;
     /* ── Modal Ganti Paket Internet ──
        @param {string} updateUrl PUT target (customers.package.update), dirender
        server-side lewat data-package-update-url di tombol pemanggil. JANGAN
-       merakit path dari id pelanggan di sini — ADHOC-20 langkah 3. */
-    function openPackageChangeModal(updateUrl, currentPackageId, currentPackageLabel, currentPriceLabel, customerName) {
+       merakit path dari id pelanggan di sini — ADHOC-20 langkah 3.
+       @param {string} previewUrl GET view-only (customers.package.preview),
+       dirender server-side sama seperti updateUrl — dipakai loadPackagePreview()
+       tiap dropdown paket berubah, nunjukin breakdown "Prorate Paket Lama +
+       Prorate Paket Baru" (Skema-downgrade-dan-upgrade.md) sebelum submit. */
+    function openPackageChangeModal(updateUrl, previewUrl, currentPackageId, currentPackageLabel, currentPriceLabel, customerName) {
         const wrapper = document.getElementById('package-change-modal-wrapper');
         const form = document.getElementById('package-change-form');
         const select = document.getElementById('pkg-select');
@@ -644,10 +653,13 @@ ODP/Distribusi: ${dist}`;
         }
 
         form.action = updateUrl;
+        form.dataset.previewUrl = previewUrl || '';
         if (select) select.value = currentPackageId || '';
         if (nameEl) nameEl.textContent = customerName || '-';
         if (currentPackageEl) currentPackageEl.textContent = currentPackageLabel || '-';
         if (currentPriceEl) currentPriceEl.textContent = currentPriceLabel || '-';
+
+        resetPackagePreview();
 
         wrapper.classList.remove('hidden');
         document.body.classList.add('overflow-hidden');
@@ -657,20 +669,242 @@ ODP/Distribusi: ${dist}`;
         const wrapper = document.getElementById('package-change-modal-wrapper');
         if (wrapper) wrapper.classList.add('hidden');
         document.body.classList.remove('overflow-hidden');
+        resetPackagePreview();
+    }
+
+    function formatRupiahPkg(value) {
+        if (value === null || value === undefined) return '-';
+        return 'Rp ' + Number(value).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+    }
+
+    function resetPackagePreview() {
+        const toggle = document.getElementById('pkg-preview-toggle');
+        const detail = document.getElementById('pkg-preview-detail');
+        const status = document.getElementById('pkg-preview-status');
+        if (toggle) toggle.classList.add('hidden');
+        if (detail) { detail.classList.add('hidden'); detail.innerHTML = ''; }
+        if (status) status.textContent = '';
+    }
+
+    /* Dipanggil @change dari #pkg-select. Fetch GET view-only, render
+       breakdown prorate ke #pkg-preview-detail. Gagal diam-diam kalau
+       previewUrl belum sempat terisi (modal belum selesai dibuka). */
+    function loadPackagePreview() {
+        const form = document.getElementById('package-change-form');
+        const select = document.getElementById('pkg-select');
+        const toggle = document.getElementById('pkg-preview-toggle');
+        const detail = document.getElementById('pkg-preview-detail');
+        const status = document.getElementById('pkg-preview-status');
+        if (!form || !select) return;
+
+        const previewUrl = form.dataset.previewUrl;
+        resetPackagePreview();
+
+        if (!previewUrl || !select.value) return;
+
+        if (status) status.textContent = 'Menghitung rincian tagihan…';
+        if (toggle) toggle.classList.remove('hidden');
+
+        fetch(previewUrl + '?internet_package_id=' + encodeURIComponent(select.value), {
+            headers: { Accept: 'application/json' },
+        })
+            .then((res) => {
+                if (!res.ok) throw new Error('Gagal memuat rincian');
+                return res.json();
+            })
+            .then((data) => {
+                if (status) status.textContent = 'Lihat rincian tagihan periode ini';
+                if (detail) {
+                    detail.innerHTML = renderPackagePreview(data);
+                }
+            })
+            .catch(() => {
+                if (status) status.textContent = 'Gagal memuat rincian tagihan.';
+            });
+    }
+
+    function togglePackagePreviewDetail() {
+        const detail = document.getElementById('pkg-preview-detail');
+        if (detail) detail.classList.toggle('hidden');
+    }
+
+    function escapeHtmlPkg(value) {
+        const div = document.createElement('div');
+        div.textContent = String(value ?? '');
+        return div.innerHTML;
+    }
+
+    function renderPackagePreview(data) {
+        if (!data || !data.has_current_invoice) {
+            return '<p>Belum ada tagihan periode ini — harga baru langsung berlaku penuh mulai tagihan periode berikutnya, tanpa prorate.</p>';
+        }
+
+        let rows = (data.segments || []).map((segment) => (
+            '<div class="flex items-center justify-between gap-2">' +
+            '<span>' + escapeHtmlPkg(segment.package_name) + ' — ' + escapeHtmlPkg(segment.days) + ' hari</span>' +
+            '<span class="font-mono shrink-0">' + formatRupiahPkg(segment.amount) + '</span>' +
+            '</div>'
+        )).join('');
+
+        let footer = '';
+        if (data.deposit_baru > 0) {
+            footer = '<p class="text-emerald-600 dark:text-emerald-400 mt-1">Tagihan ini sudah lunas lebih bayar — kelebihan ' + formatRupiahPkg(data.deposit_baru) + ' jadi deposit pengurang tagihan berikutnya.</p>';
+        } else if (data.sisa_tagih > 0) {
+            footer = '<p class="mt-1">Sisa yang harus dibayar: <span class="font-mono font-bold">' + formatRupiahPkg(data.sisa_tagih) + '</span></p>';
+        }
+
+        return (
+            '<p class="font-bold text-slate-900 dark:text-white">Tagihan periode ' + escapeHtmlPkg(data.billing_period) + ' (prorate ganti paket):</p>' +
+            rows +
+            '<div class="flex items-center justify-between gap-2 border-t border-sky-200 dark:border-sky-900/50 pt-1 mt-1 font-bold">' +
+            '<span>Total tagihan periode ini</span>' +
+            '<span class="font-mono shrink-0">' + formatRupiahPkg(data.total_invoice_periode) + '</span>' +
+            '</div>' +
+            footer
+        );
     }
 
     function triggerEdit() {
         window.location.href = '/customers/' + selectedCustomerData.id + '/edit';
     }
 
+    // Jembatan Modal Hub → Modal Request Putus Langganan. Dulu cuma redirect
+    // ke panel inline di halaman Detail (`#terminate`) — sekarang modal
+    // sendiri, tapi SUBMIT-nya AJAX (bukan form POST biasa) persis alasan di
+    // _termination_modal.blade.php: form POST+referer di atas List bikin
+    // validasi gagal nutup modal tanpa pesan error nyantol (ADHOC-20).
     function triggerTerminate() {
+        if (!selectedCustomerData.canTerminate) {
+            showModalToast('Request Putus Langganan hanya untuk pelanggan aktif/terisolir yang sudah punya layanan.');
+            return;
+        }
         closeActionsModal();
-        if (!selectedCustomerData.detailUrl) return;
-        // Konfirmasi (+ alasan wajib) sudah ditangani panel "Putus Langganan"
-        // di halaman Detail (window.confirmDelete) — bukan di sini, biar gak
-        // dobel dialog dan halaman Detail tetap satu-satunya tempat forms
-        // mutasi data ini benar-benar dirender (lihat customers/show.blade.php).
-        window.location.href = selectedCustomerData.detailUrl + '#terminate';
+        openTerminationModal();
+    }
+
+    function openTerminationModal() {
+        const wrapper = document.getElementById('termination-modal-wrapper');
+        const form = document.getElementById('termination-form');
+        const select = document.getElementById('terminate-reason-select');
+        const nameEl = document.getElementById('terminate-customer-name');
+        const errBox = document.getElementById('termination-modal-errors');
+        if (!wrapper || !form || !selectedCustomerData.terminateUrl) return;
+
+        form.action = selectedCustomerData.terminateUrl;
+        if (select) select.value = '';
+        if (nameEl) nameEl.textContent = selectedCustomerData.name || '-';
+        if (errBox) { errBox.classList.add('hidden'); errBox.innerHTML = ''; }
+
+        const penaltyWrapper = document.getElementById('terminate-penalty-wrapper');
+        const penaltyInput = document.getElementById('terminate-penalty-input');
+        const freeNote = document.getElementById('terminate-penalty-free-note');
+        if (selectedCustomerData.penaltyEligible) {
+            penaltyWrapper?.classList.remove('hidden');
+            freeNote?.classList.add('hidden');
+            if (penaltyInput) penaltyInput.value = 0;
+        } else {
+            penaltyWrapper?.classList.add('hidden');
+            freeNote?.classList.remove('hidden');
+        }
+        window.formatInputRupiah && window.formatInputRupiah();
+
+        wrapper.classList.remove('hidden');
+        document.body.classList.add('overflow-hidden');
+    }
+
+    function closeTerminationModal() {
+        const wrapper = document.getElementById('termination-modal-wrapper');
+        if (wrapper) wrapper.classList.add('hidden');
+        document.body.classList.remove('overflow-hidden');
+    }
+
+    function onTerminationReasonChange() {
+        if (!selectedCustomerData.penaltyEligible) return;
+        const select = document.getElementById('terminate-reason-select');
+        const input = document.getElementById('terminate-penalty-input');
+        const opt = select?.selectedOptions[0];
+        if (input && opt && opt.dataset.default !== undefined) {
+            input.value = opt.dataset.default;
+            window.formatInputRupiah && window.formatInputRupiah();
+        }
+    }
+
+    function submitTerminationModal(event) {
+        event.preventDefault();
+        window.Dialog.show({
+            title: 'Konfirmasi Putus Langganan',
+            message: `Yakin memutuskan langganan pelanggan "${selectedCustomerData.name}"? Layanan akan dihentikan permanen dan tidak bisa diaktifkan lagi lewat toggle Isolir.`,
+            icon: 'error',
+            buttons: [
+                { text: 'Batal', type: 'secondary', onClick: () => window.Dialog.close() },
+                {
+                    text: 'Ya, Putuskan', type: 'danger', onClick: () => {
+                        window.Dialog.close();
+                        doSubmitTermination();
+                    },
+                },
+            ],
+        });
+    }
+
+    function renderTerminationErrors(errors) {
+        const errBox = document.getElementById('termination-modal-errors');
+        if (!errBox) return;
+        const messages = Object.values(errors || {}).flat();
+        if (!messages.length) { errBox.classList.add('hidden'); errBox.innerHTML = ''; return; }
+        errBox.innerHTML = messages.map((m) => `<p>${m}</p>`).join('');
+        errBox.classList.remove('hidden');
+    }
+
+    function doSubmitTermination() {
+        const form = document.getElementById('termination-form');
+        const btn = document.getElementById('terminate-submit-btn');
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content || document.querySelector('input[name="_token"]')?.value;
+        if (!form) return;
+
+        // Submit programatik (bukan `form.submit()`/event submit asli) — event
+        // `submit` listener global yang biasa melucuti masking `[data-rupiah]`
+        // (lihat layouts/app.blade.php) tidak terpicu di sini, jadi dipanggil
+        // manual sebelum FormData dibaca. Tanpa ini server terima "500.000"
+        // bukan "500000".
+        window.Rupiah && window.Rupiah.normalisasiForm(form);
+
+        const formData = new FormData(form);
+        if (btn) btn.disabled = true;
+
+        fetch(form.action, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: formData,
+        })
+            .then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (res.status === 422 && data.errors) {
+                    renderTerminationErrors(data.errors);
+                    throw null;
+                }
+                if (!res.ok) {
+                    throw new Error(data.message || 'Gagal memutuskan langganan.');
+                }
+                return data;
+            })
+            .then((data) => {
+                closeTerminationModal();
+                if (window.Toast) window.Toast.success('Berhasil', data.message || 'Layanan pelanggan berhasil dihentikan.');
+                window.location.reload();
+            })
+            .catch((err) => {
+                if (err === null) return;
+                console.error(err);
+                if (window.Toast) window.Toast.error('Gagal', err.message || 'Terjadi kesalahan sistem.');
+            })
+            .finally(() => {
+                if (btn) btn.disabled = false;
+            });
     }
 
 @include('customers.partials._network_assignment_js')

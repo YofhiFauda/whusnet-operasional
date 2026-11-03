@@ -9,6 +9,8 @@ use App\Models\User;
 use App\Notifications\AppNotification;
 use App\Services\CustomerTerminationService;
 use App\Support\RupiahInput;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 
 class CustomerTerminationController extends Controller
@@ -21,7 +23,7 @@ class CustomerTerminationController extends Controller
      * "Bebaskan Tagihan Periode" di Detail Pelanggan, sebelum atau sesudah
      * putus. Lihat CustomerTerminationService.
      */
-    public function __invoke(Request $request, Customer $customer, CustomerTerminationService $service)
+    public function __invoke(Request $request, Customer $customer, CustomerTerminationService $service): JsonResponse|RedirectResponse
     {
         // Aksi destruktif/service-impacting, wajib permission sendiri
         // (customers.deactivate) — bukan numpang customers.update.
@@ -47,7 +49,13 @@ class CustomerTerminationController extends Controller
         $oldStatus = (string) $customer->status;
 
         if (! WorkflowTransition::tryFrom($oldStatus)?->canTransitionTo(WorkflowTransition::TERMINATED)) {
-            return redirect()->back()->with('error', "Pelanggan berstatus '{$oldStatus}' tidak bisa diputus langganan. Hanya pelanggan aktif atau terisolir.");
+            $message = "Pelanggan berstatus '{$oldStatus}' tidak bisa diputus langganan. Hanya pelanggan aktif atau terisolir.";
+
+            if ($request->wantsJson()) {
+                return response()->json(['message' => $message], 422);
+            }
+
+            return redirect()->back()->with('error', $message);
         }
 
         $invoice = $service->terminate($customer, $validated, auth()->id());
@@ -68,6 +76,16 @@ class CustomerTerminationController extends Controller
             ));
         }
 
-        return redirect()->back()->with('success', 'Layanan pelanggan berhasil dihentikan (terminasi).');
+        $message = 'Layanan pelanggan berhasil dihentikan (terminasi).';
+
+        // Modal "Request Putus Langganan" di Quick Hub List (customers/index)
+        // submit lewat AJAX, bukan form POST+referer biasa — lihat
+        // _termination_modal.blade.php kenapa. Panel inline di halaman Detail
+        // (customers/show.blade.php) tetap pakai PRG lama di bawah.
+        if ($request->wantsJson()) {
+            return response()->json(['message' => $message]);
+        }
+
+        return redirect()->back()->with('success', $message);
     }
 }

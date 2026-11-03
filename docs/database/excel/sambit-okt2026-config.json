@@ -1,0 +1,24 @@
+{
+    "_comment": "Config --config utk app:customer-package-reconcile-excel, cabang Sambit, rekap Okt 2026. Hasil review manual laporan reconcile (2026-11-02) — JANGAN diisi otomatis dari fuzzy-matching. manual_overrides (cid => package_code) buat nama di skip_names yang identitasnya SUDAH ditelusuri manual (jangan dibetulin lewat tombol Ganti Paket UI — itu reprorate tagihan periode berjalan, lihat docblock command).",
+    "name_aliases": {
+        "Wawan/Yayuk (migrasi)": "Wawan Yayuk",
+        "Rini (migrasi)": "Rini",
+        "Wahid Asari (KUD aditama wringinanom)": "Wahid Asari",
+        "Rokayatin / anis": "Rokayatin",
+        "Sarmi / Fery Dwi Martdiawan": "Fery Dwi Martdiawan",
+        "Ida Erlina - puskesmas wringinanom": "Ida Erlina",
+        "Sulastri Anggres - Lastri Wringinanom": "Sulastri Anggres",
+        "Eko Setiawan (migrasi)": "Eko Setiawan",
+        "Mediana Riska Wati": "Meidiana Riska Wati",
+        "Sri Ani 2": "Sriani 2"
+    },
+    "skip_names": [
+        "Smp 3 Sambit (migrasi)"
+    ],
+    "package_code_typo_fixes": {
+        "Net136": "Net138",
+        "Net137": "Net138",
+        "Net1380": "Net138"
+    },
+    "manual_overrides": {}
+}
