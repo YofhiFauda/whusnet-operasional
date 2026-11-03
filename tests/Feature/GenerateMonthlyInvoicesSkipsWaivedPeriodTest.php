@@ -148,4 +148,120 @@ class GenerateMonthlyInvoicesSkipsWaivedPeriodTest extends TestCase
         $this->artisan('billing:generate-monthly-invoices', ['--period' => $targetPeriod])->assertExitCode(0);
         $this->assertSame(1, Invoice::where('customer_id', $customer->id)->where('billing_period', $targetPeriod)->count());
     }
+
+    #[Test]
+    public function pop_id_membatasi_generate_ke_satu_pop_pop_lain_tidak_ikut(): void
+    {
+        $popLain = Pop::create([
+            'code' => 'POP-GEN-2',
+            'pop_code' => 'GEN2',
+            'registration_prefix' => 'E',
+            'cid_prefix' => 'E',
+            'name' => 'POP Generator Test 2',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        [$customerPopA] = $this->customerWithService('C-GEN-000005');
+
+        $customerPopB = Customer::create([
+            'customer_code' => 'C-GEN-000006',
+            'full_name' => 'Pelanggan Pop B',
+            'primary_phone' => '08110000006',
+            'registration_date' => now()->subYears(2),
+            'pop_id' => $popLain->id,
+            'status' => 'active',
+        ]);
+        CustomerService::create([
+            'customer_id' => $customerPopB->id,
+            'internet_package_id' => InternetPackage::first()->id,
+            'service_status' => 'aktif',
+            'billing_cycle' => 'monthly',
+            'package_name_snapshot' => 'Paket Test',
+            'monthly_price' => 150000,
+            'total_monthly_bill' => 150000,
+            'activation_date' => now()->subYears(2),
+        ]);
+
+        $targetPeriod = now()->addMonth()->format('Y-m');
+
+        $this->artisan('billing:generate-monthly-invoices', [
+            '--period' => $targetPeriod,
+            '--pop-id' => $this->pop->id,
+        ])->assertExitCode(0);
+
+        $this->assertSame(1, Invoice::where('customer_id', $customerPopA->id)->where('billing_period', $targetPeriod)->count());
+        $this->assertSame(0, Invoice::where('customer_id', $customerPopB->id)->where('billing_period', $targetPeriod)->count());
+    }
+
+    #[Test]
+    public function pop_id_tidak_ditemukan_gagal_tanpa_generate_apa_apa(): void
+    {
+        [$customer] = $this->customerWithService('C-GEN-000007');
+        $targetPeriod = now()->addMonth()->format('Y-m');
+
+        $this->artisan('billing:generate-monthly-invoices', [
+            '--period' => $targetPeriod,
+            '--pop-id' => 999999,
+        ])->assertExitCode(1);
+
+        $this->assertSame(0, Invoice::where('customer_id', $customer->id)->where('billing_period', $targetPeriod)->count());
+    }
+
+    #[Test]
+    public function pop_yang_dipause_tidak_ikut_generate_penuh_lalu_ikut_lagi_setelah_diresume(): void
+    {
+        [$customerPaused] = $this->customerWithService('C-GEN-000008');
+
+        $popLain = Pop::create([
+            'code' => 'POP-GEN-3',
+            'pop_code' => 'GEN3',
+            'registration_prefix' => 'F',
+            'cid_prefix' => 'F',
+            'name' => 'POP Generator Test 3',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+        $customerNormal = Customer::create([
+            'customer_code' => 'C-GEN-000009',
+            'full_name' => 'Pelanggan Pop Normal',
+            'primary_phone' => '08110000009',
+            'registration_date' => now()->subYears(2),
+            'pop_id' => $popLain->id,
+            'status' => 'active',
+        ]);
+        CustomerService::create([
+            'customer_id' => $customerNormal->id,
+            'internet_package_id' => InternetPackage::first()->id,
+            'service_status' => 'aktif',
+            'billing_cycle' => 'monthly',
+            'package_name_snapshot' => 'Paket Test',
+            'monthly_price' => 150000,
+            'total_monthly_bill' => 150000,
+            'activation_date' => now()->subYears(2),
+        ]);
+
+        $targetPeriod = now()->addMonth()->format('Y-m');
+
+        $this->artisan('billing:pause-pop', ['--pop-id' => $this->pop->id, '--note' => 'data belum rapi'])
+            ->assertExitCode(0);
+
+        // Run penuh (tanpa --pop-id) harus skip Pop yang dipause, Pop lain tetap jalan.
+        $this->artisan('billing:generate-monthly-invoices', ['--period' => $targetPeriod])
+            ->assertExitCode(0);
+
+        $this->assertSame(0, Invoice::where('customer_id', $customerPaused->id)->where('billing_period', $targetPeriod)->count());
+        $this->assertSame(1, Invoice::where('customer_id', $customerNormal->id)->where('billing_period', $targetPeriod)->count());
+
+        // --pop-id eksplisit ke Pop yang dipause juga ditolak, bukan diam-diam lolos.
+        $this->artisan('billing:generate-monthly-invoices', ['--period' => $targetPeriod, '--pop-id' => $this->pop->id])
+            ->assertExitCode(1);
+
+        $this->artisan('billing:resume-pop', ['--pop-id' => $this->pop->id])->assertExitCode(0);
+
+        $this->artisan('billing:generate-monthly-invoices', ['--period' => $targetPeriod])
+            ->assertExitCode(0);
+
+        $this->assertSame(1, Invoice::where('customer_id', $customerPaused->id)->where('billing_period', $targetPeriod)->count());
+    }
 }

@@ -198,6 +198,15 @@ class InfrastructureMapService
         $visiblePopsById = $topologyPops->keyBy('id');
         $topologyDetails = [];
         $topologyIndex = [];
+        // Urutan saudara di kanvas (JS `kidsOf`) TIDAK BOLEH mengandalkan urutan
+        // key objek JS: integer non-negatif selalu diiterasi ASCENDING oleh JS
+        // (spec, bukan insertion order) — itu diam-diam menimpa `orderBy('code')`/
+        // urutan port di bawah ini begitu ID node tidak monoton sama dengan
+        // hierarki fisik (lazim di data production: edit/import tidak berurutan).
+        // `_seq` penanda urutan insersi asli (dibaca JS buat sort `kidsOf` manual,
+        // lihat computeLayout()) — array PHP SELALU preserve insertion order,
+        // jadi penanda ini stabil lintas pemanggilan `build()` yang sama.
+        $seq = 0;
         foreach ($topologyPops as $pop) {
             $parent = $visiblePopsById->get($pop->parent_id);
             $id = -$pop->id;
@@ -234,6 +243,7 @@ class InfrastructureMapService
                 'latitude' => $pop->latitude,
                 'longitude' => $pop->longitude,
                 'show_url' => $user->hasPermission('pops.view') ? route('master.pop.show', $pop) : null,
+                '_seq' => $seq++,
             ];
             $topologyIndex[$id] = [
                 'parent' => $parentId,
@@ -245,7 +255,7 @@ class InfrastructureMapService
             $parentId = $node->parent_id !== null && $nodesById->has($node->parent_id)
                 ? $node->parent_id
                 : ($visiblePopsById->has($node->anchor_pop_id) ? -$node->anchor_pop_id : null);
-            $topologyDetails[$node->id] = [...$nodeDetails[$node->id], 'parent_id' => $parentId, 'relation' => 'location', 'verified' => null];
+            $topologyDetails[$node->id] = [...$nodeDetails[$node->id], 'parent_id' => $parentId, 'relation' => 'location', 'verified' => null, '_seq' => $seq++];
             $topologyIndex[$node->id] = [...$nodeIndex[$node->id], 'parent' => $parentId];
         }
 
@@ -284,12 +294,12 @@ class InfrastructureMapService
                 $parentId = $drop?->parent_id === $node->id ? $drop->id : $node->id;
                 $cid = $customer->cid ?? $customer->customer_code ?? 'CID-'.$customer->id;
                 $path = $paths[$node->id].' / Port '.$port->number.' / '.$cid;
-                $topologyDetails[$id] = $this->ontDetail(
+                $topologyDetails[$id] = [...$this->ontDetail(
                     $user, $customer, $id, $cid, $parentId, $path,
                     $nodeDetails[$node->id]['anchor_pop_name'], $nodeDetails[$node->id]['cabang_name'],
                     $node->code, $port->number, $nodeDetails[$node->id]['ports_url'],
                     $canViewDeviceSerials,
-                );
+                ), '_seq' => $seq++];
                 $topologyIndex[$id] = [
                     'parent' => $parentId,
                     'type' => 'customer_ont',

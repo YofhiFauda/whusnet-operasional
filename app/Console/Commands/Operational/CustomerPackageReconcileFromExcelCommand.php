@@ -137,7 +137,7 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             }
 
             if (in_array($namaExcel, $skipNames, true)) {
-                $skipped[] = [$namaExcel, 'ditandai skip di config (nominal/kode paket tidak bisa dipercaya) — review manual'];
+                $skipped[] = [$namaExcel, 'ditandai skip di config — datanya belum bisa dipercaya, perlu ditelusuri manual dulu'];
 
                 continue;
             }
@@ -150,7 +150,7 @@ class CustomerPackageReconcileFromExcelCommand extends Command
                 ->get();
 
             if ($candidates->count() !== 1) {
-                $skipped[] = [$namaExcel, $candidates->count() === 0 ? 'tidak ditemukan di app' : "ambigu ({$candidates->count()} baris app bernama sama)"];
+                $skipped[] = [$namaExcel, $candidates->count() === 0 ? 'nama ini tidak ditemukan di sistem' : "ada {$candidates->count()} pelanggan dengan nama sama di sistem — perlu dicek manual, nama saja tidak cukup unik"];
 
                 continue;
             }
@@ -159,7 +159,7 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             $service = $customer->customerService;
 
             if (! $service) {
-                $skipped[] = [$namaExcel, 'belum punya customer_service'];
+                $skipped[] = [$namaExcel, 'pelanggan ketemu, tapi belum punya data layanan (customer_service) — gak bisa dikoreksi'];
 
                 continue;
             }
@@ -188,7 +188,7 @@ class CustomerPackageReconcileFromExcelCommand extends Command
                     && (float) $current->download_speed_mbps === (float) $targetPackage->download_speed_mbps;
                 $packageTierWrong = $isDefault || ! $samePriceAndSpeed;
             } elseif ($isDefault) {
-                $skipped[] = [$namaExcel, "paket kosong, kode Excel '{$kodeRaw}' tidak ada di katalog — perlu assign manual"];
+                $skipped[] = [$namaExcel, "paket pelanggan masih kosong, dan kode paket '{$kodeRaw}' di Excel tidak dikenal katalog — perlu di-assign manual dulu"];
 
                 continue;
             } else {
@@ -240,21 +240,21 @@ class CustomerPackageReconcileFromExcelCommand extends Command
                 ->first();
 
             if (! $customer) {
-                $skipped[] = ["[manual_override] {$cid}", 'CID tidak ditemukan di Pop ini'];
+                $skipped[] = ["[manual_override] {$cid}", 'CID ini tidak ditemukan di Cabang yang dipilih — cek lagi CID-nya atau Cabang yang dipilih'];
 
                 continue;
             }
 
             $service = $customer->customerService;
             if (! $service) {
-                $skipped[] = [$customer->full_name." ({$cid})", 'belum punya customer_service'];
+                $skipped[] = [$customer->full_name." ({$cid})", 'pelanggan ketemu, tapi belum punya data layanan (customer_service) — gak bisa dikoreksi'];
 
                 continue;
             }
 
             $targetPackage = InternetPackage::where('package_code', $packageCode)->first();
             if (! $targetPackage) {
-                $skipped[] = [$customer->full_name." ({$cid})", "kode paket manual_override '{$packageCode}' tidak ada di katalog"];
+                $skipped[] = [$customer->full_name." ({$cid})", "kode paket manual_override '{$packageCode}' tidak ada di katalog — cek lagi penulisannya"];
 
                 continue;
             }

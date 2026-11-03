@@ -577,6 +577,43 @@ class InfrastructureMapTest extends TestCase
     }
 
     #[Test]
+    public function topology_details_membawa_penanda_urutan_sesuai_code_dan_port_bukan_id_mentah(): void
+    {
+        // ID database dibuat SENGAJA tidak monoton dengan urutan `code`/port
+        // (mis. data production: node ODP-A dibuat belakangan, dapat ID lebih
+        // besar dari ODP-C) — JS kanvas (`kidsOf`) dulu diam-diam mengandalkan
+        // urutan iterasi key integer objek JS (selalu ascending by ID), bukan
+        // `_seq` ini, sehingga urutan saudara acak begitu ID tidak nurut hierarki.
+        $cabang = Pop::factory()->create(['type' => 'cabang']);
+        $odpType = NetworkNodeType::firstOrCreate(['code' => 'odp'], NetworkNodeType::factory()->make(['code' => 'odp', 'has_ports' => true])->toArray());
+        $odpC = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'node_type_id' => $odpType->id, 'code' => 'ODP-C']);
+        $odpA = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'node_type_id' => $odpType->id, 'code' => 'ODP-A']);
+        $odpB = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'node_type_id' => $odpType->id, 'code' => 'ODP-B']);
+        $this->assertTrue($odpC->id < $odpA->id && $odpA->id < $odpB->id, 'prasyarat: ID dibuat tidak urut dengan code');
+
+        $customerHigh = Customer::factory()->create(['pop_id' => $cabang->id]);
+        $customerLow = Customer::factory()->create(['pop_id' => $cabang->id]);
+        $this->assertTrue($customerHigh->id < $customerLow->id);
+        $portTwo = $odpA->ports()->create(['number' => 2, 'is_used' => true]);
+        $portOne = $odpA->ports()->create(['number' => 1, 'is_used' => true]);
+        NetworkPortAssignment::create(['network_node_port_id' => $portTwo->id, 'customer_id' => $customerHigh->id, 'active_key' => 1, 'assigned_at' => now()]);
+        NetworkPortAssignment::create(['network_node_port_id' => $portOne->id, 'customer_id' => $customerLow->id, 'active_key' => 1, 'assigned_at' => now()]);
+
+        $this->loginAsAdmin();
+        $details = app(InfrastructureMapService::class)->build(auth()->user(), null, 'topology', withCustomerOnt: true)['topologyDetails'];
+
+        // Urutan `_seq` ikut `orderBy('code')` (A, B, C) — bukan urutan ID (C, A, B).
+        $this->assertLessThan($details[$odpB->id]['_seq'], $details[$odpA->id]['_seq']);
+        $this->assertLessThan($details[$odpC->id]['_seq'], $details[$odpB->id]['_seq']);
+
+        // ONT: `_seq` ikut nomor port (1 lalu 2) — bukan urutan ID pelanggan
+        // ($customerHigh id-nya lebih kecil tapi di port 2).
+        $ontLow = $details[-1000000000 - $customerLow->id];
+        $ontHigh = $details[-1000000000 - $customerHigh->id];
+        $this->assertLessThan($ontHigh['_seq'], $ontLow['_seq']);
+    }
+
+    #[Test]
     public function tab_topologi_jaringan_besar_dilayani_dari_cache_dan_fresh_membangun_ulang(): void
     {
         $cabang = Pop::factory()->create(['type' => 'cabang']);

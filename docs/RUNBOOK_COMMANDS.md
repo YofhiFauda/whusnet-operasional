@@ -71,6 +71,31 @@ lewat (scheduler mati saat tanggal 1, atau data baru diimpor pertengahan bulan)
 hanya bisa ditambal dengan `--period=YYYY-MM` eksplisit. Format selain `YYYY-MM`
 ditolak.
 
+**Batasi ke satu Pop** — `--pop-id=<id>` atau `--pop-name=<nama persis>`. Tanpa
+keduanya = semua Pop (default). Cek id/nama: `php artisan tinker --execute
+'App\Models\Pop::orderBy("name")->get(["id","name"])->each(fn($p)=>print("{$p->id}\t{$p->name}\n"));'`
+
+```bash
+php artisan billing:generate-monthly-invoices --period=2026-11 --pop-id=5
+php artisan billing:generate-monthly-invoices --period=2026-11 --pop-name=Sambit
+```
+
+**Tahan satu Pop sementara data belum rapi** (mis. sedang membenarkan massal
+paket/pelanggan Pop itu, takut keburu digenerate pas cron tanggal 1 jalan).
+Pause berlaku untuk cron (run penuh) **dan** `--pop-id`/`--pop-name` eksplisit —
+Pop yang dipause ditolak eksplisit, bukan diam-diam dilewati:
+
+```bash
+php artisan billing:pause-pop --pop-id=5 --note="data paket sedang dibenarkan"
+php artisan billing:paused-pops                 # cek Pop mana saja yang sedang ditahan
+php artisan billing:resume-pop --pop-id=5       # cabut setelah data rapi, baru generate lagi
+```
+
+State pause disimpan di cache (`Cache::forever`, store `database` — persist
+antar proses, gak hilang sampai di-`resume`), bukan kolom baru di `pops`. Cron
+`monthlyOn(1, '01:00')` otomatis baca state ini tiap jalan — gak perlu matikan
+scheduler buat nahan satu Pop.
+
 Jatuh tempo selalu tanggal 10 periodenya — bukan "tanggal jalan + 10 hari" —
 jadi menambal bulan lampau tetap menghasilkan tanggal tempo yang benar
 (dan otomatis lewat tempo alias tunggakan).
@@ -462,6 +487,8 @@ Tidak pernah menulis apa pun. Cocok dijalankan rutin (mingguan) atau setiap
 selesai migrasi.
 
 ### `app:customer-package-reconcile-excel` — migrasi/rekonsiliasi paket & harga dari Excel tagihan cabang
+
+> **UI web buat command ini DICOBA lalu DIHAPUS (2026-11-03)** — user: lebih susah dipahami lewat UI dibanding langsung di terminal (istilah teknisnya — CID, kode paket katalog, config alias/skip — tetap kelihatan teknis walau sudah dibungkus form). Command ini TETAP cuma lewat terminal. Kalau ide UI muncul lagi, baca dulu kenapa percobaan sebelumnya dibatalkan sebelum mencoba ulang.
 
 Dipakai saat data `internet_package_id`/`monthly_price` di `customer_services`
 (hasil migrasi legacy, atau salah input manual) tidak sesuai dengan Excel

@@ -8,6 +8,7 @@ use App\Enums\WorkflowTransition;
 use App\Models\Customer;
 use App\Models\CustomerBillingWaiver;
 use App\Models\Invoice;
+use App\Models\Pop;
 use App\Models\RevenueCategory;
 use App\Models\RevenueSubcategory;
 use App\Services\CustomerBalanceService;
@@ -17,12 +18,28 @@ use Carbon\Carbon;
 use Illuminate\Console\Attributes\Description;
 use Illuminate\Console\Attributes\Signature;
 use Illuminate\Console\Command;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
-#[Signature('billing:generate-monthly-invoices {--period= : Billing period YYYY-MM (default: bulan berjalan)} {--dry-run : List what would be created without inserting anything}')]
+#[Signature('billing:generate-monthly-invoices
+                {--period= : Billing period YYYY-MM (default: bulan berjalan)}
+                {--dry-run : List what would be created without inserting anything}
+                {--pop-id= : Batasi ke satu Pop by ID (default: semua Pop)}
+                {--pop-name= : Batasi ke satu Pop by nama, alternatif --pop-id (default: semua Pop)}')]
 #[Description('Generate flat BULANAN invoices for active customers for a billing period, skipping anyone who already has one.')]
 class GenerateMonthlyInvoicesCommand extends Command
 {
+    /**
+     * Key cache tempat `billing:pause-pop`/`billing:resume-pop`/`billing:paused-pops`
+     * menyimpan daftar Pop yang sedang ditahan dari generate (data belum rapi,
+     * mis. sedang dibenarkan massal). `Cache::forever` lewat store `database`
+     * (lihat `config/cache.php`) — persist antar proses artisan, jadi cron dan
+     * command manual baca state yang sama tanpa tabel baru.
+     *
+     * @var string
+     */
+    public const PAUSED_POPS_CACHE_KEY = 'billing.generate_monthly_invoices.paused_pops';
+
     /**
      * Execute the console command.
      *
@@ -50,6 +67,31 @@ class GenerateMonthlyInvoicesCommand extends Command
 
         $dryRun = (bool) $this->option('dry-run');
 
+        // --pop-id/--pop-name opsional — kosong = semua Pop (perilaku lama,
+        // dipakai jadwal harian). Diisi salah satu = generate cuma buat satu
+        // Pop, dipakai pas admin mau tahan cabang yang datanya belum rapi
+        // sementara cabang lain tetap jalan normal.
+        $popFilterRequested = $this->option('pop-id') || $this->option('pop-name');
+        $pop = $this->resolvePop();
+        if ($popFilterRequested && ! $pop) {
+            $this->error('Pop tidak ditemukan. Cek --pop-id atau --pop-name.');
+
+            return self::FAILURE;
+        }
+
+        // Pop yang di-pause (billing:pause-pop) TIDAK boleh digenerate lewat
+        // jalur apa pun — baik run penuh (semua Pop) maupun --pop-id/--pop-name
+        // eksplisit. Kalau --pop-id eksplisit menyasar Pop yang sedang
+        // di-pause, gagal keras (bukan diam-diam skip) — admin yang minta
+        // Pop itu spesifik harus sadar kenapa tidak jalan.
+        $pausedPops = Cache::get(self::PAUSED_POPS_CACHE_KEY, []);
+
+        if ($pop && array_key_exists($pop->id, $pausedPops)) {
+            $this->error("Pop {$pop->name} sedang di-pause (billing:pause-pop) — cabut dulu dengan: php artisan billing:resume-pop --pop-id={$pop->id}");
+
+            return self::FAILURE;
+        }
+
         // Enum, bukan string literal — nama status pelanggan yang berubah tanpa
         // ubah kode ini dulu akan bikin generator diam-diam skip semua
         // pelanggan (tanpa tagihan terbit, tanpa error) sampai ada yang sadar
@@ -58,6 +100,8 @@ class GenerateMonthlyInvoicesCommand extends Command
         $customers = Customer::with('customerService')
             ->whereIn('status', [WorkflowTransition::ACTIVE->value, WorkflowTransition::SUSPENDED->value])
             ->whereHas('customerService')
+            ->when($pop, fn ($query) => $query->where('pop_id', $pop->id))
+            ->when(! $pop && $pausedPops !== [], fn ($query) => $query->whereNotIn('pop_id', array_keys($pausedPops)))
             ->get();
 
         $created = 0;
@@ -200,9 +244,28 @@ class GenerateMonthlyInvoicesCommand extends Command
             }
         }
 
-        $this->info("Periode {$billingPeriod}: ".($dryRun ? 'akan dibuat' : 'dibuat')." {$created}, dilewati {$skipped}, gagal {$failed}.");
+        $scopeLabel = $pop ? "Pop {$pop->name}" : 'semua Pop';
+        $pauseNote = (! $pop && $pausedPops !== []) ? ' ['.count($pausedPops).' Pop di-pause, tidak diikutkan]' : '';
+        $this->info("Periode {$billingPeriod} ({$scopeLabel}){$pauseNote}: ".($dryRun ? 'akan dibuat' : 'dibuat')." {$created}, dilewati {$skipped}, gagal {$failed}.");
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Pop target dari --pop-id/--pop-name, `null` kalau tidak diisi (artinya
+     * semua Pop — perilaku default). --pop-id diutamakan kalau keduanya diisi.
+     */
+    private function resolvePop(): ?Pop
+    {
+        if ($this->option('pop-id')) {
+            return Pop::find((int) $this->option('pop-id'));
+        }
+
+        if ($this->option('pop-name')) {
+            return Pop::where('name', $this->option('pop-name'))->first();
+        }
+
+        return null;
     }
 
     /**

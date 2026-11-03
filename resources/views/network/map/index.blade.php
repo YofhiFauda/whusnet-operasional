@@ -379,7 +379,7 @@
         // induknya bila belum dimuat) yang diambil dari server.
         async openSearchResult(result) {
             if (this.nodes[result.ont_id]) {
-                this.focusOnt(result.ont_id);
+                await this.focusOnt(result.ont_id);
                 return;
             }
             this.searchBusy = true;
@@ -390,7 +390,7 @@
                 await this.ensureLoaded(parent_id);
                 if (!this.nodes[parent_id]) throw new Error('induk tidak termuat');
                 this.nodes[node.id] = node;
-                this.focusOnt(node.id);
+                await this.focusOnt(node.id);
             } catch (e) {
                 this.lazyHint = 'Kartu pelanggan tidak bisa ditampilkan. Coba lagi.';
             } finally {
@@ -411,10 +411,20 @@
         },
 
         // Buka lipatan induknya, pilih kartu, lalu geser kanvas ke sana.
-        focusOnt(id) {
+        //
+        // `parent_id` kartu hasil cari kadang nunjuk ke leluhur yang BELUM
+        // termuat (mis. ODP yang di-lazy-split, lihat splitLazyOdp — anaknya
+        // sendiri seperti kabel drop pelanggan TIDAK ikut di-lazy-split, jadi
+        // tetap ada di `this.nodes` walau ODP induknya sendiri belum). Tanpa
+        // `ensureLoaded` di sini, walk berhenti diam-diam begitu ketemu leluhur
+        // yang hilang → kartunya ada di `this.nodes` tapi tidak pernah masuk
+        // `kidsOf` leluhur manapun, jadi tidak pernah di-walk/diposisikan.
+        async focusOnt(id) {
             if (!this.nodes[id]) return false;
             let cursor = this.nodes[id].parent_id;
-            for (let hops = 0; cursor != null && this.nodes[cursor] && hops < 50; hops++) {
+            for (let hops = 0; cursor != null && hops < 50; hops++) {
+                if (!this.nodes[cursor]) await this.ensureLoaded(cursor);
+                if (!this.nodes[cursor]) break;
                 this.collapsedIds.delete(+cursor);
                 cursor = this.nodes[cursor].parent_id;
             }
@@ -679,6 +689,14 @@
             for (const [cid, n] of Object.entries(nodes)) {
                 if (n.parent_id != null) (kidsOf[n.parent_id] ||= []).push(+cid);
             }
+            // JS selalu meng-iterasi key integer non-negatif secara ASCENDING
+            // (urutan numerik, bukan insertion order) — tanpa sort manual ini,
+            // urutan saudara diam-diam ikut urutan ID mentah, bukan `_seq` dari
+            // server (`orderBy('code')`/nomor port). Kartu yang disisipkan manual
+            // (hasil cari satu ONT) tidak punya `_seq` → ditaruh paling akhir.
+            for (const kids of Object.values(kidsOf)) {
+                kids.sort((a, b) => (nodes[a]?._seq ?? Infinity) - (nodes[b]?._seq ?? Infinity));
+            }
             this.kidsOf = kidsOf;
             const filtering = (this.query.trim() !== '' || this.typeFilter !== 'all') && !this.localMiss;
 
@@ -727,6 +745,7 @@
 
             const roots = Object.values(nodes)
                 .filter(n => (!n.parent_id || !nodes[n.parent_id]) && this.visibleNode(n.id))
+                .sort((a, b) => (a._seq ?? Infinity) - (b._seq ?? Infinity))
                 .map(n => n.id);
 
             roots.forEach(r => walk(r, 0));
