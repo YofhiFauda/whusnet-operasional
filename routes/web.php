@@ -473,6 +473,7 @@ Route::middleware('auth')->group(function () {
     // di halaman Tagihan. Static routes dulu, dynamic ({collector}) belakangan.
     Route::middleware('permission:collector_worksheet.view')->group(function () {
         Route::get('/collector-worksheet', [CollectorWorksheetController::class, 'index'])->name('collector-worksheet.index');
+        Route::get('/collector-worksheet/summary-panel', [CollectorWorksheetController::class, 'summaryPanel'])->name('collector-worksheet.summary-panel');
         Route::get('/collector-worksheet/technicians/{technician}', [CollectorWorksheetController::class, 'showTechnician'])->name('collector-worksheet.technicians.show');
         Route::get('/collector-worksheet/{collector}', [CollectorWorksheetController::class, 'show'])->name('collector-worksheet.show');
     });

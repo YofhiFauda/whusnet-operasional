@@ -30,6 +30,8 @@ use App\Services\EffectiveAccessService;
 use App\Support\LikeSearch;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Response;
+use Illuminate\Support\Collection;
 use Illuminate\View\View;
 
 /**
@@ -220,31 +222,7 @@ class CollectorWorksheetController extends Controller
         // Saldo & status setor TEKNISI (ADHOC-122) â€” peringatan saja, tidak
         // memblokir apa pun. Teknisi dalam POP admin tetap tampil sebelum
         // transaksi pertama supaya alur pembayarannya dapat dibuka.
-        $technicianStatuses = $this->balance->technicianSettlementStatus($request->user())->keyBy(fn (array $row) => $row['user']->id);
-        $technicianRows = User::query()
-            ->technicians()
-            ->orderBy('name')
-            ->get()
-            ->filter(function (User $technician) use ($request) {
-                if (! $this->balance->isVisibleTo($technician, $request->user())) {
-                    return false;
-                }
-
-                if ($this->access->hasAllPopAccess($request->user()) || $this->access->hasAllPopAccess($technician)) {
-                    return true;
-                }
-
-                return array_intersect(
-                    $this->access->getAllowedPopIds($technician),
-                    $this->access->getAllowedPopIds($request->user())
-                ) !== [];
-            })
-            ->map(fn (User $technician) => [
-                'user' => $technician,
-                'balance' => $technicianStatuses->get($technician->id)['balance'] ?? 0,
-                'overdue' => $technicianStatuses->get($technician->id)['overdue'] ?? false,
-            ])
-            ->values();
+        $technicianRows = $this->computeTechnicianRows($request);
 
         return view('collector-worksheet.index', compact(
             'pendingDeposits',
@@ -268,6 +246,91 @@ class CollectorWorksheetController extends Controller
             'selectedDistricts',
             'selectedVillages'
         ));
+    }
+
+    /**
+     * Daftar teknisi + status saldo/overdue — diekstrak dari `index()` biar
+     * dipanggil ulang dari `summaryPanel()` (live-refresh) tanpa duplikasi
+     * logic. `CollectorBalanceService::technicianSettlementStatus()` adalah
+     * query TERBERAT yang ditemukan analisa performa (§11/§7
+     * analisa-performa-seeder-15k.md, puluhan ribu baris `payments`
+     * dihidrasi) — endpoint sempit ini TIDAK membuatnya lebih murah, cuma
+     * menghindari render ulang SELURUH `index()` (daftar kolektor, pelanggan
+     * belum di-assign, dst) setiap kali event realtime masuk.
+     */
+    private function computeTechnicianRows(Request $request): Collection
+    {
+        $technicianStatuses = $this->balance->technicianSettlementStatus($request->user())->keyBy(fn (array $row) => $row['user']->id);
+
+        return User::query()
+            ->technicians()
+            ->orderBy('name')
+            ->get()
+            ->filter(function (User $technician) use ($request) {
+                if (! $this->balance->isVisibleTo($technician, $request->user())) {
+                    return false;
+                }
+
+                if ($this->access->hasAllPopAccess($request->user()) || $this->access->hasAllPopAccess($technician)) {
+                    return true;
+                }
+
+                return array_intersect(
+                    $this->access->getAllowedPopIds($technician),
+                    $this->access->getAllowedPopIds($request->user())
+                ) !== [];
+            })
+            ->map(fn (User $technician) => [
+                'user' => $technician,
+                'balance' => $technicianStatuses->get($technician->id)['balance'] ?? 0,
+                'overdue' => $technicianStatuses->get($technician->id)['overdue'] ?? false,
+            ])
+            ->values();
+    }
+
+    /**
+     * Endpoint sempit buat live-refresh (dengar CollectorDepositUpdated/
+     * CollectorActivityUpdated/CashDepositUpdated di
+     * partials/collector-realtime.blade.php) — TIDAK merender seluruh
+     * `index()`. Cuma 2 container yang didokumentasikan sebagai sumber
+     * 48.994 model terhidrasi: kartu "Kas Anda" (`AdminCashBalanceService::
+     * tunaiBelumDisetor()`) & daftar status teknisi
+     * (`CollectorBalanceService::technicianSettlementStatus()`). Container
+     * LAIN di `live-content` (daftar kolektor, pelanggan belum di-assign,
+     * riwayat setoran, form filter) TIDAK ikut live-refresh lagi setelah
+     * ini — dulu semuanya ikut tertambal lewat `fetch(window.location.href)`
+     * penuh (satu id `live-content` membungkus semua), sekarang HANYA 2
+     * container ini. Scope sengaja dipersempit ke yang terbukti mahal dari
+     * analisa, bukan menyamai seluruh `live-content` (di luar anggaran sesi
+     * ini) — lihat ledger Task 6 kalau mau memperluas lagi.
+     */
+    public function summaryPanel(Request $request): Response
+    {
+        $user = $request->user();
+
+        $kasTunai = $this->cash->tunaiBelumDisetor($user);
+        $kasNonTunai = $this->cash->nonTunaiRekap($user);
+        $kasSelisih = $this->cash->selisihTerbuka($user);
+        $kasSumberCount = $this->cash->unsettledCollectorDepositsQuery($user)->count()
+            + $this->cash->unsettledManualPaymentsQuery($user)->count();
+        $kasIdempotencyKey = (string) str()->uuid();
+
+        $technicianRows = $this->computeTechnicianRows($request);
+
+        $kasPanel = view('partials.admin-cash-balance-card', [
+            'tunai' => $kasTunai,
+            'nonTunai' => $kasNonTunai,
+            'selisihTerbuka' => $kasSelisih,
+            'ringkas' => true,
+            'dapatSetor' => true,
+            'sumberCount' => $kasSumberCount,
+            'idempotencyKey' => $kasIdempotencyKey,
+        ])->render();
+
+        return response(
+            '<div id="kas-admin-panel">'.$kasPanel.'</div>'
+            .view('collector-worksheet.partials._technician-rows', ['technicianRows' => $technicianRows])->render()
+        );
     }
 
     public function showTechnician(Request $request, User $technician): View
