@@ -103,13 +103,6 @@
         isPanning: false,
         panStart: null,
         panMoved: false,
-        activePointers: new Map(),
-        pinchStartDist: null,
-        // Di HP, nav atas & dock bawah dilipat jadi 1 tombol bulat (FAB) masing-masing —
-        // ketuk buka menu/panel-nya. Di sm+ FAB-nya disembunyikan, toolbar lengkap
-        // selalu kelihatan seperti biasa (lihat kelas `sm:hidden` di tombolnya).
-        mobileNavOpen: false,
-        mobileDockOpen: false,
 
         init() {
             // Jaringan besar (ribuan ODP): kanvas dimulai dengan PON terlipat —
@@ -241,7 +234,6 @@
         // halaman Pohon/Inventaris dimuat ulang bila pengguna meminta kartu ONT
         // (data ONT tidak dibangun untuk tab lain).
         goTab(name, url) {
-            this.mobileNavOpen = false;
             // View ini (`network.map.index`) cuma nanganin Topologi/Pohon/Inventaris —
             // Barang Terpasang pindah view terpisah (`network.map.terpasang`, tanpa Alpine
             // sama sekali, lihat InfrastructureMapController::index()). Pindah KE tab
@@ -428,7 +420,6 @@
         // yang hilang → kartunya ada di `this.nodes` tapi tidak pernah masuk
         // `kidsOf` leluhur manapun, jadi tidak pernah di-walk/diposisikan.
         async focusOnt(id) {
-            this.mobileNavOpen = false;
             if (!this.nodes[id]) return false;
             let cursor = this.nodes[id].parent_id;
             for (let hops = 0; cursor != null && hops < 50; hops++) {
@@ -481,7 +472,6 @@
         // ONT (URL dari server) dengan semua lipatan terbuka. Di mode ONT semua
         // data sudah ada, cukup buka lipatannya.
         async expandAll() {
-            this.mobileDockOpen = false;
             if (!this.withOnt) {
                 if (confirm('Buka semua sampai ONT akan memuat seluruh pelanggan di jaringan ini (bisa ribuan kartu) dan lambat di perangkat/jaringan lemah. Lanjutkan?')) {
                     window.location.href = this.openAllUrl;
@@ -498,7 +488,6 @@
         // Tutup Semua = hanya sampai Slot: semua Slot dilipat, jadi PON, ODP,
         // dan ONT di bawahnya tersembunyi.
         collapseToSlots() {
-            this.mobileDockOpen = false;
             this.collapsedIds.clear();
             for (const [id, n] of Object.entries(this.nodes)) {
                 if (['olt_slot', 'switch_slot'].includes(n.type)) this.collapsedIds.add(+id);
@@ -509,7 +498,6 @@
         },
 
         applyDepth(val) {
-            this.mobileDockOpen = false;
             this.depthFilter = val;
             this.collapsedIds.clear();
             if (val !== 'all' && val !== 'custom') {
@@ -600,29 +588,9 @@
             this.zoomAt(event.deltaY < 0 ? 1.12 : 1 / 1.12, event.clientX, event.clientY);
         },
 
-        // Jarak & titik tengah antar dua jari yang sedang menyentuh kanvas —
-        // dipakai buat cubit zoom (pinch-to-zoom) di layar sentuh.
-        pointerDistance() {
-            const pts = [...this.activePointers.values()];
-            return Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-        },
-
-        pointerMidpoint() {
-            const pts = [...this.activePointers.values()];
-            return { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
-        },
-
         onPanStart(event) {
             if (event.button !== 0) return;
             event.preventDefault();
-            this.activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-            if (this.activePointers.size === 2) {
-                // Jari kedua turun: berhenti geser, mulai mode cubit zoom.
-                this.panStart = null;
-                this.pinchStartDist = this.pointerDistance();
-                return;
-            }
-            if (this.activePointers.size > 2) return;
             this.panStart = {
                 pointerId: event.pointerId,
                 x: event.clientX,
@@ -634,20 +602,6 @@
         },
 
         onPanMove(event) {
-            if (this.activePointers.has(event.pointerId)) {
-                this.activePointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
-            }
-            if (this.activePointers.size === 2) {
-                event.preventDefault();
-                const dist = this.pointerDistance();
-                if (this.pinchStartDist) {
-                    const mid = this.pointerMidpoint();
-                    this.zoomAt(dist / this.pinchStartDist, mid.x, mid.y);
-                }
-                this.pinchStartDist = dist;
-                this.isPanning = true;
-                return;
-            }
             if (!this.panStart || event.pointerId !== this.panStart.pointerId) return;
             const dx = event.clientX - this.panStart.x;
             const dy = event.clientY - this.panStart.y;
@@ -659,18 +613,9 @@
         },
 
         onPanEnd(event) {
-            this.activePointers.delete(event.pointerId);
-            if (this.activePointers.size < 2) this.pinchStartDist = null;
-            if (this.activePointers.size === 1) {
-                // Satu jari masih nempel setelah cubit dilepas: lanjut geser dari
-                // posisinya sekarang — jari itu tidak akan memicu pointerdown lagi.
-                const [[pointerId, pos]] = this.activePointers;
-                this.panStart = { pointerId, x: pos.x, y: pos.y, panX: this.panX, panY: this.panY };
-                this.panMoved = true;
-            } else if (this.panStart && event.pointerId === this.panStart.pointerId) {
-                this.panStart = null;
-            }
-            if (this.activePointers.size === 0) this.isPanning = false;
+            if (!this.panStart || event.pointerId !== this.panStart.pointerId) return;
+            this.panStart = null;
+            this.isPanning = false;
         },
 
         get currentSelectedNode() {
@@ -861,41 +806,10 @@
         <div class="h-full w-1/3 animate-pulse bg-sky-600"></div>
     </div>
 
-    <!-- FLOATING TOP NAVIGATION ISLAND (TABS, CABANG, SEARCH, ONT)
-         Disederhanakan: di HP ini satu tombol bulat (FAB) yang membuka panel
-         berisi semua kontrolnya, bukan deretan "pulau" yang numpuk/digeser lagi
-         (percobaan sebelumnya masih ramai). Di sm+ tetap toolbar baris mendatar
-         seperti semula — FAB-nya disembunyikan di situ. -->
-    {{-- Pembungkus `contents` (tidak ikut terlibat di layout/posisi, anak-anaknya
-         tetap absolute sendiri-sendiri) WAJIB ada di sini: `@click.outside` taruh
-         di elemen ini, bukan di <nav> doang. Kalau cuma di <nav>, tombol FAB-nya
-         (di LUAR <nav>, sebagai saudara) dianggap "di luar" nav — klik buka FAB
-         langsung kebaca juga sebagai "klik di luar" dan nav ketutup lagi di event
-         yang sama → kelihatan kayak tombolnya gak bisa ditekan. --}}
-    <div class="contents" @click.outside="mobileNavOpen = false">
-        <button type="button"
-                x-show="!drawerOpen && !mobileNavOpen"
-                @click="mobileNavOpen = true; mobileDockOpen = false"
-                aria-label="Buka menu navigasi"
-                aria-haspopup="dialog"
-                class="sm:hidden absolute top-3 left-3 z-30 flex size-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/95 shadow-lg backdrop-blur-md pointer-events-auto transition active:scale-90 active:bg-slate-100 dark:border-slate-800 dark:bg-[#131d24]/95 dark:active:bg-slate-800">
-            <svg class="size-5 text-slate-700 dark:text-slate-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="18" x2="14" y2="18"/></svg>
-        </button>
-
-        <nav aria-label="Navigasi Peta"
-             class="absolute top-3 left-3 z-30 pointer-events-auto sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-2 sm:max-w-[calc(100vw-18rem)]"
-             :class="drawerOpen ? 'hidden' : (mobileNavOpen ? 'flex flex-col items-stretch gap-2 w-72 max-w-[calc(100vw-1.5rem)] max-h-[75vh] overflow-y-auto p-3 rounded-2xl border border-slate-200/80 bg-white/95 shadow-xl backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/95' : 'hidden')">
-        <!-- Header panel (cuma kelihatan di HP saat FAB dibuka) -->
-        <div class="flex sm:hidden items-center justify-between -mt-0.5 -mb-1">
-            <span class="font-display text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Navigasi Peta</span>
-            <button type="button" @click="mobileNavOpen = false" aria-label="Tutup menu navigasi"
-                    class="inline-flex size-6 items-center justify-center rounded text-slate-400 transition active:scale-90 hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:active:bg-slate-700">
-                <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg>
-            </button>
-        </div>
-
-        <!-- BRAND & TITLE PILL (disembunyikan di HP, judul sudah ada di topbar) -->
-        <div class="hidden sm:flex shrink-0 items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/95">
+    <!-- FLOATING TOP NAVIGATION ISLAND (TABS, CABANG, SEARCH, ONT) -->
+    <nav aria-label="Navigasi Peta" class="absolute top-3 left-3 z-30 flex flex-wrap items-center gap-2 pointer-events-auto max-w-[calc(100vw-5rem)] sm:max-w-[calc(100vw-18rem)]">
+        <!-- BRAND & TITLE PILL -->
+        <div class="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-3 py-1.5 shadow-md backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/95">
             <span class="inline-flex size-2 rounded-full bg-emerald-500 animate-pulse"></span>
             <div class="leading-none">
                 <h1 class="font-display text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">Peta Infrastruktur ISP</h1>
@@ -903,14 +817,14 @@
         </div>
 
         <!-- VIEW MODE TABS (FLOATING BUTTONS) -->
-        <div role="tablist" aria-label="Tampilan Utama" class="flex w-full sm:w-auto shrink-0 flex-wrap sm:flex-nowrap items-center gap-1 sm:gap-0 rounded-xl sm:border sm:border-slate-200/80 sm:bg-white/95 p-1 sm:shadow-md sm:backdrop-blur-md dark:sm:border-slate-800 dark:sm:bg-[#131d24]/95">
+        <div role="tablist" aria-label="Tampilan Utama" class="flex items-center rounded-xl border border-slate-200/80 bg-white/95 p-1 shadow-md backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/95">
             <button
                 type="button"
                 role="tab"
                 @click="goTab('topologi', topologiUrl)"
                 :aria-selected="tab === 'topologi'"
                 :class="tab === 'topologi' ? 'bg-sky-600 text-white shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800'"
-                class="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition active:scale-95 cursor-pointer">
+                class="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition cursor-pointer">
                 <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="18" cy="5" r="3"></circle><circle cx="6" cy="12" r="3"></circle><circle cx="18" cy="19" r="3"></circle><line x1="8.59" y1="13.51" x2="15.42" y2="17.49"></line><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"></line></svg>
                 Topologi
             </button>
@@ -921,7 +835,7 @@
                 @click="goTab('pohon', @js($tabUrl('pohon')))"
                 :aria-selected="tab === 'pohon'"
                 :class="tab === 'pohon' ? 'bg-sky-600 text-white shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800'"
-                class="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition active:scale-95 cursor-pointer">
+                class="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition cursor-pointer">
                 <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12H3"></path><path d="M12 3v18"></path><path d="M18 6l-6-3-6 3"></path></svg>
                 Per POP (Pohon)
             </button>
@@ -932,35 +846,35 @@
                 @click="goTab('inventaris', @js($tabUrl('inventaris')))"
                 :aria-selected="tab === 'inventaris'"
                 :class="tab === 'inventaris' ? 'bg-sky-600 text-white shadow-xs font-bold' : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800'"
-                class="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition active:scale-95 cursor-pointer">
+                class="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs transition cursor-pointer">
                 <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="8" y1="6" x2="21" y2="6"></line><line x1="8" y1="12" x2="21" y2="12"></line><line x1="8" y1="18" x2="21" y2="18"></line><line x1="3" y1="6" x2="3.01" y2="6"></line><line x1="3" y1="12" x2="3.01" y2="12"></line><line x1="3" y1="18" x2="3.01" y2="18"></line></svg>
                 Inventaris
             </button>
 
             <a href="{{ $tabUrl('terpasang') }}" role="tab" aria-selected="false"
-               class="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs text-slate-600 transition active:scale-95 hover:bg-slate-100 hover:text-slate-900 active:bg-slate-200 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800 dark:active:bg-slate-700">
+               class="font-display inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs text-slate-600 transition hover:bg-slate-100 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white dark:hover:bg-slate-800">
                 <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 7 12 3 4 7l8 4 8-4Z"></path><path d="M4 7v10l8 4 8-4V7"></path><path d="M12 11v10"></path></svg>
                 Barang Terpasang
             </a>
         </div>
 
         <!-- CABANG & ONT FILTER (FLOATING SELECT & BUTTON) -->
-        <form method="GET" action="{{ route('network.map.index') }}" class="flex w-full sm:w-auto shrink-0 items-center gap-1.5 rounded-xl sm:border sm:border-slate-200/80 sm:bg-white/95 p-1 sm:shadow-md sm:backdrop-blur-md dark:sm:border-slate-800 dark:sm:bg-[#131d24]/95">
+        <form method="GET" action="{{ route('network.map.index') }}" class="flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/95 p-1 shadow-md backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/95">
             <input type="hidden" name="tab" x-model="tab">
             <input type="hidden" name="sort" value="{{ $sort }}">
             @if($withCustomerOnt)<input type="hidden" name="ont" value="1">@endif
             <a href="{{ route('network.map.index', array_filter(['pop_id' => $selectedPopId, 'sort' => $sort, 'ont' => $withCustomerOnt ? null : 1])) }}"
                title="{{ $withCustomerOnt ? 'Sembunyikan kartu ONT pelanggan' : 'Tampilkan kartu ONT pelanggan di kanvas' }}"
-               class="inline-flex shrink-0 items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold transition active:scale-95 {{ $withCustomerOnt ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/70 dark:text-violet-300' : 'text-slate-600 hover:bg-slate-100 active:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-800 dark:active:bg-slate-700' }}">
+               class="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold transition {{ $withCustomerOnt ? 'bg-violet-100 text-violet-800 dark:bg-violet-950/70 dark:text-violet-300' : 'text-slate-600 hover:bg-slate-100 dark:text-slate-300 dark:hover:bg-slate-800' }}">
                 <span class="size-1.5 rounded-full {{ $withCustomerOnt ? 'bg-violet-600 dark:bg-violet-400' : 'bg-slate-400' }}"></span>
                 <span>ONT: {{ $withCustomerOnt ? 'tampil' : 'sembunyi' }}</span>
             </a>
-            <span class="h-4 w-px shrink-0 bg-slate-200 dark:bg-slate-700"></span>
+            <span class="h-4 w-px bg-slate-200 dark:bg-slate-700"></span>
             <label for="map-pop" class="sr-only">Cabang</label>
-            <div class="relative flex flex-1 items-center">
+            <div class="relative flex items-center">
                 <svg class="pointer-events-none absolute left-2 size-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"></path><circle cx="12" cy="10" r="3"></circle></svg>
                 <select id="map-pop" name="pop_id" onchange="this.form.submit()"
-                        class="w-full rounded-lg border-0 bg-transparent py-1 pl-7 pr-7 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-500 focus:outline-none dark:text-slate-200 cursor-pointer">
+                        class="rounded-lg border-0 bg-transparent py-1 pl-7 pr-7 text-xs font-semibold text-slate-800 focus:ring-2 focus:ring-sky-500 focus:outline-none dark:text-slate-200 cursor-pointer">
                     <option value="">Semua Cabang</option>
                     @foreach($cabangs as $cabang)
                         <option value="{{ $cabang->id }}" @selected($selectedPopId === $cabang->id)>{{ $cabang->name }}</option>
@@ -970,7 +884,7 @@
         </form>
 
         <!-- FLOATING SEARCH -->
-        <div class="relative flex w-full sm:w-auto shrink-0 items-center rounded-xl sm:border sm:border-slate-200/80 sm:bg-white/95 sm:shadow-md sm:backdrop-blur-md dark:sm:border-slate-800 dark:sm:bg-[#131d24]/95">
+        <div class="relative flex items-center rounded-xl border border-slate-200/80 bg-white/95 shadow-md backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/95">
             <svg class="pointer-events-none absolute left-3 size-3.5 text-slate-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="8"></circle><path d="m21 21-4.35-4.35"></path></svg>
             <input
                 type="search"
@@ -978,13 +892,13 @@
                 @input.debounce.150ms="recompute()"
                 @input.debounce.400ms="searchCustomers()"
                 placeholder="Cari perangkat, pelanggan, CID, SN..."
-                class="w-full sm:w-44 focus:sm:w-60 transition-all duration-200 rounded-xl border-0 bg-transparent py-1.5 pl-8 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500 focus:outline-none dark:text-slate-100">
-            <button x-show="query" @click="clearSearch()" type="button" class="pr-2 text-slate-400 transition active:scale-90 hover:text-slate-600 active:text-slate-700 dark:hover:text-slate-200 dark:active:text-slate-100 text-xs cursor-pointer">✕</button>
+                class="w-32 sm:w-44 focus:w-60 transition-all duration-200 rounded-xl border-0 bg-transparent py-1.5 pl-8 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:ring-2 focus:ring-sky-500 focus:outline-none dark:text-slate-100">
+            <button x-show="query" @click="clearSearch()" type="button" class="pr-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs cursor-pointer">✕</button>
             <div x-show="query.trim().length >= 3 && (searchBusy || searchResults.length)" x-cloak
                  class="absolute left-0 top-full z-40 mt-1 max-h-72 w-80 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl dark:border-slate-700 dark:bg-[#131d24]">
                 <p x-show="searchBusy" class="px-3 py-2 text-[11px] text-slate-500">Mencari pelanggan…</p>
                 <template x-for="result in searchResults" :key="result.ont_id">
-                    <button type="button" @click="openSearchResult(result)" class="flex w-full flex-col rounded-lg px-3 py-1.5 text-left text-xs transition active:scale-[0.98] hover:bg-sky-50 active:bg-sky-100 dark:hover:bg-slate-800 dark:active:bg-slate-700">
+                    <button type="button" @click="openSearchResult(result)" class="flex w-full flex-col rounded-lg px-3 py-1.5 text-left text-xs hover:bg-sky-50 dark:hover:bg-slate-800">
                         <span class="font-semibold text-slate-900 dark:text-slate-100" x-text="result.name"></span>
                         <span class="font-mono text-[11px] text-slate-500" x-text="result.cid + ' · ' + result.node_code + ' port ' + result.port + ' · cocok ' + result.match"></span>
                     </button>
@@ -992,32 +906,24 @@
             </div>
         </div>
     </nav>
-    </div>
 
-    <!-- FLOATING TOP-RIGHT ACTIONS & METRICS HUD
-         Di HP, versi lengkap (node/port/kritis berdampingan) selebar ini
-         bentrok dengan baris nav di sebelah kiri (sama-sama top-3, z-30) —
-         nav kepotong/ketutup HUD. Di bawah `sm` HUD dipadatkan jadi ikon +
-         badge kritis saja (rincian lengkap tetap ada di popover saat disentuh),
-         dan nav di atas dikasih jatah lebar (max-w) yang pas buat versi padat ini. -->
+    <!-- FLOATING TOP-RIGHT ACTIONS & METRICS HUD -->
     <div class="absolute top-3 right-3 z-30 flex items-center gap-2 pointer-events-auto" @click.outside="statsOpen = false">
         <!-- METRICS HUD BUTTON & DROPDOWN -->
         <div class="relative">
             <button
                 type="button"
                 @click="statsOpen = !statsOpen"
-                aria-label="Ringkasan kapasitas jaringan"
-                class="flex items-center gap-1.5 sm:gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-2.5 sm:px-3 py-1.5 text-xs font-semibold shadow-md backdrop-blur-md transition hover:border-sky-500 hover:text-sky-700 dark:border-slate-800 dark:bg-[#131d24]/95 dark:text-slate-200 dark:hover:border-sky-400 cursor-pointer"
+                class="flex items-center gap-2 rounded-xl border border-slate-200/80 bg-white/95 px-3 py-1.5 text-xs font-semibold shadow-md backdrop-blur-md transition hover:border-sky-500 hover:text-sky-700 dark:border-slate-800 dark:bg-[#131d24]/95 dark:text-slate-200 dark:hover:border-sky-400 cursor-pointer"
                 :class="statsOpen ? 'ring-2 ring-sky-500/30 border-sky-500' : ''">
-                <svg class="size-3.5 text-slate-400 sm:hidden" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M18 17V9"/><path d="M13 17V5"/><path d="M8 17v-3"/></svg>
-                <span class="hidden sm:inline font-mono text-slate-700 dark:text-slate-300">{{ $summary['nodes'] }} <span class="text-[10px] text-slate-400">node</span></span>
-                <span class="hidden sm:inline h-3 w-px bg-slate-200 dark:bg-slate-700"></span>
-                <span class="hidden sm:inline font-mono text-slate-700 dark:text-slate-300">{{ $summary['ports'] > 0 ? round(100 * $summary['used_ports'] / $summary['ports']) : 0 }}% <span class="text-[10px] text-slate-400">port</span></span>
+                <span class="font-mono text-slate-700 dark:text-slate-300">{{ $summary['nodes'] }} <span class="text-[10px] text-slate-400">node</span></span>
+                <span class="h-3 w-px bg-slate-200 dark:bg-slate-700"></span>
+                <span class="font-mono text-slate-700 dark:text-slate-300">{{ $summary['ports'] > 0 ? round(100 * $summary['used_ports'] / $summary['ports']) : 0 }}% <span class="text-[10px] text-slate-400">port</span></span>
                 @if($summary['red_zone'] > 0)
-                    <span class="hidden sm:inline h-3 w-px bg-slate-200 dark:bg-slate-700"></span>
-                    <span class="font-mono font-bold text-rose-600 dark:text-rose-400">{{ $summary['red_zone'] }} <span class="hidden sm:inline text-[10px]">kritis</span></span>
+                    <span class="h-3 w-px bg-slate-200 dark:bg-slate-700"></span>
+                    <span class="font-mono font-bold text-rose-600 dark:text-rose-400">{{ $summary['red_zone'] }} <span class="text-[10px]">kritis</span></span>
                 @endif
-                <svg class="hidden sm:block size-3 text-slate-400 transition-transform duration-200" :class="statsOpen ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
+                <svg class="size-3 text-slate-400 transition-transform duration-200" :class="statsOpen ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="m6 9 6 6 6-6"/></svg>
             </button>
 
             <!-- FLOATING METRICS POPOVER CARD -->
@@ -1074,15 +980,14 @@
             </div>
         </div>
 
-        <!-- FLOATING DETAIL TOGGLE BUTTON (label disembunyikan di HP, cuma ikon — hemat lebar di baris yang sama dengan HUD metrik) -->
+        <!-- FLOATING DETAIL TOGGLE BUTTON -->
         <button
             type="button"
             @click="drawerOpen = !drawerOpen"
-            :aria-label="drawerOpen ? 'Tutup Detail' : 'Detail Node'"
-            class="flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/95 px-2.5 sm:px-3 py-1.5 text-xs font-semibold shadow-md backdrop-blur-md transition hover:border-sky-500 hover:text-sky-700 dark:border-slate-800 dark:bg-[#131d24]/95 dark:text-slate-200 dark:hover:border-sky-400 cursor-pointer"
+            class="flex items-center gap-1.5 rounded-xl border border-slate-200/80 bg-white/95 px-3 py-1.5 text-xs font-semibold shadow-md backdrop-blur-md transition hover:border-sky-500 hover:text-sky-700 dark:border-slate-800 dark:bg-[#131d24]/95 dark:text-slate-200 dark:hover:border-sky-400 cursor-pointer"
             :class="drawerOpen ? 'bg-sky-50 text-sky-800 border-sky-400 dark:bg-sky-950/60 dark:text-sky-300 dark:border-sky-700' : ''">
             <svg class="size-3.5 transition-transform" :class="drawerOpen ? 'rotate-180' : ''" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="18" height="18" x="3" y="3" rx="2"/><path d="M15 3v18"/></svg>
-            <span class="hidden sm:inline" x-text="drawerOpen ? 'Tutup Detail' : 'Detail Node'"></span>
+            <span x-text="drawerOpen ? 'Tutup Detail' : 'Detail Node'"></span>
         </button>
     </div>
 
@@ -1099,50 +1004,23 @@
                     <p x-text="lazyHint || ontProgress"></p>
                 </div>
 
-                <!-- FLOATING BOTTOM CANVAS CONTROLS DOCK (ZOOM, DEPTH, EXPAND, ACTIONS)
-                     Disederhanakan sama seperti nav atas: satu FAB di HP yang
-                     membuka panel semua kontrolnya, bukan deretan tombol lagi. -->
-                {{-- `contents` + @click.outside di SINI (bukan di <aside> doang) — alasan
-                     sama kayak nav atas: FAB-nya saudara <aside>, kalau outside-click
-                     cuma dipasang di <aside>, klik buka FAB kebaca "klik di luar" juga
-                     dan langsung nutup lagi di event yang sama (tombol serasa mati). --}}
-                <div class="contents" @click.outside="mobileDockOpen = false">
-                <button type="button"
-                        x-show="!drawerOpen && !mobileDockOpen"
-                        @click="mobileDockOpen = true; mobileNavOpen = false"
-                        aria-label="Buka kontrol kanvas"
-                        aria-haspopup="dialog"
-                        class="sm:hidden absolute bottom-3 left-3 z-30 flex size-11 items-center justify-center rounded-full border border-slate-200/80 bg-white/95 shadow-lg backdrop-blur-md pointer-events-auto transition active:scale-90 active:bg-slate-100 dark:border-slate-800 dark:bg-[#131d24]/95 dark:active:bg-slate-800">
-                    <svg class="size-5 text-slate-700 dark:text-slate-200" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="4" y1="21" x2="4" y2="14"></line><line x1="4" y1="10" x2="4" y2="3"></line><line x1="12" y1="21" x2="12" y2="12"></line><line x1="12" y1="8" x2="12" y2="3"></line><line x1="20" y1="21" x2="20" y2="16"></line><line x1="20" y1="12" x2="20" y2="3"></line><line x1="1" y1="14" x2="7" y2="14"></line><line x1="9" y1="8" x2="15" y2="8"></line><line x1="17" y1="16" x2="23" y2="16"></line></svg>
-                </button>
-
-                <aside aria-label="Kontrol Kanvas"
-                       class="absolute bottom-3 left-3 z-30 pointer-events-auto sm:flex sm:flex-row sm:flex-wrap sm:items-center sm:gap-1.5"
-                       :class="drawerOpen ? 'hidden' : (mobileDockOpen ? 'flex flex-col items-stretch gap-2 w-72 max-w-[calc(100vw-1.5rem)] max-h-[75vh] overflow-y-auto p-3 rounded-2xl border border-slate-200/80 bg-white/95 shadow-xl backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/95' : 'hidden sm:flex sm:rounded-2xl sm:border sm:border-slate-200/80 sm:bg-white/95 sm:p-1.5 sm:shadow-lg sm:backdrop-blur-md dark:sm:border-slate-800 dark:sm:bg-[#131d24]/95')">
-                    <!-- Header panel (cuma kelihatan di HP saat FAB dibuka) -->
-                    <div class="flex sm:hidden items-center justify-between -mt-0.5 -mb-1">
-                        <span class="font-display text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Kontrol Kanvas</span>
-                        <button type="button" @click="mobileDockOpen = false" aria-label="Tutup kontrol kanvas"
-                                class="inline-flex size-6 items-center justify-center rounded text-slate-400 transition active:scale-90 hover:bg-slate-100 hover:text-slate-700 active:bg-slate-200 dark:hover:bg-slate-800 dark:hover:text-slate-200 dark:active:bg-slate-700">
-                            <svg class="size-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M18 6 6 18"></path><path d="M6 6l12 12"></path></svg>
-                        </button>
-                    </div>
-
+                <!-- FLOATING BOTTOM CANVAS CONTROLS DOCK (ZOOM, DEPTH, EXPAND, ACTIONS) -->
+                <aside aria-label="Kontrol Kanvas" class="absolute bottom-3 left-3 z-30 flex flex-wrap items-center gap-1.5 pointer-events-auto rounded-2xl border border-slate-200/80 bg-white/95 p-1.5 shadow-lg backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/95">
                     <!-- ZOOM CONTROLS -->
-                    <div class="flex w-full sm:w-auto shrink-0 items-center justify-center rounded-xl bg-slate-100/90 dark:bg-slate-800/90 p-0.5 border border-slate-200/50 dark:border-slate-700/50">
-                        <button type="button" @click="zoomOut()" aria-label="Perkecil" class="flex size-9 sm:size-7 items-center justify-center rounded-lg text-xs font-mono font-bold text-slate-700 hover:bg-white active:bg-slate-200 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-700 dark:active:bg-slate-600 cursor-pointer transition active:scale-90">−</button>
+                    <div class="flex items-center rounded-xl bg-slate-100/90 dark:bg-slate-800/90 p-0.5 border border-slate-200/50 dark:border-slate-700/50">
+                        <button type="button" @click="zoomOut()" aria-label="Perkecil" class="flex size-7 items-center justify-center rounded-lg text-xs font-mono font-bold text-slate-700 hover:bg-white hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer transition">−</button>
                         <span class="px-2 font-mono text-[11px] font-semibold text-slate-800 dark:text-slate-200" x-text="Math.round(zoom * 100) + '%'">100%</span>
-                        <button type="button" @click="zoomIn()" aria-label="Perbesar" class="flex size-9 sm:size-7 items-center justify-center rounded-lg text-xs font-mono font-bold text-slate-700 hover:bg-white active:bg-slate-200 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-700 dark:active:bg-slate-600 cursor-pointer transition active:scale-90">+</button>
-                        <button type="button" @click="zoomFit()" class="rounded-lg px-2 py-1 font-display text-[11px] font-semibold text-slate-700 hover:bg-white active:bg-slate-200 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-700 dark:active:bg-slate-600 cursor-pointer transition active:scale-95">Pas</button>
+                        <button type="button" @click="zoomIn()" aria-label="Perbesar" class="flex size-7 items-center justify-center rounded-lg text-xs font-mono font-bold text-slate-700 hover:bg-white hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer transition">+</button>
+                        <button type="button" @click="zoomFit()" class="rounded-lg px-2 py-1 font-display text-[11px] font-semibold text-slate-700 hover:bg-white hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer transition">Pas</button>
                     </div>
 
-                    <span class="hidden sm:block h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700"></span>
+                    <span class="h-5 w-px bg-slate-200 dark:bg-slate-700"></span>
 
                     <!-- DEPTH SELECTOR -->
-                    <div class="flex w-full sm:w-auto shrink-0 items-center gap-1">
+                    <div class="flex items-center gap-1">
                         <label for="topo-depth" class="sr-only">Kedalaman</label>
                         <select id="topo-depth" x-model="depthFilter" @change="applyDepth($event.target.value)"
-                                class="w-full sm:w-auto rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-800 shadow-2xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer">
+                                class="rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-800 shadow-2xs dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 cursor-pointer">
                             <option value="custom">Kedalaman: Kustom</option>
                             <option value="all">Kedalaman: Semua (ONT/daun)</option>
                             <option value="odp">Kedalaman: Sampai ODP</option>
@@ -1151,34 +1029,36 @@
                         </select>
                     </div>
 
-                    <span class="hidden sm:block h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700"></span>
-
                     <!-- BUKA / TUTUP SEMUA -->
-                    <div class="flex w-full sm:w-auto shrink-0 items-center rounded-xl bg-slate-100/90 dark:bg-slate-800/90 p-0.5 border border-slate-200/50 dark:border-slate-700/50">
+                    <div class="flex items-center rounded-xl bg-slate-100/90 dark:bg-slate-800/90 p-0.5 border border-slate-200/50 dark:border-slate-700/50">
                         <button type="button" @click="expandAll()" title="Buka semua cabang sampai ONT pelanggan"
-                                class="flex-1 sm:flex-none rounded-lg px-2.5 py-1 font-display text-[11px] font-semibold text-slate-700 hover:bg-white active:bg-slate-200 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-700 dark:active:bg-slate-600 cursor-pointer transition active:scale-95">Buka Semua</button>
+                                class="rounded-lg px-2.5 py-1 font-display text-[11px] font-semibold text-slate-700 hover:bg-white hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer transition">Buka Semua</button>
                         <button type="button" @click="collapseToSlots()" title="Tutup semua, hanya tampil sampai Slot"
-                                class="flex-1 sm:flex-none rounded-lg px-2.5 py-1 font-display text-[11px] font-semibold text-slate-700 hover:bg-white active:bg-slate-200 hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-700 dark:active:bg-slate-600 cursor-pointer transition active:scale-95">Tutup Semua</button>
+                                class="rounded-lg px-2.5 py-1 font-display text-[11px] font-semibold text-slate-700 hover:bg-white hover:text-sky-700 dark:text-slate-300 dark:hover:bg-slate-700 cursor-pointer transition">Tutup Semua</button>
                     </div>
 
-                    <span class="hidden sm:block h-5 w-px shrink-0 bg-slate-200 dark:bg-slate-700"></span>
+                    <span class="h-5 w-px bg-slate-200 dark:bg-slate-700"></span>
 
                     <!-- ACTION SHORTCUTS -->
-                    <div class="flex w-full sm:w-auto shrink-0 flex-col sm:flex-row items-stretch sm:items-center gap-1">
+                    <div class="flex items-center gap-1">
                         <a href="{{ route('network.map.index', array_filter(['pop_id' => $selectedPopId, 'sort' => $sort, 'fresh' => 1])) }}"
                            title="Muat ulang cache topologi"
-                           class="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition active:scale-95 hover:border-sky-500 hover:text-sky-700 active:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:active:bg-slate-700">
+                           class="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-sky-500 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                             <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 21h5v-5"></path></svg>
                             <span>Muat Ulang</span>
                         </a>
                         <a href="{{ route('network.nodes.index') }}"
-                           class="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition active:scale-95 hover:border-sky-500 hover:text-sky-700 active:bg-slate-200 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200 dark:active:bg-slate-700">
+                           class="inline-flex items-center gap-1 rounded-xl border border-slate-200 bg-slate-50 px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition hover:border-sky-500 hover:text-sky-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200">
                             <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect width="7" height="7" x="3" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="3" rx="1"></rect><rect width="7" height="7" x="14" y="14" rx="1"></rect><rect width="7" height="7" x="3" y="14" rx="1"></rect></svg>
                             <span>Kelola Node</span>
                         </a>
+                        <a href="{{ route('manuals.context', ['route' => 'network.map.index']) }}"
+                           class="inline-flex items-center gap-1 rounded-xl border border-sky-300 bg-sky-50 px-2.5 py-1.5 text-xs font-semibold text-sky-800 transition hover:bg-sky-100 dark:border-sky-800 dark:bg-sky-950/40 dark:text-sky-300">
+                            <svg class="size-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"></path><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+                            <span>Panduan</span>
+                        </a>
                     </div>
                 </aside>
-                </div>
 
                 <!-- FLOATING BOTTOM-RIGHT LEGEND & GESTURE HINT -->
                 <aside aria-label="Petunjuk Kanvas" class="pointer-events-none absolute bottom-3 right-3 z-20 hidden md:flex items-center gap-3 rounded-xl border border-slate-200/80 bg-white/90 px-3 py-1.5 text-[11px] text-slate-500 shadow-md backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/90 dark:text-slate-400">
@@ -1187,6 +1067,8 @@
                         <span class="inline-flex items-center gap-1"><span class="size-2 rounded-full bg-slate-400"></span> Nonaktif</span>
                         <span class="inline-flex items-center gap-1"><span class="size-2 rounded-full bg-rose-500"></span> Penuh</span>
                     </div>
+                    <span class="h-3 w-px bg-slate-200 dark:bg-slate-700"></span>
+                    <span>Seret kanvas · Ctrl + scroll zoom · Klik node detail</span>
                 </aside>
 
                 <!-- SVG INTERACTIVE CANVAS (FULL SCREEN) -->
@@ -1297,6 +1179,13 @@
                             </div>
                         </div>
                     @endif
+
+                    <div x-show="withOnt && zoom < ontMinZoom" x-cloak class="pointer-events-none absolute bottom-12 left-4 rounded bg-violet-50/95 px-2.5 py-1 text-[11px] font-medium text-violet-800 shadow-2xs dark:bg-violet-950/80 dark:text-violet-200">
+                        Ikhtisar: kartu ONT disembunyikan — perbesar untuk menampilkannya
+                    </div>
+                    <div class="pointer-events-none absolute bottom-3 left-4 rounded bg-white/85 px-2.5 py-1 text-[11px] text-slate-500 shadow-2xs backdrop-blur-xs dark:bg-slate-900/85 dark:text-slate-400">
+                        Seret kanvas untuk menggeser · Ctrl + scroll untuk zoom · Klik node untuk detail
+                    </div>
                 </div>
             </section>
 
