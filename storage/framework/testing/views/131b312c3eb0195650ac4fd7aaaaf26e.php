@@ -49,7 +49,7 @@
     <?php echo $__env->make('partials.web-fonts', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
     <?php echo app('Illuminate\Foundation\Vite')(['resources/css/app.css', 'resources/js/app.js']); ?>
 </head>
-<body class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
+<body hx-boost="true" class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
 
 <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-sky-600 focus:text-white focus:rounded-lg focus:shadow-lg focus:font-semibold focus:text-xs">
     Lewati ke konten utama
@@ -621,6 +621,12 @@
                                 <a href="<?php echo e(route('reports.collector-payments.index')); ?>"
                                    class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('reports/collector-payments*') ? 'sidebar-subitem-active' : ''); ?>">
                                     <span>Laporan Bayar Kolektor</span>
+                                </a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('modem_sale_reconciliation.view')): ?>
+                                <a href="<?php echo e(route('reports.modem-sale-reconciliation.index')); ?>"
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('reports/modem-sale-reconciliation*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Rekonsiliasi Modem Terjual</span>
                                 </a>
                                 <?php endif; ?>
                                 <a href="<?php echo e(route('reports.imports.index')); ?>"

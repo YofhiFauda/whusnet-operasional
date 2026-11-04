@@ -431,9 +431,11 @@
                                 title="Tampilkan / sembunyikan kata sandi"
                                 x-bind:aria-label="showPassword ? 'Sembunyikan kata sandi' : 'Tampilkan kata sandi'"
                                 x-bind:aria-pressed="showPassword.toString()">
-                                <svg x-show="!showPassword" viewBox="0 0 24 24" aria-hidden="true">
-                                    <path d="M2.3 12s3.5-6.5 9.7-6.5 9.7 6.5-3.5 6.5-9.7 6.5S2.3 12 2.3 12Z" /><circle cx="12" cy="12" r="3" />
-                                </svg>
+                                    <svg x-show="!showPassword" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+                                        <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0" />
+                                        <circle cx="12" cy="12" r="3" />
+                                    </svg>
                                 <svg x-show="showPassword" x-cloak viewBox="0 0 24 24" aria-hidden="true">
                                     <path d="M3 3l18 18M10.6 5.6A11.2 11.2 0 0 1 12 5.5c6.2 0 9.7 6.5 9.7 6.5a13 13 0 0 1-3.1 3.7M6.1 6.8A14.3 14.3 0 0 0 2.3 12s3.5 6.5 9.7 6.5c1.2 0 2.3-.2 3.3-.6M10 10a3 3 0 0 0 4 4" />
                                 </svg>

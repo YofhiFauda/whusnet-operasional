@@ -709,9 +709,11 @@ class DummyScaleSeeder extends Seeder
                         'fop_task_id' => null, 'installed_at' => $returned ? null : $activation, 'created_at' => $activation, 'updated_at' => now(),
                     ];
                     $insDate = $activation->format('Ymd');
-                    $this->docCounters["INS:{$insDate}"] = ($this->docCounters["INS:{$insDate}"] ?? 0) + 1;
+                    $insSeq = $this->nextDocCounter("INS:{$insDate}", fn () => (int) DB::table('inventory_transactions')
+                        ->where('reference_number', 'like', "INS-{$insDate}-%")
+                        ->selectRaw('MAX(CAST(SUBSTRING(reference_number, -6) AS UNSIGNED)) as m')->value('m'));
                     $rows['inventory_transactions'][] = [
-                        'id' => $txId++, 'type' => 'install', 'reference_number' => sprintf('INS-%s-%06d', $insDate, $this->docCounters["INS:{$insDate}"]),
+                        'id' => $txId++, 'type' => 'install', 'reference_number' => sprintf('INS-%s-%06d', $insDate, $insSeq),
                         'inventory_transfer_id' => null, 'item_id' => $ontItem->id, 'lot_no' => null, 'serial_id' => $sid, 'roll_id' => null, 'qty' => 1,
                         'unit_price_snapshot' => 350000, 'from_pop_id' => null, 'from_network_node_id' => null, 'to_pop_id' => null, 'to_network_node_id' => null,
                         'from_technician_id' => $techId, 'to_technician_id' => null, 'fop_task_id' => null, 'reason' => "Pemasangan pelanggan {$code}",
@@ -878,8 +880,10 @@ class DummyScaleSeeder extends Seeder
                     $ppn = round($after * 0.11, 2);
                     $totalAmount = $after + $ppn;
                     $dateCode = $issue->format('Ymd');
-                    $this->docCounters["INV:{$prefix}-{$dateCode}"] = ($this->docCounters["INV:{$prefix}-{$dateCode}"] ?? 0) + 1;
-                    $invoiceNo = sprintf('%s-%s-%06d', $prefix, $dateCode, $this->docCounters["INV:{$prefix}-{$dateCode}"]);
+                    $invSeq = $this->nextDocCounter("INV:{$prefix}-{$dateCode}", fn () => (int) DB::table('invoices')
+                        ->where('invoice_number', 'like', "{$prefix}-{$dateCode}-%")
+                        ->selectRaw('MAX(CAST(SUBSTRING(invoice_number, -6) AS UNSIGNED)) as m')->value('m'));
+                    $invoiceNo = sprintf('%s-%s-%06d', $prefix, $dateCode, $invSeq);
                     $invoiceId = $ids['invoices']++;
 
                     // Peluang bayar: bulan lama hampir lunas, bulan berjalan baru separuh.
@@ -1150,6 +1154,25 @@ class DummyScaleSeeder extends Seeder
     private function takeId(string $table): int
     {
         return $this->nextId[$table] = (int) DB::table($table)->max('id') + 1;
+    }
+
+    /**
+     * Counter dokumen dummy (invoice_number/reference_number) memakai prefix
+     * yang SAMA dengan penomoran produksi (ACT/TAG via `InvoiceNumberGenerator`,
+     * INS via `inventory_transactions`) — kalau sudah ada baris NYATA untuk
+     * tanggal berjalan (mis. tagihan bulanan hari ini dari
+     * `billing:generate-monthly-invoices`), docCounters yang mulai dari nol
+     * bakal menabrak nomor yang sudah dipakai (UniqueConstraintViolationException
+     * persis di tengah seed). Query MAX() sekali per key saat PERTAMA kali key
+     * itu disentuh (bukan tiap baris) — lazy, murah untuk ribuan baris per key.
+     */
+    private function nextDocCounter(string $key, \Closure $seedFromExisting): int
+    {
+        if (! isset($this->docCounters[$key])) {
+            $this->docCounters[$key] = $seedFromExisting();
+        }
+
+        return ++$this->docCounters[$key];
     }
 
     /** Nomor urut pelanggan berikutnya di satu Cabang (maks angka `customer_code` yang ada + 1). */

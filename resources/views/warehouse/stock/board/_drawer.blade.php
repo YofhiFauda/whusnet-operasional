@@ -119,22 +119,26 @@
                                     <table class="min-w-full text-xs text-left">
                                         <thead class="sticky top-0 bg-slate-50 dark:bg-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                                             <tr>
-                                                <th scope="col" class="px-4 py-2.5">Serial number</th>
-                                                <th scope="col" class="px-4 py-2.5">Kondisi</th>
-                                                <th scope="col" class="px-4 py-2.5 text-right">Harga beli</th>
-                                                <th scope="col" class="px-4 py-2.5 text-right">Diterima</th>
+                                                <th scope="col" class="px-3 sm:px-4 py-2.5">Serial number</th>
+                                                <th scope="col" class="px-3 sm:px-4 py-2.5">Kondisi</th>
+                                                <th scope="col" class="px-3 sm:px-4 py-2.5 text-right hidden sm:table-cell">Harga beli</th>
+                                                <th scope="col" class="px-3 sm:px-4 py-2.5 text-right hidden sm:table-cell">Diterima</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                             <template x-for="serial in filteredSerials()" :key="serial.serial_number">
                                                 <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                                                    <td class="px-4 py-2.5 font-mono font-bold text-slate-800 dark:text-slate-200 select-all" x-text="serial.serial_number"></td>
-                                                    <td class="px-4 py-2.5">
+                                                    <td class="px-3 sm:px-4 py-2.5">
+                                                        <div class="font-mono font-bold text-slate-800 dark:text-slate-200 select-all text-xs" x-text="serial.serial_number"></div>
+                                                        <div class="sm:hidden mt-0.5 text-[11px] text-slate-500 dark:text-slate-400" x-text="serial.received_at || '—'"></div>
+                                                    </td>
+                                                    <td class="px-3 sm:px-4 py-2.5">
                                                         {{-- Warna = token .badge-* yang sama dengan x-warehouse.condition-badge --}}
                                                         <span class="badge" :class="conditionBadge(serial)" x-text="conditionLabel(serial)"></span>
+                                                        <div class="sm:hidden mt-0.5 font-mono text-[11px] text-slate-700 dark:text-slate-200" x-text="serial.unit_price_snapshot !== null ? fmtRupiah(serial.unit_price_snapshot) : '—'"></div>
                                                     </td>
-                                                    <td class="px-4 py-2.5 text-right font-mono text-slate-700 dark:text-slate-200" x-text="serial.unit_price_snapshot !== null ? fmtRupiah(serial.unit_price_snapshot) : '—'"></td>
-                                                    <td class="px-4 py-2.5 text-right text-slate-500 dark:text-slate-400 whitespace-nowrap" x-text="serial.received_at || '—'"></td>
+                                                    <td class="px-3 sm:px-4 py-2.5 text-right font-mono text-slate-700 dark:text-slate-200 hidden sm:table-cell" x-text="serial.unit_price_snapshot !== null ? fmtRupiah(serial.unit_price_snapshot) : '—'"></td>
+                                                    <td class="px-3 sm:px-4 py-2.5 text-right text-slate-500 dark:text-slate-400 whitespace-nowrap hidden sm:table-cell" x-text="serial.received_at || '—'"></td>
                                                 </tr>
                                             </template>
                                         </tbody>
@@ -153,24 +157,30 @@
                                     <table class="min-w-full text-xs text-left">
                                         <thead class="sticky top-0 bg-slate-50 dark:bg-slate-800 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 border-b border-slate-200 dark:border-slate-700">
                                             <tr>
-                                                <th scope="col" class="px-4 py-2.5">Kode roll</th>
-                                                <th scope="col" class="px-4 py-2.5 text-right">Sisa meter</th>
-                                                <th scope="col" class="px-4 py-2.5">Vendor</th>
-                                                <th scope="col" class="px-4 py-2.5 text-right">Diterima</th>
-                                                <th scope="col" class="px-4 py-2.5 text-right">Nilai</th>
+                                                <th scope="col" class="px-3 sm:px-4 py-2.5">Kode roll</th>
+                                                <th scope="col" class="px-3 sm:px-4 py-2.5 text-right">Sisa meter</th>
+                                                <th scope="col" class="px-3 sm:px-4 py-2.5 hidden sm:table-cell">Vendor</th>
+                                                <th scope="col" class="px-3 sm:px-4 py-2.5 text-right hidden sm:table-cell">Diterima</th>
+                                                <th scope="col" class="px-3 sm:px-4 py-2.5 text-right hidden sm:table-cell">Nilai</th>
                                             </tr>
                                         </thead>
                                         <tbody class="divide-y divide-slate-100 dark:divide-slate-800">
                                             <template x-for="roll in filteredRolls()" :key="roll.roll_code">
                                                 <tr class="hover:bg-slate-50/70 dark:hover:bg-slate-800/40">
-                                                    <td class="px-4 py-2.5 font-mono font-bold text-slate-800 dark:text-slate-200 select-all" x-text="roll.roll_code"></td>
-                                                    <td class="px-4 py-2.5 text-right font-mono whitespace-nowrap">
+                                                    <td class="px-3 sm:px-4 py-2.5">
+                                                        <div class="font-mono font-bold text-slate-800 dark:text-slate-200 select-all" x-text="roll.roll_code"></div>
+                                                        <div class="sm:hidden mt-0.5 text-[11px] text-slate-500 dark:text-slate-400">
+                                                            <span x-text="roll.vendor || '—'"></span>
+                                                            <span x-show="roll.total_value !== null"> · <span class="font-mono" x-text="roll.total_value !== null ? fmtRupiah(roll.total_value) : ''"></span></span>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-3 sm:px-4 py-2.5 text-right font-mono whitespace-nowrap">
                                                         <span class="font-semibold text-slate-900 dark:text-slate-100" x-text="fmtNumber(roll.length_remaining)"></span>
                                                         <span class="text-slate-400 dark:text-slate-500" x-text="'/ ' + fmtNumber(roll.length_total) + ' m'"></span>
                                                     </td>
-                                                    <td class="px-4 py-2.5 text-slate-600 dark:text-slate-300" x-text="roll.vendor || '—'"></td>
-                                                    <td class="px-4 py-2.5 text-right text-slate-500 dark:text-slate-400 whitespace-nowrap" x-text="roll.received_at || '—'"></td>
-                                                    <td class="px-4 py-2.5 text-right font-mono text-slate-700 dark:text-slate-200 whitespace-nowrap" x-text="roll.total_value !== null ? fmtRupiah(roll.total_value) : '—'"></td>
+                                                    <td class="px-3 sm:px-4 py-2.5 text-slate-600 dark:text-slate-300 hidden sm:table-cell" x-text="roll.vendor || '—'"></td>
+                                                    <td class="px-3 sm:px-4 py-2.5 text-right text-slate-500 dark:text-slate-400 whitespace-nowrap hidden sm:table-cell" x-text="roll.received_at || '—'"></td>
+                                                    <td class="px-3 sm:px-4 py-2.5 text-right font-mono text-slate-700 dark:text-slate-200 whitespace-nowrap hidden sm:table-cell" x-text="roll.total_value !== null ? fmtRupiah(roll.total_value) : '—'"></td>
                                                 </tr>
                                             </template>
                                         </tbody>

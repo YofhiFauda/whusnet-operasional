@@ -35,13 +35,13 @@
         <table class="min-w-full text-left text-xs border-separate border-spacing-0">
             <thead>
                 <tr class="text-[11px] font-bold uppercase tracking-wider text-slate-600 dark:text-slate-300">
-                    <th scope="col" class="sticky top-0 left-0 z-30 min-w-[11rem] sm:min-w-[16rem] px-4 py-3 bg-slate-50 dark:bg-slate-800 border-b border-r border-slate-200 dark:border-slate-700">Barang</th>
+                    <th scope="col" class="sticky top-0 left-0 z-30 min-w-[9rem] sm:min-w-[13rem] lg:min-w-[16rem] px-3 sm:px-4 py-3 bg-slate-50 dark:bg-slate-800 border-b border-r border-slate-200 dark:border-slate-700">Barang</th>
                     @foreach($pops as $pop)
-                    <th scope="col" class="sticky top-0 z-20 min-w-[7.5rem] px-3 py-3 text-right whitespace-nowrap bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
-                        <span class="block normal-case tracking-normal text-xs font-bold text-slate-800 dark:text-slate-100">{{ $pop->name }}</span>
+                    <th scope="col" class="sticky top-0 z-20 min-w-[6rem] sm:min-w-[7.5rem] px-2 sm:px-3 py-3 text-right whitespace-nowrap bg-slate-50 dark:bg-slate-800 border-b border-slate-200 dark:border-slate-700">
+                        <span class="block normal-case tracking-normal text-xs font-bold text-slate-800 dark:text-slate-100 truncate max-w-[7rem] sm:max-w-none ml-auto">{{ $pop->name }}</span>
                         <span class="block text-[10px] {{ $pop->isPusat() ? 'text-sky-700 dark:text-sky-300' : 'text-slate-500 dark:text-slate-400' }}">{{ strtoupper($pop->type) }}</span>
                         @if($pop->pic_display_name)
-                        <span class="block text-[10px] text-slate-500 dark:text-slate-400 font-normal truncate max-w-[130px] ml-auto" title="Penanggung Jawab: {{ $pop->pic_display_name }}">PJ: {{ $pop->pic_display_name }}</span>
+                        <span class="hidden sm:block text-[10px] text-slate-500 dark:text-slate-400 font-normal truncate max-w-[130px] ml-auto" title="Penanggung Jawab: {{ $pop->pic_display_name }}">PJ: {{ $pop->pic_display_name }}</span>
                         @endif
                     </th>
                     @endforeach
@@ -60,14 +60,14 @@
                         <button type="button" @click="toggleCategory(@js($catKey))"
                                 :aria-expanded="isCategoryOpen(@js($catKey)).toString()"
                                 aria-expanded="true"
-                                class="sticky left-0 flex items-center gap-2 px-4 py-2 text-left hover:bg-slate-200/70 dark:hover:bg-slate-700/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-inset transition-colors cursor-pointer">
-                            <svg class="w-4 h-4 text-slate-500 dark:text-slate-400 transition-transform duration-200" :class="isCategoryOpen(@js($catKey)) ? '' : '-rotate-90'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
-                            <span class="font-bold text-slate-800 dark:text-slate-100">{{ $category?->name ?? 'Tanpa Kategori' }}</span>
-                            <span class="flex items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400">
+                                class="sticky left-0 flex items-center gap-2 px-3 sm:px-4 py-2 text-left hover:bg-slate-200/70 dark:hover:bg-slate-700/60 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-inset transition-colors cursor-pointer">
+                            <svg class="w-4 h-4 text-slate-500 dark:text-slate-400 shrink-0 transition-transform duration-200" :class="isCategoryOpen(@js($catKey)) ? '' : '-rotate-90'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" d="M19 9l-7 7-7-7"/></svg>
+                            <span class="font-bold text-slate-800 dark:text-slate-100 truncate">{{ $category?->name ?? 'Tanpa Kategori' }}</span>
+                            <span class="flex items-center gap-2 text-[11px] font-semibold text-slate-500 dark:text-slate-400 shrink-0">
                                 <span><strong class="font-mono text-slate-700 dark:text-slate-200">{{ $categoryGroup['sku_count'] ?? $categoryGroup['rows']->count() }}</strong> SKU</span>
                                 @if(isset($categoryGroup['total_display']))
                                 <span aria-hidden="true" class="text-slate-300 dark:text-slate-600">·</span>
-                                <span>Total: <strong class="font-mono text-slate-700 dark:text-slate-200">{{ $categoryGroup['total_display'] }}</strong></span>
+                                <span class="hidden sm:inline">Total: <strong class="font-mono text-slate-700 dark:text-slate-200">{{ $categoryGroup['total_display'] }}</strong></span>
                                 @endif
                             </span>
                         </button>
@@ -77,9 +77,9 @@
                 @foreach($categoryGroup['rows'] as $matrixRow)
                 @php $item = $matrixRow['item']; @endphp
                 <tr x-show="isCategoryOpen(@js($catKey))" class="group">
-                    <th scope="row" class="sticky left-0 z-10 min-w-[11rem] sm:min-w-[16rem] px-4 py-2.5 font-normal bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 border-b border-r border-slate-100 dark:border-slate-800">
+                    <th scope="row" class="sticky left-0 z-10 min-w-[9rem] sm:min-w-[13rem] lg:min-w-[16rem] px-3 sm:px-4 py-2.5 font-normal bg-white dark:bg-slate-900 group-hover:bg-slate-50 dark:group-hover:bg-slate-800 border-b border-r border-slate-100 dark:border-slate-800">
                         <div class="font-mono text-[11px] text-slate-400 dark:text-slate-500">{{ $item->code }}</div>
-                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-100">{{ $item->name }}</div>
+                        <div class="text-sm font-semibold text-slate-900 dark:text-slate-100 leading-snug">{{ $item->name }}</div>
                         <div class="text-[11px] text-slate-500 dark:text-slate-400">{{ $trackingLabel($matrixRow['tracking']) }}</div>
                     </th>
 
@@ -100,7 +100,7 @@
                         <button type="button" data-stock-detail="{{ $detailJson }}" aria-haspopup="dialog"
                                 aria-label="Rincian {{ $item->name }} di {{ $pop->name }}: {{ $fmtQty($cell['qty']) }} {{ $matrixRow['unit'] }}{{ $cell['is_low'] ? ', menipis' : '' }}"
                                 @click="$el.focus(); $dispatch('open-stock-drawer', JSON.parse($el.dataset.stockDetail))"
-                                class="block w-full px-3 py-2.5 text-right hover:bg-sky-50 dark:hover:bg-sky-950/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-inset cursor-pointer transition-colors">
+                                class="block w-full px-2 sm:px-3 py-2.5 text-right hover:bg-sky-50 dark:hover:bg-sky-950/30 focus:outline-none focus-visible:ring-2 focus-visible:ring-sky-500 focus-visible:ring-inset cursor-pointer transition-colors">
                             <span class="text-sm font-extrabold font-mono tabular-nums {{ $cell['is_low'] ? 'text-rose-700 dark:text-rose-300' : 'text-slate-900 dark:text-slate-100' }}">{{ $fmtQty($cell['qty']) }}</span>
                             <span class="text-[11px] font-semibold text-slate-500 dark:text-slate-400">{{ $matrixRow['unit'] }}</span>
                             @if($cell['is_low'])
@@ -109,7 +109,7 @@
                         </button>
                     </td>
                     @else
-                    <td class="px-3 py-2.5 text-right whitespace-nowrap border-b border-slate-100 dark:border-slate-800 {{ $tone }}">
+                    <td class="px-2 sm:px-3 py-2.5 text-right whitespace-nowrap border-b border-slate-100 dark:border-slate-800 {{ $tone }}">
                         <span class="text-sm font-mono tabular-nums text-slate-400 dark:text-slate-500">0</span>
                         <span class="block text-[11px] font-semibold text-rose-700 dark:text-rose-300">⚠ kosong</span>
                     </td>
