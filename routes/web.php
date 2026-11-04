@@ -473,6 +473,7 @@ Route::middleware('auth')->group(function () {
     // di halaman Tagihan. Static routes dulu, dynamic ({collector}) belakangan.
     Route::middleware('permission:collector_worksheet.view')->group(function () {
         Route::get('/collector-worksheet', [CollectorWorksheetController::class, 'index'])->name('collector-worksheet.index');
+        Route::get('/collector-worksheet/summary-panel', [CollectorWorksheetController::class, 'summaryPanel'])->name('collector-worksheet.summary-panel');
         Route::get('/collector-worksheet/technicians/{technician}', [CollectorWorksheetController::class, 'showTechnician'])->name('collector-worksheet.technicians.show');
         Route::get('/collector-worksheet/{collector}', [CollectorWorksheetController::class, 'show'])->name('collector-worksheet.show');
     });
@@ -1287,6 +1288,7 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:task.view.all')->group(function () {
         Route::get('/fop', [FopDashboardController::class, 'index'])->name('fop.dashboard');
+        Route::get('/fop/dashboard/panels', [FopDashboardController::class, 'panels'])->name('fop.dashboard.panels');
         Route::get('/api/fop/pipeline', [FopDashboardController::class, 'pipeline'])->name('fop.pipeline');
     });
 
@@ -1370,6 +1372,7 @@ Route::middleware('auth')->group(function () {
 
     // Task detail — FOP (view.all) atau Teknisi (view.own + member)
     Route::middleware('permission:task.view.all|task.view.own')->group(function () {
+        Route::get('/tasks/{task}/status-panel', [TaskController::class, 'statusPanel'])->name('tasks.status-panel');
         Route::get('/tasks/{task}', [TaskController::class, 'show'])->name('tasks.show');
     });
 
@@ -1573,6 +1576,10 @@ Route::middleware('auth')->group(function () {
             ->whereNumber('ticket')
             ->name('tickets.detail-json');
 
+        Route::get('/tickets/{ticket}/status-panel', [TicketController::class, 'statusPanel'])
+            ->whereNumber('ticket')
+            ->name('tickets.status-panel');
+
         Route::get('/tickets/{ticket}', [TicketController::class, 'show'])
             ->whereNumber('ticket')
             ->name('tickets.show');
@@ -1615,6 +1622,7 @@ Route::middleware('auth')->group(function () {
     Route::redirect('/noc/worksheet/diproses', '/noc/worksheet');
     Route::middleware('permission:noc_dashboard.view')->group(function () {
         Route::get('/noc/dashboard', [NocDashboardController::class, 'index'])->name('noc.dashboard');
+        Route::get('/noc/dashboard/leaderboard-stats', [NocDashboardController::class, 'leaderboardStats'])->name('noc.dashboard.leaderboard-stats');
     });
 
     // Location APIs (used in forms)

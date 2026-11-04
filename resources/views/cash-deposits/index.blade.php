@@ -146,7 +146,7 @@
                                     Rincian sumber ({{ $deposit->collectorDeposits->count() }} setoran kolektor · {{ $deposit->manualPayments->count() }} bayar manual)
                                 </button>
                                 @if ($deposit->proof_path)
-                                    <a href="{{ route('cash-deposits.download', $deposit->id) }}"
+                                    <a href="{{ route('cash-deposits.download', $deposit->id) }}" hx-boost="false"
                                        class="text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline">Unduh bukti</a>
                                 @endif
                             </div>

@@ -808,17 +808,28 @@ function fopDashboardHandler() {
             }
         },
 
+        /**
+         * TaskStarted/TaskCompleted — paling sering kejadian (tiap teknisi
+         * mulai/selesai task sepanjang hari), jadi dikeluarkan dari
+         * fetch(window.location.href) penuh ke endpoint sempit
+         * fop.dashboard.panels (reuse cache stat 30s + partial existing,
+         * bukan render ulang seluruh index()). Container lain
+         * (antrian-survey/emergency-ticker/customer-pipeline-funnel) BELUM
+         * dikonversi — tetap lewat refreshDashboardContainers() di bawah.
+         */
         async refreshTaskStats() {
             try {
-                const res = await fetch(window.location.href);
+                const res = await fetch(`{{ route('fop.dashboard.panels') }}?targets=stat-cards,status-teknisi`);
                 const html = await res.text();
-                const parser = new DOMParser();
-                const doc = parser.parseFromString(html, 'text/html');
+                const doc = new DOMParser().parseFromString(html, 'text/html');
 
                 ['stat-cards-container', 'status-teknisi-container'].forEach(id => {
                     const el = document.getElementById(id);
                     const newEl = doc.getElementById(id);
-                    if (el && newEl) el.innerHTML = newEl.innerHTML;
+                    if (el && newEl) {
+                        el.innerHTML = newEl.innerHTML;
+                        if (window.Alpine) window.Alpine.initTree(el);
+                    }
                 });
             } catch (e) {
                 console.error('Auto-refresh error:', e);

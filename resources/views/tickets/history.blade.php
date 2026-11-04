@@ -83,7 +83,7 @@
 
             {{-- Export Excel --}}
             @if($canExport)
-            <a href="{{ route('tickets.history.export', request()->query()) }}"
+            <a href="{{ route('tickets.history.export', request()->query()) }}" hx-boost="false"
                class="inline-flex items-center justify-center gap-1.5 px-3.5 py-2 rounded-lg bg-emerald-600 text-white text-xs font-bold uppercase tracking-wider shadow-xs hover:bg-emerald-700 active:scale-95 transition-all cursor-pointer">
                 <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h14a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2z" />

@@ -63,7 +63,43 @@
     @include('partials.web-fonts')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
+{{--
+    hx-boost="true" TANPA hx-target/hx-select — boost nge-swap innerHTML
+    SELURUH <body> tiap nav (htmx getTarget() balik document.body kalau
+    boosted & tak ada hx-target eksplisit). INI SENGAJA, bukan dihindari:
+    sidebar (highlight menu aktif, badge notifikasi/antrean) dirender
+    server-side dari `Request::routeIs()` — kalau swap cuma sebagian
+    (#main-content doang, percobaan awal 2026-11-04 yang DIBATALKAN),
+    sidebar gak ikut ter-render ulang ⇒ menu aktif nyangkut di halaman
+    lama. Full-body swap tiap nav justru PERLU supaya sidebar selalu
+    sinkron sama URL terkini, sama seperti full page load biasa.
+
+    Konsekuensi full-body swap: SEMUA <script> yang tertanam di body ikut
+    tersapu & di-insert ulang (RE-EXECUTE) tiap navigasi — ketauan dari
+    console browser user 2026-11-04 nemuin 2 kelas bug:
+    (1) `let formToastLock` (top-level) di components/toast.blade.php
+    SyntaxError "Identifier ... already declared" begitu nav ke-2 —
+    exception itu SYNCHRONOUS, motong seluruh loop insert-script htmx,
+    jadi script SESUDAHNYA (termasuk registrasi Alpine punya halaman
+    tujuan) gak pernah jalan. Fix: <script> toast.blade.php dikasih
+    `id` + `hx-preserve="true"` — htmx lihat elemen lama di DOM dgn id
+    sama, PERTAHANKAN yang lama (gak diganti/di-insert ulang), jadi gak
+    pernah re-execute. Satu-satunya elemen di body yang butuh ini (sudah
+    diaudit: tidak ada top-level `let`/`const`/`class` lain di layout).
+    (2) Komponen seperti `<x-ui.pop-filter>`/`<x-ui.wilayah-filter>`/
+    queue.blade.php daftar lewat `document.addEventListener('alpine:init',
+    ...)` — event itu HANYA nyala SEKALI seumur halaman (pas Alpine.start()
+    pertama kali). Re-insert script yg sama via boost nav TIDAK memicu
+    event itu lagi ⇒ `Alpine.data()`/`Alpine.store()` gak pernah
+    terdaftar ⇒ "popFilter is not defined" dst. Fix: tiap file diubah
+    jadi fungsi registrasi yang CEK dulu — kalau `window.Alpine` SUDAH
+    ada (kasus nav ke-2+, Alpine sudah start sebelumnya), daftar
+    LANGSUNG; kalau belum (kasus full load pertama, script path body
+    biasanya kebaca sebelum module Alpine di @@vite jalan), baru nunggu
+    'alpine:init' SEKALI. Lihat pop-filter.blade.php/wilayah-filter.blade.php/
+    verifications/queue.blade.php/dst untuk pola lengkapnya.
+--}}
+<body hx-boost="true" class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
 
 <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-sky-600 focus:text-white focus:rounded-lg focus:shadow-lg focus:font-semibold focus:text-xs">
     Lewati ke konten utama
@@ -1728,6 +1764,7 @@
 
 @yield('scripts')
 @stack('scripts')
+
 <x-toast />
 <x-dialog />
 

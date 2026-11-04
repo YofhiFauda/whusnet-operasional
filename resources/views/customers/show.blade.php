@@ -1883,9 +1883,19 @@
     // discan. Ini SEKALI JALAN (gak pernah balik ke false) — menghindari
     // kompleksitas unmount-saat-query-dikosongkan demi korbankan sedikit
     // penghematan DOM buat user yang pernah search sekali.
-    document.addEventListener('alpine:init', () => {
-        Alpine.store('tabState', { mounted: ['ringkasan'], searchActive: false });
-    });
+    // Registrasi dibungkus fungsi yang CEK dulu `window.Alpine` — lihat
+    // alasan lengkap di components/ui/pop-filter.blade.php.
+    (function () {
+        const register = () => {
+            Alpine.store('tabState', { mounted: ['ringkasan'], searchActive: false });
+        };
+
+        if (window.Alpine) {
+            register();
+        } else {
+            document.addEventListener('alpine:init', register, { once: true });
+        }
+    })();
 
     function mountTab(tabId) {
         const store = window.Alpine && Alpine.store('tabState');
@@ -1901,7 +1911,11 @@
         }
     }
 
-    let currentViewMode = 'tabs'; // 'tabs' or 'all'
+    // `var`, BUKAN `let`: hx-boost nge-swap SELURUH <body> tiap nav, script
+    // ini ikut ter-insert ulang tiap balik ke halaman detail pelanggan ini
+    // — `let` top-level gak bisa redeclare (lihat bug formToastLock/
+    // selectedCustomerData, 2026-11-04).
+    var currentViewMode = 'tabs'; // 'tabs' or 'all'
 
     function switchTab(tabId) {
         if (currentViewMode === 'all') {

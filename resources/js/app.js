@@ -11,6 +11,59 @@ window.addEventListener('beforeunload', () => {
 import './bootstrap';
 import './image-source-picker';
 
+/* htmx — nav instant lintas semua halaman lewat hx-boost="true" di <body>
+   (layouts/app.blade.php). Dibundel lokal lewat Vite sama seperti Alpine,
+   bukan CDN — alasan sama: app operasional internal, jaringan luar gak
+   boleh jadi titik gagal buat interaksi dasar (lihat catatan Alpine di atas). */
+import 'htmx.org';
+
+/* Fetch boost gagal (network/4xx/5xx) → fallback navigasi native, biar
+   gak nyangkut blank/stuck di halaman lama. Lihat docs/superpowers/specs/
+   2026-11-03-spa-feel-htmx-design.md § Error Handling. */
+window.addEventListener('htmx:responseError', (e) => {
+    window.location.href = e.detail.requestConfig.path;
+});
+
+/* Boost nav lewat fetch htmx sendiri, BUKAN axios — interceptor NProgress di
+   bootstrap.js (dipasang buat request axios biasa) gak pernah ketrigger pas
+   klik link boosted, jadi user klik lalu diam, nunggu tanpa tanda apa pun
+   sampai swap jadi (keluhan UX 2026-11-04). `detail.boosted` dicek supaya
+   NProgress gak ikut nyala buat request htmx non-boost lain (mis. hx-get
+   dropdown kecil yang sudah punya hx-indicator sendiri).
+
+   Highlight instan di link sidebar yang diklik juga ditambah di sini —
+   kelas `-active` yang sama dipakai server (Request::routeIs()) — supaya
+   user lihat link-nya "nyala" SAAT diklik, bukan baru pas body selesai
+   ditukar. Kelas ini otomatis lenyap begitu swap full-body datang (elemen
+   lama ikut diganti), gak perlu dibersihkan manual.
+
+   NProgress.start() DITUNDA 150ms (bukan langsung), bukan malas — nav
+   yang memang udah cepat (<150ms, kasus umum di app ini) kalau dikasih
+   progress bar JUSTRU kerasa lebih lambat, karena mata user kebiasa liat
+   "sesuatu" yang nyicil connect sebelum konten muncul, padahal dulu tanpa
+   indicator transisinya kerasa instan (loncat langsung). Pola ini
+   standar UX utk async indicator (threshold anti-flicker) — bar cuma
+   muncul kalau request BENERAN lambat (>150ms), nav cepat tetap kerasa
+   instan tanpa bar sama sekali. Timer dibatalkan di `afterRequest` kalau
+   belum keburu nyala. */
+let boostProgressTimer = null;
+document.body.addEventListener('htmx:beforeRequest', (e) => {
+    if (!e.detail.boosted) {
+        return;
+    }
+    const link = e.detail.elt.closest?.('.sidebar-nav-item, .sidebar-subitem');
+    if (link) {
+        link.classList.add(link.classList.contains('sidebar-subitem') ? 'sidebar-subitem-active' : 'sidebar-nav-item-active');
+    }
+    boostProgressTimer = setTimeout(() => NProgress.start(), 150);
+});
+document.body.addEventListener('htmx:afterRequest', (e) => {
+    if (e.detail.boosted) {
+        clearTimeout(boostProgressTimer);
+        NProgress.done();
+    }
+});
+
 /* ── Alpine.js — dibundel lokal lewat Vite, BUKAN CDN ──
    Dulu dimuat dari cdn.jsdelivr.net di layouts/app.blade.php. Tiga alasan
    pindah: (1) bundle CDN cuma berisi core, jadi `x-collapse` di 6 titik

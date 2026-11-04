@@ -233,18 +233,7 @@
             </div>
 
             {{-- Card 4: Handler Status --}}
-            <div class="p-4 rounded-lg border border-border bg-surface shadow-2xs space-y-1">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-text-muted flex items-center justify-between">
-                    <span>Meja Penanggungjawab</span>
-                    <span class="w-2 h-2 rounded-full bg-emerald-500"></span>
-                </span>
-                <div class="text-base font-bold text-text-main">
-                    {{ $ticket->handler->label() }}
-                </div>
-                <p class="text-[11px] text-text-muted">
-                    Status: <strong class="text-text-main">{{ $ticket->statusLabel() }}</strong>
-                </p>
-            </div>
+            @include('tickets.partials._status-panel', ['ticket' => $ticket])
         </div>
 
     @else
@@ -269,9 +258,7 @@
                             </span>
                         @endif
 
-                        <span class="text-xs font-bold px-2.5 py-0.5 rounded border {{ $ticket->statusBadgeClasses() }}">
-                            {{ $ticket->statusLabel() }}
-                        </span>
+                        @include('tickets.partials._status-panel', ['ticket' => $ticket])
 
                         @if($ticket->priority)
                             <span class="text-xs font-bold px-2 py-0.5 rounded bg-slate-100 text-slate-800 dark:bg-slate-800 dark:text-slate-200 border border-border">
@@ -923,7 +910,7 @@
                         </div>
                     </div>
 
-                    <a href="{{ route('tickets.attachments.download', $attachment) }}"
+                    <a href="{{ route('tickets.attachments.download', $attachment) }}" hx-boost="false"
                        class="shrink-0 inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-slate-100 hover:bg-sky-100 dark:hover:bg-slate-800 dark:hover:bg-slate-700 text-sky-600 dark:text-sky-400 text-xs font-bold transition-colors">
                         <svg class="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
@@ -1178,5 +1165,48 @@
             },
         });
     }
+
+    /**
+     * Live-refresh status+handler panel tanpa reload — dengar event
+     * TicketQueueUpdated (channel sudah ada, dipakai worksheet NOC/Helpdesk).
+     * Event ini SENGAJA gak bawa payload ticket id (lihat komentar
+     * App\Events\TicketQueueUpdated), jadi setiap event di POP ini langsung
+     * fetch ulang panel tiket yang sedang dibuka — murah (1 partial kecil),
+     * bukan reload seluruh halaman.
+     */
+    (function () {
+        const popId = {{ (int) $ticket->pop_id }};
+        const statusPanelUrl = @json(route('tickets.status-panel', $ticket));
+
+        function refreshStatusPanel() {
+            const el = document.getElementById('ticket-status-panel');
+            if (!el) {
+                return;
+            }
+
+            fetch(statusPanelUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then((res) => res.text())
+                .then((html) => {
+                    el.outerHTML = html;
+                    const fresh = document.getElementById('ticket-status-panel');
+                    if (fresh && window.Alpine) {
+                        window.Alpine.initTree(fresh);
+                    }
+                })
+                .catch(() => {
+                    // Diam-diam gagal — panel tetap nampilin data lama.
+                });
+        }
+
+        function bind() {
+            window.Echo.private(`tickets.${popId}`).listen('.TicketQueueUpdated', refreshStatusPanel);
+        }
+
+        if (window.Echo) {
+            bind();
+        } else {
+            window.addEventListener('echo:ready', bind, { once: true });
+        }
+    })();
 </script>
 @endpush

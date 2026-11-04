@@ -91,13 +91,13 @@
                 </div>
 
                 <div class="w-full sm:w-auto">
-                    <a href="{{ route('reports.customers.export', request()->query()) }}" class="w-full sm:w-auto inline-flex justify-center items-center rounded-md bg-emerald-600 dark:bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
+                    <a href="{{ route('reports.customers.export', request()->query()) }}" hx-boost="false" class="w-full sm:w-auto inline-flex justify-center items-center rounded-md bg-emerald-600 dark:bg-emerald-500 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:ring-offset-2">
                         <svg class="mr-2 h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                         </svg>
                         Export Excel/CSV
                     </a>
-                    <a href="{{ route('reports.customers.export-xlsx', request()->query()) }}" class="w-full sm:w-auto inline-flex justify-center items-center rounded-md bg-teal-600 dark:bg-teal-500 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">
+                    <a href="{{ route('reports.customers.export-xlsx', request()->query()) }}" hx-boost="false" class="w-full sm:w-auto inline-flex justify-center items-center rounded-md bg-teal-600 dark:bg-teal-500 px-4 py-2 text-sm font-semibold text-white hover:bg-teal-700 transition-colors shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2">
                         Export Excel (.xlsx)
                     </a>
                 </div>

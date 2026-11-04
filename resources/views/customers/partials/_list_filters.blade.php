@@ -151,13 +151,29 @@
                  data dari server). Urutan diatur dengan drag-drop header tabel.
                  URL simpan/reset dirender server lewat route(). --}}
             @if($customizable)
+            {{-- Panel diteleport ke <body> (bukan absolute di dalam bar ini): bar filter
+                 punya `overflow-hidden` di section induk (buat rapihin sudut rounded header
+                 mobile), yang diam-diam memotong dropdown absolute mana pun yang nongol
+                 di dalamnya — cuma paragraf keterangan yang kelihatan, daftar checkbox
+                 kolomnya terpotong. Posisi dihitung manual dari bounding rect tombol,
+                 pola yang sama dipakai dropdown "Kelola" di warehouse/custody/index. --}}
             <div class="relative shrink-0 hidden sm:block"
                  x-data="{
                     open: false, busy: false,
+                    pos: { top: 0, left: 0 },
                     visible: @js(array_keys($columns)),
                     updateUrl: @js(route('customers.list-columns.update')),
                     resetUrl: @js(route('customers.list-columns.destroy')),
                     toggle(key) { const i = this.visible.indexOf(key); i >= 0 ? this.visible.splice(i, 1) : this.visible.push(key); },
+                    openPanel(e) {
+                        const menuWidth = 256;
+                        const r = e.currentTarget.getBoundingClientRect();
+                        let left = r.right - menuWidth;
+                        if (left < 8) left = 8;
+                        if (left + menuWidth > window.innerWidth - 8) left = Math.max(8, window.innerWidth - menuWidth - 8);
+                        this.pos = { top: Math.round(r.bottom + 8), left: Math.round(left) };
+                        this.open = true;
+                    },
                     async send(method, url, body) {
                         this.busy = true;
                         try {
@@ -175,8 +191,8 @@
                     },
                     reset() { this.send('DELETE', this.resetUrl); }
                  }"
-                 @click.outside="open = false" @keydown.escape="open = false">
-                <button type="button" @click="open = !open"
+                 @scroll.window="open = false" @resize.window="open = false">
+                <button type="button" @click="open ? (open = false) : openPanel($event)"
                         :aria-expanded="open ? 'true' : 'false'"
                         aria-haspopup="dialog"
                         aria-label="Atur kolom tabel"
@@ -184,26 +200,30 @@
                     <svg class="w-3.5 h-3.5 text-slate-500 dark:text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 17V7m6 10V7M4 7h16M4 17h16"/></svg>
                     <span>Kolom</span>
                 </button>
-                <div x-show="open" x-cloak x-transition
-                     role="dialog" aria-label="Pengaturan visibilitas kolom tabel"
-                     class="absolute right-0 z-30 mt-2 w-64 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-3 space-y-2">
-                    <p class="text-[11px] text-slate-600 dark:text-slate-400">Centang kolom yang ditampilkan. Geser judul kolom di tabel untuk mengubah urutan.</p>
-                    <div class="max-h-64 overflow-y-auto space-y-1">
-                        @foreach(\App\Support\CustomerListColumns::all() as $colKey => $colDef)
-                            <label class="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 cursor-pointer">
-                                <input type="checkbox" class="rounded border-slate-300 text-sky-600"
-                                       aria-label="{{ $colDef['label'] }}"
-                                       :checked="visible.includes('{{ $colKey }}')" @change="toggle('{{ $colKey }}')">
-                                <span>{{ $colDef['label'] }}</span>
-                            </label>
-                        @endforeach
+                <template x-teleport="body">
+                    <div x-show="open" x-cloak x-transition
+                         @click.outside="open = false" @keydown.escape.window="open = false"
+                         role="dialog" aria-label="Pengaturan visibilitas kolom tabel"
+                         :style="`position: fixed; top: ${pos.top}px; left: ${pos.left}px; z-index: 9999;`"
+                         class="w-64 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg p-3 space-y-2">
+                        <p class="text-[11px] text-slate-600 dark:text-slate-400">Centang kolom yang ditampilkan. Geser judul kolom di tabel untuk mengubah urutan.</p>
+                        <div class="max-h-64 overflow-y-auto space-y-1">
+                            @foreach(\App\Support\CustomerListColumns::all() as $colKey => $colDef)
+                                <label class="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 cursor-pointer">
+                                    <input type="checkbox" class="rounded border-slate-300 text-sky-600"
+                                           aria-label="{{ $colDef['label'] }}"
+                                           :checked="visible.includes('{{ $colKey }}')" @change="toggle('{{ $colKey }}')">
+                                    <span>{{ $colDef['label'] }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                        <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
+                            <button type="button" @click="reset()" :disabled="busy" class="text-xs text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400">Reset</button>
+                            <button type="button" @click="apply()" :disabled="busy"
+                                    class="h-8 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold disabled:opacity-50">Terapkan</button>
+                        </div>
                     </div>
-                    <div class="flex items-center justify-between gap-2 pt-1 border-t border-slate-100 dark:border-slate-800">
-                        <button type="button" @click="reset()" :disabled="busy" class="text-xs text-slate-600 hover:text-rose-600 dark:text-slate-400 dark:hover:text-rose-400">Reset</button>
-                        <button type="button" @click="apply()" :disabled="busy"
-                                class="h-8 px-3 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold disabled:opacity-50">Terapkan</button>
-                    </div>
-                </div>
+                </template>
             </div>
             @endif
 

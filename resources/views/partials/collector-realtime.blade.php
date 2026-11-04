@@ -15,6 +15,23 @@
       - `audiens`  : 'admin' | 'kolektor' — menentukan bunyi pesannya.
       - `patchContainerId` : id elemen yang di-fetch-ulang & ditambal otomatis
                      tiap event masuk (default 'live-content').
+      - `patchUrl`  : URL sumber tambalan (default halaman ini sendiri,
+                     `window.location.href`). Diisi beda kalau mau tambal dari
+                     endpoint yang lebih murah daripada full-page (lihat
+                     `patchTargets`).
+      - `patchTargets` : array id elemen TAMBAHAN yang ditambal dari `patchUrl`
+                     yang sama (dipakai bareng `patchContainerId`, bukan
+                     pengganti). Kosong = perilaku lama (cuma `patchContainerId`
+                     dari `window.location.href`). Dipakai Worksheet Admin index
+                     buat nambal "Kas Anda" + daftar status teknisi dari endpoint
+                     sempit `collector-worksheet.summary-panel` TANPA bikin
+                     full-page fetch jadi mahal (lihat analisa-performa-seeder-15k.md
+                     §7/§11 — `technicianSettlementStatus()` & `tunaiBelumDisetor()`
+                     dulu ikut terhidrasi ulang tiap event lewat `window.location.href`
+                     penuh). Container LAIN di `live-content` (daftar kolektor,
+                     pelanggan belum di-assign, riwayat setoran, form filter) TIDAK
+                     ikut ditambal otomatis lagi — scope sengaja dipersempit ke yang
+                     terbukti mahal, bukan menyamai seluruh `live-content`.
 
     Riwayat keputusan (2026-08-21): sebelum ini halaman CUMA dikasih kabar
     (toast + bar "Muat ulang" manual) — sengaja TIDAK menambal angka sendiri,
@@ -29,6 +46,8 @@
 --}}
 @php
     $patchContainerId = $patchContainerId ?? 'live-content';
+    $patchUrl = $patchUrl ?? null;
+    $patchTargets = $patchTargets ?? [];
 @endphp
 @push('scripts')
 <script>
@@ -36,6 +55,8 @@
         const CHANNELS = @js($channels);
         const AUDIENS = @js($audiens);
         const PATCH_CONTAINER_ID = @js($patchContainerId);
+        const PATCH_URL = @js($patchUrl);
+        const PATCH_TARGETS = @js($patchTargets);
 
         if (! CHANNELS.length) return;
 
@@ -109,18 +130,22 @@
          * BUKAN reload, BUKAN polling.
          */
         function tambalOtomatis() {
-            const current = document.getElementById(PATCH_CONTAINER_ID);
-            if (! current) return;
+            const ids = PATCH_TARGETS.length ? PATCH_TARGETS : [PATCH_CONTAINER_ID];
+            const url = PATCH_URL || window.location.href;
 
-            fetch(window.location.href, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+            fetch(url, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
                 .then((res) => res.text())
                 .then((html) => {
                     const doc = new DOMParser().parseFromString(html, 'text/html');
-                    const fresh = doc.getElementById(PATCH_CONTAINER_ID);
-                    if (! fresh) return;
 
-                    current.replaceWith(fresh);
-                    if (window.Alpine) window.Alpine.initTree(fresh);
+                    ids.forEach(function (id) {
+                        const current = document.getElementById(id);
+                        const fresh = doc.getElementById(id);
+                        if (! current || ! fresh) return;
+
+                        current.replaceWith(fresh);
+                        if (window.Alpine) window.Alpine.initTree(fresh);
+                    });
                 })
                 .catch(() => {
                     // Diam-diam gagal — halaman tetap nampilin data lama, gak ganggu kerjaan.

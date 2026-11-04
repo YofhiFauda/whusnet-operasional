@@ -61,6 +61,27 @@ class PaymentListTest extends TestCase
         $response->assertDontSee('Budi Payment Filter');
     }
 
+    public function test_dropdown_filter_pop_hanya_menampilkan_pop_bertipe_cabang(): void
+    {
+        $owner = $this->loginAsAdmin();
+        $cabang = $this->createPop('POP-PAY-CABANG', 'PPCB', 'Cabang Payment Filter Test');
+        Pop::create([
+            'code' => 'POP-PAY-PUSAT', 'pop_code' => 'PPPS', 'registration_prefix' => 'G', 'cid_prefix' => 'G',
+            'name' => 'Pusat Payment Filter Test', 'type' => 'pusat', 'status' => 'active',
+        ]);
+        Pop::create([
+            'code' => 'POP-PAY-MINI', 'pop_code' => 'PPMN', 'registration_prefix' => 'H', 'cid_prefix' => 'H',
+            'name' => 'Mini Payment Filter Test', 'type' => 'mini_pop', 'parent_id' => $cabang->id, 'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('payments.index'));
+
+        $response->assertOk();
+        $response->assertSee('Cabang Payment Filter Test');
+        $response->assertDontSee('Pusat Payment Filter Test');
+        $response->assertDontSee('Mini Payment Filter Test');
+    }
+
     public function test_admin_cabang_only_sees_assigned_pop_payments(): void
     {
         $role = Role::where('name', 'POP Admin')->firstOrFail();

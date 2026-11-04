@@ -84,7 +84,7 @@
                             <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-1 italic">{{ $setoran->note }}</p>
                         @endif
                         @if ($setoran->proof_path)
-                            <a href="{{ route('cash-deposits.download', $setoran->id) }}"
+                            <a href="{{ route('cash-deposits.download', $setoran->id) }}" hx-boost="false"
                                class="inline-block mt-1 text-[11px] font-semibold text-sky-600 dark:text-sky-400 hover:underline">Unduh bukti</a>
                         @endif
                     </div>

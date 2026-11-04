@@ -386,6 +386,21 @@ class TicketController extends Controller
         ]);
     }
 
+    /**
+     * Partial status+handler buat live-refresh tanpa reload (dengar event
+     * TicketQueueUpdated di tickets/show.blade.php). Query ulang dari DB
+     * ($ticket->fresh()), BUKAN percaya payload event — event ini sengaja
+     * gak bawa data tiket (lihat App\Events\TicketQueueUpdated), dan status
+     * bisa sudah berubah lagi antara event terkirim & fetch ini jalan.
+     */
+    public function statusPanel(Ticket $ticket)
+    {
+        abort_unless(auth()->user()->hasPermission('tickets.view'), 403);
+        $this->authorizeTicketScope($ticket);
+
+        return view('tickets.partials._status-panel', ['ticket' => $ticket->fresh()]);
+    }
+
     public function show(Ticket $ticket)
     {
         abort_unless(auth()->user()->hasPermission('tickets.view'), 403);

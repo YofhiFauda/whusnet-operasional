@@ -26,7 +26,7 @@
         <input type="date" name="date_from" value="{{ request('date_from') }}" aria-label="Tanggal mulai" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800">
         <input type="date" name="date_to" value="{{ request('date_to') }}" aria-label="Tanggal akhir" class="rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-800">
         <button class="rounded-lg bg-slate-800 px-4 py-2 text-sm font-semibold text-white">Terapkan filter</button>
-        <a href="{{ route('warehouse.branch-sales.report.export', request()->query()) }}" class="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Ekspor CSV</a>
+        <a href="{{ route('warehouse.branch-sales.report.export', request()->query()) }}" hx-boost="false" class="rounded-lg border border-slate-300 px-4 py-2 text-center text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Ekspor CSV</a>
     </form>
 
     @if($summary !== null)

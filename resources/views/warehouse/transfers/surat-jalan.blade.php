@@ -372,8 +372,8 @@
         <div class="notes">
             <div class="notes-title">Catatan / Instruksi Pengiriman:</div>
             <ol>
-                <li>Surat jalan ini merupakan dokumen resmi transfer peralatan jaringan ISP antar gudang WHUSNET.</li>
-                <li>Pihak Gudang Cabang wajib melakukan verifikasi, pemeriksaan fisik, dan penghitungan barang saat tiba.</li>
+                <li>Surat jalan ini merupakan dokumen resmi transfer peralatan jaringan antar cabang WHUSNET.</li>
+                <li>Pihak Cabang wajib melakukan verifikasi, pemeriksaan fisik, dan penghitungan barang saat tiba.</li>
                 <li>Apabila terdapat selisih atau kerusakan, harap dicatat pada kolom 'Keterangan' dan dikonfirmasi ke Gudang Pusat.</li>
                 <li>Update status penerimaan barang wajib diinput ke sistem WHUSNET Operasional setelah serah terima selesai.</li>
             </ol>

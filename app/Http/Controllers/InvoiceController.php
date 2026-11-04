@@ -86,7 +86,9 @@ class InvoiceController extends Controller
         }
 
         $invoices = $query->paginate(10)->withQueryString();
-        $pops = Pop::forUser()->orderBy('name')->get();
+        // Dropdown filter POP cuma buat pilih Cabang — Pusat & Mini POP bukan
+        // satuan billing (permintaan user 2026-11-03).
+        $pops = Pop::forUser()->where('type', 'cabang')->orderBy('name')->get();
 
         // Ringkasan tunggakan (independen dari filter/search di atas), supaya
         // admin lihat total nunggak AWAL vs BULANAN tanpa hitung manual per baris.

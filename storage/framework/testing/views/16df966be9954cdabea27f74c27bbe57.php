@@ -1,7 +1,8 @@
 <!-- Global Toast Container -->
 <div id="toast-container" class="fixed top-6 right-6 z-50 w-[calc(100%-3rem)] sm:w-[350px] h-0 pointer-events-none"></div>
 
-<script>
+
+<script id="toast-script" hx-preserve="true">
     window.Toast = {
         toasts: [],
         isHovered: false,
@@ -182,8 +183,13 @@
         <?php endif; ?>
     });
 
-    // Intercept native browser HTML form validation 'invalid' events and display via Toast component
-    let formToastLock = false;
+    // Intercept native browser HTML form validation 'invalid' events and display via Toast component.
+    // `var`, BUKAN `let`: hx-preserve di atas SEHARUSNYA sudah cegah script
+    // ini re-execute, tapi kalau tab browser masih pegang DOM dari SEBELUM
+    // id+hx-preserve ini ter-deploy (gak hard-refresh), getElementById gak
+    // nemu node lama buat dicocokkan ⇒ fallback var tetap aman redeclare,
+    // gak gantung ke satu mekanisme doang.
+    var formToastLock = false;
     document.addEventListener('invalid', (e) => {
         // Prevent default browser validation popup bubble ("Please select an item in the list")
         e.preventDefault();

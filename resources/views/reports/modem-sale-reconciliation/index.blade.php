@@ -22,7 +22,7 @@
     </div>
 
     @if($canExport)
-        <a href="{{ route('reports.modem-sale-reconciliation.export') }}" class="inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Ekspor CSV</a>
+        <a href="{{ route('reports.modem-sale-reconciliation.export') }}" hx-boost="false" class="inline-flex rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 dark:border-slate-700 dark:text-slate-200">Ekspor CSV</a>
     @endif
 
     <div class="overflow-x-auto rounded-xl border border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">

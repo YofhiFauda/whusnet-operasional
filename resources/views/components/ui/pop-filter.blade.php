@@ -153,9 +153,16 @@
 @once
 <script>
     /* Fase 5.4b - komponen filter POP (Cabang + Mini POP). Mini cascade dari
-       cabang terpilih. Semua fetch lewat endpoint ber-scope forUser. */
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('popFilter', (cfg) => ({
+       cabang terpilih. Semua fetch lewat endpoint ber-scope forUser.
+       Registrasi dibungkus fungsi yang CEK dulu `window.Alpine`: hx-boost
+       (layouts/app.blade.php) nge-swap SELURUH <body> tiap nav, jadi script
+       ini ikut ter-insert ulang di halaman kedua-dst — pada titik itu Alpine
+       SUDAH start, jadi daftar langsung. Di load pertama (bukan boost), body
+       biasanya kebaca SEBELUM module Alpine dari @@vite jalan ⇒ window.Alpine
+       belum ada ⇒ tunggu 'alpine:init' (nyala sekali, pas sebelum Alpine.start()). */
+    (function () {
+        const register = () => {
+            Alpine.data('popFilter', (cfg) => ({
             open: false,
             tab: 'cabang',
             cq: '', mq: '',
@@ -223,6 +230,13 @@
                 });
             },
         }));
-    });
+        };
+
+        if (window.Alpine) {
+            register();
+        } else {
+            document.addEventListener('alpine:init', register, { once: true });
+        }
+    })();
 </script>
 @endonce

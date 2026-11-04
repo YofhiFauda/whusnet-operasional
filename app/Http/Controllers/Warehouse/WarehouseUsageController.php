@@ -109,18 +109,16 @@ class WarehouseUsageController extends Controller
 
         $popIds = $pops->pluck('id')->all();
         $filters = $this->resolveFilters($request, $popIds);
-        $usageEntries = $this->fetchUnifiedUsageEntries($filters, $popIds, $locationResolver);
-        $filteredEntries = $this->applySearchAndCategoryFilters($usageEntries, $filters);
 
         $filename = 'rekap-pemakaian-material-'.$filters['start']->format('Ymd').'-sd-'.$filters['end']->format('Ymd').'.xlsx';
 
-        return response()->streamDownload(function () use ($filteredEntries) {
+        return response()->streamDownload(function () use ($filters, $popIds, $locationResolver) {
             $writer = SimpleExcelWriter::create('php://output', 'xlsx');
 
             $headerStyle = (new Style)
-                ->setFontBold()
-                ->setFontSize(11)
-                ->setBackgroundColor(Color::rgb(224, 242, 254)); // Sky-100
+                ->withFontBold(true)
+                ->withFontSize(11)
+                ->withBackgroundColor(Color::rgb(224, 242, 254)); // Sky-100
 
             // Sheet 1: Rincian Log Pemakaian
             $writer->nameCurrentSheet('Rincian Pemakaian');
@@ -141,7 +139,16 @@ class WarehouseUsageController extends Controller
                 'Catatan',
             ], $headerStyle);
 
-            foreach ($filteredEntries as $entry) {
+            // Agregat Sheet 2 dihitung di sini (running total per nama barang),
+            // BUKAN dari koleksi penuh — baris mentah tak pernah disimpan utuh,
+            // cuma angka ringkasannya yang numpuk (lihat streamUsageEntries()).
+            $itemAgg = [];
+
+            $this->streamUsageEntries($filters, $popIds, $locationResolver, function (array $entry) use ($filters, $writer, &$itemAgg) {
+                if (! $this->entryMatchesFilters($entry, $filters)) {
+                    return;
+                }
+
                 $writer->addRow([
                     $entry['created_at']->format('d/m/Y H:i'),
                     $entry['pop_name'],
@@ -158,10 +165,31 @@ class WarehouseUsageController extends Controller
                     $entry['location_breadcrumb'] ?? '-',
                     $entry['note'] ?? '-',
                 ]);
-            }
+
+                $key = $entry['item_name'];
+                if (! isset($itemAgg[$key])) {
+                    $itemAgg[$key] = [
+                        'item_name' => $entry['item_name'],
+                        'item_code' => $entry['item_code'],
+                        'category_name' => $entry['category_name'],
+                        'unit' => $entry['unit'],
+                        'total_qty' => 0.0,
+                        'total_value' => 0.0,
+                        'task_ids' => [],
+                        'identifiers' => [],
+                    ];
+                }
+                $itemAgg[$key]['total_qty'] += (float) $entry['qty'];
+                $itemAgg[$key]['total_value'] += (float) $entry['total_price'];
+                if ($entry['fop_task_id']) {
+                    $itemAgg[$key]['task_ids'][$entry['fop_task_id']] = true;
+                }
+                if ($entry['identifier'] !== '-') {
+                    $itemAgg[$key]['identifiers'][$entry['identifier']] = true;
+                }
+            });
 
             // Sheet 2: Rekapitulasi per Barang
-            $itemSummaries = $this->buildItemSummaries($filteredEntries);
             $writer->addNewSheetAndMakeItCurrent('Rekap per Barang');
             $writer->addHeader([
                 'Nama Barang',
@@ -173,6 +201,8 @@ class WarehouseUsageController extends Controller
                 'Roll / SN Terpakai',
             ], $headerStyle);
 
+            $itemSummaries = collect($itemAgg)->sortByDesc('total_qty');
+
             foreach ($itemSummaries as $summary) {
                 $writer->addRow([
                     $summary['item_name'],
@@ -180,8 +210,8 @@ class WarehouseUsageController extends Controller
                     $summary['category_name'],
                     $summary['total_qty'],
                     $summary['unit'],
-                    $summary['task_count'],
-                    implode(', ', $summary['identifiers']) ?: '-',
+                    count($summary['task_ids']),
+                    implode(', ', array_keys($summary['identifiers'])) ?: '-',
                 ]);
             }
 
@@ -276,7 +306,13 @@ class WarehouseUsageController extends Controller
         $entries = collect();
 
         // 1. Ambil data material pasif & kabel per-roll dari task_materials (kind=TERPAKAI)
-        $taskMaterials = TaskMaterial::query()
+        //
+        // `chunk()`, bukan `get()`: preset "all" gak dibatasi tanggal (lihat resolveFilters),
+        // jadi hasilnya bisa puluhan ribu baris. `get()` + eager load relasi (fopTask.customer.pop
+        // dkk) sekaligus pernah bikin OOM 512MB di BelongsTo::match() pas hydrate (laporan
+        // 2026-11-04, halaman warehouse/usage?preset=all). Chunk 500 baris jaga peak memory
+        // tetap kecil karena eager load cuma jalan per-batch, bukan buat seluruh resultset.
+        TaskMaterial::query()
             ->where('kind', MaterialKind::TERPAKAI->value)
             ->whereBetween('created_at', [$start, $end])
             ->with([
@@ -293,57 +329,14 @@ class WarehouseUsageController extends Controller
                 $q->whereHas('fopTask', fn ($tq) => $tq->whereIn('pop_id', $scopedPops))
                     ->orWhereHas('customer', fn ($cq) => $cq->whereIn('pop_id', $scopedPops));
             })
-            ->get();
-
-        foreach ($taskMaterials as $tm) {
-            $popName = $tm->fopTask?->pop?->name
-                ?? $tm->customer?->pop?->name
-                ?? '-';
-
-            $itemName = $tm->item?->name ?? $tm->item_name ?? 'Material';
-            $itemCode = $tm->item?->code ?? '-';
-            $categoryName = $tm->item?->category?->name ?? $tm->category?->name ?? $tm->category_label ?? 'Lainnya';
-            $categoryCode = $tm->item?->category?->code ?? $tm->item_type ?? 'lainnya';
-            $unit = $tm->unit ?: ($tm->item?->unit ?? 'meter');
-
-            $technicianName = $tm->recordedBy?->name
-                ?? $tm->fopTask?->technicians->first()?->name
-                ?? '-';
-
-            $badge = FopTask::resolveUsageBadgeForTask($tm->fopTask);
-
-            $entries->push([
-                'source' => 'task_material',
-                'source_id' => $tm->id,
-                'created_at' => $tm->created_at,
-                'item_id' => $tm->item_id,
-                'item_category_id' => $tm->item?->item_category_id ?? $tm->item_category_id,
-                'item_name' => $itemName,
-                'item_code' => $itemCode,
-                'category_name' => $categoryName,
-                'category_code' => $categoryCode,
-                'tracking_type' => $tm->item?->tracking_type?->value ?? ($tm->lot_no ? 'roll' : 'quantity'),
-                'qty' => (float) $tm->qty,
-                'unit' => $unit,
-                'identifier' => $tm->lot_no ?: '-',
-                'technician_name' => $technicianName,
-                'customer_name' => $tm->customer?->full_name ?? $tm->fopTask?->customer?->full_name ?? '-',
-                'customer_id' => $tm->customer_id ?? $tm->fopTask?->customer_id,
-                'fop_task_id' => $tm->fop_task_id,
-                'task_number' => $tm->fopTask?->task_number ?? '-',
-                'task_type' => $badge['type'],
-                'task_detail' => $badge['detail'],
-                'task_category' => $badge['label'],
-                'pop_name' => $popName,
-                'unit_price' => (float) ($tm->unit_price_snapshot ?? 0),
-                'total_price' => (float) ($tm->unit_price_snapshot ?? 0) * (float) $tm->qty,
-                'note' => $tm->note,
-                'location_breadcrumb' => null,
-            ]);
-        }
+            ->chunkById(500, function (Collection $taskMaterials) use ($entries) {
+                foreach ($taskMaterials as $tm) {
+                    $entries->push($this->buildTaskMaterialEntry($tm));
+                }
+            });
 
         // 2. Ambil data modem terpasang dari inventory_transactions (type=INSTALL)
-        $installTransactions = InventoryTransaction::query()
+        InventoryTransaction::query()
             ->where('type', InventoryTransactionType::INSTALL->value)
             ->whereBetween('created_at', [$start, $end])
             ->with([
@@ -361,63 +354,18 @@ class WarehouseUsageController extends Controller
                     ->orWhereHas('fopTask', fn ($tq) => $tq->whereIn('pop_id', $scopedPops))
                     ->orWhereHas('serial.customer', fn ($cq) => $cq->whereIn('pop_id', $scopedPops));
             })
-            ->get();
-
-        foreach ($installTransactions as $trx) {
-            $popName = $trx->fopTask?->pop?->name
-                ?? $trx->serial?->customer?->pop?->name
-                ?? $trx->fromPop?->name
-                ?? '-';
-
-            $itemName = $trx->item?->name ?? 'Modem ONT';
-            $itemCode = $trx->item?->code ?? '-';
-            $categoryName = $trx->item?->category?->name ?? 'ONT';
-            $categoryCode = $trx->item?->category?->code ?? 'ont';
-            $unit = $trx->item?->unit ?? 'Unit';
-
-            $technicianName = $trx->fromTechnician?->name
-                ?? $trx->createdBy?->name
-                ?? '-';
-
-            $isModemInstall = ($trx->item?->tracking_type?->value === 'serialized') || $trx->serial_id !== null;
-            $badge = FopTask::resolveUsageBadgeForTask($trx->fopTask, $isModemInstall);
-
-            $entries->push([
-                'source' => 'inventory_transaction',
-                'source_id' => $trx->id,
-                'created_at' => $trx->created_at,
-                'item_id' => $trx->item_id,
-                'item_category_id' => $trx->item?->item_category_id,
-                'item_name' => $itemName,
-                'item_code' => $itemCode,
-                'category_name' => $categoryName,
-                'category_code' => $categoryCode,
-                'tracking_type' => 'serialized',
-                'qty' => (float) ($trx->qty ?: 1),
-                'unit' => $unit,
-                'identifier' => $trx->serial?->serial_number ?: ($trx->lot_no ?: '-'),
-                'technician_name' => $technicianName,
-                'customer_name' => $trx->fopTask?->customer?->full_name ?? $trx->serial?->customer?->full_name ?? '-',
-                'customer_id' => $trx->fopTask?->customer_id ?? $trx->serial?->customer_id,
-                'fop_task_id' => $trx->fop_task_id,
-                'task_number' => $trx->fopTask?->task_number ?? '-',
-                'task_type' => $badge['type'],
-                'task_detail' => $badge['detail'],
-                'task_category' => $badge['label'],
-                'pop_name' => $popName,
-                'unit_price' => (float) ($trx->unit_price_snapshot ?? 0),
-                'total_price' => (float) ($trx->unit_price_snapshot ?? 0) * (float) ($trx->qty ?: 1),
-                'note' => $trx->reason,
-                'location_breadcrumb' => null,
-            ]);
-        }
+            ->chunkById(500, function (Collection $installTransactions) use ($entries) {
+                foreach ($installTransactions as $trx) {
+                    $entries->push($this->buildInstallEntry($trx));
+                }
+            });
 
         // 3. Ambil barang yang terpasang NETAP ke titik infrastruktur (type=DEPLOY) —
         // OLT/Slot/PON/ODP, bukan ke pelanggan. Dulu cuma kelihatan di drawer Riwayat
         // Mutasi (ledger mentah, numpuk seiring waktu); di sini digabung supaya "dipasang
         // dimana, siapa, jam berapa, task apa" kebaca langsung dari laporan Pemakaian
         // Material (laporan 2026-10-22).
-        $deployTransactions = InventoryTransaction::query()
+        InventoryTransaction::query()
             ->where('type', InventoryTransactionType::DEPLOY->value)
             ->whereBetween('created_at', [$start, $end])
             ->with([
@@ -435,59 +383,268 @@ class WarehouseUsageController extends Controller
                 $q->whereIn('to_pop_id', $scopedPops)
                     ->orWhereHas('fopTask', fn ($tq) => $tq->whereIn('pop_id', $scopedPops));
             })
-            ->get();
+            ->chunkById(500, function (Collection $deployTransactions) use ($entries, $locationResolver) {
+                foreach ($deployTransactions as $trx) {
+                    $entries->push($this->buildDeployEntry($trx, $locationResolver));
+                }
+            });
 
-        foreach ($deployTransactions as $trx) {
-            $popName = $trx->fopTask?->pop?->name
+        return $entries->sortByDesc('created_at')->values();
+    }
+
+    /**
+     * Versi streaming dari `fetchUnifiedUsageEntries()` — dipakai khusus oleh `export()`.
+     * Bedanya: entry LANGSUNG dilempar ke `$onEntry` per baris (chunk 5.000/batch per
+     * sumber), tidak pernah ditumpuk jadi satu Collection raksasa. Export (preset "all"
+     * bisa tanpa batas tanggal) itu beban terberat laporan ini — kalau semua baris
+     * ditumpuk dulu sebelum ditulis ke Excel, besarnya koleksi array itu sendiri yang
+     * jadi risiko OOM baru walau model Eloquent-nya sudah di-chunk (permintaan user
+     * 2026-11-04, "download Excel batch per 5k").
+     *
+     * Trade-off yang disengaja: urutan baris Sheet 1 jadi per-sumber (task_materials →
+     * INSTALL → DEPLOY), terbaru dulu DI DALAM tiap sumber — bukan gabungan kronologis
+     * ketiga sumber seperti di halaman index. Index tetap pakai `fetchUnifiedUsageEntries()`
+     * yang gabungan+sort penuh (datanya sudah dibatasi pagination, aman ditumpuk).
+     *
+     * @param  array{preset: string, start: Carbon, end: Carbon, pop_id: ?int, category_id: ?int, search: string}  $filters
+     * @param  list<int>  $popIds
+     * @param  callable(array<string, mixed>): void  $onEntry
+     */
+    private function streamUsageEntries(array $filters, array $popIds, InfrastructureLocationResolver $locationResolver, callable $onEntry): void
+    {
+        $scopedPops = $filters['pop_id'] ? [$filters['pop_id']] : $popIds;
+        $start = $filters['start'];
+        $end = $filters['end'];
+        $batchSize = 5000;
+
+        TaskMaterial::query()
+            ->where('kind', MaterialKind::TERPAKAI->value)
+            ->whereBetween('created_at', [$start, $end])
+            ->with([
+                'item.category',
+                'category',
+                'fopTask.pop',
+                'fopTask.customer.pop',
+                'fopTask.technicians',
+                'fopTask.task.creqDetail',
+                'customer.pop',
+                'recordedBy',
+            ])
+            ->where(function ($q) use ($scopedPops) {
+                $q->whereHas('fopTask', fn ($tq) => $tq->whereIn('pop_id', $scopedPops))
+                    ->orWhereHas('customer', fn ($cq) => $cq->whereIn('pop_id', $scopedPops));
+            })
+            ->chunkById($batchSize, function (Collection $taskMaterials) use ($onEntry) {
+                foreach ($taskMaterials as $tm) {
+                    $onEntry($this->buildTaskMaterialEntry($tm));
+                }
+            });
+
+        InventoryTransaction::query()
+            ->where('type', InventoryTransactionType::INSTALL->value)
+            ->whereBetween('created_at', [$start, $end])
+            ->with([
+                'item.category',
+                'serial.customer.pop',
+                'fopTask.pop',
+                'fopTask.customer.pop',
+                'fopTask.task.creqDetail',
+                'fromTechnician',
+                'createdBy',
+            ])
+            ->where(function ($q) use ($scopedPops) {
+                $q->whereIn('from_pop_id', $scopedPops)
+                    ->orWhereIn('to_pop_id', $scopedPops)
+                    ->orWhereHas('fopTask', fn ($tq) => $tq->whereIn('pop_id', $scopedPops))
+                    ->orWhereHas('serial.customer', fn ($cq) => $cq->whereIn('pop_id', $scopedPops));
+            })
+            ->chunkById($batchSize, function (Collection $installTransactions) use ($onEntry) {
+                foreach ($installTransactions as $trx) {
+                    $onEntry($this->buildInstallEntry($trx));
+                }
+            });
+
+        InventoryTransaction::query()
+            ->where('type', InventoryTransactionType::DEPLOY->value)
+            ->whereBetween('created_at', [$start, $end])
+            ->with([
+                'item.category',
+                'serial',
+                'roll',
+                'fopTask.pop',
+                'fopTask.task.creqDetail',
+                'fromTechnician',
+                'createdBy',
+                'toInfrastructurePop',
+                'toMiniPop',
+            ])
+            ->where(function ($q) use ($scopedPops) {
+                $q->whereIn('to_pop_id', $scopedPops)
+                    ->orWhereHas('fopTask', fn ($tq) => $tq->whereIn('pop_id', $scopedPops));
+            })
+            ->chunkById($batchSize, function (Collection $deployTransactions) use ($onEntry, $locationResolver) {
+                foreach ($deployTransactions as $trx) {
+                    $onEntry($this->buildDeployEntry($trx, $locationResolver));
+                }
+            });
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildTaskMaterialEntry(TaskMaterial $tm): array
+    {
+        $popName = $tm->fopTask?->pop?->name
+                ?? $tm->customer?->pop?->name
+                ?? '-';
+
+        $itemName = $tm->item?->name ?? $tm->item_name ?? 'Material';
+        $itemCode = $tm->item?->code ?? '-';
+        $categoryName = $tm->item?->category?->name ?? $tm->category?->name ?? $tm->category_label ?? 'Lainnya';
+        $categoryCode = $tm->item?->category?->code ?? $tm->item_type ?? 'lainnya';
+        $unit = $tm->unit ?: ($tm->item?->unit ?? 'meter');
+
+        $technicianName = $tm->recordedBy?->name
+            ?? $tm->fopTask?->technicians->first()?->name
+            ?? '-';
+
+        $badge = FopTask::resolveUsageBadgeForTask($tm->fopTask);
+
+        return [
+            'source' => 'task_material',
+            'source_id' => $tm->id,
+            'created_at' => $tm->created_at,
+            'item_id' => $tm->item_id,
+            'item_category_id' => $tm->item?->item_category_id ?? $tm->item_category_id,
+            'item_name' => $itemName,
+            'item_code' => $itemCode,
+            'category_name' => $categoryName,
+            'category_code' => $categoryCode,
+            'tracking_type' => $tm->item?->tracking_type?->value ?? ($tm->lot_no ? 'roll' : 'quantity'),
+            'qty' => (float) $tm->qty,
+            'unit' => $unit,
+            'identifier' => $tm->lot_no ?: '-',
+            'technician_name' => $technicianName,
+            'customer_name' => $tm->customer?->full_name ?? $tm->fopTask?->customer?->full_name ?? '-',
+            'customer_id' => $tm->customer_id ?? $tm->fopTask?->customer_id,
+            'fop_task_id' => $tm->fop_task_id,
+            'task_number' => $tm->fopTask?->task_number ?? '-',
+            'task_type' => $badge['type'],
+            'task_detail' => $badge['detail'],
+            'task_category' => $badge['label'],
+            'pop_name' => $popName,
+            'unit_price' => (float) ($tm->unit_price_snapshot ?? 0),
+            'total_price' => (float) ($tm->unit_price_snapshot ?? 0) * (float) $tm->qty,
+            'note' => $tm->note,
+            'location_breadcrumb' => null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildInstallEntry(InventoryTransaction $trx): array
+    {
+        $popName = $trx->fopTask?->pop?->name
+                ?? $trx->serial?->customer?->pop?->name
+                ?? $trx->fromPop?->name
+                ?? '-';
+
+        $itemName = $trx->item?->name ?? 'Modem ONT';
+        $itemCode = $trx->item?->code ?? '-';
+        $categoryName = $trx->item?->category?->name ?? 'ONT';
+        $categoryCode = $trx->item?->category?->code ?? 'ont';
+        $unit = $trx->item?->unit ?? 'Unit';
+
+        $technicianName = $trx->fromTechnician?->name
+            ?? $trx->createdBy?->name
+            ?? '-';
+
+        $isModemInstall = ($trx->item?->tracking_type?->value === 'serialized') || $trx->serial_id !== null;
+        $badge = FopTask::resolveUsageBadgeForTask($trx->fopTask, $isModemInstall);
+
+        return [
+            'source' => 'inventory_transaction',
+            'source_id' => $trx->id,
+            'created_at' => $trx->created_at,
+            'item_id' => $trx->item_id,
+            'item_category_id' => $trx->item?->item_category_id,
+            'item_name' => $itemName,
+            'item_code' => $itemCode,
+            'category_name' => $categoryName,
+            'category_code' => $categoryCode,
+            'tracking_type' => 'serialized',
+            'qty' => (float) ($trx->qty ?: 1),
+            'unit' => $unit,
+            'identifier' => $trx->serial?->serial_number ?: ($trx->lot_no ?: '-'),
+            'technician_name' => $technicianName,
+            'customer_name' => $trx->fopTask?->customer?->full_name ?? $trx->serial?->customer?->full_name ?? '-',
+            'customer_id' => $trx->fopTask?->customer_id ?? $trx->serial?->customer_id,
+            'fop_task_id' => $trx->fop_task_id,
+            'task_number' => $trx->fopTask?->task_number ?? '-',
+            'task_type' => $badge['type'],
+            'task_detail' => $badge['detail'],
+            'task_category' => $badge['label'],
+            'pop_name' => $popName,
+            'unit_price' => (float) ($trx->unit_price_snapshot ?? 0),
+            'total_price' => (float) ($trx->unit_price_snapshot ?? 0) * (float) ($trx->qty ?: 1),
+            'note' => $trx->reason,
+            'location_breadcrumb' => null,
+        ];
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function buildDeployEntry(InventoryTransaction $trx, InfrastructureLocationResolver $locationResolver): array
+    {
+        $popName = $trx->fopTask?->pop?->name
                 ?? $trx->toInfrastructurePop?->name
                 ?? $trx->toMiniPop?->name
                 ?? '-';
 
-            $itemName = $trx->item?->name ?? 'Material Infrastruktur';
-            $itemCode = $trx->item?->code ?? '-';
-            $categoryName = $trx->item?->category?->name ?? 'Infrastruktur';
-            $categoryCode = $trx->item?->category?->code ?? 'infrastruktur';
-            $unit = $trx->roll_id !== null ? 'meter' : ($trx->item?->unit ?? 'Unit');
+        $itemName = $trx->item?->name ?? 'Material Infrastruktur';
+        $itemCode = $trx->item?->code ?? '-';
+        $categoryName = $trx->item?->category?->name ?? 'Infrastruktur';
+        $categoryCode = $trx->item?->category?->code ?? 'infrastruktur';
+        $unit = $trx->roll_id !== null ? 'meter' : ($trx->item?->unit ?? 'Unit');
 
-            $technicianName = $trx->fromTechnician?->name
-                ?? $trx->createdBy?->name
-                ?? '-';
+        $technicianName = $trx->fromTechnician?->name
+            ?? $trx->createdBy?->name
+            ?? '-';
 
-            $locationBreadcrumb = $this->resolveDeployLocationBreadcrumb($trx, $locationResolver);
+        $locationBreadcrumb = $this->resolveDeployLocationBreadcrumb($trx, $locationResolver);
 
-            $badge = FopTask::resolveUsageBadgeForTask($trx->fopTask);
+        $badge = FopTask::resolveUsageBadgeForTask($trx->fopTask);
 
-            $entries->push([
-                'source' => 'inventory_transaction_deploy',
-                'source_id' => $trx->id,
-                'created_at' => $trx->created_at,
-                'item_id' => $trx->item_id,
-                'item_category_id' => $trx->item?->item_category_id,
-                'item_name' => $itemName,
-                'item_code' => $itemCode,
-                'category_name' => $categoryName,
-                'category_code' => $categoryCode,
-                'tracking_type' => $trx->item?->tracking_type?->value ?? ($trx->serial_id ? 'serialized' : ($trx->roll_id ? 'roll' : 'quantity')),
-                'qty' => (float) ($trx->qty ?: 1),
-                'unit' => $unit,
-                'identifier' => $trx->serial?->serial_number ?: ($trx->roll?->roll_code ?: ($trx->lot_no ?: '-')),
-                'technician_name' => $technicianName,
-                'customer_name' => '-',
-                'customer_id' => null,
-                'fop_task_id' => $trx->fop_task_id,
-                'task_number' => $trx->fopTask?->task_number ?? '-',
-                'task_type' => $badge['type'],
-                'task_detail' => $badge['detail'],
-                'task_category' => $badge['label'],
-                'pop_name' => $popName,
-                'unit_price' => (float) ($trx->unit_price_snapshot ?? 0),
-                'total_price' => (float) ($trx->unit_price_snapshot ?? 0) * (float) ($trx->qty ?: 1),
-                'note' => $trx->notes,
-                'location_breadcrumb' => $locationBreadcrumb,
-            ]);
-        }
-
-        return $entries->sortByDesc('created_at')->values();
+        return [
+            'source' => 'inventory_transaction_deploy',
+            'source_id' => $trx->id,
+            'created_at' => $trx->created_at,
+            'item_id' => $trx->item_id,
+            'item_category_id' => $trx->item?->item_category_id,
+            'item_name' => $itemName,
+            'item_code' => $itemCode,
+            'category_name' => $categoryName,
+            'category_code' => $categoryCode,
+            'tracking_type' => $trx->item?->tracking_type?->value ?? ($trx->serial_id ? 'serialized' : ($trx->roll_id ? 'roll' : 'quantity')),
+            'qty' => (float) ($trx->qty ?: 1),
+            'unit' => $unit,
+            'identifier' => $trx->serial?->serial_number ?: ($trx->roll?->roll_code ?: ($trx->lot_no ?: '-')),
+            'technician_name' => $technicianName,
+            'customer_name' => '-',
+            'customer_id' => null,
+            'fop_task_id' => $trx->fop_task_id,
+            'task_number' => $trx->fopTask?->task_number ?? '-',
+            'task_type' => $badge['type'],
+            'task_detail' => $badge['detail'],
+            'task_category' => $badge['label'],
+            'pop_name' => $popName,
+            'unit_price' => (float) ($trx->unit_price_snapshot ?? 0),
+            'total_price' => (float) ($trx->unit_price_snapshot ?? 0) * (float) ($trx->qty ?: 1),
+            'note' => $trx->notes,
+            'location_breadcrumb' => $locationBreadcrumb,
+        ];
     }
 
     /**
@@ -520,31 +677,38 @@ class WarehouseUsageController extends Controller
      */
     private function applySearchAndCategoryFilters(Collection $entries, array $filters): Collection
     {
-        return $entries->filter(function ($entry) use ($filters) {
-            if ($filters['category_id'] && (int) $entry['item_category_id'] !== (int) $filters['category_id']) {
+        return $entries->filter(fn ($entry) => $this->entryMatchesFilters($entry, $filters))->values();
+    }
+
+    /**
+     * @param  array<string, mixed>  $entry
+     * @param  array{category_id: ?int, search: string}  $filters
+     */
+    private function entryMatchesFilters(array $entry, array $filters): bool
+    {
+        if ($filters['category_id'] && (int) $entry['item_category_id'] !== (int) $filters['category_id']) {
+            return false;
+        }
+
+        if ($filters['search'] !== '') {
+            $search = mb_strtolower($filters['search']);
+            $haystack = mb_strtolower(implode(' ', [
+                $entry['item_name'],
+                $entry['item_code'],
+                $entry['identifier'],
+                $entry['technician_name'],
+                $entry['customer_name'],
+                $entry['task_number'],
+                $entry['pop_name'],
+                $entry['location_breadcrumb'] ?? '',
+            ]));
+
+            if (! str_contains($haystack, $search)) {
                 return false;
             }
+        }
 
-            if ($filters['search'] !== '') {
-                $search = mb_strtolower($filters['search']);
-                $haystack = mb_strtolower(implode(' ', [
-                    $entry['item_name'],
-                    $entry['item_code'],
-                    $entry['identifier'],
-                    $entry['technician_name'],
-                    $entry['customer_name'],
-                    $entry['task_number'],
-                    $entry['pop_name'],
-                    $entry['location_breadcrumb'] ?? '',
-                ]));
-
-                if (! str_contains($haystack, $search)) {
-                    return false;
-                }
-            }
-
-            return true;
-        })->values();
+        return true;
     }
 
     /**

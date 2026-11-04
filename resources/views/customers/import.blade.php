@@ -11,7 +11,7 @@
     <h1 class="text-2xl font-bold text-text-main tracking-tight">Import Pelanggan & Billing Lama</h1>
     <p class="text-xs text-text-secondary mt-1">Unggah file Excel multi-sheet untuk memigrasikan data pelanggan, paket, layanan, detail teknis, tagihan, dan pembayaran</p>
     <div class="mt-4 flex gap-3">
-        <a href="{{ route('customers.import.template') }}" class="inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2.5 px-4 rounded transition-all shadow-sm">
+        <a href="{{ route('customers.import.template') }}" hx-boost="false" class="inline-flex items-center justify-center gap-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold py-2.5 px-4 rounded transition-all shadow-sm">
             <svg class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
             </svg>

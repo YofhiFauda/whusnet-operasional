@@ -113,7 +113,9 @@ class PaymentController extends Controller
         }
 
         $payments = $query->paginate(10)->withQueryString();
-        $pops = Pop::forUser()->orderBy('name')->get();
+        // Dropdown filter POP cuma buat pilih Cabang — Pusat & Mini POP bukan
+        // satuan billing (permintaan user 2026-11-03).
+        $pops = Pop::forUser()->where('type', 'cabang')->orderBy('name')->get();
 
         return view('payments.index', compact(
             'payments',
@@ -168,7 +170,7 @@ class PaymentController extends Controller
 
         $totalOverpay = (float) (clone $query)->sum('overpay_amount');
         $payments = $query->paginate(10)->withQueryString();
-        $pops = Pop::forUser()->orderBy('name')->get();
+        $pops = Pop::forUser()->where('type', 'cabang')->orderBy('name')->get();
 
         return view('payments.overpay', compact('payments', 'pops', 'search', 'popId', 'totalOverpay'));
     }

@@ -53,6 +53,27 @@ class InvoiceListTest extends TestCase
         $response->assertDontSee('Budi Invoice Filter');
     }
 
+    public function test_dropdown_filter_pop_hanya_menampilkan_pop_bertipe_cabang(): void
+    {
+        $owner = $this->loginAsAdmin();
+        $cabang = $this->createPop('POP-CABANG', 'PCBG', 'Cabang Filter Test');
+        $pusat = Pop::create([
+            'code' => 'POP-PUSAT', 'pop_code' => 'PPST', 'registration_prefix' => 'E', 'cid_prefix' => 'E',
+            'name' => 'Pusat Filter Test', 'type' => 'pusat', 'status' => 'active',
+        ]);
+        $miniPop = Pop::create([
+            'code' => 'POP-MINI', 'pop_code' => 'PMNI', 'registration_prefix' => 'F', 'cid_prefix' => 'F',
+            'name' => 'Mini Filter Test', 'type' => 'mini_pop', 'parent_id' => $cabang->id, 'status' => 'active',
+        ]);
+
+        $response = $this->actingAs($owner)->get(route('invoices.index'));
+
+        $response->assertOk();
+        $response->assertSee('Cabang Filter Test');
+        $response->assertDontSee('Pusat Filter Test');
+        $response->assertDontSee('Mini Filter Test');
+    }
+
     public function test_admin_cabang_only_sees_assigned_pop_invoices(): void
     {
         $role = Role::where('name', 'POP Admin')->firstOrFail();
