@@ -42,7 +42,7 @@
             <div class="flex gap-2">
                 <button type="submit" class="px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 hover:bg-sky-700 text-white transition-colors">Tampilkan</button>
                 @if($canExport)
-                    <a href="{{ route('reports.collector-monthly.export', array_filter(['period' => $period, 'pop_id' => $popId])) }}" class="px-4 py-2 text-sm font-semibold rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Export Excel</a>
+                    <a href="{{ route('reports.collector-monthly.export', array_filter(['period' => $period, 'pop_id' => $popId])) }}" hx-boost="false" class="px-4 py-2 text-sm font-semibold rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Export Excel</a>
                 @endif
             </div>
         </form>
@@ -306,7 +306,7 @@
                 {{-- Daftar tagih/kejar untuk audit — bukan sekadar dilihat di modal.
                      href dirakit dari param yang store SIMPAN saat modal dibuka
                      (bukan input bebas), sama seperti url fetch di atas. --}}
-                <a :href="$store.reportDetail.exportUrl()" x-show="$store.reportDetail.rows.length > 0"
+                <a :href="$store.reportDetail.exportUrl()" x-show="$store.reportDetail.rows.length > 0" hx-boost="false"
                    class="px-3 py-1.5 rounded-md border border-border text-text-secondary hover:bg-surface-muted font-semibold cursor-pointer">
                     Unduh Excel
                 </a>

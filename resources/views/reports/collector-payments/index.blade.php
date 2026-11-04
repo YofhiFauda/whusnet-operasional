@@ -67,7 +67,7 @@
             <div class="flex gap-2">
                 <button type="submit" class="px-4 py-2 text-sm font-semibold rounded-md bg-sky-600 hover:bg-sky-700 text-white transition-colors">Tampilkan</button>
                 @if($canExport)
-                    <a href="{{ route('reports.collector-payments.export', array_filter(['collector_id' => $collectorId, 'start_date' => $start_date, 'end_date' => $end_date, 'method' => $method, 'source' => $source])) }}" class="px-4 py-2 text-sm font-semibold rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Export</a>
+                    <a href="{{ route('reports.collector-payments.export', array_filter(['collector_id' => $collectorId, 'start_date' => $start_date, 'end_date' => $end_date, 'method' => $method, 'source' => $source])) }}" hx-boost="false" class="px-4 py-2 text-sm font-semibold rounded-md border border-slate-300 dark:border-slate-600 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors">Export</a>
                 @endif
             </div>
         </form>

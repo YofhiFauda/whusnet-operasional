@@ -888,7 +888,7 @@
                                                 </a>
                                             @endif
 
-                                            <a href="{{ route('payment-receipts.download', $receipt->id) }}" class="text-xs font-medium text-primary hover:underline">Lembar asal</a>
+                                            <a href="{{ route('payment-receipts.download', $receipt->id) }}" hx-boost="false" class="text-xs font-medium text-primary hover:underline">Lembar asal</a>
                                         </div>
                                     </div>
 
