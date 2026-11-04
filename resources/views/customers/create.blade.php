@@ -631,11 +631,15 @@
         }
     })();
 
-    /* ── Wizard Form Stepper & Live Validation Logic ── */
-    let currentActiveStep = 1;
-    const totalStepsCount = 2;
+    /* ── Wizard Form Stepper & Live Validation Logic ──
+       `var`, BUKAN `let`/`const`: hx-boost nge-swap SELURUH <body> tiap
+       nav, script ini ikut ter-insert ulang tiap balik ke halaman create
+       pelanggan ini — `let`/`const` top-level gak bisa redeclare (lihat
+       bug formToastLock/selectedCustomerData, 2026-11-04). */
+    var currentActiveStep = 1;
+    var totalStepsCount = 2;
 
-    const formFields = {
+    var formFields = {
         'data-diri': {
             required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id'],
             optional: ['email', 'alternative_phone', 'npwp', 'latitude', 'longitude']
@@ -649,7 +653,7 @@
     // Paket yang butuh FAB (Formulir Akan Berlangganan Bisnis) — paket
     // berkategori Bisnis (dikirim server lewat CustomerController::create()).
     // Cuma dipakai buat toggle tampilan; guard sebenarnya tetap di server.
-    const fabRequiredPackageIds = @json($fabRequiredPackageIds->map(fn ($id) => (string) $id)->values());
+    var fabRequiredPackageIds = @json($fabRequiredPackageIds->map(fn ($id) => (string) $id)->values());
 
     function toggleFabRequirement() {
         const select = document.getElementById('internet_package_id');
@@ -669,14 +673,14 @@
         runLiveProgressUpdates();
     }
 
-    const stepKeys = {
+    var stepKeys = {
         1: 'data-diri',
         2: 'layanan'
     };
 
     // Field yang pindah jadi wajib di Step 1 begitu Skip Survey aktif —
     // lat/long dari 'optional' data-diri, sisanya baru muncul lewat toggle.
-    const skipSurveyRequiredFields = ['latitude', 'longitude', 'nearest_odp', 'cable_estimation_meter', 'difficulty_level', 'foto_rumah', 'survey_photo'];
+    var skipSurveyRequiredFields = ['latitude', 'longitude', 'nearest_odp', 'cable_estimation_meter', 'difficulty_level', 'foto_rumah', 'survey_photo'];
 
     /* Toggle Skip Survey — tampilkan/sembunyikan blok data survey & pindahkan
        field-nya antara required/optional di formFields['data-diri']. */

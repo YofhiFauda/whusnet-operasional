@@ -1911,7 +1911,11 @@
         }
     }
 
-    let currentViewMode = 'tabs'; // 'tabs' or 'all'
+    // `var`, BUKAN `let`: hx-boost nge-swap SELURUH <body> tiap nav, script
+    // ini ikut ter-insert ulang tiap balik ke halaman detail pelanggan ini
+    // — `let` top-level gak bisa redeclare (lihat bug formToastLock/
+    // selectedCustomerData, 2026-11-04).
+    var currentViewMode = 'tabs'; // 'tabs' or 'all'
 
     function switchTab(tabId) {
         if (currentViewMode === 'all') {

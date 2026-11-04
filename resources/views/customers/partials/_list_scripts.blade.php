@@ -96,15 +96,21 @@
         });
     })();
 
-    let selectedCustomerData = {};
-    let hubRemainingAmount = 0;
+    // `var`, BUKAN `let`/`const`: hx-boost (layouts/app.blade.php) nge-swap
+    // SELURUH <body> tiap nav, jadi script ini ikut ter-insert ulang tiap
+    // kali halaman List Pelanggan dibuka lewat boost nav. `let`/`const`
+    // top-level gak bisa dideklarasi dua kali di global scope yang sama ⇒
+    // SyntaxError "Identifier ... already declared" (ketauan user, console
+    // browser, 2026-11-04). `var` aman redeclare berkali-kali.
+    var selectedCustomerData = {};
+    var hubRemainingAmount = 0;
 
     // Cuma kelas STATE yang ditukar, bukan className utuh. Menimpa className
     // penuh (versi lama) ikut menghapus kelas responsif tab (text-[11px]
     // sm:text-xs, sm:px-4, snap-start) — begitu user pindah tab sekali, header
     // tab langsung berantakan di layar kecil.
-    const TAB_ACTIVE_CLASSES = ['font-bold', 'border-sky-600', 'text-sky-600', 'dark:text-sky-400', 'bg-white', 'dark:bg-slate-800'];
-    const TAB_INACTIVE_CLASSES = ['font-medium', 'border-transparent', 'text-slate-500', 'hover:text-slate-700', 'dark:hover:text-slate-300'];
+    var TAB_ACTIVE_CLASSES = ['font-bold', 'border-sky-600', 'text-sky-600', 'dark:text-sky-400', 'bg-white', 'dark:bg-slate-800'];
+    var TAB_INACTIVE_CLASSES = ['font-medium', 'border-transparent', 'text-slate-500', 'hover:text-slate-700', 'dark:hover:text-slate-300'];
 
     function switchActionTab(tabName) {
         const tabs = ['profile', 'technical', 'field', 'documents', 'finance'];
@@ -401,7 +407,9 @@
     }
 
     // URL struk pembayaran terakhir pelanggan yang lagi dibuka di Modal Hub.
-    let latestReceiptUrl = null;
+    // `var` (bukan `let`) — lihat alasan di deklarasi atas, script ini ikut
+    // ter-insert ulang tiap boost nav ke halaman List Pelanggan.
+    var latestReceiptUrl = null;
 
     function setLatestReceipt(url) {
         latestReceiptUrl = url || null;

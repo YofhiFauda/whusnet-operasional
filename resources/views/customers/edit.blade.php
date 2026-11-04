@@ -905,13 +905,17 @@
         }
     })();
 
-    /* ── Wizard Form Stepper & Live Validation Logic ── */
-    let currentActiveStep = 1;
-    const totalStepsCount = 7;
+    /* ── Wizard Form Stepper & Live Validation Logic ──
+       `var`, BUKAN `let`/`const`: hx-boost nge-swap SELURUH <body> tiap
+       nav, script ini ikut ter-insert ulang tiap balik ke halaman edit
+       pelanggan ini — `let`/`const` top-level gak bisa redeclare (lihat
+       bug formToastLock/selectedCustomerData, 2026-11-04). */
+    var currentActiveStep = 1;
+    var totalStepsCount = 7;
 
     // Field wizard dikelompokkan mengikuti tab Detail Pelanggan
     // (identitas/alamat/pop dipisah) supaya per-step gak campur aduk.
-    const formFields = {
+    var formFields = {
         'identitas': {
             required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date'],
             optional: ['email', 'alternative_phone', 'npwp']
@@ -953,7 +957,7 @@
         }
     };
 
-    const stepKeys = {
+    var stepKeys = {
         1: 'identitas',
         2: 'alamat',
         3: 'pop',
@@ -1029,9 +1033,9 @@
     });
 
     // Populate active city/district
-    const activeCityId = "{{ old('city_id', $customer->city_id) }}";
-    const activeDistrictId = "{{ old('district_id', $customer->district_id) }}";
-    const activeVillageId = "{{ old('village_id', $customer->village_id) }}";
+    var activeCityId = "{{ old('city_id', $customer->city_id) }}";
+    var activeDistrictId = "{{ old('district_id', $customer->district_id) }}";
+    var activeVillageId = "{{ old('village_id', $customer->village_id) }}";
 
     if (activeCityId) {
         loadDistricts(activeCityId, activeDistrictId, activeVillageId);

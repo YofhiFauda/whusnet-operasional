@@ -193,8 +193,13 @@
         @endif
     });
 
-    // Intercept native browser HTML form validation 'invalid' events and display via Toast component
-    let formToastLock = false;
+    // Intercept native browser HTML form validation 'invalid' events and display via Toast component.
+    // `var`, BUKAN `let`: hx-preserve di atas SEHARUSNYA sudah cegah script
+    // ini re-execute, tapi kalau tab browser masih pegang DOM dari SEBELUM
+    // id+hx-preserve ini ter-deploy (gak hard-refresh), getElementById gak
+    // nemu node lama buat dicocokkan ⇒ fallback var tetap aman redeclare,
+    // gak gantung ke satu mekanisme doang.
+    var formToastLock = false;
     document.addEventListener('invalid', (e) => {
         // Prevent default browser validation popup bubble ("Please select an item in the list")
         e.preventDefault();
