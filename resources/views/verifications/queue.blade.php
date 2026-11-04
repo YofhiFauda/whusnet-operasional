@@ -235,7 +235,11 @@
     // tab Pemasangan yang cuma 1 pelanggan per halaman). openQrPeek()
     // dipanggil dari tombol tiap baris (queue-actions.blade.php) dengan
     // URL yang SUDAH dirender server-side (route()) — bukan dirakit di sini.
-    document.addEventListener('alpine:init', () => {
+    // Alpine.store() dipanggil LANGSUNG, bukan digantung di 'alpine:init'
+    // — event itu cuma nyala sekali seumur halaman; script ini ikut
+    // ter-swap ulang tiap navigasi htmx boost balik ke halaman ini, dan
+    // registrasi store harus jalan lagi tiap kali, bukan cuma sekali.
+    (() => {
         Alpine.store('qrPeek', {
             loading: false,
             issuing: false,
@@ -283,7 +287,7 @@
                 }
             },
         });
-    });
+    })();
 
     /**
      * @param {string} statusUrl route('customers.qr.status', $customer)

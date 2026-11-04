@@ -153,8 +153,14 @@
 @once
 <script>
     /* Fase 5.4b - komponen filter POP (Cabang + Mini POP). Mini cascade dari
-       cabang terpilih. Semua fetch lewat endpoint ber-scope forUser. */
-    document.addEventListener('alpine:init', () => {
+       cabang terpilih. Semua fetch lewat endpoint ber-scope forUser.
+       Alpine.data() dipanggil LANGSUNG, bukan digantung di 'alpine:init'
+       — event itu cuma nyala sekali seumur halaman (saat Alpine.start()).
+       Script ini ikut ter-swap ulang tiap navigasi htmx boost ke halaman
+       lain yang pakai komponen ini; kalau nunggu 'alpine:init', registrasi
+       kedua-dst gak pernah jalan ⇒ "popFilter is not defined". Alpine.data()
+       aman dipanggil berkali-kali kapan pun (termasuk sesudah Alpine.start()). */
+    (() => {
         Alpine.data('popFilter', (cfg) => ({
             open: false,
             tab: 'cabang',
@@ -223,6 +229,6 @@
                 });
             },
         }));
-    });
+    })();
 </script>
 @endonce

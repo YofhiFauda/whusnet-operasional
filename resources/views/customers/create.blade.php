@@ -599,8 +599,11 @@
 <script>
     /* Skema 3 (2026-09-12) — autocomplete ID Referral Pelanggan, cari
        pelanggan existing lewat CID/nama. Nol dependency baru (vanilla fetch
-       + Alpine yang sudah dibundel), pola sama komponen Alpine lain di app. */
-    document.addEventListener('alpine:init', () => {
+       + Alpine yang sudah dibundel), pola sama komponen Alpine lain di app.
+       Alpine.data() dipanggil LANGSUNG, bukan digantung di 'alpine:init'
+       — event itu cuma nyala sekali seumur halaman; script ini ikut
+       ter-swap ulang tiap navigasi htmx boost balik ke halaman ini. */
+    (() => {
         Alpine.data('referralSearch', () => ({
             query: '',
             results: [],
@@ -619,7 +622,7 @@
                 this.results = [];
             },
         }));
-    });
+    })();
 
     /* ── Wizard Form Stepper & Live Validation Logic ── */
     let currentActiveStep = 1;

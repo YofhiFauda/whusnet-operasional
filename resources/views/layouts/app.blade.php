@@ -63,7 +63,37 @@
     @include('partials.web-fonts')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>
-<body hx-boost="true" class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
+{{--
+    hx-target/hx-select="#main-content": TANPA ini, boost default nge-swap
+    innerHTML SELURUH <body> (htmx getTarget() balik document.body kalau
+    boosted & tak ada hx-target eksplisit) — termasuk <x-toast/>, <x-dialog/>,
+    dan blok <script> global (toggle sidebar, format rupiah, dst.) yang
+    SEMUANYA ikut tertanam ulang & RE-EXECUTE tiap navigasi. Itu nyebabin
+    dua kelas bug nyata (ketauan user, console browser, 2026-11-04):
+    (1) `let formToastLock` di components/toast.blade.php SyntaxError
+    "Identifier ... already declared" begitu nav ke-2 — exception itu
+    synchronous, motong SELURUH loop insert-script htmx, jadi script
+    SESUDAHNYA (termasuk Alpine.data() registrasi punya halaman tujuan)
+    gak pernah jalan; (2) komponen `<x-ui.pop-filter>`/`<x-ui.wilayah-filter>`
+    daftar lewat `document.addEventListener('alpine:init', ...)` — event itu
+    HANYA sekali seumur halaman (saat Alpine.start()), re-insert script itu
+    via boost gak pernah bikin event itu nyala lagi, jadi `Alpine.data()`
+    gak pernah terdaftar ⇒ "popFilter is not defined" tiap x-data dievaluasi
+    di halaman baru. Scoping ke #main-content bikin toast/dialog/script
+    global CUMA dirender sekali (saat full page load asli), gak disentuh
+    lagi — konsisten sama alasan kenapa live-refresh (Task 2-6 ADHOC-263)
+    sengaja dibikin endpoint partial sempit, bukan full-body swap. @yield/
+    @stack('scripts') DIPINDAH ke dalam <main> (lihat di bawah) supaya
+    script per-halaman (listener Echo, Alpine.data register) IKUT tiap
+    swap & jalan fresh tiap nav — beda dari toast/dialog yang sengaja
+    singleton. Konsekuensi yang disadari: BADGE sidebar (notifikasi,
+    antrean) gak lagi ikut ter-refresh otomatis tiap nav boosted (dulu ikut
+    kebawa swap full-body) — badge tetap akurat di full reload/event
+    realtime yang sudah ada, cuma gak di navigasi biasa. Lihat juga perbaikan
+    pop-filter.blade.php/wilayah-filter.blade.php (Alpine.data() dipanggil
+    langsung, gak lagi digantung di 'alpine:init').
+--}}
+<body hx-boost="true" hx-target="#main-content" hx-select="#main-content" class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
 
 <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-sky-600 focus:text-white focus:rounded-lg focus:shadow-lg focus:font-semibold focus:text-xs">
     Lewati ke konten utama
@@ -1099,6 +1129,17 @@
              satu-satunya rute yang melepas padding+scroll <main> default. --}}
         <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto scroll-smooth focus:outline-none {{ Request::routeIs('network.map.*') ? '' : 'p-4 sm:p-6 lg:p-5 xl:p-8' }}">
             @yield('content')
+            {{--
+                @yield('scripts')/@stack('scripts') DIPINDAH ke sini (dalam
+                #main-content) — bukan di lokasi asli dekat </body> — supaya
+                ikut tersapu & jalan ulang tiap boosted swap (lihat komentar
+                hx-select di <body>). Script per-halaman MEMANG harus jalan
+                fresh tiap nav (listener Echo task/ticket/dashboard, dll),
+                beda dari <x-toast/>/<x-dialog/> yang sengaja singleton di
+                luar #main-content.
+            --}}
+            @yield('scripts')
+            @stack('scripts')
         </main>
     </div>
 </div>
@@ -1726,8 +1767,6 @@
     })();
 </script>
 
-@yield('scripts')
-@stack('scripts')
 <x-toast />
 <x-dialog />
 

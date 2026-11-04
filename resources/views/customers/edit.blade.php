@@ -873,8 +873,11 @@
 @section('scripts')
 <script>
     /* Skema 3 (2026-09-12) — autocomplete ID Referral Pelanggan (sama
-       komponen dengan customers/create.blade.php). */
-    document.addEventListener('alpine:init', () => {
+       komponen dengan customers/create.blade.php). Alpine.data() dipanggil
+       LANGSUNG, bukan digantung di 'alpine:init' — event itu cuma nyala
+       sekali seumur halaman; script ini ikut ter-swap ulang tiap navigasi
+       htmx boost balik ke halaman edit pelanggan ini. */
+    (() => {
         Alpine.data('referralSearch', () => ({
             query: @json(old('referral_customer_id') ? '' : ($customer->referralCustomer ? $customer->referralCustomer->customer_code.' — '.$customer->referralCustomer->full_name : '')),
             results: [],
@@ -893,7 +896,7 @@
                 this.results = [];
             },
         }));
-    });
+    })();
 
     /* ── Wizard Form Stepper & Live Validation Logic ── */
     let currentActiveStep = 1;

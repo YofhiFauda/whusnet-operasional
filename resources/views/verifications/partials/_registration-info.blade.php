@@ -176,13 +176,16 @@
                     <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-2xs transition-colors">Simpan Data Diri</button>
                 </div>
                 <script>
-                    // Prefill kecamatan/desa saat form dibuka pertama kali
-                    document.addEventListener('alpine:init', () => {
+                    // Prefill kecamatan/desa saat form dibuka pertama kali.
+                    // Dipanggil LANGSUNG (bukan digantung di 'alpine:init'
+                    // — event itu cuma sekali seumur halaman, gak nyala
+                    // lagi kalau blok ini dirender ulang lewat htmx boost).
+                    (() => {
                         const cityId = document.getElementById('verif-edit-city_id')?.value;
                         if (cityId) {
                             window.verifEditLoadDistricts(cityId, '{{ old('district_id', $customer->district_id) }}', '{{ old('village_id', $customer->village_id) }}');
                         }
-                    });
+                    })();
                 </script>
             </form>
         @endif

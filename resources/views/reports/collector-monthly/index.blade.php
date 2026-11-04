@@ -375,7 +375,10 @@
 </x-ui.modal>
 
 <script>
-    document.addEventListener('alpine:init', () => {
+    // Alpine.store() dipanggil LANGSUNG, bukan digantung di 'alpine:init'
+    // — event itu cuma nyala sekali seumur halaman; script ini ikut
+    // ter-swap ulang tiap navigasi htmx boost balik ke halaman ini.
+    (() => {
         Alpine.store('reportDetail', {
             loading: false,
             error: null,
@@ -445,7 +448,7 @@
                 return `{{ $detailExportUrl }}?period={{ $period }}&pop_id=${this.lastPopId}&block=${encodeURIComponent(this.lastBlock)}&column=${encodeURIComponent(this.lastColumn)}`;
             },
         });
-    });
+    })();
 
     function openReportDetail(popId, block, column, label) {
         Alpine.store('reportDetail').open(popId, block, column, label);

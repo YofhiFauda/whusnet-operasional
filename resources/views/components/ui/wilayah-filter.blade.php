@@ -156,9 +156,12 @@
 @once
 <script>
     /* Fase 5.4 - komponen filter wilayah (Kecamatan + Desa). Desa cascade dari
-       kecamatan terpilih (mencegah desa senama lintas kecamatan). Registrasi
-       sekali lewat alpine:init. Batch: pilih beberapa lalu "Terapkan". */
-    document.addEventListener('alpine:init', () => {
+       kecamatan terpilih (mencegah desa senama lintas kecamatan). Batch:
+       pilih beberapa lalu "Terapkan". Alpine.data() dipanggil LANGSUNG,
+       bukan digantung di 'alpine:init' — lihat alasan di pop-filter.blade.php,
+       pola & masalahnya identik ("wilayahFilter is not defined" tiap script
+       ini ter-swap ulang lewat htmx boost ke halaman kedua-dst). */
+    (() => {
         Alpine.data('wilayahFilter', (cfg) => ({
             open: false,
             tab: 'kec',
@@ -229,6 +232,6 @@
                 });
             },
         }));
-    });
+    })();
 </script>
 @endonce
