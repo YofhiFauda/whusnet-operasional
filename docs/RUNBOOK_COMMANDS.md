@@ -587,6 +587,62 @@ ketemu. Aman diulang — dry-run ulang pasca-apply harus hasilnya 0 diubah.
 php artisan app:customer-package-reconcile-excel "docs/database/excel/<file>.xlsx" --pop-name="<Nama POP>" --dry-run   # harus 0 diubah
 ```
 
+### `app:customer-serial-reconcile-excel` — selaraskan Serial Number dari rekap kegiatan Excel cabang
+
+Dipakai saat Serial Number (SN) modem/ONT yang tampil di Detail Pelanggan
+sudah usang — beda dengan rekap kegiatan lapangan Excel kolektor/teknisi
+cabang (mis. "SN-SAMBIT-26 - rekap kegiatan.xlsx"), baik karena SN-nya pernah
+diganti (kegiatan "ganti modem") maupun karena typo input manual.
+
+```bash
+php artisan app:customer-serial-reconcile-excel "docs/database/excel/<file>.xlsx" --pop-name="<Nama POP>"
+php artisan app:customer-serial-reconcile-excel "docs/database/excel/<file>.xlsx" --pop-name="<Nama POP>" --apply
+```
+
+**Selalu jalan tanpa `--apply` dulu** (default dry-run — cetak daftar
+perubahan, tidak menulis apa pun), baca hasilnya, baru tambahkan `--apply`.
+
+**Syarat kolom Excel** (header harus ada):
+
+| Kolom | Isi |
+|---|---|
+| `Kegiatan` | `psb` / `ganti modem` / dll — TIDAK dibedakan di command ini, lihat penjelasan "baris terakhir menang" di bawah |
+| `Tgl` | Tanggal kegiatan — dipakai menentukan baris mana yang terbaru per pelanggan |
+| `SN BARU` | SN yang berlaku setelah kegiatan itu — ini yang jadi kandidat nilai final |
+| `CID` | Dicocokkan ke `customers.cid` lewat **6 digit angka pertama** yang ditemukan di kolom ini (bukan di akhir — CID rekap manual diakhiri `_DESA_NAMA`, bukan digit), di dalam `pop_id` yang sama. Toleran typo prefix (`G1X1BRQ000006` di Excel vs `G00RQ000006` di DB tetap cocok, karena 6 digit angkanya sama) |
+
+**Baris terakhir menang**: per pelanggan (dikelompokkan oleh 6-digit CID),
+baris dengan `Tgl` **terbaru** yang dipakai, `SN BARU` baris itu jadi nilai
+final — baik baris itu `psb` maupun `ganti modem`, dan berapa kali pun
+rantai gantinya (ganti modem bisa berkali-kali, ambil ujung rantai).
+
+**Target tulis** ikut urutan cadangan yang sama dengan Detail Pelanggan:
+`customer_devices.serial_number` kalau baris itu sudah ada → kalau tidak,
+`customer_technical_details.router_or_ont_serial` → kalau tidak ada juga,
+fallback `customers.ont_sn`. Command ini **tidak** membuat baris
+`customer_devices` baru.
+
+**Tidak pernah disentuh**: pelanggan yang SN-nya berasal dari Inventori
+Gudang (`InventorySerial` status `installed`) — itu dikelola lewat alur
+Gudang (Reassign/Transfer/dll), menimpa langsung di sini bikin data Gudang &
+Detail Pelanggan menyimpang. Baris begini muncul di tabel "Dilewati".
+
+**Kalau ada CID yang mau dilewatkan atau dikoreksi manual** (CID ambigu/gak
+ketemu otomatis, atau perlu set SN tertentu tanpa lewat Excel) — pakai
+`--config=path/ke/config.json`:
+
+```json
+{
+  "skip_cids": ["G1X1BRQ000090"],
+  "manual_overrides": { "G00RQ000091": "SNBENERNYA123" }
+}
+```
+
+```bash
+# Verifikasi idempoten setelah apply:
+php artisan app:customer-serial-reconcile-excel "docs/database/excel/<file>.xlsx" --pop-name="<Nama POP>"   # harus 0 diubah
+```
+
 ### `billing:backfill-activation-date` — betulkan tanggal aktivasi lama
 
 ```bash

@@ -26,6 +26,7 @@ use Database\Seeders\RoleSeeder;
 use Database\Seeders\WarehouseFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use PHPUnit\Framework\Attributes\Test;
+use Spatie\SimpleExcel\SimpleExcelReader;
 use Tests\TestCase;
 
 class WarehouseMaterialUsageReportTest extends TestCase
@@ -401,6 +402,99 @@ class WarehouseMaterialUsageReportTest extends TestCase
         $response->assertSee('Warga Siman');
         $response->assertDontSee('DC-KAUMAN-001');
         $response->assertDontSee('Warga Kauman');
+    }
+
+    /**
+     * Regresi OOM (laporan 2026-11-04, `warehouse/usage?preset=all`) — `fetchUnifiedUsageEntries()`
+     * dulu `->get()` seluruh baris sekaligus + eager load relasi berat, meledak di 512MB kalau
+     * datanya banyak. Sekarang pakai `chunkById()` per sumber. 600 baris (> ukuran chunk 500)
+     * sengaja dipakai supaya test gagal kalau ada baris hilang/dobel lintas batas chunk.
+     */
+    #[Test]
+    public function large_dataset_across_chunk_boundary_is_fully_aggregated(): void
+    {
+        $customer = Customer::factory()->create(['pop_id' => $this->popSiman->id, 'full_name' => 'Pelanggan Banyak']);
+        $fopTask = FopTask::create([
+            'task_number' => 'TSK-CHUNK-001',
+            'tugas' => 'Pemasangan Chunk',
+            'category' => TaskType::PEMASANGAN->value,
+            'pop_id' => $this->popSiman->id,
+            'customer_id' => $customer->id,
+            'status' => 'selesai',
+        ]);
+
+        $total = 600;
+        for ($i = 1; $i <= $total; $i++) {
+            TaskMaterial::create([
+                'fop_task_id' => $fopTask->id,
+                'customer_id' => $customer->id,
+                'kind' => MaterialKind::TERPAKAI->value,
+                'item_id' => $this->patchcordItem->id,
+                'item_type' => 'material_pasif',
+                'item_name' => $this->patchcordItem->name,
+                'qty' => 1,
+                'unit' => 'pcs',
+                'created_at' => now(),
+            ]);
+        }
+
+        $response = $this->actingAs($this->owner)
+            ->get(route('warehouse.usage.index', ['preset' => 'today']))
+            ->assertOk();
+
+        $response->assertViewHas('kpi', fn (array $kpi) => (float) $kpi['passive_count'] === (float) $total);
+        $response->assertViewHas('itemSummaries', fn ($summaries) => (float) $summaries->firstWhere('item_name', $this->patchcordItem->name)['total_qty'] === (float) $total);
+    }
+
+    /**
+     * Regresi — `export()` sekarang streaming (`streamUsageEntries()`, batch 5.000/sumber,
+     * lihat ADHOC-265) BUKAN lagi `fetchUnifiedUsageEntries()->get()` ditumpuk dulu sebelum
+     * ditulis. 600 baris (lintas 1 batch DB internal 500 tapi di bawah batch export 5.000)
+     * dipakai supaya korelasi agregat Sheet 2 ("Rekap per Barang") tetap akurat walau
+     * ditulis langsung per baris tanpa pernah menyimpan koleksi penuh.
+     */
+    #[Test]
+    public function export_large_dataset_keeps_sheet_totals_accurate(): void
+    {
+        $customer = Customer::factory()->create(['pop_id' => $this->popSiman->id, 'full_name' => 'Pelanggan Export Banyak']);
+        $fopTask = FopTask::create([
+            'task_number' => 'TSK-EXPCHUNK-001',
+            'tugas' => 'Pemasangan Export Chunk',
+            'category' => TaskType::PEMASANGAN->value,
+            'pop_id' => $this->popSiman->id,
+            'customer_id' => $customer->id,
+            'status' => 'selesai',
+        ]);
+
+        $total = 600;
+        for ($i = 1; $i <= $total; $i++) {
+            TaskMaterial::create([
+                'fop_task_id' => $fopTask->id,
+                'customer_id' => $customer->id,
+                'kind' => MaterialKind::TERPAKAI->value,
+                'item_id' => $this->patchcordItem->id,
+                'item_type' => 'material_pasif',
+                'item_name' => $this->patchcordItem->name,
+                'qty' => 1,
+                'unit' => 'pcs',
+                'created_at' => now(),
+            ]);
+        }
+
+        $response = $this->actingAs($this->owner)
+            ->get(route('warehouse.usage.export', ['preset' => 'today']));
+
+        $response->assertOk();
+        $this->assertStringContainsString('application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', $response->headers->get('Content-Type'));
+
+        $tmpFile = tempnam(sys_get_temp_dir(), 'usage-export-');
+        file_put_contents($tmpFile, $response->streamedContent());
+        $rows = SimpleExcelReader::create($tmpFile, 'xlsx')->fromSheetName('Rekap per Barang')->getRows();
+        $patchcordRow = $rows->first(fn ($row) => $row['Nama Barang'] === $this->patchcordItem->name);
+        unlink($tmpFile);
+
+        $this->assertNotNull($patchcordRow);
+        $this->assertSame((float) $total, (float) $patchcordRow['Total Terpakai']);
     }
 
     #[Test]

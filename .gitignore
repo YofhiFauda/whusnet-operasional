@@ -41,3 +41,5 @@ Thumbs.db
 # Lighthouse CI — laporan hasil audit lokal, gak perlu dicommit.
 /lighthouse-reports/
 /.lighthouseci/
+.gemini
+
