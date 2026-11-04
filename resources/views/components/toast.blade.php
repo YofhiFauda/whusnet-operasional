@@ -1,7 +1,18 @@
 <!-- Global Toast Container -->
 <div id="toast-container" class="fixed top-6 right-6 z-50 w-[calc(100%-3rem)] sm:w-[350px] h-0 pointer-events-none"></div>
 
-<script>
+{{--
+    id + hx-preserve="true": hx-boost="true" global di <body> (layouts/app.blade.php)
+    nge-swap SELURUH <body> tiap nav, termasuk script ini. `let formToastLock`
+    di bawah adalah top-level — re-insert via boost (bukan reload asli) bikin
+    SyntaxError "Identifier ... already declared" begitu nav ke-2, synchronous,
+    motong seluruh loop insert-script htmx setelahnya (ketauan dari console
+    browser user, 2026-11-04). hx-preserve bikin htmx PERTAHANKAN node lama
+    (sudah jalan, listener-nya sudah terpasang) & abaikan yang baru — jadi
+    tidak pernah re-execute. Jangan dihapus walau script-nya "cuma" assignment
+    `window.Toast = {...}` — tetap ada `let formToastLock` top-level di bawah.
+--}}
+<script id="toast-script" hx-preserve="true">
     window.Toast = {
         toasts: [],
         isHovered: false,

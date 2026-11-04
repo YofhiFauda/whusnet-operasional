@@ -235,11 +235,14 @@
     // tab Pemasangan yang cuma 1 pelanggan per halaman). openQrPeek()
     // dipanggil dari tombol tiap baris (queue-actions.blade.php) dengan
     // URL yang SUDAH dirender server-side (route()) — bukan dirakit di sini.
-    // Alpine.store() dipanggil LANGSUNG, bukan digantung di 'alpine:init'
-    // — event itu cuma nyala sekali seumur halaman; script ini ikut
-    // ter-swap ulang tiap navigasi htmx boost balik ke halaman ini, dan
-    // registrasi store harus jalan lagi tiap kali, bukan cuma sekali.
-    (() => {
+    // Registrasi dibungkus fungsi yang CEK dulu `window.Alpine`: hx-boost
+    // nge-swap SELURUH <body> tiap nav, jadi script ini ikut ter-insert
+    // ulang di halaman kedua-dst — pada titik itu Alpine SUDAH start,
+    // daftar langsung. Di load pertama (bukan boost), body biasanya
+    // kebaca SEBELUM module Alpine dari @@vite jalan ⇒ window.Alpine belum
+    // ada ⇒ tunggu 'alpine:init' (nyala sekali, pas sebelum Alpine.start()).
+    (function () {
+        const register = () => {
         Alpine.store('qrPeek', {
             loading: false,
             issuing: false,
@@ -287,6 +290,13 @@
                 }
             },
         });
+        };
+
+        if (window.Alpine) {
+            register();
+        } else {
+            document.addEventListener('alpine:init', register, { once: true });
+        }
     })();
 
     /**

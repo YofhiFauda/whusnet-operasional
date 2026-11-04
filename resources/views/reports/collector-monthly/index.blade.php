@@ -375,10 +375,14 @@
 </x-ui.modal>
 
 <script>
-    // Alpine.store() dipanggil LANGSUNG, bukan digantung di 'alpine:init'
-    // — event itu cuma nyala sekali seumur halaman; script ini ikut
-    // ter-swap ulang tiap navigasi htmx boost balik ke halaman ini.
-    (() => {
+    // Registrasi dibungkus fungsi yang CEK dulu `window.Alpine`: hx-boost
+    // nge-swap SELURUH <body> tiap nav, jadi script ini ikut ter-insert
+    // ulang di halaman kedua-dst — pada titik itu Alpine SUDAH start,
+    // daftar langsung. Di load pertama (bukan boost), body biasanya kebaca
+    // SEBELUM module Alpine dari @@vite jalan ⇒ window.Alpine belum ada ⇒
+    // tunggu 'alpine:init' (nyala sekali, pas sebelum Alpine.start()).
+    (function () {
+        const register = () => {
         Alpine.store('reportDetail', {
             loading: false,
             error: null,
@@ -448,6 +452,13 @@
                 return `{{ $detailExportUrl }}?period={{ $period }}&pop_id=${this.lastPopId}&block=${encodeURIComponent(this.lastBlock)}&column=${encodeURIComponent(this.lastColumn)}`;
             },
         });
+        };
+
+        if (window.Alpine) {
+            register();
+        } else {
+            document.addEventListener('alpine:init', register, { once: true });
+        }
     })();
 
     function openReportDetail(popId, block, column, label) {
