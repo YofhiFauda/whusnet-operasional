@@ -375,17 +375,18 @@
             <div class="overflow-x-auto custom-scrollbar">
                 <table class="w-full text-left text-xs border-collapse whitespace-nowrap">
                     <thead class="bg-slate-50/60 dark:bg-slate-800/40 text-slate-400 dark:text-slate-500 border-b border-slate-100 dark:border-slate-800/80">
+                        @php $sortDir = request()->query('dir', 'asc'); @endphp
                         <tr class="text-left font-bold uppercase tracking-wider text-[10px]">
-                            <th class="px-3.5 py-3">Waktu Masuk</th>
-                            <th class="px-3.5 py-3">Tiket</th>
-                            <th class="px-3.5 py-3">Pelanggan / CID</th>
+                            <x-sortable-th sort-key="created_at" label="Waktu Masuk" class="px-3.5 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
+                            <x-sortable-th sort-key="ticket_number" label="Tiket" class="px-3.5 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
+                            <x-sortable-th sort-key="customer" label="Pelanggan / CID" class="px-3.5 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
                             <th class="px-3.5 py-3">Kontak &amp; Lokasi</th>
-                            <th class="px-3.5 py-3">POP</th>
-                            <th class="px-3.5 py-3 min-w-[200px]">Aduan Keluhan</th>
-                            <th class="px-3.5 py-3">Kategori</th>
-                            <th class="px-3.5 py-3">Prioritas</th>
+                            <x-sortable-th sort-key="pop" label="POP" class="px-3.5 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
+                            <x-sortable-th sort-key="detail_keluhan" label="Aduan Keluhan" class="px-3.5 py-3 min-w-[200px]" :current-sort="$activeSort" :current-dir="$sortDir" />
+                            <x-sortable-th sort-key="issue_category" label="Kategori" class="px-3.5 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
+                            <x-sortable-th sort-key="priority" label="Prioritas" class="px-3.5 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
                             @if($tab === 'assign_fop')
-                                <th class="px-3.5 py-3">Status</th>
+                                <x-sortable-th sort-key="status" label="Status" class="px-3.5 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
                                 <th class="px-3.5 py-3" title="Kapan tiket diserahkan ke FOP">Diserahkan</th>
                                 <th class="px-3.5 py-3" title="Yang mengirim tiket ke FOP">Dikirim Oleh</th>
                             @else

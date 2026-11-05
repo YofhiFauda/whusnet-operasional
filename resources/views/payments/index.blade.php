@@ -240,15 +240,16 @@
             <table class="w-full border-collapse text-left text-xs text-text-secondary">
                 <thead>
                     <tr class="bg-surface-muted/60 border-b border-border text-text-muted font-bold text-[10px] uppercase tracking-wider">
+                        @php $sortDir = request()->query('dir', 'asc'); @endphp
                         <th class="px-4 py-3 w-10 text-center">No</th>
-                        <th class="px-4 py-3">No. Transaksi</th>
-                        <th class="px-4 py-3">No. Invoice</th>
-                        <th class="px-4 py-3">Pelanggan</th>
-                        <th class="px-4 py-3">POP / Cabang</th>
-                        <th class="px-4 py-3">Tanggal</th>
-                        <th class="px-4 py-3">Metode</th>
+                        <x-sortable-th sort-key="payment_number" label="No. Transaksi" class="px-4 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="invoice" label="No. Invoice" class="px-4 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="customer" label="Pelanggan" class="px-4 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="pop" label="POP / Cabang" class="px-4 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="payment_date" label="Tanggal" class="px-4 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="payment_method" label="Metode" class="px-4 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
                         <th class="px-4 py-3">Penerima / Kolektor</th>
-                        <th class="px-4 py-3 text-right">Nominal (Rp)</th>
+                        <x-sortable-th sort-key="amount" label="Nominal (Rp)" align="right" class="px-4 py-3" :current-sort="$activeSort" :current-dir="$sortDir" />
                         <th class="px-4 py-3 text-center w-16">Aksi</th>
                     </tr>
                 </thead>

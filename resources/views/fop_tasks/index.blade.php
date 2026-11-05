@@ -352,15 +352,16 @@
                         <th class="w-8 px-2.5 py-2.5 text-center">
                             <input type="checkbox" @change="toggleSelectAll($event.target.checked)" :checked="isAllSelected()" class="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-sky-600 focus:ring-sky-500 cursor-pointer">
                         </th>
-                        <th class="px-3 py-2.5">Kategori</th>
-                        <th class="px-3 py-2.5">Tanggal</th>
-                        <th class="px-3 py-2.5">Tugas</th>
-                        <th class="px-3 py-2.5">Area</th>
-                        <th class="px-3 py-2.5">Issue</th>
+                        @php $sortDir = request()->query('dir', 'asc'); @endphp
+                        <x-sortable-th sort-key="category" label="Kategori" class="px-3 py-2.5" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="task_date" label="Tanggal" class="px-3 py-2.5" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="tugas" label="Tugas" class="px-3 py-2.5" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="area" label="Area" class="px-3 py-2.5" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="issue" label="Issue" class="px-3 py-2.5" :current-sort="$activeSort" :current-dir="$sortDir" />
                         <th class="px-3 py-2.5">Teknisi</th>
-                        <th class="px-3 py-2.5">Team</th>
-                        <th class="px-3 py-2.5">Status</th>
-                        <th class="px-3 py-2.5">Prioritas</th>
+                        <x-sortable-th sort-key="team" label="Team" class="px-3 py-2.5" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="status" label="Status" class="px-3 py-2.5" :current-sort="$activeSort" :current-dir="$sortDir" />
+                        <x-sortable-th sort-key="priority" label="Prioritas" class="px-3 py-2.5" :current-sort="$activeSort" :current-dir="$sortDir" />
                         <th class="px-3 py-2.5 text-right">Aksi</th>
                     </tr>
                 </thead>

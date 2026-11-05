@@ -8,6 +8,7 @@ use App\Enums\PaymentMethod;
 use App\Enums\PaymentStatus;
 use App\Events\CollectorActivityUpdated;
 use App\Models\BankAccount;
+use App\Models\Customer;
 use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
@@ -21,6 +22,7 @@ use App\Support\LikeSearch;
 use App\Support\Money;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
+use App\Support\SortRequest;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -50,9 +52,7 @@ class PaymentController extends Controller
 
         $query = Payment::query()
             ->applyUserScope()
-            ->with(['invoice', 'customer', 'pop', 'receiver', 'collector', 'bankAccount', 'collectorDeposit', 'cashDeposit'])
-            ->latest('payment_date')
-            ->latest('id');
+            ->with(['invoice', 'customer', 'pop', 'receiver', 'collector', 'bankAccount', 'collectorDeposit', 'cashDeposit']);
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
@@ -112,6 +112,28 @@ class PaymentController extends Controller
             });
         }
 
+        // Sort header tabel. Kolom "Penerima/Kolektor" SENGAJA tidak dibuatkan
+        // sort — nilainya dari 2 relasi berbeda (receiver ATAU collector,
+        // salah satu), ambigu jadi satu kolom (keputusan user 2026-11-05).
+        $activeSort = SortRequest::apply($request, $query, [
+            'payment_number' => 'payment_number',
+            'invoice' => fn ($q, $dir) => $q->orderBy(
+                Invoice::select('invoice_number')->whereColumn('invoices.id', 'payments.invoice_id'), $dir
+            ),
+            'customer' => fn ($q, $dir) => $q->orderBy(
+                Customer::select('full_name')->whereColumn('customers.id', 'payments.customer_id'), $dir
+            ),
+            'pop' => fn ($q, $dir) => $q->orderBy(
+                Pop::select('name')->whereColumn('pops.id', 'payments.pop_id'), $dir
+            ),
+            'payment_date' => 'payment_date',
+            'payment_method' => 'payment_method',
+            'amount' => 'amount',
+        ]);
+        if ($activeSort === null) {
+            $query->latest('payment_date')->latest('id');
+        }
+
         $payments = $query->paginate(10)->withQueryString();
         // Dropdown filter POP cuma buat pilih Cabang — Pusat & Mini POP bukan
         // satuan billing (permintaan user 2026-11-03).
@@ -119,6 +141,7 @@ class PaymentController extends Controller
 
         return view('payments.index', compact(
             'payments',
+            'activeSort',
             'pops',
             'search',
             'popId',

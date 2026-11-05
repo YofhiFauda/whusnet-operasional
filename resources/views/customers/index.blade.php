@@ -41,7 +41,11 @@
 {{-- ────────────────────────────────────────────────────────────
      MAIN DATA CONTAINER: TABLE VIEW (DESKTOP) & CARD VIEW (MOBILE)
 ──────────────────────────────────────────────────────────── --}}
-<section aria-labelledby="heading-tabel-pelanggan" class="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden mb-6">
+{{-- `[contain:layout]` ngisolasi tabel ini dari reflow Card KPI/Filter di atasnya
+     (x-collapse animasi height = browser hitung ulang layout semua yang di bawahnya
+     tiap frame). Dengan containment, tabel cuma digeser posisinya, isinya gak
+     dihitung ulang — animasi buka/tutup Card jadi jauh lebih ringan. --}}
+<section aria-labelledby="heading-tabel-pelanggan" class="[contain:layout] bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden mb-6">
     <h2 id="heading-tabel-pelanggan" class="sr-only">Tabel Data Pelanggan</h2>
     @if(!empty($statusGroup))
     {{-- Header grup survey/verification. Grup failed/terminated tidak lewat sini
