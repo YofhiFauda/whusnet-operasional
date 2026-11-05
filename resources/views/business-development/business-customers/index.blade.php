@@ -50,7 +50,7 @@
                     Paket Bisnis
                 </span>
             </div>
-            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
+            <p class="hidden sm:block text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
                 Otomatis dari data pelanggan berkategori paket Bisnis (Master Kategori Paket) — harga bulanan sebelum/sesudah PPN, biaya instalasi, serta perangkat terpasang di lokasi.
             </p>
         </div>

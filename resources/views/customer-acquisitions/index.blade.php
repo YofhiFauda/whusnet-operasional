@@ -29,18 +29,8 @@
                 <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 border border-sky-200/80 dark:border-sky-800/60 font-mono">
                     {{ $totalCount }} Pelanggan
                 </span>
-                @if($isCurrentPeriode)
-                    <span class="inline-flex items-center gap-1.5 px-2.5 py-0.5 rounded-full text-xs font-semibold bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/80 dark:border-emerald-800/60">
-                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                        Bulan Berjalan
-                    </span>
-                @else
-                    <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-400 border border-slate-200 dark:border-slate-700">
-                        Arsip
-                    </span>
-                @endif
             </div>
-            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
+            <p class="hidden sm:block text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
                 Monitoring akuisisi pelanggan baru aktif per bulan verifikasi, perhitungan DPP net PPN 11%, dan validasi tagihan instalasi kategori bisnis.
             </p>
         </div>
@@ -87,60 +77,60 @@
     {{-- ── LAYER 2: SUMMARY STRIP (TYPE A — FLAT BAR WITH 1 ENCLOSING CONTAINER) ── --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700/60 rounded-lg shadow-2xs mb-5 overflow-hidden">
         {{-- Total Pelanggan --}}
-        <div class="p-3.5 sm:p-4 border-b lg:border-b-0 border-r border-slate-200/60 dark:border-slate-700/50">
+        <div class="p-2.5 sm:p-4 border-b lg:border-b-0 border-r border-slate-200/60 dark:border-slate-700/50">
             <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Total Pelanggan Baru
             </span>
             <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-xl sm:text-2xl font-bold font-mono text-slate-900 dark:text-slate-100">
+                <span class="text-lg sm:text-2xl font-bold font-mono text-slate-900 dark:text-slate-100">
                     {{ number_format($totalCount) }}
                 </span>
-                <span class="text-[11px] text-slate-400 dark:text-slate-500">
+                <span class="hidden sm:inline text-[11px] text-slate-400 dark:text-slate-500">
                     terverifikasi
                 </span>
             </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            <p class="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Periode {{ \Carbon\Carbon::createFromFormat('Y-m', $periode)->locale('id')->translatedFormat('F Y') }}
             </p>
         </div>
 
         {{-- Total Biaya Langganan --}}
-        <div class="p-3.5 sm:p-4 border-b lg:border-b-0 lg:border-r border-slate-200/60 dark:border-slate-700/50">
+        <div class="p-2.5 sm:p-4 border-b lg:border-b-0 lg:border-r border-slate-200/60 dark:border-slate-700/50">
             <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Total Biaya Langganan
             </span>
             <div class="mt-1">
-                <span class="text-lg sm:text-xl font-bold font-mono text-slate-900 dark:text-slate-100 truncate block">
+                <span class="text-sm sm:text-xl font-bold font-mono text-slate-900 dark:text-slate-100 truncate block">
                     {{ \App\Helpers\FormatHelper::rupiah($totalLangganan) }}
                 </span>
             </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            <p class="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Total tagihan bulanan bruto
             </p>
         </div>
 
         {{-- Total DPP (Net PPN) --}}
-        <div class="p-3.5 sm:p-4 border-r border-slate-200/60 dark:border-slate-700/50">
+        <div class="p-2.5 sm:p-4 border-r border-slate-200/60 dark:border-slate-700/50">
             <span class="block text-[10px] font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400">
                 Total DPP (Net PPN 11%)
             </span>
             <div class="mt-1">
-                <span class="text-lg sm:text-xl font-bold font-mono text-sky-600 dark:text-sky-400 truncate block">
+                <span class="text-sm sm:text-xl font-bold font-mono text-sky-600 dark:text-sky-400 truncate block">
                     {{ \App\Helpers\FormatHelper::rupiah($totalDpp) }}
                 </span>
             </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            <p class="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Pendapatan sebelum PPN 11%
             </p>
         </div>
 
         {{-- Biaya Instalasi Terbit / Pending --}}
-        <div class="p-3.5 sm:p-4">
+        <div class="p-2.5 sm:p-4">
             <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Tagihan Instalasi Bisnis
             </span>
             <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-lg sm:text-xl font-bold font-mono text-slate-900 dark:text-slate-100 truncate">
+                <span class="text-sm sm:text-xl font-bold font-mono text-slate-900 dark:text-slate-100 truncate">
                     {{ \App\Helpers\FormatHelper::rupiah($totalInstalasi) }}
                 </span>
             </div>
@@ -151,7 +141,7 @@
                 @if($pendingValidationCount > 0)
                     <span class="text-slate-300 dark:text-slate-600">·</span>
                     <span class="text-amber-600 dark:text-amber-400 font-medium">
-                        {{ $pendingValidationCount }} Perlu Validasi
+                        {{ $pendingValidationCount }} Validasi
                     </span>
                 @endif
             </div>
@@ -159,8 +149,31 @@
     </div>
 
     {{-- ── LAYER 2: FILTER BAR (NAKED — NO ENCLOSING CARD) ── --}}
-    <div class="mb-5">
-        <form action="{{ route('customer-acquisitions.index') }}" method="GET" class="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
+    @php
+        $activeFilterCount = ($roleId ? 1 : 0) + ($salesUserId ? 1 : 0) + ($search !== '' ? 1 : 0);
+    @endphp
+    <div class="mb-5" x-data="{ showFilter: {{ $activeFilterCount > 0 ? 'true' : 'false' }} }">
+        {{-- Mobile-only toggle: filter bar expand/collapse biar hemat ruang vertikal --}}
+        <button type="button"
+                @click="showFilter = !showFilter"
+                class="lg:hidden w-full flex items-center justify-between px-3 py-2 mb-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <span class="inline-flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 4a1 1 0 011-1h16a1 1 0 01.8 1.6l-6.3 8.4v5.2a1 1 0 01-1.45.9l-3-1.5A1 1 0 019.5 17v-3L3.2 5.6A1 1 0 013 4z"/>
+                </svg>
+                Filter &amp; Pencarian
+                @if($activeFilterCount > 0)
+                    <span class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-sky-600 text-white text-[10px] font-bold">{{ $activeFilterCount }}</span>
+                @endif
+            </span>
+            <svg class="w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform" :class="{ 'rotate-180': showFilter }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
+
+        <form action="{{ route('customer-acquisitions.index') }}" method="GET"
+              :class="showFilter ? 'flex' : 'hidden lg:flex'"
+              class="flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3">
             {{-- Dropdown Filters --}}
             <div class="grid grid-cols-1 sm:grid-cols-3 gap-2.5 flex-1 max-w-3xl">
                 {{-- Periode Selector --}}

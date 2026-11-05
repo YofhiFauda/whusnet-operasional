@@ -2612,7 +2612,7 @@
                       "height": 881
                     },
                     "snippet": "<div x-data=\"{\n        tab: 'topologi',\n        serverTab: 'topologi',\n        selected…\" class=\"isp-infra flex h-full w-full flex-col bg-[#f8fafc] text-slate-900 dark:bg-…\">",
-                    "nodeLabel": "PETA JARINGAN & TOPOLOGI DISTRIBUSI\n\nPeta Infrastruktur ISP\n\nKapasitas, slot ko…"
+                    "nodeLabel": "PETA JARINGAN & TOPOLOGI DISTRIBUSI\n\nPeta Infrastruktur\n\nKapasitas, slot ko…"
                   }
                 }
               ]

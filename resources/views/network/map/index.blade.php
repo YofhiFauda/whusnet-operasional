@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Peta Infrastruktur ISP')
-@section('page_title', 'Peta Infrastruktur ISP')
+@section('title', 'Peta Infrastruktur')
+@section('page_title', 'Peta Infrastruktur')
 
 @section('content')
 {{-- Font IBM Plex dimuat async (bukan @import di <style>, yang memblokir render dan
@@ -870,7 +870,7 @@
          class="sticky top-0 z-20 flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/95">
         <div class="flex items-center gap-2">
             <span class="inline-flex size-2 rounded-full bg-emerald-500"></span>
-            <h1 class="font-display text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">Peta Infrastruktur ISP</h1>
+            <h1 class="font-display text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">Peta Infrastruktur</h1>
         </div>
 
         <div role="tablist" aria-label="Tampilan Utama" class="flex items-center rounded-xl border border-slate-200/80 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/60">
@@ -920,7 +920,7 @@
          (di LUAR <nav>, sebagai saudara) dianggap "di luar" nav — klik buka FAB
          langsung kebaca juga sebagai "klik di luar" dan nav ketutup lagi di event
          yang sama → kelihatan kayak tombolnya gak bisa ditekan. --}}
-    <div class="contents" x-show="tab === 'topologi'" @click.outside="mobileNavOpen = false">
+    <div class="contents" x-show="tab === 'topologi'" x-cloak @click.outside="mobileNavOpen = false">
         <button type="button"
                 x-show="!drawerOpen && !mobileNavOpen"
                 @click="mobileNavOpen = true; mobileDockOpen = false"
@@ -1040,7 +1040,7 @@
          nav kepotong/ketutup HUD. Di bawah `sm` HUD dipadatkan jadi ikon +
          badge kritis saja (rincian lengkap tetap ada di popover saat disentuh),
          dan nav di atas dikasih jatah lebar (max-w) yang pas buat versi padat ini. -->
-    <div class="absolute top-3 right-3 z-30 flex items-center gap-2 pointer-events-auto" x-show="tab === 'topologi'" @click.outside="statsOpen = false">
+    <div class="absolute top-3 right-3 z-30 flex items-center gap-2 pointer-events-auto" x-show="tab === 'topologi'" x-cloak @click.outside="statsOpen = false">
         <!-- METRICS HUD BUTTON & DROPDOWN -->
         <div class="relative">
             <button
@@ -1133,7 +1133,7 @@
         <main class="h-full w-full min-w-0 bg-[#f8fafc] dark:bg-[#0c1319] flex flex-col">
 
             <!-- TAB 1: TOPOLOGI (SVG CANVAS FULL FOCUS) -->
-            <section x-show="tab === 'topologi'" class="relative flex-1 flex flex-col min-h-0 h-full w-full overflow-hidden">
+            <section x-show="tab === 'topologi'" x-cloak class="relative flex-1 flex flex-col min-h-0 h-full w-full overflow-hidden">
                 <!-- FLOATING LAZY HINT -->
                 <div x-show="lazyHint || ontProgress" x-cloak x-transition class="absolute top-16 left-1/2 -translate-x-1/2 z-30 pointer-events-auto max-w-lg rounded-xl border border-amber-300 bg-amber-50/95 px-4 py-2 text-xs font-medium text-amber-900 shadow-lg backdrop-blur-md dark:border-amber-700/60 dark:bg-amber-950/90 dark:text-amber-200">
                     <p x-text="lazyHint || ontProgress"></p>

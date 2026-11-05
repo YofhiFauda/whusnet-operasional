@@ -44,7 +44,12 @@
             <div>
                 <label class="mb-2 block text-[10px] font-bold uppercase tracking-wider text-text-muted">1. Tipe Perangkat / Titik</label>
                 <div class="grid grid-cols-3 gap-2 sm:grid-cols-6">
-                    @foreach($nodeTypes->reject(fn ($type) => $type->code === 'odp') as $nodeType)
+                    {{-- Kode posisi (olt_slot/olt_pon/switch_slot/switch_port) dikecualikan juga —
+                         itu konsep struktural yang sudah diwakili tombol statis SLOT/PON di bawah,
+                         bukan tipe yang dibuat lewat form node umum (NetworkNodeController::store()
+                         malah menolaknya, lihat positionTypeCodes()). Tanpa ini tombolnya dobel
+                         dengan SLOT/PON statis dan submit-nya pasti gagal validasi. --}}
+                    @foreach($nodeTypes->reject(fn ($type) => $type->code === 'odp' || in_array($type->code, \App\Models\NetworkNode::positionTypeCodes(), true)) as $nodeType)
                         <button type="button" data-device-type="{{ $nodeType->code }}" @click="chooseCreateType('{{ $nodeType->code }}')" @disabled(! auth()->user()->hasPermission('network_nodes.create'))
                                 :class="createType === '{{ $nodeType->code }}' ? 'border-sky-600 bg-sky-50 dark:bg-sky-950/60 text-sky-700 dark:text-sky-300 font-bold shadow-2xs' : 'border-border bg-surface text-text-secondary hover:bg-surface-muted font-semibold'"
                                 class="rounded-lg border p-2.5 text-xs text-center transition-colors cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed">
