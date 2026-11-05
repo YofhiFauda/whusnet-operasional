@@ -102,9 +102,10 @@ class AdminCashBalanceService
         // bayar 3 bulan sekaligus lewat invoice BULANAN) hilang dari
         // kewajiban setor — admin pegang uang lebih tapi sistem bilang tak
         // ada yang harus disetor.
-        $dariManual = Money::sum(
-            $this->unsettledManualPaymentsQuery($admin)->get(['id', 'amount', 'balance_used_amount', 'overpay_amount'])->map(fn (Payment $p) => $p->physicalAmount())
-        );
+        $dariManual = Money::of($this->unsettledManualPaymentsQuery($admin)
+            ->selectRaw('COALESCE(SUM(amount - COALESCE(balance_used_amount, 0) + COALESCE(overpay_amount, 0)), 0) AS total')
+            ->toBase()
+            ->first()?->total ?? 0);
 
         return Money::add($dariKolektor, $dariManual);
     }
@@ -134,21 +135,19 @@ class AdminCashBalanceService
             ->where('payment_method', '!=', 'cash')
             ->where('payment_method', '!=', PaymentMethod::SALDO->value)
             ->whereBetween('payment_date', [$sejak, $sampai])
-            ->get(['payment_method', 'amount', 'balance_used_amount', 'overpay_amount']);
-
-        // `Payment::physicalAmount()` per baris (ADHOC-92 G4) — payment
-        // transfer yang sebagian ditutup pakai saldo manual tidak menghitung
-        // porsi saldonya, TAPI kelebihan transfer (`overpay_amount`) ikut
-        // dihitung karena uangnya beneran mendarat di rekening.
-        $fisik = fn (Collection $group) => Money::sum($group->map(fn (Payment $p) => $p->physicalAmount()));
-
-        $perMetode = $baris
+            ->selectRaw('payment_method, SUM(amount - COALESCE(balance_used_amount, 0) + COALESCE(overpay_amount, 0)) AS total')
             ->groupBy('payment_method')
-            ->map($fisik)
+            ->toBase()
+            ->get();
+
+        // DECIMAL SQL setara dengan physicalAmount(): porsi saldo dikeluarkan,
+        // kelebihan transfer tetap dihitung sebagai uang yang masuk rekening.
+        $perMetode = $baris
+            ->mapWithKeys(fn ($row) => [$row->payment_method => Money::of($row->total)])
             ->all();
 
         return [
-            'total' => $fisik($baris),
+            'total' => Money::sum($perMetode),
             'per_metode' => $perMetode,
         ];
     }

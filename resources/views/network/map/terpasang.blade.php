@@ -136,7 +136,6 @@
                             <th class="px-4 py-3">Posisi</th>
                             <th class="px-4 py-3">Tanggal Pasang</th>
                             <th class="px-4 py-3">Teknisi</th>
-                            <th class="px-4 py-3">Task</th>
                         </tr>
                     </thead>
                     <tbody class="divide-y divide-slate-200 dark:divide-slate-800">
@@ -144,22 +143,23 @@
                             <tr data-asset-row class="hover:bg-sky-50/70 dark:hover:bg-sky-950/30">
                                 <td class="px-4 py-3 font-medium text-slate-900 dark:text-slate-100">{{ $row['name'] ?? 'Barang tanpa nama' }}</td>
                                 <td class="px-4 py-3">{{ $row['kind'] }}</td>
-                                <td class="font-mono px-4 py-3">{{ $row['reference'] ?? '—' }}</td>
-                                <td class="px-4 py-3">{{ $row['amount'] ?? '—' }}</td>
-                                <td class="max-w-[260px] px-4 py-3 truncate font-mono text-[11px] text-slate-600 dark:text-slate-300">{{ $row['path'] ?? '—' }}</td>
-                                <td class="px-4 py-3">{{ $row['installed_at'] ?? 'belum tercatat' }}</td>
-                                <td class="px-4 py-3">{{ $row['technician'] ?? '—' }}</td>
-                                <td class="px-4 py-3">
-                                    @if($row['trace_url'] ?? null)
-                                        <a href="{{ $row['trace_url'] }}" class="text-sky-700 hover:underline dark:text-sky-400">{{ $row['task'] ?? 'Riwayat Gudang' }}</a>
+                                <td class="font-mono px-4 py-3">
+                                    {{-- Trace dipicu dari teks SN/Roll-nya sendiri (link), bukan kolom Task
+                                         yang sudah dihapus (keputusan user 2026-11-05). --}}
+                                    @if(($row['trace_url'] ?? null) && ($row['reference'] ?? null))
+                                        <a href="{{ $row['trace_url'] }}" class="font-semibold text-sky-600 hover:underline dark:text-sky-400">{{ $row['reference'] }}</a>
                                     @else
-                                        {{ $row['task'] ?? '—' }}
+                                        {{ $row['reference'] ?? '—' }}
                                     @endif
                                 </td>
+                                <td class="px-4 py-3">{{ $row['amount'] ?? '—' }}</td>
+                                <td class="max-w-[360px] px-4 py-3 whitespace-normal break-words font-mono text-[11px] text-slate-600 dark:text-slate-300">{{ $row['path'] ?? '—' }}</td>
+                                <td class="px-4 py-3">{{ $row['installed_at'] ?? 'belum tercatat' }}</td>
+                                <td class="px-4 py-3">{{ $row['technician'] ?? '—' }}</td>
                             </tr>
                         @empty
                             <tr>
-                                <td colspan="8" class="px-4 py-8 text-center text-xs text-slate-500">Belum ada barang gudang yang tercatat terpasang.</td>
+                                <td colspan="7" class="px-4 py-8 text-center text-xs text-slate-500">Belum ada barang gudang yang tercatat terpasang.</td>
                             </tr>
                         @endforelse
                     </tbody>

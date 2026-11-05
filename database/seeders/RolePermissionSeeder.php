@@ -539,6 +539,12 @@ class RolePermissionSeeder extends Seeder
             // satuan). Lihat RoleSeeder untuk definisi role-nya.
             'admin_gudang' => [
                 'warehouse.view',
+                // Barang Terpasang di Infrastruktur — state saat ini, TANPA
+                // network_nodes.* (Peta Infrastruktur tetap tertutup dari
+                // Gudang). Keputusan user 2026-11-05: admin_gudang dulu,
+                // role lain (pic_gudang/pop_admin) nyusul lewat Role Matrix
+                // kalau diperlukan.
+                'warehouse.infra_stock.view',
                 'warehouse_adjustment.create',
                 'warehouse_custody.view',
                 'warehouse_issue.create',

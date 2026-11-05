@@ -1,0 +1,685 @@
+app-D3v08iWq.js:33 Alpine Expression Error: notif is not defined
+
+Expression: "notif.data.action_url || '#'"
+
+ 
+normalErrorHandler @ app-D3v08iWq.js:33
+handleError @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+Promise.catch
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+handler2 @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:33 Alpine Expression Error: notif is not defined
+
+Expression: "notif.read_at ? 'bg-white dark:bg-slate-800' : 'bg-sky-50/50 dark:bg-sky-950/30'"
+
+ 
+normalErrorHandler @ app-D3v08iWq.js:33
+handleError @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+Promise.catch
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+handler2 @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:33 Alpine Expression Error: notif is not defined
+
+Expression: "{
+                                      'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400': notif.data.type === 'success',
+                                      'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400': notif.data.type === 'warning',
+                                      'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400': notif.data.type === 'error',
+                                      'bg-sky-100 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400': !notif.data.type || notif.data.type === 'info'
+                                  }"
+
+ 
+normalErrorHandler @ app-D3v08iWq.js:33
+handleError @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+Promise.catch
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+handler2 @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:33 Alpine Expression Error: notif is not defined
+
+Expression: "notif.data.type === 'error'"
+
+ 
+normalErrorHandler @ app-D3v08iWq.js:33
+handleError @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+Promise.catch
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:33 Alpine Expression Error: notif is not defined
+
+Expression: "notif.data.type === 'warning'"
+
+ 
+normalErrorHandler @ app-D3v08iWq.js:33
+handleError @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+Promise.catch
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:33 Alpine Expression Error: notif is not defined
+
+Expression: "notif.data.type === 'success'"
+
+ 
+normalErrorHandler @ app-D3v08iWq.js:33
+handleError @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+Promise.catch
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:33 Alpine Expression Error: notif is not defined
+
+Expression: "!notif.data.type || notif.data.type === 'info'"
+
+ 
+normalErrorHandler @ app-D3v08iWq.js:33
+handleError @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+Promise.catch
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:33 Alpine Expression Error: notif is not defined
+
+Expression: "notif.data.title"
+
+ 
+normalErrorHandler @ app-D3v08iWq.js:33
+handleError @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+Promise.catch
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:33 Alpine Expression Error: notif is not defined
+
+Expression: "notif.data.message"
+
+ 
+normalErrorHandler @ app-D3v08iWq.js:33
+handleError @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+Promise.catch
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:33 Alpine Expression Error: notif is not defined
+
+Expression: "formatDate(notif.created_at)"
+
+ 
+normalErrorHandler @ app-D3v08iWq.js:33
+handleError @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+Promise.catch
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:37 Uncaught ReferenceError: notif is not defined
+    at [Alpine] notif.data.action_url || '#' (eval at <anonymous> (app-D3v08iWq.js:37:1277), <anonymous>:3:32)
+    at app-D3v08iWq.js:37:1772
+    at tryCatch (app-D3v08iWq.js:33:69840)
+    at app-D3v08iWq.js:37:44134
+    at n (app-D3v08iWq.js:37:24112)
+    at Object.effect2 [as effect] (app-D3v08iWq.js:37:23826)
+    at effect (app-D3v08iWq.js:33:63880)
+    at app-D3v08iWq.js:33:64046
+    at handler2 (app-D3v08iWq.js:37:44128)
+    at n (app-D3v08iWq.js:37:4417)
+[Alpine] notif.data.action_url || '#' @ VM2568:3
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+handler2 @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:37 Uncaught ReferenceError: notif is not defined
+    at [Alpine] notif.read_at ? 'bg-white dark:bg-slate-800' : 'bg-sky-50/50 dark:bg-sky-950/30' (eval at <anonymous> (app-D3v08iWq.js:37:1277), <anonymous>:3:32)
+    at app-D3v08iWq.js:37:1772
+    at tryCatch (app-D3v08iWq.js:33:69840)
+    at app-D3v08iWq.js:37:44134
+    at n (app-D3v08iWq.js:37:24112)
+    at Object.effect2 [as effect] (app-D3v08iWq.js:37:23826)
+    at effect (app-D3v08iWq.js:33:63880)
+    at app-D3v08iWq.js:33:64046
+    at handler2 (app-D3v08iWq.js:37:44128)
+    at n (app-D3v08iWq.js:37:4417)
+[Alpine] notif.read_at ? 'bg-white dark:bg-slate-800' : 'bg-sky-50/50 dark:bg-sky-950/30' @ VM2569:3
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+handler2 @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:37 Uncaught ReferenceError: notif is not defined
+    at [Alpine] {
+                                      'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400': notif.data.type === 'success',
+                                      'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400': notif.data.type === 'warning',
+                                      'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400': notif.data.type === 'error',
+                                      'bg-sky-100 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400': !notif.data.type || notif.data.type === 'info'
+                                  } (eval at <anonymous> (https://rk.whusnet.com/build/assets/app-D3v08iWq.js:37:1277), <anonymous>:4:119)
+    at https://rk.whusnet.com/build/assets/app-D3v08iWq.js:37:1772
+    at tryCatch (https://rk.whusnet.com/build/assets/app-D3v08iWq.js:33:69840)
+    at https://rk.whusnet.com/build/assets/app-D3v08iWq.js:37:44134
+    at n (https://rk.whusnet.com/build/assets/app-D3v08iWq.js:37:24112)
+    at Object.effect2 [as effect] (https://rk.whusnet.com/build/assets/app-D3v08iWq.js:37:23826)
+    at effect (https://rk.whusnet.com/build/assets/app-D3v08iWq.js:33:63880)
+    at https://rk.whusnet.com/build/assets/app-D3v08iWq.js:33:64046
+    at handler2 (https://rk.whusnet.com/build/assets/app-D3v08iWq.js:37:44128)
+    at n (https://rk.whusnet.com/build/assets/app-D3v08iWq.js:37:4417)
+[Alpine] {
+                                      'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400': notif.data.type === 'success',
+                                      'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400': notif.data.type === 'warning',
+                                      'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400': notif.data.type === 'error',
+                                      'bg-sky-100 text-sky-600 dark:bg-sky-950/60 dark:text-sky-400': !notif.data.type || notif.data.type === 'info'
+                                  } @ VM2571:4
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+handler2 @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:37 Uncaught ReferenceError: notif is not defined
+    at [Alpine] notif.data.type === 'error' (eval at <anonymous> (app-D3v08iWq.js:37:1277), <anonymous>:3:32)
+    at app-D3v08iWq.js:37:1772
+    at tryCatch (app-D3v08iWq.js:33:69840)
+    at app-D3v08iWq.js:37:46650
+    at n (app-D3v08iWq.js:37:24112)
+    at Object.effect2 [as effect] (app-D3v08iWq.js:37:23826)
+    at effect (app-D3v08iWq.js:33:63880)
+    at app-D3v08iWq.js:33:64046
+    at Function.<anonymous> (app-D3v08iWq.js:37:46644)
+    at n (app-D3v08iWq.js:37:4417)
+[Alpine] notif.data.type === 'error' @ VM2572:3
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:37 Uncaught ReferenceError: notif is not defined
+    at [Alpine] notif.data.type === 'warning' (eval at <anonymous> (app-D3v08iWq.js:37:1277), <anonymous>:3:32)
+    at app-D3v08iWq.js:37:1772
+    at tryCatch (app-D3v08iWq.js:33:69840)
+    at app-D3v08iWq.js:37:46650
+    at n (app-D3v08iWq.js:37:24112)
+    at Object.effect2 [as effect] (app-D3v08iWq.js:37:23826)
+    at effect (app-D3v08iWq.js:33:63880)
+    at app-D3v08iWq.js:33:64046
+    at Function.<anonymous> (app-D3v08iWq.js:37:46644)
+    at n (app-D3v08iWq.js:37:4417)
+[Alpine] notif.data.type === 'warning' @ VM2573:3
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:37 Uncaught ReferenceError: notif is not defined
+    at [Alpine] notif.data.type === 'success' (eval at <anonymous> (app-D3v08iWq.js:37:1277), <anonymous>:3:32)
+    at app-D3v08iWq.js:37:1772
+    at tryCatch (app-D3v08iWq.js:33:69840)
+    at app-D3v08iWq.js:37:46650
+    at n (app-D3v08iWq.js:37:24112)
+    at Object.effect2 [as effect] (app-D3v08iWq.js:37:23826)
+    at effect (app-D3v08iWq.js:33:63880)
+    at app-D3v08iWq.js:33:64046
+    at Function.<anonymous> (app-D3v08iWq.js:37:46644)
+    at n (app-D3v08iWq.js:37:4417)
+[Alpine] notif.data.type === 'success' @ VM2574:3
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:37 Uncaught ReferenceError: notif is not defined
+    at [Alpine] !notif.data.type || notif.data.type === 'info' (eval at <anonymous> (app-D3v08iWq.js:37:1277), <anonymous>:3:33)
+    at app-D3v08iWq.js:37:1772
+    at tryCatch (app-D3v08iWq.js:33:69840)
+    at app-D3v08iWq.js:37:46650
+    at n (app-D3v08iWq.js:37:24112)
+    at Object.effect2 [as effect] (app-D3v08iWq.js:37:23826)
+    at effect (app-D3v08iWq.js:33:63880)
+    at app-D3v08iWq.js:33:64046
+    at Function.<anonymous> (app-D3v08iWq.js:37:46644)
+    at n (app-D3v08iWq.js:37:4417)
+[Alpine] !notif.data.type || notif.data.type === 'info' @ VM2575:3
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:37 Uncaught ReferenceError: notif is not defined
+    at [Alpine] notif.data.title (eval at <anonymous> (app-D3v08iWq.js:37:1277), <anonymous>:3:32)
+    at app-D3v08iWq.js:37:1772
+    at tryCatch (app-D3v08iWq.js:33:69840)
+    at app-D3v08iWq.js:37:43495
+    at n (app-D3v08iWq.js:37:24112)
+    at Object.effect2 [as effect] (app-D3v08iWq.js:37:23826)
+    at effect (app-D3v08iWq.js:33:63880)
+    at app-D3v08iWq.js:33:64046
+    at Function.<anonymous> (app-D3v08iWq.js:37:43488)
+    at n (app-D3v08iWq.js:37:4417)
+[Alpine] notif.data.title @ VM2576:3
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:37 Uncaught ReferenceError: notif is not defined
+    at [Alpine] notif.data.message (eval at <anonymous> (app-D3v08iWq.js:37:1277), <anonymous>:3:32)
+    at app-D3v08iWq.js:37:1772
+    at tryCatch (app-D3v08iWq.js:33:69840)
+    at app-D3v08iWq.js:37:43495
+    at n (app-D3v08iWq.js:37:24112)
+    at Object.effect2 [as effect] (app-D3v08iWq.js:37:23826)
+    at effect (app-D3v08iWq.js:33:63880)
+    at app-D3v08iWq.js:33:64046
+    at Function.<anonymous> (app-D3v08iWq.js:37:43488)
+    at n (app-D3v08iWq.js:37:4417)
+[Alpine] notif.data.message @ VM2577:3
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33
+app-D3v08iWq.js:37 Uncaught ReferenceError: notif is not defined
+    at [Alpine] formatDate(notif.created_at) (eval at <anonymous> (app-D3v08iWq.js:37:1277), <anonymous>:3:43)
+    at app-D3v08iWq.js:37:1772
+    at tryCatch (app-D3v08iWq.js:33:69840)
+    at app-D3v08iWq.js:37:43495
+    at n (app-D3v08iWq.js:37:24112)
+    at Object.effect2 [as effect] (app-D3v08iWq.js:37:23826)
+    at effect (app-D3v08iWq.js:33:63880)
+    at app-D3v08iWq.js:33:64046
+    at Function.<anonymous> (app-D3v08iWq.js:37:43488)
+    at n (app-D3v08iWq.js:37:4417)
+[Alpine] formatDate(notif.created_at) @ VM2578:3
+(anonymous) @ app-D3v08iWq.js:37
+tryCatch @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+effect2 @ app-D3v08iWq.js:37
+effect @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:33
+(anonymous) @ app-D3v08iWq.js:37
+n @ app-D3v08iWq.js:37
+i @ app-D3v08iWq.js:37
+deferHandlingDirectives @ app-D3v08iWq.js:37
+initTree @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:37
+(anonymous) @ app-D3v08iWq.js:33
+onMutate @ app-D3v08iWq.js:33
+childList
+(anonymous) @ app-D3v08iWq.js:33
+forEach @ app-D3v08iWq.js:33
+handlePreservedElements @ app-D3v08iWq.js:33
+E @ app-D3v08iWq.js:33
+swap @ app-D3v08iWq.js:33
+restoreHistory @ app-D3v08iWq.js:33
+window.onpopstate @ app-D3v08iWq.js:33

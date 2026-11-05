@@ -6,7 +6,7 @@
 @section('breadcrumb_parent_url', '/')
 
 @section('content')
-<div x-data="fopDashboardHandler()" class="flex flex-col gap-4 sm:gap-5 max-w-screen-2xl mx-auto font-sans text-text-main px-1 sm:px-0">
+<div x-data="fopDashboardHandler()" class="flex flex-col gap-4 sm:gap-5 max-w-screen-5xl mx-auto font-sans text-text-main px-1 sm:px-0">
 
     {{-- ══ Page Header ══════════════════════════════════════════════ --}}
     <div class="page-header flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -26,9 +26,9 @@
         <div class="flex items-center gap-2.5 flex-wrap">
             {{-- Dual Mode Switcher: Operasional Harian vs Rekapitulasi Analitik --}}
             <div class="inline-flex rounded-lg border border-border bg-surface p-1 shadow-2xs">
-                <span class="px-2.5 py-1 text-xs font-bold rounded-md bg-primary text-white">⚡ Operasional Harian</span>
+                <span class="px-2.5 py-1 text-xs font-bold rounded-md bg-primary text-white">Operasional Harian</span>
                 @can('fop_analytics.view')
-                <a href="{{ route('fop.analytics') }}" class="px-2.5 py-1 text-xs font-medium text-text-muted hover:text-text-main transition-colors">📊 Rekapitulasi &amp; Analitik</a>
+                <a href="{{ route('fop.analytics') }}" class="px-2.5 py-1 text-xs font-medium text-text-muted hover:text-text-main transition-colors">Rekapitulasi &amp; Analitik</a>
                 @endcan
             </div>
 
@@ -162,9 +162,19 @@
                                         </span>
 
                                         @if($t['draggable'] && $activeFopTeams->count() > 1)
+                                        {{-- Dibuka buat semua ukuran layar (dulu md:hidden, cuma mobile) —
+                                             drag masih jalan di desktop, tapi tombol ini jadi jalur cepat
+                                             tanpa drag: gak perlu geser kursor pas-pasan ke tim yang jauh
+                                             (apalagi kalau di luar viewport). Reuse flow mobile yang sama.
+                                             `draggable="false"` WAJIB: parent row-nya draggable="true"
+                                             buat drag-drop, dan algoritma drag HTML5 nganggep seluruh
+                                             descendant ikut jadi area sumber drag kecuali di-opt-out
+                                             eksplisit — tanpa ini mousedown di icon ketangkep drag-intent
+                                             duluan, click gak pernah sempat fire. --}}
                                         <button type="button"
+                                                draggable="false"
                                                 @click.stop="openMobileSwitchTeamModal({{ $t['fop_task_id'] }}, {{ $team['id'] }}, @js($t['tugas']))"
-                                                class="md:hidden p-1 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 cursor-pointer shadow-2xs"
+                                                class="p-1 rounded-md bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800 shrink-0 cursor-pointer shadow-2xs"
                                                 title="Pindahkan ke Tim Lain">
                                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                                         </button>
@@ -335,9 +345,13 @@
     {{-- JSON Payload for Alpine Teams State --}}
     <script type="application/json" id="fop-teams-json">@json($activeFopTeams)</script>
 
-    {{-- ══ Mobile Step 1 Modal: Pilih Tim Tujuan untuk Switch ══ --}}
+    {{-- ══ Step 1 Modal: Pilih Tim Tujuan untuk Switch (Mobile & Desktop) ══
+         Dulu `md:hidden` — modal CSS-nya disembunyikan begitu lewat breakpoint
+         md, padahal trigger-nya (tombol "Pindahkan ke Tim Lain") sekarang
+         tampil di semua ukuran layar juga. Akibatnya klik tombol di desktop
+         cuma ubah state Alpine tanpa modal pernah kelihatan. --}}
     <div x-show="mobileSwitchSelectTeamModal.open"
-         class="fixed inset-0 z-50 overflow-hidden flex items-end md:hidden p-0"
+         class="fixed inset-0 z-50 overflow-hidden flex items-end p-0"
          x-transition:enter="transition ease-out duration-200"
          x-transition:enter-start="opacity-0"
          x-transition:enter-end="opacity-100"
@@ -663,24 +677,31 @@ function fopDashboardHandler() {
             event.dataTransfer.setData('text/plain', String(fopTaskId));
         },
 
-        // Native HTML5 drag & drop TIDAK auto-scroll window begitu card
-        // tujuan (mis. Team 24) ada di luar viewport — cursor cuma mengirim
-        // event `dragover`, bukan `mousemove`, jadi gak ada cara lain
-        // mendeteksi posisi kursor saat drag berlangsung selain listener ini.
-        // Dipasang sekali di window (lihat initEchoListeners/init), jalan
-        // terus selama `dragging` truthy, berhenti otomatis begitu
-        // endTaskDrag() mengosongkan `dragging`.
+        // Native HTML5 drag & drop TIDAK auto-scroll begitu card tujuan
+        // (mis. Team di baris paling bawah) ada di luar viewport — cursor
+        // cuma mengirim event `dragover`, bukan `mousemove`, jadi gak ada
+        // cara lain mendeteksi posisi kursor saat drag berlangsung selain
+        // listener ini. Scroll target HARUS #main-content, bukan window:
+        // layouts/app.blade.php bikin <html>/<body> `overflow-hidden`,
+        // scrollbar beneran ada di <main id="main-content"> (overflow-y-auto)
+        // — window.scrollBy() di sini cuma no-op. Dipasang sekali di window
+        // (lihat initEchoListeners/init) supaya tetap kebaca walau cursor
+        // lewat di atas card/children lain, jalan terus selama `dragging`
+        // truthy, berhenti otomatis begitu endTaskDrag() mengosongkan
+        // `dragging`.
         autoScrollOnDragOver(event) {
             if (!this.dragging) return;
+            const scrollEl = document.getElementById('main-content');
+            if (!scrollEl) return;
             const edge = 90;
             const maxSpeed = 22;
             const y = event.clientY;
             const vh = window.innerHeight;
 
             if (y < edge) {
-                window.scrollBy(0, -Math.ceil(((edge - y) / edge) * maxSpeed));
+                scrollEl.scrollBy(0, -Math.ceil(((edge - y) / edge) * maxSpeed));
             } else if (y > vh - edge) {
-                window.scrollBy(0, Math.ceil(((y - (vh - edge)) / edge) * maxSpeed));
+                scrollEl.scrollBy(0, Math.ceil(((y - (vh - edge)) / edge) * maxSpeed));
             }
         },
 

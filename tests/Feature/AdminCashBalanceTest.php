@@ -5,6 +5,7 @@ namespace Tests\Feature;
 use App\Enums\CashDepositStatus;
 use App\Enums\PaymentStatus;
 use App\Models\CashDeposit;
+use App\Models\Payment;
 use App\Services\AdminCashBalanceService;
 use App\Services\CashDepositService;
 use App\Services\CollectorDepositService;
@@ -61,6 +62,22 @@ class AdminCashBalanceTest extends TestCase
      * berhenti di verifikasi setoran dan tak pernah jadi tanggung jawab siapa
      * pun. Saldo harus melekat ke ORANG yang menghitung uangnya, bukan ke POP.
      */
+    public function test_saldo_tunai_manual_tidak_menghidrasi_seluruh_pembayaran(): void
+    {
+        $first = $this->payAtOffice('KAS-PERF-1', 100000);
+        $second = $this->payAtOffice('KAS-PERF-2', 200000);
+        $first->update(['balance_used_amount' => 25000, 'overpay_amount' => 5000]);
+        $second->update(['balance_used_amount' => 50000, 'overpay_amount' => 10000]);
+
+        $hydratedPayments = 0;
+        Payment::retrieved(function () use (&$hydratedPayments): void {
+            $hydratedPayments++;
+        });
+
+        $this->assertSame(240000.0, $this->saldo());
+        $this->assertSame(0, $hydratedPayments);
+    }
+
     public function test_saldo_melekat_ke_admin_yang_memverifikasi_bukan_admin_lain(): void
     {
         $adminLain = $this->createUser('pop_admin', $this->pop);
@@ -98,7 +115,13 @@ class AdminCashBalanceTest extends TestCase
 
         $this->assertSame(0.0, $this->saldo());
 
+        $hydratedPayments = 0;
+        Payment::retrieved(function () use (&$hydratedPayments): void {
+            $hydratedPayments++;
+        });
+
         $rekap = app(AdminCashBalanceService::class)->nonTunaiRekap($this->admin->fresh());
+        $this->assertSame(0, $hydratedPayments);
         $this->assertSame(750000.0, $rekap['total']);
         $this->assertSame(500000.0, $rekap['per_metode']['transfer']);
         $this->assertSame(250000.0, $rekap['per_metode']['lainnya']);

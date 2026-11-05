@@ -17,6 +17,14 @@ import './image-source-picker';
    boleh jadi titik gagal buat interaksi dasar (lihat catatan Alpine di atas). */
 import 'htmx.org';
 
+// Hapus snapshot lama yang masih berisi DOM hasil render Alpine di tab terbuka.
+// Snapshot baru dicegah oleh hx-history="false" pada body layout.
+try {
+    window.sessionStorage.removeItem('htmx-history-cache');
+} catch {
+    // Storage bisa dinonaktifkan oleh browser; htmx juga tidak memakai cache saat itu.
+}
+
 /* Fetch boost gagal (network/4xx/5xx) → fallback navigasi native, biar
    gak nyangkut blank/stuck di halaman lama. Lihat docs/superpowers/specs/
    2026-11-03-spa-feel-htmx-design.md § Error Handling. */

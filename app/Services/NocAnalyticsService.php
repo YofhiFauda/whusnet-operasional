@@ -11,6 +11,7 @@ use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Ticket;
 use App\Models\TicketHistory;
+use App\Models\TicketIssueCategory;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Carbon;
@@ -464,17 +465,12 @@ class NocAnalyticsService
      */
     public function getChronicCustomers(Builder $baseQuery, int $days = 30, int $minTickets = 2): array
     {
-        $since = now()->subDays($days);
-
         $tickets = (clone $baseQuery)
             ->where('type', TaskType::MAINTENANCE->value)
-            ->where('created_at', '>=', $since)
+            ->where('created_at', '>=', now()->subDays($days))
             ->whereNotNull('customer_id')
-            ->with([
-                'customer:id,full_name,cid,customer_code,address',
-                'pop:id,name',
-                'issueCategory:id,name',
-            ])
+            ->orderBy('id')
+            ->toBase()
             ->get(['id', 'ticket_number', 'customer_id', 'pop_id', 'issue_category_id', 'created_at']);
 
         if ($tickets->isEmpty()) {
@@ -483,33 +479,60 @@ class NocAnalyticsService
 
         $chronic = [];
         foreach ($tickets->groupBy('customer_id') as $customerId => $custTickets) {
-            if ($custTickets->count() >= $minTickets) {
-                $firstTicket = $custTickets->first();
-                $latestTicket = $custTickets->sortByDesc('created_at')->first();
-
-                $topIssue = $custTickets
-                    ->groupBy(fn (Ticket $t) => $t->issueCategory?->name ?? 'Lainnya')
-                    ->map->count()
-                    ->sortDesc()
-                    ->keys()
-                    ->first() ?? 'Gangguan';
-
-                $chronic[] = [
-                    'customer_id' => $customerId,
-                    'name' => $firstTicket->customer?->full_name ?? 'Pelanggan #'.$customerId,
-                    'cid' => $firstTicket->customer?->cid ?? $firstTicket->customer?->customer_code,
-                    'count' => $custTickets->count(),
-                    'address' => $firstTicket->customer?->address,
-                    'pop_name' => $firstTicket->pop?->name ?? '—',
-                    'top_issue' => $topIssue,
-                    'last_ticket' => $latestTicket->ticket_number,
-                ];
+            if ($custTickets->count() < $minTickets) {
+                continue;
             }
+
+            $chronic[] = [
+                'customer_id' => (int) $customerId,
+                'count' => $custTickets->count(),
+                'first_pop_id' => $custTickets->first()->pop_id,
+                'last_ticket' => $custTickets->sortByDesc('created_at')->first()->ticket_number,
+                'tickets' => $custTickets,
+            ];
         }
 
         usort($chronic, fn ($a, $b) => $b['count'] <=> $a['count']);
+        $chronic = array_slice($chronic, 0, 8);
 
-        return array_slice($chronic, 0, 8);
+        if ($chronic === []) {
+            return [];
+        }
+
+        $topTickets = collect($chronic)->flatMap(fn (array $row) => $row['tickets']);
+        $issueNames = TicketIssueCategory::query()
+            ->whereIn('id', $topTickets->pluck('issue_category_id')->filter()->unique())
+            ->pluck('name', 'id');
+
+        $customers = Customer::query()
+            ->whereIn('id', array_column($chronic, 'customer_id'))
+            ->get(['id', 'full_name', 'cid', 'customer_code', 'address'])
+            ->keyBy('id');
+        $pops = Pop::query()
+            ->whereIn('id', array_column($chronic, 'first_pop_id'))
+            ->get(['id', 'name'])
+            ->keyBy('id');
+
+        return array_map(function (array $row) use ($issueNames, $customers, $pops): array {
+            $customer = $customers->get($row['customer_id']);
+            $topIssue = $row['tickets']
+                ->groupBy(fn (object $ticket) => $issueNames->get($ticket->issue_category_id) ?? 'Lainnya')
+                ->map->count()
+                ->sortDesc()
+                ->keys()
+                ->first() ?? 'Gangguan';
+
+            return [
+                'customer_id' => $row['customer_id'],
+                'name' => $customer?->full_name ?? 'Pelanggan #'.$row['customer_id'],
+                'cid' => $customer?->cid ?? $customer?->customer_code,
+                'count' => $row['count'],
+                'address' => $customer?->address,
+                'pop_name' => $pops->get($row['first_pop_id'])?->name ?? '—',
+                'top_issue' => $topIssue,
+                'last_ticket' => $row['last_ticket'],
+            ];
+        }, $chronic);
     }
 
     /**

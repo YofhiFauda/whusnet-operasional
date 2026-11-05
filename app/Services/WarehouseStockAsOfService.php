@@ -32,6 +32,8 @@ use Illuminate\Support\Collection;
  */
 class WarehouseStockAsOfService
 {
+    private array $preloadedBalances = [];
+
     /**
      * "Barang Masuk" (`receivedInPeriod()`) CUMA ngitung tipe yang beneran
      * "barang fisik nyampe" — RECEIVE/TRANSFER(confirm)/RETURN. SENGAJA
@@ -58,6 +60,11 @@ class WarehouseStockAsOfService
      */
     public function balanceAsOf(Pop $pop, Item $item, Carbon $exclusiveCutoff, bool $isStokAwal = false): array
     {
+        $cacheKey = $pop->id.':'.$item->id.':'.$exclusiveCutoff->toDateTimeString().':'.(int) $isStokAwal;
+        if (array_key_exists($cacheKey, $this->preloadedBalances)) {
+            return $this->preloadedBalances[$cacheKey];
+        }
+
         if ($item->tracking_type === TrackingType::QUANTITY) {
             return $this->quantityAsOf($pop, $item, $exclusiveCutoff, $isStokAwal);
         }
@@ -65,6 +72,138 @@ class WarehouseStockAsOfService
         $idColumn = $item->tracking_type === TrackingType::ROLL ? 'roll_id' : 'serial_id';
 
         return $this->unitsAsOf($pop, $item, $exclusiveCutoff, $idColumn, $isStokAwal);
+    }
+
+    /**
+     * Siapkan saldo QUANTITY/SERIALIZED/ROLL untuk dua cutoff laporan
+     * dalam query per jenis, bukan query per kombinasi POP dan item. Hanya POP yang diberikan pemanggil
+     * yang boleh masuk hasil cache.
+     *
+     * @param  Collection<int, Pop>  $pops
+     * @param  Collection<int, Item>  $items
+     */
+    public function preloadBalances(Collection $pops, Collection $items, Carbon $start, Carbon $end): void
+    {
+        $this->preloadedBalances = [];
+        $unitItems = $items->filter(fn (Item $item) => $item->tracking_type !== TrackingType::QUANTITY)->keyBy('id');
+        $popIds = $pops->pluck('id');
+
+        if ($popIds->isEmpty() || $items->isEmpty()) {
+            return;
+        }
+
+        $quantityItems = $items->filter(fn (Item $item) => $item->tracking_type === TrackingType::QUANTITY)->keyBy('id');
+        $this->preloadQuantityBalances($pops, $quantityItems, $start, $end);
+
+        if ($unitItems->isEmpty()) {
+            return;
+        }
+
+        $firstIds = InventoryTransaction::query()
+            ->whereIn('item_id', $unitItems->keys())
+            ->whereIn('to_pop_id', $popIds)
+            ->whereNotNull('unit_price_snapshot')
+            ->selectRaw('MIN(id) as first_id')
+            ->groupBy('item_id', 'to_pop_id');
+
+        $firstPrices = InventoryTransaction::query()
+            ->joinSub($firstIds, 'first_arrivals', fn ($join) => $join->on('inventory_transactions.id', '=', 'first_arrivals.first_id'))
+            ->get(['inventory_transactions.item_id', 'inventory_transactions.to_pop_id', 'inventory_transactions.unit_price_snapshot']);
+
+        $earliestPrices = [];
+        foreach ($firstPrices as $row) {
+            $earliestPrices[$row->to_pop_id][$row->item_id] = (float) $row->unit_price_snapshot;
+        }
+
+        $itemIdsByUnitColumn = [
+            'serial_id' => $unitItems->filter(fn (Item $item) => $item->tracking_type === TrackingType::SERIALIZED)->keys(),
+            'roll_id' => $unitItems->filter(fn (Item $item) => $item->tracking_type === TrackingType::ROLL)->keys(),
+        ];
+
+        foreach ([$start, $end] as $cutoffIndex => $cutoff) {
+            foreach ($itemIdsByUnitColumn as $idColumn => $itemIds) {
+                if ($itemIds->isEmpty()) {
+                    continue;
+                }
+
+                $latestIds = InventoryTransaction::query()
+                    ->whereIn('item_id', $itemIds)
+                    ->whereNotNull($idColumn)
+                    ->where('created_at', '<', $cutoff)
+                    ->selectRaw('MAX(id) as max_id')
+                    ->groupBy('item_id', $idColumn);
+
+                $rowsByPopItem = InventoryTransaction::query()
+                    ->joinSub($latestIds, 'latest_units', fn ($join) => $join->on('inventory_transactions.id', '=', 'latest_units.max_id'))
+                    ->whereIn('inventory_transactions.to_pop_id', $popIds)
+                    ->whereNotIn('inventory_transactions.type', [
+                        InventoryTransactionType::DEPLOY->value,
+                        InventoryTransactionType::REGISTER_INFRA->value,
+                    ])
+                    ->orderBy('inventory_transactions.id')
+                    ->get([
+                        'inventory_transactions.id',
+                        'inventory_transactions.item_id',
+                        'inventory_transactions.to_pop_id',
+                        'inventory_transactions.qty',
+                        'inventory_transactions.unit_price_snapshot',
+                    ])
+                    ->groupBy(fn (InventoryTransaction $row) => $row->to_pop_id.':'.$row->item_id);
+
+                foreach ($pops as $pop) {
+                    foreach ($itemIds as $itemId) {
+                        $item = $unitItems->get($itemId);
+                        $rows = $rowsByPopItem->get($pop->id.':'.$itemId, collect());
+                        $cacheKey = $pop->id.':'.$itemId.':'.$cutoff->toDateTimeString().':'.(int) ($cutoffIndex === 0);
+                        $this->preloadedBalances[$cacheKey] = $this->splitUnitRowsIntoSlots(
+                            $rows, $cutoffIndex === 0, $pop, $item, $cutoff, $earliestPrices
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    /**
+     * Replay QUANTITY untuk seluruh item/POP laporan dalam dua query ledger.
+     *
+     * @param  Collection<int, Pop>  $pops
+     * @param  Collection<int, Item>  $items
+     */
+    private function preloadQuantityBalances(Collection $pops, Collection $items, Carbon $start, Carbon $end): void
+    {
+        if ($items->isEmpty()) {
+            return;
+        }
+
+        $popIds = $pops->pluck('id');
+        foreach ([$start, $end] as $cutoffIndex => $cutoff) {
+            $rows = InventoryTransaction::query()
+                ->whereIn('item_id', $items->keys())
+                ->where(fn ($query) => $query->whereIn('to_pop_id', $popIds)->orWhereIn('from_pop_id', $popIds))
+                ->where('created_at', '<', $cutoff)
+                ->whereNotIn('type', [InventoryTransactionType::DEPLOY->value, InventoryTransactionType::REGISTER_INFRA->value])
+                ->orderBy('id')
+                ->toBase()
+                ->get(['id', 'item_id', 'lot_no', 'qty', 'to_pop_id', 'from_pop_id', 'unit_price_snapshot']);
+
+            $rowsByPopItem = [];
+            foreach ($rows as $row) {
+                foreach (array_unique(array_filter([$row->to_pop_id, $row->from_pop_id])) as $popId) {
+                    if ($popIds->contains((int) $popId)) {
+                        $rowsByPopItem[$popId][$row->item_id][] = $row;
+                    }
+                }
+            }
+
+            foreach ($pops as $pop) {
+                foreach ($items as $item) {
+                    $itemRows = collect($rowsByPopItem[$pop->id][$item->id] ?? []);
+                    $cacheKey = $pop->id.':'.$item->id.':'.$cutoff->toDateTimeString().':'.(int) ($cutoffIndex === 0);
+                    $this->preloadedBalances[$cacheKey] = $this->quantityAsOfRows($itemRows, $pop);
+                }
+            }
+        }
     }
 
     /**
@@ -106,6 +245,15 @@ class WarehouseStockAsOfService
             ->orderBy('id')
             ->get(['id', 'lot_no', 'qty', 'to_pop_id', 'from_pop_id', 'unit_price_snapshot']);
 
+        return $this->quantityAsOfRows($rows, $pop);
+    }
+
+    /**
+     * @param  Collection<int, InventoryTransaction|object>  $rows
+     * @return array{lama: array{qty: float, harga: ?float}, baru: array{qty: float, harga: ?float}, nilai: float}
+     */
+    private function quantityAsOfRows(Collection $rows, Pop $pop): array
+    {
         $balances = [];
         $firstSeenId = [];
         $lastPrice = [];
@@ -275,7 +423,7 @@ class WarehouseStockAsOfService
      * @param  Collection<int, InventoryTransaction>  $rows
      * @return array{lama: array{qty: float, harga: ?float}, baru: array{qty: float, harga: ?float}, nilai: float}
      */
-    private function splitUnitRowsIntoSlots(Collection $rows, bool $isStokAwal, ?Pop $pop = null, ?Item $item = null, ?Carbon $cutoff = null): array
+    private function splitUnitRowsIntoSlots(Collection $rows, bool $isStokAwal, ?Pop $pop = null, ?Item $item = null, ?Carbon $cutoff = null, ?array $earliestPrices = null): array
     {
         if ($rows->isEmpty()) {
             return ['lama' => ['qty' => 0.0, 'harga' => null], 'baru' => ['qty' => 0.0, 'harga' => null], 'nilai' => 0.0];
@@ -319,14 +467,17 @@ class WarehouseStockAsOfService
 
             // Untuk Barang Masuk / Stok Akhir:
             // Cek harga pertama kali item ini pernah diterima di POP ini
-            $earliestTx = ($pop && $item) ? InventoryTransaction::query()
-                ->where('item_id', $item->id)
-                ->where('to_pop_id', $pop->id)
-                ->whereNotNull('unit_price_snapshot')
-                ->orderBy('id')
-                ->first(['unit_price_snapshot', 'created_at']) : null;
-
-            $earliestPrice = $earliestTx ? (float) $earliestTx->unit_price_snapshot : null;
+            if ($earliestPrices !== null) {
+                $earliestPrice = $pop && $item ? ($earliestPrices[$pop->id][$item->id] ?? null) : null;
+            } else {
+                $earliestTx = ($pop && $item) ? InventoryTransaction::query()
+                    ->where('item_id', $item->id)
+                    ->where('to_pop_id', $pop->id)
+                    ->whereNotNull('unit_price_snapshot')
+                    ->orderBy('id')
+                    ->first(['unit_price_snapshot', 'created_at']) : null;
+                $earliestPrice = $earliestTx ? (float) $earliestTx->unit_price_snapshot : null;
+            }
 
             if ($earliestPrice !== null && $single['price'] !== null && abs($single['price'] - $earliestPrice) > 0.01) {
                 // Harga saat ini berbeda dari harga awal yang pernah ada -> masuk slot Baru

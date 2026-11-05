@@ -264,8 +264,14 @@ class TechnicianPaymentTest extends TestCase
             ->postJson(route('technician-payments.store'), $this->payload($invoice, 'tek-pay-telat', 150000, '2026-10-04'))
             ->assertOk();
 
+        $hydratedPayments = 0;
+        Payment::retrieved(function () use (&$hydratedPayments): void {
+            $hydratedPayments++;
+        });
+
         $status = app(CollectorBalanceService::class)->technicianSettlementStatus();
 
+        $this->assertSame(0, $hydratedPayments);
         $this->assertCount(1, $status);
         $this->assertSame($this->teknisi->id, $status->first()['user']->id);
         $this->assertTrue($status->first()['overdue']);

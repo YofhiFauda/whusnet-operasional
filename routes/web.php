@@ -104,6 +104,7 @@ use App\Http\Controllers\Warehouse\WarehouseCustodyController;
 use App\Http\Controllers\Warehouse\WarehouseCustomerReturnController;
 use App\Http\Controllers\Warehouse\WarehouseDamagedStockController;
 use App\Http\Controllers\Warehouse\WarehouseHistoryController;
+use App\Http\Controllers\Warehouse\WarehouseInfraStockController;
 use App\Http\Controllers\Warehouse\WarehouseIssueController;
 use App\Http\Controllers\Warehouse\WarehousePicGudangController;
 use App\Http\Controllers\Warehouse\WarehouseReassignController;
@@ -914,6 +915,18 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:warehouse.view|warehouse.usage.view')->group(function () {
         Route::get('/warehouse/usage', [WarehouseUsageController::class, 'index'])->name('warehouse.usage.index');
         Route::get('/warehouse/usage/export', [WarehouseUsageController::class, 'export'])->name('warehouse.usage.export');
+    });
+
+    // Barang Terpasang di Infrastruktur — state SAAT INI (SN DEPLOYED +
+    // saldo qty/kabel di infra), BUKAN log periode kayak warehouse.usage di
+    // atas. Gerbang permission SEMPIT `warehouse.infra_stock.view` SENGAJA
+    // TIDAK di-OR dengan `warehouse.view` — role lama yang cuma punya
+    // `warehouse.view` (pic_gudang/pop_admin/atasan) TIDAK ikut tembus ke
+    // halaman ini. Jangan tambah `network_nodes.*` ke mana pun di jalur ini:
+    // tujuan halaman justru Gudang Pusat bisa lihat barangnya TANPA akses
+    // Peta Infrastruktur/Master Node (keputusan user 2026-11-05).
+    Route::middleware('permission:warehouse.infra_stock.view')->group(function () {
+        Route::get('/warehouse/infra-stock', [WarehouseInfraStockController::class, 'index'])->name('warehouse.infra_stock.index');
     });
 
     // Ambang Stok Rendah (2026-09-03) — reuse permission warehouse_adjustment.create,

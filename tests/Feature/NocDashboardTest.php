@@ -4,6 +4,9 @@ namespace Tests\Feature;
 
 use App\Enums\ScopeType;
 use App\Enums\TaskType;
+use App\Enums\TicketHandler;
+use App\Enums\TicketHistoryAction;
+use App\Http\Controllers\NocDashboardController;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\District;
@@ -11,16 +14,19 @@ use App\Models\Permission;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Ticket;
+use App\Models\TicketHistory;
 use App\Models\TicketIssueCategory;
 use App\Models\User;
 use App\Models\Village;
 use App\Services\EffectiveAccessService;
+use App\Services\NocAnalyticsService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\TicketFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use ReflectionMethod;
 use Tests\TestCase;
 
 /**
@@ -165,6 +171,38 @@ class NocDashboardTest extends TestCase
         $this->assertEquals(1, $stats['diproses_noc']);
     }
 
+    public function test_custom_date_ranges_do_not_share_cached_stats(): void
+    {
+        $ticket = Ticket::create([
+            'ticket_number' => 'TK-CUSTOM-RANGE',
+            'type' => TaskType::MAINTENANCE->value,
+            'customer_id' => $this->customer->id,
+            'pop_id' => $this->pop->id,
+            'detail_keluhan' => 'Keluhan Januari',
+            'priority' => 'High',
+            'handler' => 'noc',
+            'status' => 'open',
+            'created_by' => $this->helpdeskUser->id,
+        ]);
+        Ticket::query()->whereKey($ticket->id)->update(['created_at' => '2026-01-10 10:00:00']);
+
+        $january = $this->actingAs($this->nocUser)->get(route('noc.dashboard', [
+            'date_preset' => 'custom',
+            'date_from' => '2026-01-01',
+            'date_to' => '2026-01-31',
+        ]));
+        $february = $this->actingAs($this->nocUser)->get(route('noc.dashboard', [
+            'date_preset' => 'custom',
+            'date_from' => '2026-02-01',
+            'date_to' => '2026-02-28',
+        ]));
+
+        $january->assertOk();
+        $february->assertOk();
+        $this->assertSame(1, $january->viewData('stats')['total_ticket']);
+        $this->assertSame(0, $february->viewData('stats')['total_ticket']);
+    }
+
     public function test_dashboard_renders_new_analytic_sections(): void
     {
         $response = $this->actingAs($this->nocUser)->get(route('noc.dashboard'));
@@ -226,6 +264,51 @@ class NocDashboardTest extends TestCase
         $this->assertCount(1, $leaderboard['noc']);
         $this->assertEquals($this->nocUser->id, $leaderboard['noc'][0]['user_id']);
         $this->assertEquals(1, $leaderboard['noc'][0]['jumlah_selesai']);
+    }
+
+    public function test_leaderboard_counts_histories_without_hydrating_non_completion_actions(): void
+    {
+        $this->actingAs($this->helpdeskUser)->post(route('tickets.store'), [
+            'type' => TaskType::MAINTENANCE->value,
+            'customer_id' => $this->customer->id,
+            'detail_keluhan' => 'Internet lambat.',
+            'priority' => 'High',
+        ])->assertRedirect();
+
+        $ticket = Ticket::latest('id')->firstOrFail();
+        TicketHistory::create([
+            'ticket_id' => $ticket->id,
+            'action' => TicketHistoryAction::DIESKALASI->value,
+            'to_status' => TicketHandler::NOC->value,
+            'actor_id' => $this->helpdeskUser->id,
+            'happened_at' => now(),
+        ]);
+        TicketHistory::create([
+            'ticket_id' => $ticket->id,
+            'action' => TicketHistoryAction::DIKEMBALIKAN->value,
+            'actor_id' => $this->helpdeskUser->id,
+            'happened_at' => now(),
+        ]);
+
+        TicketHistory::create([
+            'ticket_id' => $ticket->id,
+            'action' => TicketHistoryAction::DIESKALASI->value,
+            'to_status' => TicketHandler::HELPDESK->value,
+            'actor_id' => $this->nocUser->id,
+            'happened_at' => now(),
+        ]);
+
+        $hydratedHistories = 0;
+        TicketHistory::retrieved(function () use (&$hydratedHistories): void {
+            $hydratedHistories++;
+        });
+
+        $response = $this->actingAs($this->nocUser)->get(route('noc.dashboard.leaderboard-stats', ['date_preset' => 'all_time']));
+
+        $response->assertOk();
+        $response->assertSee($this->helpdeskUser->name);
+        $response->assertDontSee($this->nocUser->name);
+        $this->assertSame(0, $hydratedHistories);
     }
 
     public function test_delta_stats_null_when_all_time_preset(): void
@@ -306,6 +389,131 @@ class NocDashboardTest extends TestCase
         $this->assertGreaterThanOrEqual(2, $activeTickets->count());
         $firstTicket = $activeTickets->first();
         $this->assertEquals($olderTicket->id, $firstTicket->id);
+    }
+
+    public function test_monthly_complaint_window_reads_compact_rows_without_hydrating_tickets(): void
+    {
+        $category = TicketIssueCategory::create([
+            'name' => 'Kabel Putus',
+            'default_priority' => 'High',
+            'is_active' => true,
+        ]);
+        Customer::query()->whereKey($this->customer->id)->update([
+            'district_id' => Village::findOrFail($this->customer->village_id)->district_id,
+        ]);
+        Ticket::create([
+            'ticket_number' => 'TK-COMPACT-TREND',
+            'type' => TaskType::MAINTENANCE->value,
+            'customer_id' => $this->customer->id,
+            'pop_id' => $this->pop->id,
+            'issue_category_id' => $category->id,
+            'detail_keluhan' => 'Kabel putus.',
+            'priority' => 'High',
+            'handler' => 'noc',
+            'status' => 'open',
+            'created_by' => $this->helpdeskUser->id,
+        ]);
+
+        $hydratedTickets = 0;
+        Ticket::retrieved(function () use (&$hydratedTickets): void {
+            $hydratedTickets++;
+        });
+
+        $this->actingAs($this->nocUser);
+        $window = (new ReflectionMethod(NocDashboardController::class, 'loadComplaintWindow'))
+            ->invoke(app(NocDashboardController::class));
+
+        $this->assertSame(0, $hydratedTickets);
+        $this->assertCount(1, $window['tickets']);
+        $this->assertSame('Babadan', $window['tickets']->first()->region_name);
+        $this->assertSame('Kabel Putus', $window['tickets']->first()->issue_name);
+    }
+
+    public function test_monthly_complaint_window_keeps_selected_pop_scope(): void
+    {
+        $otherPop = Pop::create([
+            'name' => 'POP Luar Scope',
+            'code' => 'POP-LUAR-NOC',
+            'type' => 'branch',
+            'address' => 'Luar scope',
+            'status' => 'active',
+        ]);
+        $otherCustomer = Customer::factory()->create([
+            'pop_id' => $otherPop->id,
+            'village_id' => $this->customer->village_id,
+        ]);
+
+        foreach ([$this->customer, $otherCustomer] as $index => $customer) {
+            Ticket::create([
+                'ticket_number' => "TK-SCOPE-TREND-{$index}",
+                'type' => TaskType::MAINTENANCE->value,
+                'customer_id' => $customer->id,
+                'pop_id' => $customer->pop_id,
+                'detail_keluhan' => 'Uji scope.',
+                'priority' => 'High',
+                'handler' => 'noc',
+                'status' => 'open',
+                'created_by' => $this->helpdeskUser->id,
+            ]);
+        }
+
+        $scope = $this->nocUser->roleScopes()->firstOrFail();
+        $scope->update(['scope_type' => ScopeType::SELECTED_POP->value]);
+        $scope->targets()->create(['pop_id' => $this->pop->id]);
+        app(EffectiveAccessService::class)->clearCache($this->nocUser);
+
+        $this->actingAs($this->nocUser);
+        $window = (new ReflectionMethod(NocDashboardController::class, 'loadComplaintWindow'))
+            ->invoke(app(NocDashboardController::class));
+
+        $this->assertCount(1, $window['tickets']);
+        $this->assertSame($this->pop->id, (int) $window['tickets']->first()->pop_id);
+    }
+
+    public function test_dashboard_cache_isolated_when_user_pop_scope_shrinks(): void
+    {
+        $otherPop = Pop::create([
+            'name' => 'POP Cache Luar',
+            'code' => 'POP-CACHE-LUAR',
+            'type' => 'branch',
+            'address' => 'Luar scope',
+            'status' => 'active',
+        ]);
+        $otherCustomer = Customer::factory()->create([
+            'pop_id' => $otherPop->id,
+            'village_id' => $this->customer->village_id,
+        ]);
+
+        foreach ([$this->customer, $otherCustomer] as $index => $customer) {
+            Ticket::create([
+                'ticket_number' => "TK-CACHE-SCOPE-{$index}",
+                'type' => TaskType::MAINTENANCE->value,
+                'customer_id' => $customer->id,
+                'pop_id' => $customer->pop_id,
+                'detail_keluhan' => 'Uji cache POP.',
+                'priority' => 'High',
+                'handler' => 'noc',
+                'status' => 'open',
+                'created_by' => $this->helpdeskUser->id,
+            ]);
+        }
+
+        $before = $this->actingAs($this->nocUser)->get(route('noc.dashboard'));
+        $before->assertOk();
+        $this->assertSame(2, $before->viewData('stats')['total_ticket']);
+        $this->assertSame(2, $before->viewData('monthlyComplaintTrend')['total']);
+
+        $scope = $this->nocUser->roleScopes()->firstOrFail();
+        $scope->update(['scope_type' => ScopeType::SELECTED_POP->value]);
+        $scope->targets()->create(['pop_id' => $this->pop->id]);
+        app(EffectiveAccessService::class)->clearCache($this->nocUser);
+
+        $after = $this->actingAs($this->nocUser)->get(route('noc.dashboard'));
+        $after->assertOk();
+        $this->assertSame(1, $after->viewData('stats')['total_ticket']);
+        $this->assertSame(1, $after->viewData('monthlyComplaintTrend')['total']);
+        $this->assertCount(1, $after->viewData('perPopAnalytics'));
+        $this->assertCount(1, $after->viewData('deepAnalytics')['regional_complaint_rates']);
     }
 
     public function test_monthly_complaint_trend_renders_and_spans_twelve_months(): void
@@ -410,6 +618,44 @@ class NocDashboardTest extends TestCase
         $this->assertGreaterThanOrEqual(1, end($entry['customers']));
         $this->assertNotEmpty($entry['analysis']);
         $this->assertStringNotContainsString('NaN', $entry['analysis']);
+    }
+
+    public function test_chronic_customer_analytics_does_not_hydrate_every_ticket(): void
+    {
+        $category = TicketIssueCategory::create([
+            'name' => 'Koneksi Putus',
+            'default_priority' => 'High',
+            'is_active' => true,
+        ]);
+
+        for ($i = 1; $i <= 2; $i++) {
+            Ticket::create([
+                'ticket_number' => "TK-CHRONIC-{$i}",
+                'type' => TaskType::MAINTENANCE->value,
+                'customer_id' => $this->customer->id,
+                'pop_id' => $this->pop->id,
+                'issue_category_id' => $category->id,
+                'detail_keluhan' => 'Koneksi putus.',
+                'priority' => 'High',
+                'handler' => 'noc',
+                'status' => 'open',
+                'created_by' => $this->helpdeskUser->id,
+            ]);
+        }
+
+        $hydratedTickets = 0;
+        Ticket::retrieved(function () use (&$hydratedTickets): void {
+            $hydratedTickets++;
+        });
+
+        $this->actingAs($this->nocUser);
+        $rows = app(NocAnalyticsService::class)->getChronicCustomers(Ticket::query()->applyUserScope());
+
+        $this->assertSame(0, $hydratedTickets);
+        $this->assertCount(1, $rows);
+        $this->assertSame($this->customer->full_name, $rows[0]['name']);
+        $this->assertSame('Koneksi Putus', $rows[0]['top_issue']);
+        $this->assertSame(2, $rows[0]['count']);
     }
 
     public function test_pop_without_any_customer_is_skipped_from_per_pop_analytics(): void

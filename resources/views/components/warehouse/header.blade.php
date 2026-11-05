@@ -18,6 +18,7 @@
     $canViewReport = $user->hasPermission('warehouse_report.view');
     $canViewSoldToCustomer = $user->hasPermission('warehouse_report.sold_to_customer.view');
     $canViewStockRequest = $user->hasPermission('warehouse_stock_request.view');
+    $canViewInfraStock = $user->hasPermission('warehouse.infra_stock.view');
     $canViewTransfer = $user->hasPermission('warehouse_transfer.view');
     $canViewBranchSale = $user->hasPermission('warehouse_branch_sale.view');
 
@@ -30,7 +31,7 @@
     $isTransfersActive = in_array($active, ['transfers', 'transfers-pending', 'branch-sales', 'transfers-create', 'transfers-reverse'], true);
     $isReturnsActive = in_array($active, ['returns', 'returns-from-customer', 'from-customer', 'retrievals', 'damaged', 'pusat', 'dispatch'], true);
     $isFieldActive = in_array($active, ['custody', 'scan', 'traceability'], true);
-    $isReportsActive = in_array($active, ['history', 'usage', 'reports', 'sold-to-customer'], true);
+    $isReportsActive = in_array($active, ['history', 'usage', 'infra-stock', 'reports', 'sold-to-customer'], true);
 
     $transfersActiveLabel = match ($active) {
         'transfers' => 'Daftar Transfer',
@@ -61,6 +62,7 @@
     $reportsActiveLabel = match ($active) {
         'history' => 'Riwayat Mutasi',
         'usage' => 'Pemakaian',
+        'infra-stock' => 'Terpasang di Infra',
         'reports' => 'Laporan Stok',
         'sold-to-customer' => 'Barang Terjual',
         default => null,
@@ -650,6 +652,19 @@
                             </div>
                         </a>
                         @endif
+                        @if($canViewInfraStock)
+                        <a href="{{ route('warehouse.infra_stock.index') }}" class="{{ $vItemClass($active === 'infra-stock') }}">
+                            <div class="flex items-center gap-2.5 min-w-0">
+                                <div class="{{ $vIconWrapClass($active === 'infra-stock', 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400') }}">
+                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8m0 0L4.5 9m7.5 4l7.5-4M12 13L4.5 9m7.5 4l7.5-4M4.5 9l7.5-4.5L19.5 9M4.5 9v6l7.5 4.5 7.5-4.5V9"/></svg>
+                                </div>
+                                <div class="min-w-0">
+                                    <p class="truncate">Terpasang di Infrastruktur</p>
+                                    <p class="text-[11px] font-normal text-slate-500 dark:text-slate-400 truncate">SN/qty/kabel yang sedang di infra</p>
+                                </div>
+                            </div>
+                        </a>
+                        @endif
                         @if($canViewReport)
                         <a href="{{ route('warehouse.reports.index') }}" class="{{ $vItemClass($active === 'reports') }}">
                             <div class="flex items-center gap-2.5 min-w-0">
@@ -1158,6 +1173,19 @@
                             <div class="min-w-0">
                                 <p class="truncate">Pemakaian Material</p>
                                 <p class="text-[11px] font-normal text-slate-500 dark:text-slate-400 truncate">Rekap pemakaian oleh teknisi</p>
+                            </div>
+                        </div>
+                    </a>
+                    @endif
+                    @if($canViewInfraStock)
+                    <a href="{{ route('warehouse.infra_stock.index') }}" class="{{ $vItemClass($active === 'infra-stock') }}">
+                        <div class="flex items-center gap-2.5 min-w-0">
+                            <div class="{{ $vIconWrapClass($active === 'infra-stock', 'bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400') }}">
+                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8m0 0L4.5 9m7.5 4l7.5-4M12 13L4.5 9m7.5 4l7.5-4M4.5 9l7.5-4.5L19.5 9M4.5 9v6l7.5 4.5 7.5-4.5V9"/></svg>
+                            </div>
+                            <div class="min-w-0">
+                                <p class="truncate">Terpasang di Infrastruktur</p>
+                                <p class="text-[11px] font-normal text-slate-500 dark:text-slate-400 truncate">SN/qty/kabel yang sedang di infra</p>
                             </div>
                         </div>
                     </a>

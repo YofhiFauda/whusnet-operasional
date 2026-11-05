@@ -113,24 +113,28 @@ class CollectorBalanceService
             return collect();
         }
 
-        // Satu query untuk semua teknisi (bukan satu query per teknisi).
+        // Agregasi DECIMAL per teknisi menjaga rumus physicalAmount() dan
+        // tanggal tertua tanpa menghidrasi seluruh pembayaran tertunda.
         $unsettled = Payment::query()
             ->whereIn('collected_by', $technicians->pluck('id'))
             ->where('payment_status', PaymentStatus::VALID->value)
             ->whereNull('collector_deposit_id')
-            ->get(['id', 'collected_by', 'collected_date', 'amount', 'balance_used_amount', 'overpay_amount'])
-            ->groupBy('collected_by');
+            ->selectRaw('collected_by, MIN(collected_date) as oldest_collected_date, SUM(amount - COALESCE(balance_used_amount, 0) + COALESCE(overpay_amount, 0)) as balance')
+            ->groupBy('collected_by')
+            ->toBase()
+            ->get()
+            ->keyBy('collected_by');
 
         return $technicians
             ->map(function (User $technician) use ($unsettled, $pastCloseTime, $today) {
-                $payments = $unsettled->get($technician->id, collect());
-                $balance = Money::sum($payments->map(fn (Payment $p) => $p->physicalAmount()));
+                $summary = $unsettled->get($technician->id);
+                $balance = Money::of($summary?->balance ?? 0);
 
                 if (Money::isZero($balance)) {
                     return null;
                 }
 
-                $oldestDate = $payments->min('collected_date');
+                $oldestDate = $summary?->oldest_collected_date;
                 $oldestDate = $oldestDate ? (string) $oldestDate : null;
                 $overdue = $pastCloseTime || ($oldestDate !== null && $oldestDate < $today);
 

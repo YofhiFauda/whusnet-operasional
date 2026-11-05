@@ -99,7 +99,7 @@
     'alpine:init' SEKALI. Lihat pop-filter.blade.php/wilayah-filter.blade.php/
     verifications/queue.blade.php/dst untuk pola lengkapnya.
 --}}
-<body hx-boost="true" class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
+<body hx-boost="true" hx-history="false" class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
 
 <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-sky-600 focus:text-white focus:rounded-lg focus:shadow-lg focus:font-semibold focus:text-xs">
     Lewati ke konten utama
