@@ -17,6 +17,7 @@ use App\Services\ManualCategoryInvoiceService;
 use App\Support\LikeSearch;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
+use App\Support\SortRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -46,9 +47,7 @@ class InvoiceController extends Controller
                     ->with('collector:id,name')
                     ->orderBy('payment_date')
                     ->orderBy('id'),
-            ])
-            ->latest('issue_date')
-            ->latest('id');
+            ]);
 
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
@@ -83,6 +82,25 @@ class InvoiceController extends Controller
             $query->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value]);
         } elseif ($status !== '' && in_array($status, $allowedStatuses, true)) {
             $query->where('invoice_status', $status);
+        }
+
+        // Sort header tabel (klik kolom) — kalau `sort` kosong/tidak valid,
+        // query tidak disentuh dan jatuh ke default (terbit terbaru dulu).
+        $activeSort = SortRequest::apply($request, $query, [
+            'invoice_number' => 'invoice_number',
+            'customer' => fn ($q, $dir) => $q->orderBy(
+                Customer::select('full_name')->whereColumn('customers.id', 'invoices.customer_id'), $dir
+            ),
+            'pop' => fn ($q, $dir) => $q->orderBy(
+                Pop::select('name')->whereColumn('pops.id', 'invoices.pop_id'), $dir
+            ),
+            'billing_period' => 'billing_period',
+            'total_amount' => 'total_amount',
+            'remaining_amount' => 'remaining_amount',
+            'invoice_status' => 'invoice_status',
+        ]);
+        if ($activeSort === null) {
+            $query->latest('issue_date')->latest('id');
         }
 
         $invoices = $query->paginate(10)->withQueryString();
@@ -120,6 +138,7 @@ class InvoiceController extends Controller
 
         return view('invoices.index', compact(
             'invoices',
+            'activeSort',
             'pops',
             'search',
             'popId',

@@ -28,6 +28,7 @@ use App\Services\NumberSequenceService;
 use App\Services\TaskService;
 use App\Support\LikeSearch;
 use App\Support\ReasonValidationRule;
+use App\Support\SortRequest;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -69,34 +70,7 @@ class FopTaskController extends Controller
             'ticket.customer.pop:id,name,cid_prefix',
         ])
             ->applyUserScope()
-            ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
-            // Urutan papan (keputusan eksplisit user, 2026-09-10 — membalik
-            // rancangan lama di flowchart.md §8/user-flow.md yang urut
-            // prioritas dulu baru tanggal, dua dokumen itu sudah disinkronkan
-            // ke aturan baru ini di komit yang sama): TANGGAL KERJA DULU,
-            // PRIORITAS JADI TIE-BREAKER.
-            //   1. Bucket client_request_date "belum waktunya" (PSB nunggu
-            //      tanggal request pelanggan) TETAP di-sink ke bawah duluan —
-            //      ini bukan soal urutan tanggal/prioritas, tapi "belum layak
-            //      masuk antrean sama sekali" (lihat catatan asli Task 8).
-            //   2. `task_date` ASC — tanggal kerja terjadwal paling dekat di
-            //      atas. NULL (harusnya gak pernah kejadian — store()/
-            //      syncToFopTask() selalu isi nilai — tapi kolomnya nullable
-            //      di skema) sengaja disink ke bawah, bukan nyelonong ke atas
-            //      kayak default ASC NULL-first di MySQL/SQLite.
-            //   3. Prioritas (Urgent→Low) — cuma dipakai kalau `task_date`-nya
-            //      SAMA PERSIS.
-            //   4. `created_at` ASC — tie-breaker terakhir (urutan masuk),
-            //      biar dua task tanggal+prioritas sama tetap stabil urutannya
-            //      antar-request, bukan berubah-ubah ngikut query plan.
-            ->orderByRaw('CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END', [now()->addDay()->toDateString()])
-            ->orderByRaw('CASE WHEN task_date IS NULL THEN 1 ELSE 0 END')
-            ->orderBy('task_date', 'asc')
-            ->orderByRaw(
-                'CASE priority '.self::priorityOrderCaseSql().' ELSE 5 END',
-                self::priorityOrderBindings()
-            )
-            ->orderBy('created_at', 'asc');
+            ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN]);
 
         // Search filter
         if ($request->filled('search')) {
@@ -136,6 +110,37 @@ class FopTaskController extends Controller
 
         if ($request->filled('team_id')) {
             $query->where('team_id', $request->input('team_id'));
+        }
+
+        // Sort header tabel — klik kolom MENGGANTI TOTAL urutan papan prioritas
+        // di atas (keputusan user 2026-11-05: klik = urutan murni ikut kolom
+        // itu, bukan tie-breaker). Default (tanpa ?sort=) tetap urutan papan
+        // lama: tanggal kerja dulu, prioritas jadi tie-breaker (2026-09-10).
+        // Kolom "Teknisi" SENGAJA tidak sortable — many-to-many, gak ada 1
+        // nilai tunggal per baris buat diurutkan (keputusan user 2026-11-05).
+        $activeSort = SortRequest::apply($request, $query, [
+            'category' => 'category',
+            'task_date' => 'task_date',
+            'tugas' => 'tugas',
+            'area' => fn ($q, $dir) => $q->orderBy(
+                Village::select('name')->whereColumn('villages.id', 'fop_tasks.village_id'), $dir
+            ),
+            'issue' => 'issue',
+            'team' => fn ($q, $dir) => $q->orderBy(
+                FopTaskTeam::select('name')->whereColumn('fop_task_teams.id', 'fop_tasks.team_id'), $dir
+            ),
+            'status' => 'status',
+            'priority' => 'priority',
+        ]);
+        if ($activeSort === null) {
+            $query->orderByRaw('CASE WHEN client_request_date IS NOT NULL AND client_request_date >= ? THEN 1 ELSE 0 END', [now()->addDay()->toDateString()])
+                ->orderByRaw('CASE WHEN task_date IS NULL THEN 1 ELSE 0 END')
+                ->orderBy('task_date', 'asc')
+                ->orderByRaw(
+                    'CASE priority '.self::priorityOrderCaseSql().' ELSE 5 END',
+                    self::priorityOrderBindings()
+                )
+                ->orderBy('created_at', 'asc');
         }
 
         $fopTasks = $query->with('team:id,name')->paginate(20)->withQueryString();
@@ -242,7 +247,7 @@ class FopTaskController extends Controller
         // Tim aktif khusus hari ini (untuk Roster Summary Bar di atas tabel)
         $todayTeams = $teams->filter(fn ($t) => $t['work_date'] === $today)->values();
 
-        return view('fop_tasks.index', compact('fopTasks', 'villages', 'pops', 'cabangPops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts', 'switchTargetTasks', 'todayTeams', 'todayWorkloadByTech'));
+        return view('fop_tasks.index', compact('fopTasks', 'activeSort', 'villages', 'pops', 'cabangPops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams', 'teamConflicts', 'switchTargetTasks', 'todayTeams', 'todayWorkloadByTech'));
     }
 
     /**
@@ -1411,8 +1416,7 @@ class FopTaskController extends Controller
             'customer:id,full_name,primary_phone,cid,address,latitude,longitude',
         ])
             ->applyUserScope()
-            ->whereIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN])
-            ->orderBy('updated_at', 'desc');
+            ->whereIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN]);
 
         // Search filter
         if ($request->filled('search')) {
@@ -1448,6 +1452,26 @@ class FopTaskController extends Controller
 
         if ($request->filled('team_id')) {
             $query->where('team_id', $request->input('team_id'));
+        }
+
+        // Sort header tabel — kolom "Teknisi" sengaja tidak sortable (many-to-many,
+        // sama kayak FOP Task index, keputusan user 2026-11-05).
+        $activeSort = SortRequest::apply($request, $query, [
+            'category' => 'category',
+            'task_date' => 'task_date',
+            'tugas' => 'tugas',
+            'area' => fn ($q, $dir) => $q->orderBy(
+                Village::select('name')->whereColumn('villages.id', 'fop_tasks.village_id'), $dir
+            ),
+            'issue' => 'issue',
+            'team' => fn ($q, $dir) => $q->orderBy(
+                FopTaskTeam::select('name')->whereColumn('fop_task_teams.id', 'fop_tasks.team_id'), $dir
+            ),
+            'status' => 'status',
+            'priority' => 'priority',
+        ]);
+        if ($activeSort === null) {
+            $query->orderBy('updated_at', 'desc');
         }
 
         $fopTasks = $query->with('team:id,name')->paginate(20)->withQueryString();
@@ -1504,7 +1528,7 @@ class FopTaskController extends Controller
                 ];
             });
 
-        return view('fop_tasks.history', compact('fopTasks', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams'));
+        return view('fop_tasks.history', compact('fopTasks', 'activeSort', 'villages', 'pops', 'technicians', 'categories', 'manualCategories', 'canEditFopTaskType', 'teams'));
     }
 
     /**

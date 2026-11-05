@@ -7,11 +7,13 @@ use App\Enums\TaskType;
 use App\Enums\TicketHandler;
 use App\Enums\TicketHandlingStatus;
 use App\Enums\TicketHistoryAction;
+use App\Models\Customer;
 use App\Models\Pop;
 use App\Models\Ticket;
 use App\Models\TicketIssueCategory;
 use App\Models\User;
 use App\Support\LikeSearch;
+use App\Support\SortRequest;
 use Illuminate\Contracts\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
@@ -56,7 +58,7 @@ class NocWorksheetController extends Controller
 
         $tab = $this->resolveTab($request);
 
-        $tickets = $this->baseQuery($request, $tab)
+        $ticketQuery = $this->baseQuery($request, $tab)
             ->with([
                 // pop_id/status/distribution_id WAJIB ikut — Customer::getDisplayIdAttribute()
                 // butuh relasi POP buat resolve CID lengkap.
@@ -67,13 +69,37 @@ class NocWorksheetController extends Controller
                 'issueCategory:id,name',
                 // Dipakai escalatedToFopBy() di kolom "Dikirim oleh" tab Assign FOP.
                 'histories.actor:id,name',
-            ])
-            ->latest('created_at')
-            ->paginate(50)
-            ->withQueryString();
+            ]);
+
+        // Sort header tabel. "Kontak & Lokasi", "Umur Antrean", "Diserahkan",
+        // "Dikirim Oleh" SENGAJA tidak sortable — bukan kolom tunggal dari DB
+        // (komposit alamat, dihitung dari created_at, atau diturunkan dari
+        // relasi histories — keputusan user 2026-11-05).
+        $activeSort = SortRequest::apply($request, $ticketQuery, [
+            'created_at' => 'created_at',
+            'ticket_number' => 'ticket_number',
+            'customer' => fn ($q, $dir) => $q->orderBy(
+                Customer::select('full_name')->whereColumn('customers.id', 'tickets.customer_id'), $dir
+            ),
+            'pop' => fn ($q, $dir) => $q->orderBy(
+                Pop::select('name')->whereColumn('pops.id', 'tickets.pop_id'), $dir
+            ),
+            'detail_keluhan' => 'detail_keluhan',
+            'issue_category' => fn ($q, $dir) => $q->orderBy(
+                TicketIssueCategory::select('name')->whereColumn('ticket_issue_categories.id', 'tickets.issue_category_id'), $dir
+            ),
+            'priority' => 'priority',
+            'status' => 'status',
+        ]);
+        if ($activeSort === null) {
+            $ticketQuery->latest('created_at');
+        }
+
+        $tickets = $ticketQuery->paginate(50)->withQueryString();
 
         return view('noc.worksheet', [
             'tickets' => $tickets,
+            'activeSort' => $activeSort,
             'tab' => $tab,
             'tabCounts' => $this->tabCounts($request),
             'filters' => $this->activeFilters($request),

@@ -120,13 +120,13 @@
             <thead>
                 <tr class="bg-slate-50/50 dark:bg-slate-700/50 border-b border-slate-200 dark:border-slate-700 text-slate-500 dark:text-slate-400 font-semibold text-xs">
                     <th class="px-6 py-3.5 w-12 text-center">NO</th>
-                    <th class="px-6 py-3.5">NO. TAGIHAN</th>
-                    <th class="px-6 py-3.5">PELANGGAN</th>
-                    <th class="px-6 py-3.5">POP</th>
-                    <th class="px-6 py-3.5">PERIODE</th>
-                    <th class="px-6 py-3.5 text-center">TOTAL</th>
-                    <th class="px-6 py-3.5 text-center">SISA</th>
-                    <th class="px-6 py-3.5 text-center">STATUS</th>
+                    <x-sortable-th sort-key="invoice_number" label="NO. TAGIHAN" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
+                    <x-sortable-th sort-key="customer" label="PELANGGAN" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
+                    <x-sortable-th sort-key="pop" label="POP" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
+                    <x-sortable-th sort-key="billing_period" label="PERIODE" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
+                    <x-sortable-th sort-key="total_amount" label="TOTAL" align="center" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
+                    <x-sortable-th sort-key="remaining_amount" label="SISA" align="center" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
+                    <x-sortable-th sort-key="invoice_status" label="STATUS" align="center" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
                     <th class="px-6 py-3.5 text-center">ACTION</th>
                 </tr>
             </thead>

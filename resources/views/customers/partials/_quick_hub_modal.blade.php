@@ -128,27 +128,27 @@
                         </div>
 
                         <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
-                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                                 <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">Nama Lengkap</span>
                                 <span id="hub-prof-fullname" class="font-bold text-slate-900 dark:text-white truncate block text-xs mt-0.5">-</span>
                             </div>
-                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                                 <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">NIK / No. KTP</span>
                                 <span id="hub-prof-nik" class="font-mono font-medium text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
-                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                                 <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">Kode Pelanggan (CID)</span>
                                 <span id="hub-prof-cid" class="font-mono font-bold text-sky-600 dark:text-sky-400 truncate block text-xs mt-0.5">-</span>
                             </div>
-                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                                 <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">No. HP / WhatsApp</span>
                                 <span id="hub-prof-phone" class="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
-                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                                 <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">Email</span>
                                 <span id="hub-prof-email" class="text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
-                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                                 <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">Tanggal Registrasi</span>
                                 <span id="hub-prof-reg" class="font-mono font-medium text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
@@ -169,7 +169,7 @@
                             </div>
                             
                             <div class="space-y-3 pt-1">
-                                <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750 flex items-center justify-between">
+                                <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 flex items-center justify-between">
                                     <div>
                                         <span class="text-slate-600 dark:text-slate-400 text-[10px] block font-medium">Nama Paket Layanan</span>
                                         <span id="hub-prof-package" class="font-bold text-slate-900 dark:text-white text-sm sm:text-base mt-0.5 block">-</span>
@@ -209,7 +209,7 @@
                             <span>Konfigurasi Jaringan & Perangkat</span>
                         </h3>
                         <div class="flex items-center gap-2 shrink-0">
-                            <button type="button" onclick="copyTechInfo()" class="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-100 dark:hover:bg-slate-750 transition-colors btn-interactive inline-flex items-center gap-1.5" title="Salin seluruh info teknis ke clipboard">
+                            <button type="button" onclick="copyTechInfo()" class="px-2.5 py-1.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors btn-interactive inline-flex items-center gap-1.5" title="Salin seluruh info teknis ke clipboard">
                                 <svg class="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 5H6a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2v-1M8 5a2 2 0 002 2h2a2 2 0 002-2M8 5a2 2 0 012-2h2a2 2 0 012 2m0 0h2a2 2 0 012 2v3m2 4H10m0 0l3-3m-3 3l3 3"/></svg>
                                 <span>Copy Teknis</span>
                             </button>
@@ -226,7 +226,7 @@
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                         <!-- PPPoE Username -->
-                        <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750 flex flex-col justify-between">
+                        <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 flex flex-col justify-between">
                             <div>
                                 <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Username PPPoE</span>
                                 <div class="flex items-center justify-between gap-1.5 mt-0.5">
@@ -240,43 +240,43 @@
                         </div>
 
                         <!-- VLAN ID -->
-                        <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                        <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">VLAN ID</span>
                             <span id="hub-tech-vlan" class="font-mono font-bold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                         </div>
 
                         <!-- Bandwidth -->
-                        <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                        <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Bandwidth</span>
                             <span id="hub-tech-bandwidth" class="font-bold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                         </div>
 
                         <!-- SN Perangkat -->
-                        <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                        <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">SN Perangkat (ONT/Modem)</span>
                             <span id="hub-tech-onu" class="font-mono font-bold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                         </div>
 
                         <!-- Merk / Model / MAC -->
-                        <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                        <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Merk / Model / MAC</span>
                             <span id="hub-tech-router" class="font-mono font-semibold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                         </div>
 
                         <!-- ODP / Distribusi -->
-                        <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                        <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">ODP / Distribusi</span>
                             <span id="hub-tech-distribution" class="font-semibold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                         </div>
 
                         <!-- Skema Kontrak -->
-                        <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                        <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Skema Kontrak</span>
                             <span id="hub-tech-contract" class="font-semibold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                         </div>
 
                         <!-- Redaman Optik -->
-                        <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                        <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Redaman (dBm)</span>
                             <span id="hub-tech-attenuation" class="font-mono font-bold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                         </div>
@@ -297,31 +297,31 @@
                     </div>
 
                     <div class="space-y-3">
-                        <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                        <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                             <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Alamat Pemasangan Lengkap</span>
                             <p id="hub-field-address-full" class="font-semibold text-slate-900 dark:text-white text-xs sm:text-sm mt-0.5">-</p>
                         </div>
 
                         <div class="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                                 <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Desa / Kelurahan</span>
                                 <span id="hub-field-village" class="font-semibold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
-                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                                 <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Kecamatan</span>
                                 <span id="hub-field-district" class="font-semibold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
-                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                                 <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Kota / Kabupaten</span>
                                 <span id="hub-field-city" class="font-semibold text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
-                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750">
+                            <div class="p-2.5 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700">
                                 <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Kode Pos</span>
                                 <span id="hub-field-postal-code" class="font-mono font-medium text-slate-800 dark:text-slate-200 truncate block text-xs mt-0.5">-</span>
                             </div>
                         </div>
 
-                        <div class="p-3 rounded-xl bg-white dark:bg-slate-850 border border-slate-200/60 dark:border-slate-750 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div class="p-3 rounded-xl bg-white dark:bg-slate-800 border border-slate-200/60 dark:border-slate-700 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                             <div>
                                 <span class="text-slate-400 dark:text-slate-500 text-[10px] block font-medium">Koordinat GPS</span>
                                 <span id="hub-field-coords" class="font-mono font-bold text-sky-600 dark:text-sky-400 block text-xs sm:text-sm mt-0.5">-</span>
@@ -361,7 +361,7 @@
                             <span id="hub-doc-{{ $berkas['type'] }}-badge" class="text-[10px] px-2.5 py-0.5 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-semibold shrink-0 border border-slate-200 dark:border-slate-700">-</span>
                         </div>
 
-                        <div class="h-32 rounded-xl bg-slate-50 dark:bg-slate-850 flex items-center justify-center border border-dashed border-slate-300 dark:border-slate-700 text-slate-400 overflow-hidden">
+                        <div class="h-32 rounded-xl bg-slate-50 dark:bg-slate-800 flex items-center justify-center border border-dashed border-slate-300 dark:border-slate-700 text-slate-400 overflow-hidden">
                             <a id="hub-doc-{{ $berkas['type'] }}-link" href="#" target="_blank" class="hidden w-full h-full items-center justify-center text-xs font-semibold text-sky-600 dark:text-sky-400 hover:underline bg-sky-50/50 dark:bg-sky-950/20">
                                 <span>Lihat Berkas Tersimpan ↗</span>
                             </a>
@@ -387,7 +387,7 @@
             <!-- TAB 5: RINGKASAN & TAGIHAN -->
             <div id="tab-content-finance" class="tab-pane hidden space-y-4 sm:space-y-6">
                 <!-- Ringkasan Billing Banner -->
-                <div class="p-4 sm:p-5 rounded-2xl bg-gradient-to-br from-slate-50 to-sky-50/30 dark:from-slate-850 dark:to-sky-950/20 border border-slate-200/80 dark:border-slate-800 space-y-3.5 max-w-lg shadow-2xs">
+                <div class="p-4 sm:p-5 rounded-2xl bg-slate-50/70 dark:bg-slate-800/40 border border-slate-200/80 dark:border-slate-800 space-y-3.5 max-w-lg shadow-2xs">
                     <div class="flex items-center justify-between border-b border-slate-200/60 dark:border-slate-700/60 pb-2.5">
                         <h3 class="text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider flex items-center gap-1.5">
                             <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 14l6-6m-5.5.5h.01m4.99 5h.01M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16l3.5-2 3.5 2 3.5-2 3.5 2z"/></svg>

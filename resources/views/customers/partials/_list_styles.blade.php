@@ -40,10 +40,14 @@
     .animate-pop-in { animation: popIn 0.35s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
     .animate-pulse-glow { animation: pulseGlow 2s infinite ease-in-out; }
 
-    .btn-interactive { transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
+    {{-- `transition: all` dulu di sini ikut nge-transition tiap properti (termasuk
+         warna/border) pas Card KPI & Card Filter buka/tutup lewat x-collapse — kerjaan
+         ekstra buat browser di setiap frame animasi height, kerasa berat di HP.
+         Dipersempit ke transform/box-shadow (satu-satunya yang beneran dipakai hover/active). --}}
+    .btn-interactive { transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1); }
     .btn-interactive:hover { transform: translateY(-1px); }
     .btn-interactive:active { transform: translateY(0) scale(0.98); }
 
-    .card-interactive { transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+    .card-interactive { transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
     .card-interactive:hover { transform: translateY(-2px); }
 </style>
