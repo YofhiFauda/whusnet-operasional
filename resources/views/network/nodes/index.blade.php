@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Master Node Jaringan & ODN - Whusnet Operasional')
-@section('page_title', 'Master Node Jaringan & ODN')
+@section('title', 'Master Node Jaringan - Whusnet Operasional')
+@section('page_title', 'Master Node Jaringan')
 
 @push('styles')
 <style>
@@ -177,7 +177,7 @@
     </div>
 
     {{-- Segmented View Switcher untuk Layar Mobile & Tablet (< 1024px) --}}
-    <div class="sticky top-14 z-20 flex lg:hidden bg-surface p-1 rounded-lg border border-border shadow-xs">
+    <div class="flex lg:hidden bg-surface p-1 rounded-lg border border-border shadow-xs">
         <button type="button" @click="activeMobileTab = 'tree'"
                 :class="activeMobileTab === 'tree' ? 'bg-sky-600 text-white font-bold shadow-xs' : 'text-text-muted hover:text-text-main hover:bg-surface-muted'"
                 class="flex-1 py-2 text-xs rounded-md text-center transition-colors cursor-pointer flex items-center justify-center gap-1.5">

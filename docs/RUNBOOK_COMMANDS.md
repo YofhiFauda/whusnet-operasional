@@ -3,7 +3,9 @@
 Panduan kapan dan dengan urutan apa tiap command dijalankan. Ditulis 2026-07-21,
 diperbarui 2026-08-10 (langkah tambal bulan + cek scheduler di kelompok C,
 kelompok C-2 go-live "pelanggan saja"), 2026-11-02 (struktur folder per
-kategori pakai + tabel rekap semua command).
+kategori pakai + tabel rekap semua command), 2026-11-05 (`--terminate-missing`
+di `app:customer-package-reconcile-excel` — auto putus langganan pelanggan
+luar Excel).
 
 Aturan umum sebelum mulai:
 
@@ -586,6 +588,67 @@ ketemu. Aman diulang — dry-run ulang pasca-apply harus hasilnya 0 diubah.
 # Verifikasi idempoten setelah apply:
 php artisan app:customer-package-reconcile-excel "docs/database/excel/<file>.xlsx" --pop-name="<Nama POP>" --dry-run   # harus 0 diubah
 ```
+
+#### `--terminate-missing` — putus langganan otomatis buat pelanggan luar Excel (2026-11-05)
+
+**Opt-in, default OFF.** Pelanggan di Pop yang sama tapi **TIDAK ADA** baris
+Excel-nya (bukan nama yang di-skip, bukan nama ambigu, bukan yang dikoreksi
+lewat `manual_overrides`) dianggap sudah putus langganan — rekap Excel jadi
+sumber kebenaran TERBARU, bukan cuma buat koreksi harga/paket. Dipakai kalau
+tujuannya memang menyamakan List Pelanggan sepenuhnya dengan rekap Excel
+terbaru (bukan sekadar membetulkan harga/paket pelanggan yang masih aktif).
+
+```bash
+# Dry-run WAJIB dulu — cek tabel "Akan Diputus Langganan" sebelum --apply
+php artisan app:customer-package-reconcile-excel "docs/database/excel/<file>.xlsx" --pop-name="<Nama POP>" --config=<config>.json --terminate-missing --actor-id=<user_id>
+
+php artisan app:customer-package-reconcile-excel "docs/database/excel/<file>.xlsx" --pop-name="<Nama POP>" --config=<config>.json --terminate-missing --actor-id=<user_id> --apply
+```
+
+- **`--actor-id` wajib** kalau `--terminate-missing` dipakai — console command
+  tidak punya `Auth::user()`, user id ini yang tercatat sebagai pelaku di audit
+  log. Cek id user yang mau dipakai: `php artisan tinker --execute
+  'echo \App\Models\User::where("email","<email>")->first()?->id;'`
+- Lewat jalur resmi `CustomerTerminationService::terminate()` — SAMA dengan
+  form "Request Putus Langganan" di UI. Alasan putus auto-dibuat sekali
+  (idempotent) bernama **"Rekonsiliasi Data Excel"**, denda selalu `0`.
+- **"Modem belum diambil" muncul otomatis** — bukan field yang diisi command
+  ini. Begitu pelanggan baru pertama kali di-terminate,
+  `customer_devices.device_retrieved_at` tetap NULL (belum ada task AMBIL_MODEM
+  yang selesai), jadi pelanggan itu langsung muncul di List Putus Langganan
+  dengan tombol "Ambil Alat" tersedia — tanpa command ini perlu membuat
+  FopTask apa pun.
+- **Tanpa flag ini, behaviour command 100% tidak berubah** — aman dipakai
+  terus buat koreksi harga/paket biasa.
+
+**Yang TIDAK ikut diputus** (sengaja dilindungi, perlu review manual dulu):
+nama di `skip_names`, nama ambigu (>1 kandidat di Pop yang sama), CID yang
+disebut di `manual_overrides` (walau koreksinya sendiri gagal), dan pelanggan
+di Pop lain. Yang ikut jadi kandidat hanya status `active`/`suspended` —
+pelanggan yang sudah `terminated`/`draft`/dll dilewati diam-diam (tidak valid
+jadi target transisi putus langganan).
+
+> ⚠️ **Ini aksi destruktif (putus langganan sungguhan), bukan rollback
+> impor.** Pastikan tabel dry-run "Akan Diputus Langganan" sudah dicek
+> satu-satu — nama yang nyasar ke situ karena beda tulisan/typo harus
+> dibetulkan dulu lewat `name_aliases` di config, BUKAN langsung `--apply`.
+
+
+### Cara pakai:
+
+1. Dry-run dulu (wajib, cek diff tanpa tulis DB):
+php artisan app:customer-package-reconcile-excel "docs/database/excel/NamaFile.xlsx" --pop-name=Sambit --config=docs/database/excel/sambit-config.json --terminate-missing --actor-id=1
+Lihat tabel "Akan Diputus Langganan" — cek dulu nama-namanya bener-bener harus putus, bukan korban nama beda tulisan/typo yang harusnya kena alias/skip_names/manual_overrides di config.
+
+2. Kalau aman, jalanin beneran + --apply:
+php artisan app:customer-package-reconcile-excel "docs/database/excel/NamaFile.xlsx" --pop-name=Sambit --config=docs/database/excel/sambit-config.json --terminate-missing --actor-id=1 --apply
+
+Catatan:
+- --actor-id = user id pelaku (buat audit log). Cek id user yang mau dipakai lewat php artisan tinker → User::where('email','...')->first()->id atau liat tabel users.
+- Gak pake --terminate-missing sama sekali = behavior lama, gak ada yg diputus (aman, backward compatible).
+- Pelanggan yang keliru ketemu di tabel "Akan Diputus" karena nama beda tulisan → betulin lewat name_aliases di config, jangan apply dulu.
+- Alasan putus otomatis ke "Rekonsiliasi Data Excel" (reason baru, auto dibuat sekali, bisa dicek/edit di Master Alasan Putus Langganan).
+- Kalau docker: docker compose exec -u www-data app php artisan ... (ganti php artisan di atas).
 
 ### `app:customer-serial-reconcile-excel` — selaraskan Serial Number dari rekap kegiatan Excel cabang
 

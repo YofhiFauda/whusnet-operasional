@@ -1,7 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Peta Infrastruktur ISP — Barang Terpasang')
-@section('page_title', 'Peta Infrastruktur ISP')
+@section('title', 'Peta Infrastruktur — Barang Terpasang')
+@section('page_title', 'Peta Infrastruktur')
 
 @section('content')
 {{--
@@ -30,7 +30,7 @@
     <div class="sticky top-0 z-10 flex flex-wrap items-center gap-2 border-b border-slate-200 bg-white/95 px-4 py-2.5 backdrop-blur-md dark:border-slate-800 dark:bg-[#131d24]/95">
         <div class="flex items-center gap-2">
             <span class="inline-flex size-2 rounded-full bg-emerald-500"></span>
-            <h1 class="font-display text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">Peta Infrastruktur ISP</h1>
+            <h1 class="font-display text-xs font-bold uppercase tracking-wider text-slate-900 dark:text-slate-100">Peta Infrastruktur</h1>
         </div>
 
         <div role="tablist" aria-label="Tampilan Utama" class="flex items-center rounded-xl border border-slate-200/80 bg-slate-50 p-1 dark:border-slate-800 dark:bg-slate-900/60">

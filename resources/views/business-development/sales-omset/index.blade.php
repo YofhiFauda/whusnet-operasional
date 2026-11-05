@@ -63,7 +63,7 @@
                     Formula PPN 11%
                 </span>
             </div>
-            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
+            <p class="hidden sm:block text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
                 Monitoring akumulasi omset per staf Sales/Penginput berdasarkan nilai PPN 11% tagihan pelanggan baru pada periode aktif. Klik baris nama Sales untuk melihat rincian per pelanggan.
             </p>
         </div>
@@ -173,8 +173,100 @@
         </div>
     </div>
 
-    {{-- ── LAYER 2: FILTER BAR (NAKED — NO ENCLOSING CARD, SESUAI DESIGN.MD TYPE A) ── --}}
-    <div class="mb-5">
+    {{-- ── LAYER 2: FILTER CARD (EXPANDABLE / COLLAPSIBLE ON MOBILE, SESUAI DESIGN.MD) ── --}}
+    @php
+        $hasActiveFilter = (bool) ($roleId || $salesUserId || $periode !== now()->format('Y-m'));
+        $activeFilterCount = ($roleId ? 1 : 0) + ($salesUserId ? 1 : 0) + ($periode !== now()->format('Y-m') ? 1 : 0);
+    @endphp
+
+    <div x-data="{
+            mobileFilterOpen: {{ $hasActiveFilter ? 'true' : 'false' }},
+            isDesktop: window.innerWidth >= 768
+         }"
+         @resize.window.debounce.100ms="isDesktop = window.innerWidth >= 768"
+         class="bg-white dark:bg-slate-800 border border-slate-200/80 dark:border-slate-700/80 rounded-xl shadow-2xs mb-5 overflow-hidden transition-all">
+
+        <!-- Header Filter: Mobile Toggle & Status Info -->
+        <div class="px-4 py-3 flex items-center justify-between gap-3 bg-slate-50/70 dark:bg-slate-800/80 border-b border-slate-200/80 dark:border-slate-700/80">
+            <div class="flex items-center gap-2.5 flex-wrap">
+                <button type="button"
+                        class="flex items-center gap-2 text-left cursor-pointer md:cursor-default focus:outline-none"
+                        @click="if (!isDesktop) mobileFilterOpen = !mobileFilterOpen">
+                    <div class="w-6 h-6 rounded-lg bg-sky-100 dark:bg-sky-950/60 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0 border border-sky-200/80 dark:border-sky-800/60">
+                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M12 3c2.755 0 5.455.232 8.083.678.533.09.917.556.917 1.096v1.044a2.25 2.25 0 01-.659 1.591l-5.432 5.432a2.25 2.25 0 00-.659 1.591v2.927a2.25 2.25 0 01-1.244 2.013L9.75 21v-6.568a2.25 2.25 0 00-.659-1.591L3.659 7.409A2.25 2.25 0 013 5.818V4.774c0-.54.384-1.006.917-1.096A48.32 48.32 0 0112 3z"/>
+                        </svg>
+                    </div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-slate-700 dark:text-slate-200 select-none">
+                        Filter &amp; Pencarian
+                    </span>
+                </button>
+
+                @if($hasActiveFilter)
+                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-bold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border border-sky-200/80 dark:border-sky-800/60">
+                        <span class="w-1.5 h-1.5 rounded-full bg-sky-500 animate-pulse"></span>
+                        <span>{{ $activeFilterCount }} Filter Aktif</span>
+                    </span>
+                @endif
+            </div>
+
+            <!-- Header Action Controls -->
+            <div class="flex items-center gap-2">
+                @if($roleId || $salesUserId || $periode !== now()->format('Y-m'))
+                    <a href="{{ route('business-development.sales-omset.index', ['periode' => $periode]) }}"
+                       class="inline-flex items-center gap-1 px-2.5 py-1 text-xs font-semibold text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-colors border border-rose-200 dark:border-rose-900/60"
+                       title="Reset Semua Filter">
+                        <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                        </svg>
+                        <span>Reset</span>
+                    </a>
+                @endif
+
+                <!-- Mobile Toggle Button (Visible on Mobile only) -->
+                <button type="button"
+                        @click="mobileFilterOpen = !mobileFilterOpen"
+                        :aria-expanded="mobileFilterOpen ? 'true' : 'false'"
+                        class="md:hidden inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-bold bg-white dark:bg-slate-700/80 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-600 transition-all cursor-pointer shadow-2xs">
+                    <span x-text="mobileFilterOpen ? 'Tutup Filter' : 'Buka Filter'"></span>
+                    <svg class="w-3.5 h-3.5 text-slate-400 transition-transform duration-200"
+                         :class="mobileFilterOpen ? 'rotate-180' : ''"
+                         fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Active Filter Pills (always visible if active, gives quick overview even if collapsed on mobile) -->
+        @if($roleId || $salesUserId)
+            <div class="px-4 py-2 bg-slate-50/50 dark:bg-slate-900/40 border-b border-slate-200/60 dark:border-slate-700/60 flex items-center gap-1.5 flex-wrap text-xs">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mr-1">Aktif:</span>
+
+                @if($roleId)
+                    @php $activeRoleName = $restrictedRoles->firstWhere('id', $roleId)?->name ?? $roleId; @endphp
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 shadow-2xs">
+                        <span class="text-slate-400 dark:text-slate-500">Role:</span> {{ $activeRoleName }}
+                        <a href="{{ route('business-development.sales-omset.index', request()->except(['role_id'])) }}"
+                           class="text-slate-400 hover:text-rose-500 font-bold ml-1 transition-colors"
+                           title="Hapus filter role">×</a>
+                    </span>
+                @endif
+
+                @if($salesUserId)
+                    @php $activeSalesName = $nameOptions->firstWhere('id', $salesUserId)?->name ?? $salesUserId; @endphp
+                    <span class="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 shadow-2xs">
+                        <span class="text-slate-400 dark:text-slate-500">Sales:</span> {{ $activeSalesName }}
+                        <a href="{{ route('business-development.sales-omset.index', request()->except(['sales_user_id'])) }}"
+                           class="text-slate-400 hover:text-rose-500 font-bold ml-1 transition-colors"
+                           title="Hapus filter nama sales">×</a>
+                    </span>
+                @endif
+            </div>
+        @endif
+
+        <!-- Collapsible Filter Form Body -->
+        <div x-show="isDesktop || mobileFilterOpen" x-collapse x-cloak class="p-4 sm:p-5 bg-white dark:bg-slate-800">
         <form action="{{ route('business-development.sales-omset.index') }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-3 items-end">
             {{-- Periode Selector --}}
             <div class="lg:col-span-3">
@@ -264,6 +356,7 @@
                 @endif
             </div>
         </form>
+        </div>
     </div>
 
     {{-- ── LAYER 3: PRIMARY CONTENT — TABLE PANEL (CARD BUDGET = 1) ── --}}

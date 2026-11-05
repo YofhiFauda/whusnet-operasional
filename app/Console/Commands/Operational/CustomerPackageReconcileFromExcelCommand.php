@@ -3,17 +3,22 @@
 namespace App\Console\Commands\Operational;
 
 use App\Enums\InvoiceType;
+use App\Enums\WorkflowTransition;
 use App\Models\Customer;
 use App\Models\CustomerService;
+use App\Models\CustomerTerminationReason;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\Pop;
 use App\Models\RevenueCategory;
 use App\Models\RevenueSubcategory;
+use App\Models\User;
+use App\Services\CustomerTerminationService;
 use App\Services\InvoiceItemBuilder;
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
 use Spatie\SimpleExcel\SimpleExcelReader;
+use Throwable;
 
 class CustomerPackageReconcileFromExcelCommand extends Command
 {
@@ -86,12 +91,44 @@ class CustomerPackageReconcileFromExcelCommand extends Command
      * Excel + 3.000 sisanya baru kelar direview minggu ke-3, padahal tagihan
      * bulanan sudah terbit duluan di antaranya) tetap aman dari jebakan itu
      * di SEMUA baris, bukan cuma yang auto-match.
+     *
+     * **`--terminate-missing` (2026-11-05, opt-in, default OFF):** pelanggan
+     * di Pop yang sama tapi TIDAK ADA baris Excel-nya (bukan nama yang
+     * di-skip, bukan nama ambigu, bukan yang dikoreksi lewat
+     * `manual_overrides`) dianggap sudah putus langganan — rekap Excel
+     * kolektor jadi sumber kebenaran TERBARU, bukan cuma buat koreksi
+     * harga/paket. Jalan lewat `CustomerTerminationService::terminate()`,
+     * jalur resmi YANG SAMA dengan form "Request Putus Langganan" di UI —
+     * BUKAN update status manual di sini, supaya audit log, invariant
+     * `terminated_at`, dan state machine `WorkflowTransition` tetap
+     * terjaga. Status alat "Modem belum diambil" TIDAK PERNAH field
+     * tersendiri yang perlu diisi manual — begitu pelanggan baru pertama
+     * kali di-terminate, `customer_devices.device_retrieved_at` otomatis
+     * tetap NULL (belum ada task AMBIL_MODEM yang selesai), jadi tombol
+     * "Ambil Alat" otomatis muncul di List Putus Langganan tanpa command
+     * ini perlu menyentuhnya sama sekali.
+     *
+     * Alasan putus (`termination_reason_id`) SENGAJA bukan opsi — command
+     * `firstOrCreate()` satu baris master alasan tetap bernama konstan
+     * (lihat `TERMINATION_REASON_NAME`) kalau belum ada, lalu selalu pakai
+     * itu. Idempotent lintas cabang/environment; admin tetap bebas kelola
+     * baris ini normal lewat UI Master Alasan Putus Langganan sesudahnya.
+     * `penalty_amount` SELALU 0 — ini batch koreksi data, bukan keputusan
+     * denda per pelanggan (beda dari form UI yang wajib diisi admin).
+     *
+     * `--actor-id` wajib kalau `--terminate-missing` — console command
+     * tidak punya `Auth::user()`, dan `AuditLog`/`CustomerTerminationService`
+     * butuh user id pelaku yang valid.
      */
+    private const TERMINATION_REASON_NAME = 'Rekonsiliasi Data Excel';
+
     protected $signature = 'app:customer-package-reconcile-excel
                         {file : Path Excel sumber (relatif ke base_path, atau absolut)}
                         {--pop-id= : ID Pop tujuan. Wajib kalau nama Pop ambigu/tidak diisi --pop-name}
                         {--pop-name= : Nama Pop tujuan, alternatif --pop-id}
                         {--config= : Path JSON alias/skip/typo-fix/manual_overrides khusus cabang ini (opsional, lihat contoh docs/database/excel/sambit-okt2026-config.json)}
+                        {--terminate-missing : Putus langganan pelanggan di Pop ini yang TIDAK ada baris Excel-nya (opt-in, default OFF)}
+                        {--actor-id= : User id pelaku, wajib kalau --terminate-missing (dicatat di audit log)}
                         {--apply : Tulis perubahan ke database. Tanpa flag ini cuma dry-run (tampilkan diff)}';
 
     // php artisan app:customer-package-reconcile-excel "docs/database/excel/OKT_sambit_Tagihan Sambit Oktober 2026.xlsx" --pop-name=Sambit --config=docs/database/excel/sambit-okt2026-config.json --apply
@@ -120,12 +157,30 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             return self::FAILURE;
         }
 
+        $terminateMissing = (bool) $this->option('terminate-missing');
+        $actor = null;
+        if ($terminateMissing) {
+            $actorId = $this->option('actor-id');
+            $actor = $actorId ? User::find((int) $actorId) : null;
+            if (! $actor) {
+                $this->error('--terminate-missing butuh --actor-id yang valid (user id pelaku, dicatat di audit log).');
+
+                return self::FAILURE;
+            }
+        }
+
         $apply = (bool) $this->option('apply');
         $this->info($apply ? 'MODE APPLY — perubahan akan ditulis ke database.' : 'MODE DRY-RUN — tidak ada perubahan ditulis. Jalankan dengan --apply untuk eksekusi.');
 
         $changed = [];
         $unchanged = 0;
         $skipped = [];
+        // Dipakai `--terminate-missing` — siapa pun yang namanya MUNCUL di
+        // Excel (walau gagal dikoreksi otomatis: di-skip config, ambigu >1
+        // kandidat) dianggap "masih ada" dan TIDAK boleh ikut diputus. Diisi
+        // SELAMA loop ini berjalan (lookup-nya dipindah ke atas pengecekan
+        // skip_names), bukan cuma dari baris yang berhasil dikoreksi.
+        $presentCustomerIds = [];
 
         foreach (SimpleExcelReader::create($fullPath)->getRows() as $row) {
             $namaExcel = trim((string) ($row['Nama'] ?? ''));
@@ -136,18 +191,22 @@ class CustomerPackageReconcileFromExcelCommand extends Command
                 continue;
             }
 
-            if (in_array($namaExcel, $skipNames, true)) {
-                $skipped[] = [$namaExcel, 'ditandai skip di config — datanya belum bisa dipercaya, perlu ditelusuri manual dulu'];
-
-                continue;
-            }
-
             $resolvedName = $nameAliases[$namaExcel] ?? $namaExcel;
 
             $candidates = Customer::query()
                 ->where('pop_id', $pop->id)
                 ->whereRaw('LOWER(TRIM(full_name)) = ?', [mb_strtolower(trim($resolvedName))])
                 ->get();
+
+            foreach ($candidates as $candidate) {
+                $presentCustomerIds[$candidate->id] = true;
+            }
+
+            if (in_array($namaExcel, $skipNames, true)) {
+                $skipped[] = [$namaExcel, 'ditandai skip di config — datanya belum bisa dipercaya, perlu ditelusuri manual dulu'];
+
+                continue;
+            }
 
             if ($candidates->count() !== 1) {
                 $skipped[] = [$namaExcel, $candidates->count() === 0 ? 'nama ini tidak ditemukan di sistem' : "ada {$candidates->count()} pelanggan dengan nama sama di sistem — perlu dicek manual, nama saja tidak cukup unik"];
@@ -245,6 +304,11 @@ class CustomerPackageReconcileFromExcelCommand extends Command
                 continue;
             }
 
+            // CID disebut eksplisit di manual_overrides = admin tahu
+            // pelanggan ini ADA, walau koreksinya di bawah nanti gagal
+            // (service/kode paket invalid) — tetap jangan ikut diputus.
+            $presentCustomerIds[$customer->id] = true;
+
             $service = $customer->customerService;
             if (! $service) {
                 $skipped[] = [$customer->full_name." ({$cid})", 'pelanggan ketemu, tapi belum punya data layanan (customer_service) — gak bisa dikoreksi'];
@@ -284,8 +348,52 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             }
         }
 
+        $terminated = [];
+        if ($terminateMissing) {
+            $candidates = Customer::query()
+                ->where('pop_id', $pop->id)
+                ->whereNotIn('id', array_keys($presentCustomerIds))
+                ->whereIn('status', [WorkflowTransition::ACTIVE->value, WorkflowTransition::SUSPENDED->value])
+                ->get();
+
+            foreach ($candidates as $customer) {
+                $note = 'Reconcile Excel '.basename($fullPath)." ({$pop->name}, ".now()->toDateString().'): tidak ditemukan di rekap';
+
+                if ($apply) {
+                    // `firstOrCreate` baru dijalankan sekarang (bukan di atas
+                    // sebelum loop) — supaya dry-run TIDAK meninggalkan baris
+                    // master alasan baru di DB walau tidak ada kandidat yang
+                    // benar-benar diputus.
+                    $reason = CustomerTerminationReason::firstOrCreate(
+                        ['name' => self::TERMINATION_REASON_NAME],
+                        ['default_penalty_amount' => 0, 'is_active' => true],
+                    );
+
+                    try {
+                        app(CustomerTerminationService::class)->terminate($customer, [
+                            'termination_reason_id' => $reason->id,
+                            'termination_note' => $note,
+                            'penalty_amount' => 0,
+                        ], $actor->id);
+                    } catch (Throwable $e) {
+                        $skipped[] = [$customer->full_name." ({$customer->id})", 'gagal diputus otomatis: '.$e->getMessage()];
+
+                        continue;
+                    }
+                }
+
+                $terminated[] = [$customer->id, $customer->full_name];
+            }
+        }
+
         if ($changed !== []) {
             $this->table(['Customer ID', 'Nama', 'Harga Lama', 'Harga Baru', 'Paket', 'Sumber'], $changed);
+        }
+
+        if ($terminated !== []) {
+            $this->newLine();
+            $this->warn('Akan Diputus Langganan (Pelanggan Luar Excel):');
+            $this->table(['Customer ID', 'Nama'], $terminated);
         }
 
         if ($skipped !== []) {
@@ -296,11 +404,12 @@ class CustomerPackageReconcileFromExcelCommand extends Command
 
         $this->newLine();
         $this->info(sprintf(
-            '%s: %d diubah, %d sudah cocok (tidak disentuh), %d dilewati.',
+            '%s: %d diubah, %d sudah cocok (tidak disentuh), %d dilewati, %d diputus langganan.',
             $apply ? 'Selesai' : 'Dry-run selesai',
             count($changed),
             $unchanged,
             count($skipped),
+            count($terminated),
         ));
 
         return self::SUCCESS;

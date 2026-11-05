@@ -18,6 +18,7 @@
 <div x-data="{
     searchQuery: '',
     showGuide: false,
+    showFilter: false,
     matchesQuery(row) {
         if (!this.searchQuery.trim()) return true;
         const q = this.searchQuery.toLowerCase();
@@ -48,7 +49,7 @@
                     </span>
                 @endif
             </div>
-            <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
+            <p class="hidden sm:block text-xs sm:text-sm text-slate-500 dark:text-slate-400 max-w-3xl">
                 Pelanggan kategori bisnis yang telah lolos verifikasi teknis CS dan menunggu penentuan Biaya Instalasi oleh tim Business Development sebelum resmi diaktifkan.
             </p>
         </div>
@@ -103,74 +104,92 @@
     {{-- ── LAYER 2: SUMMARY STRIP (FLAT BAR WITH 1 ENCLOSING CONTAINER) ── --}}
     <div class="grid grid-cols-2 lg:grid-cols-4 bg-white dark:bg-slate-800 border border-slate-200/70 dark:border-slate-700/60 rounded-lg shadow-2xs mb-5 overflow-hidden">
         {{-- Antrean Verifikasi --}}
-        <div class="p-3.5 sm:p-4 border-b lg:border-b-0 border-r border-slate-200/60 dark:border-slate-700/50">
+        <div class="p-2.5 sm:p-4 border-b lg:border-b-0 border-r border-slate-200/60 dark:border-slate-700/50">
             <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Antrean Menunggu
             </span>
             <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-xl sm:text-2xl font-bold font-mono {{ $totalCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100' }}">
+                <span class="text-lg sm:text-2xl font-bold font-mono {{ $totalCount > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-slate-900 dark:text-slate-100' }}">
                     {{ number_format($totalCount) }}
                 </span>
-                <span class="text-[11px] text-slate-400 dark:text-slate-500">
+                <span class="hidden sm:inline text-[11px] text-slate-400 dark:text-slate-500">
                     pelanggan
                 </span>
             </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            <p class="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Perlu ditinjau &amp; diaktifkan
             </p>
         </div>
 
         {{-- Total Potensi Biaya Bulanan --}}
-        <div class="p-3.5 sm:p-4 border-b lg:border-b-0 lg:border-r border-slate-200/60 dark:border-slate-700/50">
+        <div class="p-2.5 sm:p-4 border-b lg:border-b-0 lg:border-r border-slate-200/60 dark:border-slate-700/50">
             <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Total Biaya Langganan
             </span>
             <div class="mt-1">
-                <span class="text-lg sm:text-xl font-bold font-mono text-slate-900 dark:text-slate-100 truncate block">
+                <span class="text-sm sm:text-xl font-bold font-mono text-slate-900 dark:text-slate-100 truncate block">
                     {{ \App\Helpers\FormatHelper::rupiah($totalLangganan) }}
                 </span>
             </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            <p class="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Potensi pendapatan bulanan
             </p>
         </div>
 
         {{-- Estimasi Bawaan Instalasi --}}
-        <div class="p-3.5 sm:p-4 border-r border-slate-200/60 dark:border-slate-700/50">
+        <div class="p-2.5 sm:p-4 border-r border-slate-200/60 dark:border-slate-700/50">
             <span class="block text-[10px] font-semibold uppercase tracking-wider text-sky-600 dark:text-sky-400">
                 Estimasi Instalasi Bawaan
             </span>
             <div class="mt-1">
-                <span class="text-lg sm:text-xl font-bold font-mono text-sky-600 dark:text-sky-400 truncate block">
+                <span class="text-sm sm:text-xl font-bold font-mono text-sky-600 dark:text-sky-400 truncate block">
                     {{ \App\Helpers\FormatHelper::rupiah($totalDefaultInstalasi) }}
                 </span>
             </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            <p class="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Berdasarkan master paket
             </p>
         </div>
 
         {{-- Cakupan POP --}}
-        <div class="p-3.5 sm:p-4">
+        <div class="p-2.5 sm:p-4">
             <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">
                 Sebaran Cabang / POP
             </span>
             <div class="flex items-baseline gap-2 mt-1">
-                <span class="text-lg sm:text-xl font-bold font-mono text-slate-900 dark:text-slate-100 truncate">
+                <span class="text-sm sm:text-xl font-bold font-mono text-slate-900 dark:text-slate-100 truncate">
                     {{ $popCount }}
                 </span>
-                <span class="text-[11px] text-slate-400 dark:text-slate-500">
+                <span class="hidden sm:inline text-[11px] text-slate-400 dark:text-slate-500">
                     POP terlibat
                 </span>
             </div>
-            <p class="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
+            <p class="hidden sm:block text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 truncate">
                 Wilayah pelanggan antrean
             </p>
         </div>
     </div>
 
     {{-- ── LAYER 2: NAKED SEARCH BAR & TOOLBAR ── --}}
-    <div class="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-5">
+    <div class="mb-5">
+        {{-- Mobile-only toggle: search bar expand/collapse biar hemat ruang vertikal --}}
+        <button type="button"
+                @click="showFilter = !showFilter"
+                class="md:hidden w-full flex items-center justify-between px-3 py-2 mb-2 text-xs font-semibold rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300">
+            <span class="inline-flex items-center gap-1.5">
+                <svg class="w-3.5 h-3.5 text-slate-400 dark:text-slate-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+                Cari &amp; Filter
+                <span x-show="searchQuery" style="display: none;" class="inline-flex items-center justify-center min-w-[16px] h-4 px-1 rounded-full bg-sky-600 text-white text-[10px] font-bold">1</span>
+            </span>
+            <svg class="w-4 h-4 text-slate-400 dark:text-slate-500 transition-transform" :class="{ 'rotate-180': showFilter }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/>
+            </svg>
+        </button>
+
+        <div :class="showFilter ? 'flex' : 'hidden md:flex'"
+             class="flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
         {{-- Instant Search Box --}}
         <div class="relative flex-1 max-w-md">
             <input type="text"
@@ -193,6 +212,7 @@
 
         <div class="text-xs text-slate-500 dark:text-slate-400 flex items-center gap-2 self-end sm:self-center">
             <span>Menampilkan <strong>{{ $totalCount }}</strong> antrean</span>
+        </div>
         </div>
     </div>
 

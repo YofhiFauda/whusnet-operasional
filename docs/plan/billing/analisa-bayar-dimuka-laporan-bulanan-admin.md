@@ -1,7 +1,7 @@
 # Analisis Bayar Dimuka pada Laporan Bulanan Admin
 
 **Tanggal:** 2026-10-29  
-**Status:** Implementasi kode lokal selesai 2026-10-29; migration perlu dijalankan pada database tujuan.
+**Status:** Implementasi kode lokal selesai 2026-10-29; migration telah terpasang pada database aplikasi lokal (terverifikasi 2026-11-05).
 **Cakupan:** Laporan Bulanan Admin (/reports/collector-monthly), blok Tagihan, Pelanggan, dan penjelasan Piutang Bulan Lalu. Task aktif ADHOC-202 tetap berjalan.
 
 ## Definisi yang diminta

@@ -391,7 +391,7 @@ class InfrastructureMapTest extends TestCase
 
         $this->get(route('network.nodes.index'))
             ->assertOk()
-            ->assertSee('Peta Infrastruktur ISP')
+            ->assertSee('Peta Infrastruktur')
             ->assertSee(route('network.map.index'), false);
     }
 
