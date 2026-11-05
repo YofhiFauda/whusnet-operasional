@@ -671,6 +671,15 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // Barang Terpasang di Infrastruktur (state saat ini, bukan log
+        // periode) — permission SEMPIT terpisah dari `warehouse.view`,
+        // SENGAJA TIDAK di-OR di route supaya role lama yang cuma punya
+        // `warehouse.view` (pic_gudang/pop_admin/atasan) gak otomatis
+        // tembus. Keputusan user 2026-11-05: admin_gudang dulu.
+        'warehouse.infra_stock' => [
+            ActionCode::VIEW->value,
+        ],
+
         // Permintaan Stok Cabang→Pusat (2026-09-03) — jawaban gap "cabang
         // habis stok, Pusat gak sadar". APPROVE/REJECT dipegang sisi Pusat
         // (fulfill/tolak), CANCEL dipegang pengaju sendiri (dicek scope
@@ -972,5 +981,6 @@ return [
 
         // Rekap Pemakaian Material Lapangan (/warehouse/usage)
         'warehouse.usage.view' => 'Lihat Rekap Pemakaian Material Lapangan',
+        'warehouse.infra_stock.view' => 'Lihat Barang Terpasang di Infrastruktur',
     ],
 ];

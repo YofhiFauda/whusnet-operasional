@@ -1153,6 +1153,57 @@ class InfrastructureMapTest extends TestCase
         $this->assertContains('Splitter Terpasang', $names); // ODP turunan OLT ikut ter-BFS
     }
 
+    /**
+     * Permintaan user 2026-11-05: kolom "Task" dihapus dari tabel Barang
+     * Terpasang (task_number bukan info yang relevan di sini — trace sudah
+     * pindah ke SN/Roll-nya langsung), SN & Roll jadi link trace, dan kolom
+     * Posisi tidak boleh ke-truncate (isi breadcrumb lengkap harus tampak).
+     */
+    #[Test]
+    public function tab_barang_terpasang_menghapus_kolom_task_dan_menautkan_sn_dan_roll(): void
+    {
+        $this->seed(PermissionSeeder::class);
+        $this->seed(WarehouseFeatureSeeder::class);
+        $this->seed(RolePermissionSeeder::class);
+
+        $cabang = Pop::factory()->create(['name' => 'Cabang Hapus Task', 'type' => 'cabang']);
+        $node = NetworkNode::factory()->create(['anchor_pop_id' => $cabang->id, 'parent_id' => null, 'code' => 'NODE-HAPUS-TASK']);
+
+        $category = ItemCategory::create([
+            'code' => 'hapus_task_cat', 'name' => 'Kategori Hapus Task', 'default_unit' => 'pcs',
+            'equipment_class' => 'pasif', 'is_system' => false, 'is_active' => true,
+        ]);
+
+        $serialItem = Item::create([
+            'code' => 'HAPUS-TASK-SN-ITEM', 'name' => 'Barang SN Hapus Task', 'unit' => 'pcs',
+            'item_category_id' => $category->id, 'tracking_type' => 'serialized', 'ownership_mode' => 'infrastructure_asset',
+        ]);
+        InventorySerial::create([
+            'item_id' => $serialItem->id, 'serial_number' => 'HAPUS-TASK-SN-0001',
+            'status' => SerialStatus::DEPLOYED->value, 'current_network_node_id' => $node->id,
+        ]);
+
+        $rollItem = Item::create([
+            'code' => 'HAPUS-TASK-ROLL-ITEM', 'name' => 'Kabel Hapus Task', 'unit' => 'meter',
+            'item_category_id' => $category->id, 'tracking_type' => 'quantity', 'ownership_mode' => 'infrastructure_asset',
+        ]);
+        InfrastructureBalance::create(['item_id' => $rollItem->id, 'lot_no' => 'ROLL-HAPUS-TASK-01', 'network_node_id' => $node->id, 'qty' => 50]);
+
+        $this->loginAsAdmin();
+
+        $html = $this->get(route('network.map.index', ['tab' => 'terpasang']))
+            ->assertOk()
+            ->assertSee('HAPUS-TASK-SN-0001')
+            ->assertSee('ROLL-HAPUS-TASK-01')
+            ->getContent();
+
+        $this->assertStringNotContainsString('>Task</th>', $html);
+        $this->assertStringContainsString('traceability?sn=HAPUS-TASK-SN-0001', $html);
+        $this->assertStringContainsString('traceability?roll=ROLL-HAPUS-TASK-01', $html);
+        // Posisi: breadcrumb gak boleh ke-truncate CSS — kelas `truncate` dihapus total dari sel ini.
+        $this->assertStringNotContainsString('truncate font-mono text-[11px]', $html);
+    }
+
     #[Test]
     public function tab_barang_terpasang_mengabaikan_pop_di_luar_scope_pengguna(): void
     {

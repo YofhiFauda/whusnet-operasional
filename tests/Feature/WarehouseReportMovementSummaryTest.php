@@ -20,6 +20,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\WarehouseFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -88,6 +89,84 @@ class WarehouseReportMovementSummaryTest extends TestCase
         $this->assertEquals(40.0, $cabangRow['transfer_in']);
         $this->assertEquals(10.0, $cabangRow['issue']);
         $this->assertEquals(0.0, $cabangRow['receive'], 'Cabang gak pernah RECEIVE langsung dari distributor');
+        $pusatItem = $pusatRow['items']->firstWhere('item_id', $this->kabel->id);
+        $cabangItem = $cabangRow['items']->firstWhere('item_id', $this->kabel->id);
+        $this->assertEquals(60.0, $pusatItem['stok_akhir_qty']);
+        $this->assertEquals(300000.0, $pusatItem['stok_akhir_nilai']);
+        $this->assertEquals(30.0, $cabangItem['stok_akhir_qty']);
+        $this->assertEquals(150000.0, $cabangItem['stok_akhir_nilai']);
+    }
+
+    #[Test]
+    public function query_ledger_laporan_tidak_bertambah_linear_per_item_serial_dan_quantity(): void
+    {
+        $category = ItemCategory::where('equipment_class', 'aktif')->firstOrFail();
+        $items = [];
+        $counting = false;
+        $ledgerQueries = 0;
+
+        DB::listen(function ($query) use (&$counting, &$ledgerQueries): void {
+            if ($counting && str_contains($query->sql, 'inventory_transactions')) {
+                $ledgerQueries++;
+            }
+        });
+
+        for ($i = 1; $i <= 4; $i++) {
+            $item = Item::create([
+                'code' => "RPT-MODEM-{$i}",
+                'name' => "Modem Report {$i}",
+                'item_category_id' => $category->id,
+                'unit' => 'unit',
+                'tracking_type' => 'serialized',
+                'ownership_mode' => 'installable',
+            ]);
+            app(InventoryReceiveService::class)->receiveSerialized(
+                $this->pusat, $item, ["RPT-SN-{$i}"], 100000 + $i, $this->owner
+            );
+            $items[] = $item;
+
+            if ($i === 1) {
+                $counting = true;
+                $first = $this->actingAs($this->owner)->get(route('warehouse.reports.index'));
+                $first->assertOk();
+                $firstQueryCount = $ledgerQueries;
+                $ledgerQueries = 0;
+                $counting = false;
+            }
+        }
+
+        $quantityItems = [];
+        for ($i = 1; $i <= 3; $i++) {
+            $item = Item::create([
+                'code' => "RPT-QTY-{$i}",
+                'name' => "Quantity Report {$i}",
+                'item_category_id' => $this->kabel->item_category_id,
+                'unit' => 'unit',
+                'tracking_type' => 'quantity',
+            ]);
+            app(InventoryReceiveService::class)->receiveQuantity($this->pusat, $item, 10, 1000 + $i, $this->owner);
+            $quantityItems[] = $item;
+        }
+
+        $counting = true;
+        $response = $this->actingAs($this->owner)->get(route('warehouse.reports.index'));
+        $counting = false;
+        $response->assertOk();
+
+        $this->assertLessThanOrEqual($firstQueryCount + 8, $ledgerQueries);
+
+        $pusat = collect($response->viewData('movementRows'))
+            ->firstWhere(fn ($row) => $row['pop']->id === $this->pusat->id);
+        foreach ($items as $item) {
+            $row = $pusat['items']->firstWhere('item_id', $item->id);
+            $this->assertEquals(1.0, $row['stok_akhir_qty']);
+            $this->assertEquals(100000 + (int) substr($item->code, -1), $row['stok_akhir_nilai']);
+        }
+        foreach ($quantityItems as $item) {
+            $row = $pusat['items']->firstWhere('item_id', $item->id);
+            $this->assertEquals(10.0, $row['stok_akhir_qty']);
+            $this->assertEquals(10 * (1000 + (int) substr($item->code, -1)), $row['stok_akhir_nilai']);
+        }
     }
 
     #[Test]
@@ -104,7 +183,12 @@ class WarehouseReportMovementSummaryTest extends TestCase
         $response = $this->actingAs($this->owner)->get(route('warehouse.reports.index', ['period' => now()->format('Y-m')]));
 
         $movementRows = collect($response->viewData('movementRows'));
-        $this->assertTrue($movementRows->isEmpty(), 'transaksi bulan lalu gak boleh nongol di laporan bulan ini');
+        $pusatRow = $movementRows->firstWhere(fn ($row) => $row['pop']->id === $this->pusat->id);
+        $itemRow = $pusatRow['items']->firstWhere('item_id', $this->kabel->id);
+
+        $this->assertEquals(0.0, $pusatRow['receive'], 'Transaksi bulan lalu bukan barang masuk periode ini');
+        $this->assertEquals(100.0, $itemRow['stok_awal_qty'], 'Barang idle tetap tercatat sebagai stok awal');
+        $this->assertEquals(100.0, $itemRow['stok_akhir_qty'], 'Barang idle tetap tercatat sebagai stok akhir');
     }
 
     #[Test]

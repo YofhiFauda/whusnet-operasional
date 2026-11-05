@@ -49,7 +49,8 @@
     <?php echo $__env->make('partials.web-fonts', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
     <?php echo app('Illuminate\Foundation\Vite')(['resources/css/app.css', 'resources/js/app.js']); ?>
 </head>
-<body hx-boost="true" class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
+
+<body hx-boost="true" hx-history="false" class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
 
 <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-sky-600 focus:text-white focus:rounded-lg focus:shadow-lg focus:font-semibold focus:text-xs">
     Lewati ke konten utama
@@ -460,26 +461,26 @@
                     <?php endif; ?>
 
                     <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('network_nodes.view')): ?>
-                    <a href="<?php echo e(route('network.nodes.index')); ?>" title="Master Node Jaringan &amp; Port"
+                    <a href="<?php echo e(route('network.nodes.index')); ?>" title="Master Node Jaringan"
                        class="sidebar-nav-item <?php echo e(Request::routeIs('network.nodes.*') || Request::routeIs('network.node-ports.*') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::routeIs('network.nodes.*') || Request::routeIs('network.node-ports.*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <rect x="2" y="2" width="20" height="8" rx="2"/><rect x="2" y="14" width="20" height="8" rx="2"/><line x1="6" y1="6" x2="6.01" y2="6"/><line x1="6" y1="18" x2="6.01" y2="18"/>
                             </svg>
-                            <span class="sidebar-text truncate">Master Node Jaringan &amp; Port</span>
+                            <span class="sidebar-text truncate">Master Node Jaringan</span>
                         </div>
                         <?php if(($badge_node_attention_count ?? 0) > 0): ?>
                             <span id="node-attention-count" class="sidebar-badge bg-sky-500/15 text-sky-600 dark:text-sky-400 border border-sky-500/20 text-[9px] font-bold px-1.5 py-0.5 rounded-full" title="Node dengan perangkat baru terpasang"><?php echo e($badge_node_attention_count); ?></span>
                         <?php endif; ?>
                     </a>
 
-                    <a href="<?php echo e(route('network.map.index')); ?>" title="Peta Infrastruktur ISP"
+                    <a href="<?php echo e(route('network.map.index')); ?>" title="Peta Infrastruktur"
                        class="sidebar-nav-item <?php echo e(Request::routeIs('network.map.*') ? 'sidebar-nav-item-active' : ''); ?>">
                         <div class="flex items-center gap-3 sidebar-item-content">
                             <svg class="h-5 w-5 shrink-0 <?php echo e(Request::routeIs('network.map.*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M9 20l-5.447-2.724A1 1 0 013 16.382V5.618a1 1 0 011.447-.894L9 7m0 13l6-3m-6 3V7m6 10l4.553 2.276A1 1 0 0021 18.382V7.618a1 1 0 00-.553-.894L15 4m0 13V4m0 0L9 7"/>
                             </svg>
-                            <span class="sidebar-text truncate">Peta Infrastruktur ISP</span>
+                            <span class="sidebar-text truncate">Peta Infrastruktur</span>
                         </div>
                     </a>
                     <?php endif; ?>
@@ -1707,6 +1708,7 @@
 
 <?php echo $__env->yieldContent('scripts'); ?>
 <?php echo $__env->yieldPushContent('scripts'); ?>
+
 <?php if (isset($component)) { $__componentOriginal7cfab914afdd05940201ca0b2cbc009b = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal7cfab914afdd05940201ca0b2cbc009b = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.toast','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>

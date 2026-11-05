@@ -1,75 +1,48 @@
-# Rancangan — Index Pendukung dari Temuan `analisa-performa-seeder-15k.md`
+# Rancangan dan verifikasi indeks — temuan seeder 15k
 
-Status: **rancangan, belum diimplementasi.** Turunan dari kategori 3 ("butuh index biasa") di `analisa-performa-seeder-15k.md` §10. Lima titik ini dipisah ke dokumen sendiri karena solusinya murni tambah index — low-effort, low-risk, tapi tetap butuh migration asli + verifikasi EXPLAIN, bukan cuma dicatat sebagai temuan.
+Status per 2026-11-05: **diimplementasikan pada kode dan database development lokal** melalui `2026_11_05_113900_add_listing_order_and_transition_indexes.php`. Migration belum diterapkan ke database production. Dokumen ini mencatat keputusan setelah memeriksa query aplikasi, skema MySQL 8.0.46, serta EXPLAIN sebelum dan sesudah migration. Angka `rows` di bawah adalah **estimasi optimizer**, bukan waktu respons atau bukti skor Lighthouse.
 
-Index yang SUDAH ada di `invoices`/`payments` dicek langsung ke MySQL (`show index from ...`), bukan dari migration saja — supaya rancangan di bawah tidak mengusulkan index yang sudah ada dengan nama/kolom lain.
+## Scope dan keputusan
 
-## 1. `workflow_transition_permissions.(from_status, to_status)`
+Perubahan hanya menambah tiga indeks urutan dan satu constraint unik. Tidak ada filter, urutan, aturan billing, POP scope, atau kode controller yang diubah. Indeks lama untuk filter POP tetap dipakai pada query yang memiliki `pop_id`; pengujian di bawah memakai daftar global tanpa filter agar masalah yang ditemukan analisis awal dapat dibandingkan langsung.
 
-**Bukti:** `/tasks/1` → EXPLAIN flag full scan (~12 baris). Tabel ini cuma punya `PRIMARY(id)` — tidak ada index lain sama sekali.
+| Tabel | Indeks baru | Query sasaran | Alasan |
+| --- | --- | --- | --- |
+| `invoices` | `invoices_issue_date_idx (issue_date)` | `ORDER BY issue_date DESC, id DESC LIMIT 10/15` tanpa filter status/POP | Indeks lama diawali `pop_id`, `customer_id`, atau `invoice_status`, sehingga tidak memberi urutan tanggal global. InnoDB menyimpan primary key `id` pada secondary index. |
+| `payments` | `payments_payment_date_idx (payment_date)` | `ORDER BY payment_date DESC, id DESC LIMIT 15` tanpa filter | Indeks lama untuk tanggal pembayaran diawali `pop_id`, `customer_id`, atau `payment_status`. |
+| `customers` | `customers_updated_at_idx (updated_at)` | Widget 10 pelanggan belum lengkap terbaru | `WHERE data_completeness_status IN (...)` perlu urutan `updated_at` global. Pemindaian dari baris terbaru dapat berhenti setelah menemukan 10 baris yang cocok. |
+| `workflow_transition_permissions` | `wtp_from_to_unique (from_status, to_status)` | Lookup satu aturan transisi | Tujuan utama integritas data. Tabel berisi 12 pasangan berbeda; manfaat performa diperkirakan kecil. |
 
-**Kenapa worth dibenahi walau tabelnya kecil:** query `where from_status = ? and to_status = ? limit 1` ini dipanggil di SETIAP transisi status task (dicek via `TaskPolicy`/`TaskService`, bukan cuma di halaman detail), jadi frekuensi panggilnya tinggi walau tabelnya kecil. Index murah, dampak kumulatif lebih besar dari ukuran tabelnya.
+**Koreksi rancangan lama:** `(invoice_status, issue_date)` tidak menyelesaikan `ORDER BY issue_date` global tanpa filter `invoice_status`, karena `invoice_status` adalah kolom pertama. Filter `IN` dengan beberapa status juga tidak otomatis menghasilkan urutan tanggal global dari indeks itu. Karena itu indeks tersebut **tidak dibuat**. Untuk widget pelanggan, kandidat lama `(data_completeness_status, updated_at)` juga tidak dipilih: query memakai beberapa status dan meminta urutan terbaru lintas status. Indeks pengganti yang dipilih telah diuji dengan EXPLAIN setelah migration; kandidat yang tidak dibuat belum dibandingkan sebagai indeks terpasang.
 
-```php
-Schema::table('workflow_transition_permissions', function (Blueprint $table) {
-    $table->unique(['from_status', 'to_status'], 'wtp_from_to_unique');
-});
-```
-Pakai `unique()` bukan `index()` biasa — satu pasangan `(from_status, to_status)` semestinya cuma punya satu baris aturan; kalau ternyata ada duplikat di data sekarang, migration akan gagal dan itu sendiri sinyal bug data yang harus dibersihkan dulu (jangan diam-diam diganti ke `index()` biasa untuk meloloskan migration).
+## Bukti EXPLAIN pada database development
 
-## 2. `invoices` — ORDER BY `issue_date` tanpa WHERE yang cocok
+Query yang diuji memilih `id` dan urutan yang sama dengan daftar. Tabel aplikasi juga memuat relasi serta filter lain; hasil di bawah hanya membuktikan perbaikan jalur pengurutan untuk varian ini. Nilai `rows` adalah estimasi, bukan jumlah baris aktual yang pasti dibaca.
 
-**Bukti:** `/invoices`, `/reports/invoices` → full scan `invoices` (~111.438 baris) + filesort untuk `ORDER BY issue_date DESC, id DESC LIMIT 10/15` TANPA klausa WHERE.
+| Query | Sebelum | Sesudah |
+| --- | --- | --- |
+| Invoice global terbaru, LIMIT 15 | `invoices_pop_issue_idx`, rows 123841, `Using filesort` | `invoices_issue_date_idx`, rows 15, `Backward index scan; Using index` |
+| Invoice lunas terbaru, LIMIT 10 | `invoices_status_due_idx`, rows 61920, `Using filesort` | `invoices_issue_date_idx`, rows 20, `Using where; Backward index scan` |
+| Payment global terbaru, LIMIT 15 | `payments_pop_date_idx`, rows 103581, `Using filesort` | `payments_payment_date_idx`, rows 15, `Backward index scan; Using index` |
+| Pelanggan belum lengkap terbaru, LIMIT 10 | full scan, rows 48495, `Using where; Using filesort` | `customers_updated_at_idx`, rows 10, `Using where; Backward index scan` |
 
-**Index yang SUDAH ada (dicek langsung ke DB, bukan tebakan):** `invoices_pop_issue_idx (pop_id, issue_date)`, `invoices_customer_issue_date_index (customer_id, issue_date)`, `invoices_status_due_idx (invoice_status, due_date)`, `invoices_status_period_due_idx (invoice_status, billing_period, due_date)`. **Tidak ada satu pun yang punya `issue_date` sebagai kolom terdepan** — makanya sort tanpa filter `pop_id`/`customer_id` tidak bisa pakai index manapun di atas.
+Cek tambahan pada POP 2 (sekitar 125.056 invoice dan 50.107 pelanggan) menunjukkan daftar invoice tetap memilih `invoices_pop_issue_idx`, daftar payment memilih `payments_pop_date_idx`, dan widget pelanggan memilih `customers_updated_at_idx` tanpa filesort. Ini memeriksa rencana query untuk satu POP besar; uji akses POP lintas role tetap menjadi tanggung jawab test RBAC yang sudah ada.
 
-**Untuk `/invoices/belum-lunas`** (`where invoice_status in (...) order by issue_date`): index status yang ada (`invoices_status_due_idx`, `invoices_status_period_due_idx`) urutan kedua kolomnya `due_date`/`billing_period`, bukan `issue_date` — tetap filesort.
+Constraint unik berhasil dibuat pada data development; 12 pasangan status yang ada tidak duplikat. Migration `down()` diuji pada database development: indeks dan constraint baru hilang, lalu `up()` dijalankan kembali. Tidak ada baris data yang diubah oleh migration.
 
-```php
-Schema::table('invoices', function (Blueprint $table) {
-    $table->index(['invoice_status', 'issue_date'], 'invoices_status_issue_idx');
-});
-```
+## Laporan kolektor bulanan
 
-Satu composite ini menolong KEDUA kasus: `/invoices` & `/reports/invoices` (tanpa filter — MySQL tetap bisa pakai index ini untuk ORDER BY walau tanpa WHERE, karena optimizer boleh pilih full index scan terurut alih-alih filesort) dan `/invoices/belum-lunas` (`WHERE invoice_status IN (...) ORDER BY issue_date`, prefix match langsung).
+`CollectorMonthlyReportService` memakai `billing_period`, `pop_id`, `invoice_id`, `payment_date`, beberapa subquery agregat, dan kondisi status. Pengukuran `perf:pages` setelah migration pada periode default memberi **6.451 ms, 24 query, 92,5 MB** untuk `/reports/collector-monthly`; dua query terberat masing-masing 3.615,2 ms dan 1.421,8 ms. EXPLAIN masih menandai full scan `invoices` sekitar 123.841 baris pada query piutang lama. Query ini meminta seluruh invoice sebelum periode berjalan dan menggabungkan agregat payment; indeks tanggal untuk daftar global memang bukan solusi langsung. Indeks yang sudah ada mencakup `invoices_pop_period_idx`, `payments_invoice_id_idx`, dan `payments_status_date_idx`. Tidak ada indeks tambahan khusus laporan bulanan dalam migration ini. Optimasi laporan memerlukan analisis SQL per blok dengan periode dan POP representatif, lalu pengujian bentuk query serta indeks JOIN/agregat secara terpisah agar angka keuangan dan scope POP tetap sama.
 
-## 3. `payments` — ORDER BY `payment_date` tanpa WHERE yang cocok
+## Kaitan dengan optimasi query lain
 
-**Bukti:** `/reports/payments` → full scan `payments` (~101.990 baris) + filesort, `ORDER BY payment_date DESC, id DESC LIMIT 15` tanpa WHERE.
+ADHOC-268 mengganti tiga pengambilan histori eskalasi/pengembalian NOC dengan satu agregasi `GROUP BY actor_id, action, to_status`. Tes regresi membuktikan histori non-selesai tidak lagi dihidrasi; 17 tes NOC lulus. Setelah ADHOC-270 memadatkan tren 12 bulan dan pelanggan kronis, halaman NOC terukur 6.827 ms/12.512 model pada satu run development; bottleneck halaman penuh masih terbuka.
 
-**Index yang sudah ada:** `payments_pop_date_idx (pop_id, payment_date)`, `payments_status_date_idx (payment_status, payment_date)`, `payments_customer_date_idx (customer_id, payment_date)`, `payments_status_date_amount_idx (payment_status, payment_date, amount)` — semua butuh WHERE di kolom pertama buat kepakai; tidak ada yang menutupi sort tanpa filter.
+Setelah ADHOC-269 pada database development, `/warehouse/reports` turun dari 221 menjadi 47 query lewat batch saldo, dan `/collector-worksheet` turun dari 50.108 menjadi 74 model lewat agregasi kas. Keduanya merupakan perubahan query, bukan dampak migration indeks ini. `/fop-tasks` masih 21.782 model; refresh halaman penuh serta laporan kolektor bulanan tetap terbuka. Status dan urutan kerja ada di `rancangan-optimasi-performa-skala-15k.md`.
 
-`payments_status_date_idx` sebenarnya SUDAH cukup untuk kasus berfilter status (dipakai `/reports/collector-payments` dkk). Yang belum ketolong cuma listing tanpa filter apa pun. Daripada nambah index kelima yang isinya tumpang-tindih sama `payments_status_date_idx`, opsi yang lebih murah: ubah default `/reports/payments` supaya SELALU punya filter minimal (mis. default ke bulan berjalan) — itu keputusan produk, bukan keputusan index, jadi dicatat di sini sebagai alternatif, bukan dieksekusi sepihak.
+## Verifikasi dan batasan
 
-Kalau listing tanpa filter tetap mau dipertahankan sebagai default:
-```php
-Schema::table('payments', function (Blueprint $table) {
-    $table->index('payment_date', 'payments_payment_date_idx');
-});
-```
-
-## 4. `reports/collector-monthly` — JOIN besar di `invoices`/`payments`
-
-**Bukti:** full scan `invoices as i` (~111.438), full scan `payments as pay` (~101.990), temporary table — EXPLAIN dari `CollectorMonthlyReportController`.
-
-Berbeda dari #2/#3: ini bukan sekadar ORDER BY, tapi JOIN + agregat per periode. Index #2 dan #3 di atas kemungkinan membantu sebagian (JOIN condition-nya perlu dicek ulang query aslinya — EXPLAIN di `analisa-performa-seeder-15k.md` belum menunjukkan kolom JOIN persis). **Butuh EXPLAIN ulang SETELAH #2 & #3 diterapkan** sebelum menyimpulkan index tambahan apa yang masih kurang di sini — jangan tembak index baru tanpa ukur ulang, berisiko nambah index yang ternyata tidak terpakai (kelas masalah E di `ANALISA_INDEX_DATABASE.md`: index redundan = write amplification tanpa manfaat baca).
-
-## 5. `customers.data_completeness_status` (widget "Aktivitas Terbaru" di Dashboard `/`)
-
-**Bukti:** `/` → full scan `customers` (~49.463 baris) + filesort untuk `WHERE data_completeness_status IN (...) ORDER BY updated_at DESC LIMIT 10`.
-
-```php
-Schema::table('customers', function (Blueprint $table) {
-    $table->index(['data_completeness_status', 'updated_at'], 'customers_completeness_updated_idx');
-});
-```
-
-Catatan: ini index TERPISAH dari masalah utama Dashboard (§5 di `analisa-performa-seeder-15k.md` — JOIN 5 tabel ber-`LOWER()` buat omset per segmen, lebih tepat dibenahi lewat cache, bukan index). Index ini cuma menyembuhkan satu dari beberapa query berat di halaman `/`, bukan solusi tunggal buat halaman itu.
-
-## Urutan eksekusi yang disarankan
-
-1. Migration gabungan untuk #1, #2, #3, #5 — empat-empatnya independen satu sama lain, aman dalam satu migration, tidak menyentuh kode PHP.
-2. Jalankan ulang `php artisan perf:pages --only=invoices --only=payments --only=tasks` (atau satu-satu) buat konfirmasi EXPLAIN sudah hilang full scan/filesort-nya.
-3. Baru investigasi #4 (`collector-monthly`) dengan EXPLAIN ulang, karena bentuk JOIN-nya belum cukup jelas dari data yang ada sekarang.
-
-Belum ada migration yang dibuat — nunggu konfirmasi sebelum generate file migration asli (`php artisan make:migration`), sesuai CLAUDE.md §Cara Kerja Task.
+- PHPUnit `tests/Feature/PerformanceIndexMigrationTest.php` menguji bentuk tiga indeks urutan dan penolakan pasangan transisi duplikat.
+- EXPLAIN sebelum/sesudah di atas menunjukkan perubahan rencana eksekusi untuk varian query yang diuji. Waktu respons halaman, p95, beban tulis, dan Lighthouse **belum diukur ulang**; jangan menyimpulkan persentase percepatan dari estimasi EXPLAIN saja.
+- Di production, periksa pasangan transisi duplikat dan indeks yang sudah ada sebelum migration. Jalankan pada jendela operasional yang sesuai, lalu verifikasi EXPLAIN dan waktu query pada data serta POP scope production.
+- Indeks menambah biaya INSERT/UPDATE dan ruang penyimpanan. Masalah N+1, pemuatan seluruh model, dan refresh halaman penuh di `analisa-performa-seeder-15k.md` tetap pekerjaan terpisah.

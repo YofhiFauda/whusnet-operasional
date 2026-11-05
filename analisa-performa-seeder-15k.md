@@ -1,5 +1,24 @@
 # Analisa Performa — Setelah Inject Seeder 15k Pelanggan
 
+> **Status 2026-11-05:** Temuan di bawah adalah snapshot historis. Indeks ADHOC-266 sudah diterapkan di database development, belum production. Endpoint parsial ADHOC-263 baru mencakup sebagian panel. ADHOC-269 sudah membatch saldo halaman gudang dan mengagregasi kas worksheet. ADHOC-270 memadatkan analitik NOC dan mengikat cache pada scope POP. Optimasi leaderboard ADHOC-268 mengagregasi histori eskalasi/pengembalian di SQL, tetapi bottleneck halaman penuh, target 15k–50k, dan Lighthouse >90 belum selesai/diverifikasi.
+
+## Pengukuran ulang development
+
+Data saat ini sekitar 50 ribu pelanggan. Angka dari `perf:pages` di bawah bukan p95 atau skor browser; cache dan beban mesin dapat memengaruhi perbandingan.
+
+| Route | ms | Query | Model | Sisa masalah |
+| --- | ---: | ---: | ---: | --- |
+| `/noc/dashboard` | 6.827 | 86 | 12.512 | Setelah query tren 12 bulan dan pelanggan kronis dipadatkan; sebelumnya sekitar 39 ribu model. Masih lambat. |
+| `/warehouse/reports` | 948 | 47 | 9.814 | Setelah batch saldo QUANTITY/SERIALIZED/ROLL; tidak ada pola 20+ query identik. Sebelumnya 3.229 ms/221 query. |
+| `/fop-tasks` | 3.064 | 51 | 21.782 | Hidrasi besar dan query survei. |
+| `/collector-worksheet` | 2.060 | 32 | 74 | Setelah agregasi kas admin/teknisi; sebelumnya 2.896 ms/50.108 model. Endpoint summary 998 ms/13 model; query agregat pembayaran dan invoice masih mahal. |
+| `/reports/collector-monthly` | 6.451 | 24 | — | JOIN/agregat historis masih berat. |
+
+**Bug yang ditemukan pada NOC:** kunci cache statistik filter tanggal custom sebelumnya memakai variabel yang tidak didefinisikan, sehingga dua rentang tanggal berbagi hasil; sudah diperbaiki dan diuji. Cache statistik, tren, dan telemetri sebelumnya tidak memuat scope POP, sehingga penyempitan akses bisa menampilkan data lama sampai TTL habis; sudah diperbaiki dan diuji setelah persetujuan user. Di `NocAnalyticsService`, pembagian MTTR remote/field dan remote solve rate membandingkan enum `TicketHandler` dengan string `fop`; ini berpotensi salah klasifikasi, belum diubah dalam task performa agar angka operasional tidak berubah tanpa review terpisah.
+
+**Koreksi diagnosis:** N+1 pada GET `/warehouse/reports` berasal dari `balanceAsOf()` yang dipanggil dalam loop `buildMovementSummary()`. `receivedInPeriod()` juga dipanggil per POP×item, tetapi pada export Excel. Indeks urutan daftar yang baru terbukti membantu EXPLAIN daftar; belum membuktikan laporan kolektor bulanan membaik. Rute mati `api/fop/pipeline` dan bug export gudang `Border::TOP` (OpenSpout) yang tercatat saat tes belum diperbaiki karena di luar task performa ini. Tes lama periode tanpa transaksi sudah dikoreksi agar sesuai aturan item idle yang tetap membawa stok awal/akhir.
+
+
 Dikonfirmasi dengan `php artisan perf:pages` (query log asli, DB mysql container `whusnet-app`, bukan tebakan dari baca kode). Command ini sudah ada di repo (`app/Console/Commands/MeasurePagesCommand.php`) — load tiap halaman GET dalam proses terisolasi, catat waktu, jumlah query, jumlah model Eloquent yang di-hidrasi, dan EXPLAIN query SELECT yang ≥ 50ms.
 
 Database saat pengukuran: `customers` ≈ 49.463 baris (bukan hanya 15k yang baru di-inject — akumulasi), `ticket_histories` ≈ 26.815 baris.
@@ -23,7 +42,7 @@ Halaman lain yang diukur (`tickets/dibatalkan`, `tickets/history`, `tickets/sele
 
 ### 1. Ticketing — `/noc/dashboard` (9,1 detik, 64 ribu model)
 
-`app/Http/Controllers/NocDashboardController.php:575-619` — `buildPerformanceLeaderboard()`. Leaderboard performa Helpdesk/NOC ambil **4 query `->get()` terpisah** ke `TicketHistory` (selesai, eskalasi-ke-NOC, eskalasi-ke-FOP, dikembalikan), masing-masing eager-load relasi `ticket`, lalu di-`groupBy('actor_id')` **di PHP**, bukan di SQL. Tanpa filter tanggal (default), ini menyapu seluruh 26.815 baris `ticket_histories` 4 kali dan menghidrasi puluhan ribu model Eloquent di memori hanya untuk dikelompokkan — hal yang SQL `GROUP BY` + agregat bisa kerjakan di DB.
+`app/Http/Controllers/NocDashboardController.php:575-619` — `buildPerformanceLeaderboard()`. Leaderboard performa Helpdesk/NOC ambil **4 query `->get()` terpisah** ke `TicketHistory` (selesai, eskalasi-ke-NOC, eskalasi-ke-FOP, dikembalikan), hanya histori selesai yang eager-load relasi `ticket`, lalu di-`groupBy('actor_id')` **di PHP**, bukan di SQL. Tanpa filter tanggal (default), ini menyapu seluruh 26.815 baris `ticket_histories` 4 kali dan menghidrasi puluhan ribu model Eloquent di memori hanya untuk dikelompokkan — hal yang SQL `GROUP BY` + agregat bisa kerjakan di DB.
 
 EXPLAIN: full scan `ticket_histories` (~26.815 baris) + filesort.
 
@@ -56,9 +75,9 @@ Query `count()` pakai `EXISTS` berkorelasi ke `customer_services`/`invoices` (st
 
 Bukan "kekurangan index" generik. Pola yang berulang di 3 dari 4 halaman termahal: **`whereDoesntHave()` / NOT EXISTS berkorelasi di atas tabel `customers` yang sekarang besar**, dijalankan ulang tiap request (bukan di-cache / di-precompute), kadang dalam loop PHP per-baris (`autoSyncAndCalculatePriority`), kadang buat sekadar menghitung/mengelompokkan data yang semestinya bisa selesai di SQL (`buildPerformanceLeaderboard`). Di data kecil, NOT EXISTS murah. Begitu `customers` sampai puluhan ribu baris, biayanya melompat jadi full scan tabel — dan karena dieksekusi ulang di setiap buka halaman (bukan dihitung sekali/di-cache), Lighthouse Performance score ikut anjlok di SEMUA halaman yang kena, sesuai laporan: FOP, Ticketing (NOC Dashboard), Peta Infra/Master Node.
 
-## Belum dieksekusi
+## Status saat snapshot awal
 
-Dokumen ini analisa + bukti ukur saja. Perbaikan (ubah `whereDoesntHave` jadi agregat SQL, pindahkan jaring pengaman FOP ke job terjadwal/queue, cache leaderboard NOC, index pendukung untuk `portAssignments`) belum disentuh — tunggu konfirmasi/prioritas sebelum ubah kode, sesuai CLAUDE.md §Cara Kerja Task (scope check dulu, baru coding).
+Dokumen ini analisa + bukti ukur pada saat dibuat. Perbaikan (ubah `whereDoesntHave` jadi agregat SQL, pindahkan jaring pengaman FOP ke job terjadwal/queue, cache leaderboard NOC, index pendukung untuk `portAssignments`) belum disentuh — tunggu konfirmasi/prioritas sebelum ubah kode, sesuai CLAUDE.md §Cara Kerja Task (scope check dulu, baru coding).
 
 ---
 
@@ -109,7 +128,7 @@ Jadi payload 14,9 MB JSON yang dikeluhkan di dokumen lama itu sendiri **mahal bu
 
 #### 8. Laporan Gudang `/warehouse/reports` — satu-satunya N+1 yang TERBUKTI lewat tanda tangan SQL berulang
 
-311 query untuk SATU halaman, dan tool otomatis mendeteksi **78× query identik** (beda binding) ke `inventory_transactions` (`id in (…) and to_pop_id = ? and type not in (…)`). Root cause: `app/Services/WarehouseStockAsOfService.php:83-93` (`receivedInPeriod()`) — method ini mengambil transaksi **per kombinasi (POP × Item)**, dan dipanggil dalam loop dari `WarehouseReportController` untuk tiap baris item di laporan. N × M pemanggilan = query terpisah tiap kombinasi, bukan satu query batch yang di-`groupBy` di SQL/PHP. Ini definisi buku teks dari N+1 — bukan soal index, soal cara query-nya ditulis.
+311 query untuk SATU halaman, dan tool otomatis mendeteksi **78× query identik** (beda binding) ke `inventory_transactions` (`id in (…) and to_pop_id = ? and type not in (…)`). Koreksi setelah menelusuri pemanggil: pada GET halaman, query berulang berasal dari `WarehouseReportController::buildMovementSummary()` yang memanggil `WarehouseStockAsOfService::balanceAsOf()` dua kali per kombinasi POP × item. `receivedInPeriod()` dipanggil per kombinasi pada jalur export Excel. GET halaman kini memakai batching yang menjaga replay ledger dan batas POP; jalur export Excel masih menghitung per item dan belum dioptimasi. Ini definisi buku teks dari N+1 — bukan soal index, soal cara query-nya ditulis.
 
 #### 9. Laporan Setoran Kolektor `/reports/collector-payments` — 167 MB memori, 20.474 model dari SATU query tanpa limit
 
@@ -133,7 +152,7 @@ Rancangan migration konkret untuk kelima titik di bawah (termasuk index yang SUD
 
 Yang PALING berdampak ke keluhan "lemot di mana-mana" ada di kategori 1 & 2, bukan kategori 3. Index pendukung masih worth dikerjakan (gratis, gak ada risiko), tapi jangan dikira itu yang nyelesaikan masalah utama.
 
-Belum ada kode yang diubah — semua di atas murni hasil ukur `php artisan perf:pages`, nunggu arahan prioritas mana yang dikerjakan duluan.
+Pada saat snapshot ini belum ada kode yang diubah — semua di atas murni hasil ukur `php artisan perf:pages`, nunggu arahan prioritas mana yang dikerjakan duluan.
 
 ---
 
@@ -208,7 +227,7 @@ Saat nyoba ukur endpoint `api/*` yang dilewatin sweep otomatis (`perf:pages` nge
 2. Kategori 1 & 2 yang sudah dicatat (cache Dashboard/leaderboard NOC/collector-worksheet; ubah N+1 gudang & jaring pengaman FOP & NOT EXISTS Peta Infra-Master Node).
 3. Index biasa (kategori 3, lihat `docs/plan/rancangan-index-performa-15k-seeder.md`) + hapus rute mati `fop.pipeline` — gratis, kapan saja.
 
-Belum ada kode yang diubah.
+Pada saat snapshot ini belum ada kode yang diubah. Status terbaru ada di awal dokumen.
 
 ---
 

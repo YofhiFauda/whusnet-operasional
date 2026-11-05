@@ -799,10 +799,16 @@ class WarehouseReportController extends Controller
             ->unique();
         $itemsById = Item::query()->whereIn('id', $itemIds)->get()->keyBy('id');
 
-        return Pop::query()
+        $reportPops = Pop::query()
             ->whereIn('id', $scopedPops)
             ->orderBy('type')->orderBy('name')
-            ->get()
+            ->get();
+
+        if ($stockAsOf) {
+            $stockAsOf->preloadBalances($reportPops, $itemsById, $start, $nextPeriodStart);
+        }
+
+        return $reportPops
             ->map(function (Pop $pop) use ($receive, $transferIn, $transferOut, $issue, $receiveByItem, $transferInByItem, $transferOutByItem, $issueByItem, $itemsById, $stockAsOf, $start, $nextPeriodStart, $itemIdsEverTouchedByPop) {
                 // Union pergerakan BULAN INI + item yang PERNAH disentuh di
                 // POP ini (idle stock, gak ada transaksi bulan ini tapi

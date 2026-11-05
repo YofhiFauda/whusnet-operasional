@@ -20,6 +20,7 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 /**
  * Dashboard NOC — pusat analisa dan pemantauan operasional tiket NOC.
@@ -53,6 +54,8 @@ class NocDashboardController extends Controller
         // Filter Param Handling (Default preset: month_to_date)
         $selectedPopId = $request->query('pop_id');
         ['datePreset' => $datePreset, 'dateFrom' => $dateFrom, 'dateTo' => $dateTo] = $this->resolveDateRange($request);
+        $userPops = Pop::forUser($user)->get(['id', 'name', 'code']);
+        $scopeFingerprint = hash('sha256', $userPops->pluck('id')->sort()->values()->implode(','));
 
         // Base Query with User Scope (RBAC) & POP Filter
         $baseQuery = Ticket::query()->applyUserScope();
@@ -70,18 +73,19 @@ class NocDashboardController extends Controller
             $filteredQuery->where('created_at', '<=', $dateTo);
         }
 
-        // Cache 60 detik per user+filter — HANYA data array/skalar polos,
+        // Cache 60 detik per user+filter+scope POP — HANYA data array/skalar polos,
         // aman diserialize (lihat catatan korupsi Collection Eloquent di
         // bawah). $activeTickets, $activityFeed, dan leaderboard SENGAJA
         // tidak ikut cache tuple ini kalau butuh Collection Model mentah;
         // semua yang di sini SUDAH direduksi jadi array sebelum dikembalikan.
         $cacheKey = sprintf(
-            'dashboard:noc:stats:%d:%s:%s:%s:%s',
+            'dashboard:noc:stats:%d:%s:%s:%s:%s:%s',
             auth()->id(),
+            $scopeFingerprint,
             $datePreset,
             $selectedPopId ?? '',
-            $dateFromInput ?? '',
-            $dateToInput ?? ''
+            $dateFrom?->toDateTimeString() ?? '',
+            $dateTo?->toDateTimeString() ?? ''
         );
 
         [$stats, $issueStats, $regionStats, $trendMatrix, $deltaStats, $dailyTrend, $slaCompliance, $agingBuckets] = Cache::remember(
@@ -285,7 +289,7 @@ class NocDashboardController extends Controller
         // dashboard di atas: tujuannya justru membandingkan POP satu sama
         // lain buat cari daerah paling sering komplain, milih satu POP di
         // filter atas malah mematikan tujuan itu. Cache TERPISAH dari tuple
-        // filter di atas (kuncinya cuma per-user, granularitas bulanan —
+        // filter di atas (kuncinya per-user+scope POP, granularitas bulanan —
         // gak perlu ikut refresh 60 detik punya stat lain).
         //
         // Digabung SATU cache entry (bukan dua) — dua-duanya butuh koleksi
@@ -293,7 +297,7 @@ class NocDashboardController extends Controller
         // gabung query-nya sekali di sini lebih murah daripada dua
         // Cache::remember terpisah yang masing-masing query ulang.
         [$monthlyComplaintTrend, $perPopAnalytics] = Cache::remember(
-            sprintf('dashboard:noc:monthly-complaint:%d', auth()->id()),
+            sprintf('dashboard:noc:monthly-complaint:%d:%s', auth()->id(), $scopeFingerprint),
             300,
             function () {
                 $window = $this->loadComplaintWindow();
@@ -305,13 +309,12 @@ class NocDashboardController extends Controller
             }
         );
 
-        $userPops = Pop::forUser(auth()->user())->get(['id', 'name', 'code']);
-
         // Data Live Command Center & Deep Analytics dari NocAnalyticsService
-        // Cache 60 detik per user+filter (hanya skalar array aman)
+        // Cache 60 detik per user+filter+scope POP (hanya skalar array aman)
         $telemetryCacheKey = sprintf(
-            'dashboard:noc:telemetry:%d:%s:%s',
+            'dashboard:noc:telemetry:%d:%s:%s:%s',
             auth()->id(),
+            $scopeFingerprint,
             $datePreset,
             $selectedPopId ?? ''
         );
@@ -645,27 +648,22 @@ class NocDashboardController extends Controller
             ->get()
             ->groupBy('actor_id');
 
-        $eskalasiNocRows = (clone $historyBase)
-            ->where('action', TicketHistoryAction::DIESKALASI->value)
-            ->where('to_status', TicketHandler::NOC->value)
-            ->get()
-            ->groupBy('actor_id');
-
-        $eskalasiFopRows = (clone $historyBase)
-            ->where('action', TicketHistoryAction::DIESKALASI->value)
-            ->where('to_status', TicketHandler::FOP->value)
-            ->get()
-            ->groupBy('actor_id');
-
-        $dikembalikanRows = (clone $historyBase)
-            ->where('action', TicketHistoryAction::DIKEMBALIKAN->value)
+        $actionCounts = (clone $historyBase)
+            ->where(function ($query) {
+                $query->where('action', TicketHistoryAction::DIKEMBALIKAN->value)
+                    ->orWhere(function ($escalation) {
+                        $escalation->where('action', TicketHistoryAction::DIESKALASI->value)
+                            ->whereIn('to_status', [TicketHandler::NOC->value, TicketHandler::FOP->value]);
+                    });
+            })
+            ->selectRaw('actor_id, action, to_status, COUNT(*) as total')
+            ->groupBy('actor_id', 'action', 'to_status')
+            ->toBase()
             ->get()
             ->groupBy('actor_id');
 
         $actorIds = $selesaiRows->keys()
-            ->merge($eskalasiNocRows->keys())
-            ->merge($eskalasiFopRows->keys())
-            ->merge($dikembalikanRows->keys())
+            ->merge($actionCounts->keys())
             ->unique();
 
         if ($actorIds->isEmpty()) {
@@ -698,20 +696,25 @@ class NocDashboardController extends Controller
                 : null;
             $slaBreachCount = $selesai->filter(fn (TicketHistory $h) => $h->ticket?->isSlaBreached())->count();
 
+            $actorCounts = $actionCounts->get($actorId, collect());
+            $countAction = fn (string $action, ?string $toStatus = null): int => (int) $actorCounts
+                ->filter(fn ($count) => $count->action === $action && ($toStatus === null || $count->to_status === $toStatus))
+                ->sum('total');
+
             $row = [
                 'user_id' => $actorId,
                 'name' => $actor->name,
                 'jumlah_selesai' => $selesai->count(),
-                'jumlah_dikembalikan' => $dikembalikanRows->get($actorId, collect())->count(),
+                'jumlah_dikembalikan' => $countAction(TicketHistoryAction::DIKEMBALIKAN->value),
                 'avg_durasi_menit' => $avgDurasiMenit,
                 'sla_breach_count' => $slaBreachCount,
             ];
 
             if ($roleCode === 'helpdesk') {
-                $row['jumlah_eskalasi_noc'] = $eskalasiNocRows->get($actorId, collect())->count();
+                $row['jumlah_eskalasi_noc'] = $countAction(TicketHistoryAction::DIESKALASI->value, TicketHandler::NOC->value);
                 $helpdesk[] = $row;
             } else {
-                $row['jumlah_eskalasi_fop'] = $eskalasiFopRows->get($actorId, collect())->count();
+                $row['jumlah_eskalasi_fop'] = $countAction(TicketHistoryAction::DIESKALASI->value, TicketHandler::FOP->value);
                 $noc[] = $row;
             }
         }
@@ -735,19 +738,31 @@ class NocDashboardController extends Controller
      * `FopAnalyticsController` ("Komplain" = task_type MAINTENANCE) — label
      * UI WAJIB eksplisit "Ticket Maintenance", bukan klaim "Komplain" murni.
      *
-     * @return array{tickets: Collection<int, Ticket>, monthKeys: string[], labels: string[]}
+     * @return array{tickets: Collection<int, object>, monthKeys: string[], labels: string[]}
      */
     private function loadComplaintWindow(): array
     {
         $end = now()->endOfMonth();
         $start = now()->copy()->subMonths(11)->startOfMonth();
 
-        $tickets = Ticket::query()
+        $scopedTickets = Ticket::query()
             ->applyUserScope()
             ->where('type', TaskType::MAINTENANCE->value)
             ->whereBetween('created_at', [$start, $end])
-            ->with(['customer:id,district_id', 'customer.district:id,name', 'pop:id,name', 'issueCategory:id,name'])
-            ->get(['id', 'created_at', 'customer_id', 'pop_id', 'issue_category_id']);
+            ->select(['created_at', 'pop_id', 'customer_id', 'issue_category_id'])
+            ->toBase();
+
+        // Scope POP selesai di subquery sebelum join, sehingga kolom pop_id
+        // pada scope tidak ambigu dan relasi pelanggan tidak dihidrasi massal.
+        $tickets = DB::query()
+            ->fromSub($scopedTickets, 'trend_tickets')
+            ->leftJoin('customers as trend_customers', 'trend_customers.id', '=', 'trend_tickets.customer_id')
+            ->leftJoin('districts as trend_districts', 'trend_districts.id', '=', 'trend_customers.district_id')
+            ->leftJoin('pops as trend_pops', 'trend_pops.id', '=', 'trend_tickets.pop_id')
+            ->leftJoin('ticket_issue_categories as trend_issues', 'trend_issues.id', '=', 'trend_tickets.issue_category_id')
+            ->select(['trend_tickets.created_at', 'trend_tickets.pop_id'])
+            ->selectRaw('COALESCE(trend_districts.name, trend_pops.name, ?) as region_name, COALESCE(trend_issues.name, ?) as issue_name', ['Tidak diketahui', 'Lainnya'])
+            ->get();
 
         $labels = [];
         $monthKeys = [];
@@ -770,7 +785,7 @@ class NocDashboardController extends Controller
      * mana yang sering komplain (`by_region`) DAN komplainnya soal apa
      * (`by_issue`) — masing-masing top 5 + "Lainnya", per bulan.
      *
-     * @param  array{tickets: Collection<int, Ticket>, monthKeys: string[], labels: string[]}  $window  dari `loadComplaintWindow()`
+     * @param  array{tickets: Collection<int, object>, monthKeys: string[], labels: string[]}  $window  dari `loadComplaintWindow()`
      * @return array{
      *     labels: string[],
      *     total: int,
@@ -782,8 +797,8 @@ class NocDashboardController extends Controller
     {
         ['tickets' => $tickets, 'monthKeys' => $monthKeys, 'labels' => $labels] = $window;
 
-        $regionOf = fn (Ticket $t) => $t->customer?->district?->name ?? $t->pop?->name ?? 'Tidak diketahui';
-        $issueOf = fn (Ticket $t) => $t->issueCategory?->name ?? 'Lainnya';
+        $regionOf = fn (object $t) => $t->region_name;
+        $issueOf = fn (object $t) => $t->issue_name;
 
         $topRegions = $tickets->groupBy($regionOf)->map->count()->sortDesc()->take(5)->keys()->toArray();
         $topIssues = $tickets->groupBy($issueOf)->map->count()->sortDesc()->take(5)->keys()->toArray();
@@ -815,7 +830,7 @@ class NocDashboardController extends Controller
      * reliable dipakai luas, `CustomerStatusLog` scope-nya beda & riskan
      * data legacy bolong), tapi cukup buat lihat ARAH tren pertumbuhan.
      *
-     * @param  array{tickets: Collection<int, Ticket>, monthKeys: string[], labels: string[]}  $window  dari `loadComplaintWindow()`
+     * @param  array{tickets: Collection<int, object>, monthKeys: string[], labels: string[]}  $window  dari `loadComplaintWindow()`
      * @return array<int, array{pop_id: int, pop_name: string, labels: string[], complaints: int[], customers: int[], analysis: string}>
      */
     private function buildPerPopAnalytics(array $window): array
@@ -859,7 +874,7 @@ class NocDashboardController extends Controller
 
             $complaints = array_fill(0, count($monthKeys), 0);
             foreach ($popTickets as $ticket) {
-                $monthIndex = array_search($ticket->created_at->format('Y-m'), $monthKeys, true);
+                $monthIndex = array_search(substr($ticket->created_at, 0, 7), $monthKeys, true);
                 if ($monthIndex !== false) {
                     $complaints[$monthIndex]++;
                 }
@@ -875,7 +890,7 @@ class NocDashboardController extends Controller
             }
 
             $topIssueName = $popTickets
-                ->groupBy(fn (Ticket $t) => $t->issueCategory?->name ?? 'Lainnya')
+                ->groupBy('issue_name')
                 ->map->count()
                 ->sortDesc()
                 ->keys()
@@ -960,7 +975,7 @@ class NocDashboardController extends Controller
      * dengan classifier beda ($regionOf/$issueOf), biar logic loop bulan +
      * fallback "Lainnya"-nya gak diduplikasi.
      *
-     * @param  Collection<int, Ticket>  $tickets
+     * @param  Collection<int, object>  $tickets
      * @param  string[]  $monthKeys  format 'Y-m', urut kronologis, dari `buildMonthlyComplaintTrend()`
      * @param  string[]  $topKeys  TANPA "Lainnya" — ditambahkan sebagai series fallback di sini
      * @return array<string, int[]>
@@ -973,7 +988,7 @@ class NocDashboardController extends Controller
         }
 
         foreach ($tickets as $ticket) {
-            $monthIndex = array_search($ticket->created_at->format('Y-m'), $monthKeys, true);
+            $monthIndex = array_search(substr($ticket->created_at, 0, 7), $monthKeys, true);
             if ($monthIndex === false) {
                 continue;
             }

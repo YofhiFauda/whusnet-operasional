@@ -103,6 +103,14 @@ class WarehouseFeatureSeeder extends Seeder
         $subFeatures = [
             ['parent' => 'warehouse_report', 'code' => 'warehouse_report.sold_to_customer', 'name' => 'Laporan Barang Terjual ke Pelanggan', 'sort_order' => 1],
             ['parent' => 'warehouse', 'code' => 'warehouse.usage', 'name' => 'Rekap Pemakaian Material Lapangan', 'sort_order' => 1],
+            // Barang Terpasang di Infrastruktur (ADHOC baru, 2026-11-05) — state
+            // SAAT INI (bukan log periode kayak warehouse.usage) buat Gudang
+            // Pusat lihat SN/qty/kabel yang nempel di infra TANPA buka Peta
+            // Infrastruktur (`network_nodes.*`). Permission SENGAJA gak di-OR
+            // dengan `warehouse.view` di route — biar role lama yang cuma
+            // punya `warehouse.view` (pic_gudang/pop_admin/atasan) gak ikut
+            // tembus; keputusan user: admin_gudang dulu, role lain lewat RBAC.
+            ['parent' => 'warehouse', 'code' => 'warehouse.infra_stock', 'name' => 'Barang Terpasang di Infrastruktur', 'sort_order' => 2],
         ];
 
         foreach ($subFeatures as $sf) {
