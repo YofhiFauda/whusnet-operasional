@@ -172,13 +172,17 @@ unset($__defined_vars, $__key, $__value); ?>
     </div>
 </div>
 
-<?php if (! $__env->hasRenderedOnce('36f1d2f0-73fc-4566-a6f7-63e0d9b09711')): $__env->markAsRenderedOnce('36f1d2f0-73fc-4566-a6f7-63e0d9b09711'); ?>
+<?php if (! $__env->hasRenderedOnce('f1aee0d4-19af-4f2d-807f-c354722d03ab')): $__env->markAsRenderedOnce('f1aee0d4-19af-4f2d-807f-c354722d03ab'); ?>
 <script>
     /* Fase 5.4 - komponen filter wilayah (Kecamatan + Desa). Desa cascade dari
-       kecamatan terpilih (mencegah desa senama lintas kecamatan). Registrasi
-       sekali lewat alpine:init. Batch: pilih beberapa lalu "Terapkan". */
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('wilayahFilter', (cfg) => ({
+       kecamatan terpilih (mencegah desa senama lintas kecamatan). Batch:
+       pilih beberapa lalu "Terapkan". Registrasi dibungkus fungsi yang CEK
+       dulu `window.Alpine` — lihat alasan lengkap di pop-filter.blade.php,
+       pola & masalahnya identik ("wilayahFilter is not defined" tiap script
+       ini ter-insert ulang lewat htmx boost ke halaman kedua-dst). */
+    (function () {
+        const register = () => {
+            Alpine.data('wilayahFilter', (cfg) => ({
             open: false,
             tab: 'kec',
             dq: '', vq: '',
@@ -248,7 +252,14 @@ unset($__defined_vars, $__key, $__value); ?>
                 });
             },
         }));
-    });
+        };
+
+        if (window.Alpine) {
+            register();
+        } else {
+            document.addEventListener('alpine:init', register, { once: true });
+        }
+    })();
 </script>
 <?php endif; ?>
 <?php /**PATH /home/yopi/whusnet/whusnet-operasional/resources/views/components/ui/wilayah-filter.blade.php ENDPATH**/ ?>

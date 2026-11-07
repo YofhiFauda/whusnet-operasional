@@ -693,6 +693,16 @@ return [
             ActionCode::CANCEL->value,
         ],
 
+        // Surat Pengajuan Barang (gap #2 dari 3 feature report 2026-11-05) —
+        // TANPA .cancel: reject FINAL (keputusan user), gak ada revisi di
+        // dokumen yang sama.
+        'warehouse_pengajuan_barang' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::APPROVE->value,
+            ActionCode::REJECT->value,
+        ],
+
         // Master node jaringan ber-port (ODC/ODP/dst), dulu `network_odps`.
         // Di-rename di baris Feature yang SAMA oleh migration reshape
         // (2026_10_12_110300), jadi role_permissions lama tetap nempel.

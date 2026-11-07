@@ -105,6 +105,11 @@ class RolePermissionSeeder extends Seeder
                 'warehouse.view',
                 'warehouse_custody.view',
                 'warehouse_issue.view',
+                // Surat Pengajuan Barang (gap #2 dari 3 feature report
+                // 2026-11-05) — keputusan user 2026-11-06: Atasan ikut bisa
+                // mengajukan (create), TANPA approve/reject (itu wewenang FOP).
+                'warehouse_pengajuan_barang.create',
+                'warehouse_pengajuan_barang.view',
                 'warehouse_report.sold_to_customer.view',
                 'warehouse_report.view',
                 'warehouse_stock_request.view',
@@ -274,6 +279,11 @@ class RolePermissionSeeder extends Seeder
                 'users.delete',
                 'users.update',
                 'users.view',
+                // Surat Pengajuan Barang (gap #2 dari 3 feature report
+                // 2026-11-05) — keputusan user 2026-11-06: NOC ikut bisa
+                // mengajukan (create), TANPA approve/reject (wewenang FOP).
+                'warehouse_pengajuan_barang.create',
+                'warehouse_pengajuan_barang.view',
                 'warehouse_stock_request.approve',
                 'warehouse_stock_request.cancel',
                 'warehouse_stock_request.create',
@@ -457,6 +467,13 @@ class RolePermissionSeeder extends Seeder
                 'network_nodes.register_infra',
                 'warehouse.usage.view', // Rekap Pemakaian Material Lapangan (harian/mingguan/bulanan/custom)
                 'warehouse_custody.view',
+                // Surat Pengajuan Barang (gap #2 dari 3 feature report
+                // 2026-11-05) — FOP satu-satunya yang approve/reject
+                // (keputusan user 2026-11-06), plus bisa create sendiri.
+                'warehouse_pengajuan_barang.approve',
+                'warehouse_pengajuan_barang.create',
+                'warehouse_pengajuan_barang.reject',
+                'warehouse_pengajuan_barang.view',
                 'warehouse_traceability.view',
             ],
 
@@ -549,6 +566,12 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_custody.view',
                 'warehouse_issue.create',
                 'warehouse_issue.view',
+                // Surat Pengajuan Barang (gap #2 dari 3 feature report
+                // 2026-11-05) — keputusan user 2026-11-06: Admin Gudang
+                // Pusat ikut bisa mengajukan (create), TANPA approve/reject
+                // (wewenang FOP).
+                'warehouse_pengajuan_barang.create',
+                'warehouse_pengajuan_barang.view',
                 'warehouse_reassign.create',
                 'warehouse_report.sold_to_customer.view',
                 'warehouse_report.view',

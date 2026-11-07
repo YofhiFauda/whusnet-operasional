@@ -455,6 +455,7 @@ class AppServiceProvider extends ServiceProvider
             $view->with('badge_business_development_verification_count', $count)
                 ->with('badge_transfer_confirmation_count', $user?->hasPermission('warehouse_transfer.receive') ? app(WarehouseTransferActionQueue::class)->forUser($user)->count() : 0)
                 ->with('badge_stock_request_count', $user ? $queues->stockRequests($user)->count() : 0)
+                ->with('badge_pengajuan_barang_count', $user ? $queues->pengajuanBarang($user)->count() : 0)
                 ->with('badge_collector_deposit_count', $user ? $queues->collectorDeposits($user)->count() : 0)
                 ->with('badge_cash_deposit_count', $user ? $queues->cashDeposits($user)->count() : 0);
         });
@@ -464,8 +465,10 @@ class AppServiceProvider extends ServiceProvider
             $count = $user?->hasPermission('warehouse_transfer.receive')
                 ? app(WarehouseTransferActionQueue::class)->forUser($user)->count()
                 : 0;
+            $pengajuanBarangCount = $user ? app(ActionQueueBadgeService::class)->pengajuanBarang($user)->count() : 0;
 
-            $view->with('badge_transfer_confirmation_count', $count);
+            $view->with('badge_transfer_confirmation_count', $count)
+                ->with('badge_pengajuan_barang_count', $pengajuanBarangCount);
         });
 
         // Konteks cabang global gudang (analisa-ui-ux-warehouse.md §S1) — chip

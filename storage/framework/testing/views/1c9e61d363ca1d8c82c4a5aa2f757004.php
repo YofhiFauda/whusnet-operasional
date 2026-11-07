@@ -100,7 +100,11 @@
     <div class="flex items-center gap-2 shrink-0 flex-wrap w-full xl:w-auto pt-1 xl:pt-0">
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.detail.installation.activate')): ?>
             <?php
-                $hasWorkflowTask = isset($customerTasks) && $customerTasks->whereIn('task_type', [\App\Enums\TaskType::SURVEY->value, \App\Enums\TaskType::PEMASANGAN->value])->isNotEmpty();
+                // task_type di-cast ke enum TaskType di model Task — whereIn()
+                // harus dibandingkan ke case enum-nya, bukan ->value, kalau
+                // tidak loose-compare-nya gak pernah match (enum instance
+                // tidak == string) dan $hasWorkflowTask selalu false.
+                $hasWorkflowTask = isset($customerTasks) && $customerTasks->whereIn('task_type', [\App\Enums\TaskType::SURVEY, \App\Enums\TaskType::PEMASANGAN])->isNotEmpty();
                 $isProvenLegacyActive = $customer->old_customer_id && $customer->customerService?->request_status === 'ACTIVE';
             ?>
             <?php if($customer->data_completeness_status !== 'siap_billing' && $customer->status !== 'active' && !$hasWorkflowTask && $isProvenLegacyActive): ?>
@@ -523,7 +527,9 @@
 
         <!-- TAB 2: IDENTITAS -->
         <?php if(auth()->user()->hasPermission('customers.detail.identity.view')): ?>
-        <div id="tab-content-identitas" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-identitas">
+        <div id="tab-content-identitas" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-identitas">
+        <template x-if="$store.tabState.mounted.includes('identitas') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Formulir Identitas Pelanggan</span>
@@ -585,11 +591,15 @@
                 </div>
             </div>
         </div>
+        </template>
+        </div>
         <?php endif; ?>
 
         <!-- TAB 3: ALAMAT -->
         <?php if(auth()->user()->hasPermission('customers.detail.address.view')): ?>
-        <div id="tab-content-alamat" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-alamat">
+        <div id="tab-content-alamat" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-alamat">
+        <template x-if="$store.tabState.mounted.includes('alamat') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <?php
                     $lat = $customer->latitude ?? ($customer->customerAddress->latitude ?? null);
@@ -633,10 +643,14 @@
                 </div>
             </div>
         </div>
+        </template>
+        </div>
         <?php endif; ?>
 
         <!-- TAB 4: POP/CABANG -->
-        <div id="tab-content-pop" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-pop">
+        <div id="tab-content-pop" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-pop">
+        <template x-if="$store.tabState.mounted.includes('pop') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Data POP / Cabang Terkoneksi</span>
@@ -721,31 +735,47 @@
             </div>
             <?php endif; ?>
         </div>
+        </template>
+        </div>
 
         <!-- TAB 5: SURVEY -->
         <?php if(auth()->user()->hasPermission('customers.detail.survey.view')): ?>
-        <div id="tab-content-survey" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-survey">
+        <div id="tab-content-survey" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-survey">
+        <template x-if="$store.tabState.mounted.includes('survey') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <?php echo $__env->make('customers.tabs._survey', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        </div>
+        </template>
         </div>
         <?php endif; ?>
 
         <!-- TAB 6: PEMASANGAN -->
         <?php if(auth()->user()->hasPermission('customers.detail.installation.view')): ?>
-        <div id="tab-content-pemasangan" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-pemasangan">
+        <div id="tab-content-pemasangan" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-pemasangan">
+        <template x-if="$store.tabState.mounted.includes('pemasangan') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <?php echo $__env->make('customers.tabs._installation', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        </div>
+        </template>
         </div>
         <?php endif; ?>
 
         <!-- TAB 7: PERANGKAT -->
         <?php if(auth()->user()->hasPermission('customers.detail.devices.view')): ?>
-        <div id="tab-content-perangkat" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-perangkat">
+        <div id="tab-content-perangkat" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-perangkat">
+        <template x-if="$store.tabState.mounted.includes('perangkat') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <?php echo $__env->make('customers.tabs._device', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        </div>
+        </template>
         </div>
         <?php endif; ?>
 
         <!-- TAB 8: PAKET & LAYANAN -->
         <?php if(auth()->user()->hasPermission('customers.detail.packages.view')): ?>
-        <div id="tab-content-paket-layanan" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-paket-layanan">
+        <div id="tab-content-paket-layanan" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-paket-layanan">
+        <template x-if="$store.tabState.mounted.includes('paket-layanan') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Paket Internet & Status Layanan Jaringan</span>
@@ -779,30 +809,70 @@
                     <?php endif; ?>
 
                     <?php if($customer->customerService && auth()->user()->hasPermission('customers.detail.packages.change')): ?>
-                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30" x-data="{ gantiPaketOpen: false }">
+                    
+                    <div class="border border-slate-200 dark:border-slate-700 rounded-lg p-4 bg-slate-50/50 dark:bg-slate-900/30"
+                         x-data="gantiPaketPanel('<?php echo e(route('customers.package.preview', $customer)); ?>')">
                         <div class="flex items-center justify-between">
                             <span class="block text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider">GANTI PAKET INTERNET</span>
-                            <template x-if="!gantiPaketOpen">
-                                <button type="button" @click="gantiPaketOpen = true" class="text-[11px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400">Ganti Paket</button>
+                            <template x-if="!open">
+                                <button type="button" @click="open = true" class="text-[11px] font-bold text-sky-600 hover:text-sky-700 dark:text-sky-400">Ganti Paket</button>
                             </template>
                         </div>
-                        <template x-if="gantiPaketOpen">
-                            <form action="<?php echo e(route('customers.package.update', $customer)); ?>" method="POST" class="mt-3 flex flex-col sm:flex-row gap-2">
-                                <?php echo csrf_field(); ?>
-                                <?php echo method_field('PUT'); ?>
-                                <select name="internet_package_id" required class="flex-1 text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
-                                    <option value="">Pilih paket baru...</option>
-                                    <?php $__currentLoopData = $availablePackages; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $package): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                                    <option value="<?php echo e($package->id); ?>" <?php if($customer->customerService->internet_package_id === $package->id): echo 'selected'; endif; ?>><?php echo e($package->name); ?> — <?php echo e($package->download_speed_mbps); ?>/<?php echo e($package->upload_speed_mbps); ?> Mbps — Rp <?php echo e(number_format((float) $package->monthly_price, 0, ',', '.')); ?></option>
-                                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                                </select>
-                                <div class="flex gap-2">
-                                    <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Simpan</button>
-                                    <button type="button" @click="gantiPaketOpen = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                        <template x-if="open">
+                            <div class="mt-3 space-y-2">
+                                <form action="<?php echo e(route('customers.package.update', $customer)); ?>" method="POST" class="flex flex-col sm:flex-row gap-2">
+                                    <?php echo csrf_field(); ?>
+                                    <?php echo method_field('PUT'); ?>
+                                    <select name="internet_package_id" required x-model="selectedId" @change="loadPreview()" class="flex-1 text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900/60 text-slate-800 dark:text-slate-200">
+                                        <option value="">Pilih paket baru...</option>
+                                        <?php $__currentLoopData = $availablePackages; $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $package): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                                        <option value="<?php echo e($package->id); ?>" <?php if($customer->customerService->internet_package_id === $package->id): echo 'selected'; endif; ?>><?php echo e($package->name); ?> — <?php echo e($package->download_speed_mbps); ?>/<?php echo e($package->upload_speed_mbps); ?> Mbps — Rp <?php echo e(number_format((float) $package->monthly_price, 0, ',', '.')); ?></option>
+                                        <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                                    </select>
+                                    <div class="flex gap-2">
+                                        <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold rounded-lg whitespace-nowrap">Simpan</button>
+                                        <button type="button" @click="open = false" class="px-4 py-2 text-xs font-semibold text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800">Batal</button>
+                                    </div>
+                                </form>
+
+                                <div x-show="selectedId" x-cloak>
+                                    <button type="button" @click="showDetail = !showDetail" class="text-[10px] font-bold text-slate-500 hover:text-sky-600 dark:text-slate-400 dark:hover:text-sky-400 inline-flex items-center gap-1">
+                                        <svg class="w-3 h-3 transition-transform" :class="showDetail ? 'rotate-90' : ''" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/></svg>
+                                        <span x-show="loading">Menghitung rincian tagihan…</span>
+                                        <span x-show="!loading">Lihat rincian tagihan periode ini</span>
+                                    </button>
+
+                                    <div x-show="showDetail && preview" x-cloak class="mt-2 p-3 rounded-lg border border-sky-100 dark:border-sky-900/40 bg-sky-50/60 dark:bg-sky-950/20 text-[11px] text-slate-700 dark:text-slate-300 space-y-1.5">
+                                        <template x-if="preview && !preview.has_current_invoice">
+                                            <p>Belum ada tagihan periode ini — harga baru langsung berlaku penuh mulai tagihan periode berikutnya, tanpa prorate.</p>
+                                        </template>
+                                        <template x-if="preview && preview.has_current_invoice">
+                                            <div class="space-y-1.5">
+                                                <p class="font-bold text-slate-900 dark:text-white">Tagihan periode <span x-text="preview.billing_period"></span> (prorate ganti paket):</p>
+                                                <template x-for="segment in preview.segments" :key="segment.package_name + '-' + segment.days + '-' + segment.monthly_price">
+                                                    <div class="flex items-center justify-between gap-2">
+                                                        <span x-text="segment.package_name + ' — ' + segment.days + ' hari'"></span>
+                                                        <span class="font-mono shrink-0" x-text="formatRupiah(segment.amount)"></span>
+                                                    </div>
+                                                </template>
+                                                <div class="flex items-center justify-between gap-2 border-t border-sky-200 dark:border-sky-900/50 pt-1 font-bold">
+                                                    <span>Total tagihan periode ini</span>
+                                                    <span class="font-mono shrink-0" x-text="formatRupiah(preview.total_invoice_periode)"></span>
+                                                </div>
+                                                <template x-if="preview.deposit_baru > 0">
+                                                    <p class="text-emerald-600 dark:text-emerald-400">Tagihan ini sudah lunas lebih bayar — kelebihan <span x-text="formatRupiah(preview.deposit_baru)"></span> jadi deposit pengurang tagihan berikutnya.</p>
+                                                </template>
+                                                <template x-if="preview.deposit_baru <= 0 && preview.sisa_tagih > 0">
+                                                    <p>Sisa yang harus dibayar: <span class="font-mono font-bold" x-text="formatRupiah(preview.sisa_tagih)"></span></p>
+                                                </template>
+                                            </div>
+                                        </template>
+                                    </div>
+                                    <p x-show="error" x-text="error" class="mt-2 text-rose-600 dark:text-rose-400"></p>
                                 </div>
-                            </form>
+                            </div>
                         </template>
-                        <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-2" x-show="gantiPaketOpen" x-cloak>Perubahan harga baru berlaku mulai tagihan periode berikutnya — tagihan bulan berjalan tidak berubah.</p>
+                        <p class="text-[10px] text-slate-500 dark:text-slate-400 mt-2" x-show="open" x-cloak>Kalau tagihan periode ini sudah terbit, nominalnya dihitung ulang prorata (pilih paket di atas buat lihat rinciannya) — bukan otomatis full harga baru.</p>
                     </div>
                     <?php endif; ?>
 
@@ -998,10 +1068,14 @@ unset($__errorArgs, $__bag); ?>
                 </div>
             </div>
         </div>
+        </template>
+        </div>
         <?php endif; ?>
 
         <!-- TAB 9: BILLING -->
-        <div id="tab-content-billing" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-billing">
+        <div id="tab-content-billing" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-billing">
+        <template x-if="$store.tabState.mounted.includes('billing') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100">Rincian Biaya Bulanan, Biaya Pemasangan Awal & Billing Cycle</span>
@@ -1155,9 +1229,13 @@ unset($__errorArgs, $__bag); ?>
                 </div>
             </div>
         </div>
+        </template>
+        </div>
 
         <!-- TAB 10: TAGIHAN -->
-        <div id="tab-content-tagihan" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-tagihan">
+        <div id="tab-content-tagihan" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-tagihan">
+        <template x-if="$store.tabState.mounted.includes('tagihan') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Riwayat Tagihan Pelanggan</h2>
@@ -1329,9 +1407,13 @@ unset($__errorArgs, $__bag); ?>
             </div>
             <?php endif; ?>
         </div>
+        </template>
+        </div>
 
         <!-- TAB 11: PEMBAYARAN -->
-        <div id="tab-content-pembayaran" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-pembayaran">
+        <div id="tab-content-pembayaran" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-pembayaran">
+        <template x-if="$store.tabState.mounted.includes('pembayaran') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             
             <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customer_balance.view')): ?>
             <div class="border border-sky-200 dark:border-sky-500/20 bg-sky-50/60 dark:bg-sky-500/10 rounded-lg p-4 space-y-3">
@@ -1460,9 +1542,13 @@ unset($__errorArgs, $__bag); ?>
                 </div>
             <?php endif; ?>
         </div>
+        </template>
+        </div>
 
         <!-- TAB 12: DOKUMEN & BERKAS -->
-        <div id="tab-content-dokumen" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-dokumen">
+        <div id="tab-content-dokumen" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-dokumen">
+        <template x-if="$store.tabState.mounted.includes('dokumen') || $store.tabState.searchActive">
+        <div class="space-y-6 searchable-section">
             <?php if(auth()->user()->hasPermission('customers.detail.documents.view')): ?>
                 <div class="px-5 py-3.5 bg-slate-50/60 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-700 rounded-lg flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                     <div>
@@ -1517,20 +1603,32 @@ unset($__errorArgs, $__bag); ?>
                 </div>
             <?php endif; ?>
         </div>
+        </template>
+        </div>
 
         <!-- TAB 13: RIWAYAT TICKETING -->
-        <div id="tab-content-riwayat-ticketing" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-riwayat-ticketing">
-            <?php echo $__env->make('customers.tabs._riwayat_ticketing', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        <div id="tab-content-riwayat-ticketing" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-riwayat-ticketing">
+            <template x-if="$store.tabState.mounted.includes('riwayat-ticketing') || $store.tabState.searchActive">
+            <div class="space-y-6 searchable-section">
+                <?php echo $__env->make('customers.tabs._riwayat_ticketing', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+            </div>
+            </template>
         </div>
 
         <!-- TAB 14: RIWAYAT PERUBAHAN -->
-        <div id="tab-content-riwayat-perubahan" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-riwayat-perubahan">
-            <?php echo $__env->make('customers.tabs._riwayat_perubahan', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+        <div id="tab-content-riwayat-perubahan" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-riwayat-perubahan">
+            <template x-if="$store.tabState.mounted.includes('riwayat-perubahan') || $store.tabState.searchActive">
+            <div class="space-y-6 searchable-section">
+                <?php echo $__env->make('customers.tabs._riwayat_perubahan', array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
+            </div>
+            </template>
         </div>
 
         <!-- TAB 15: DETAIL TEKNIS LAMA -->
         <?php if($customer->customerTechnicalDetail): ?>
-        <div id="tab-content-teknis-lama" class="tab-content hidden space-y-6 searchable-section" role="tabpanel" aria-labelledby="tab-btn-teknis-lama">
+        <div id="tab-content-teknis-lama" class="tab-content hidden" role="tabpanel" aria-labelledby="tab-btn-teknis-lama">
+            <template x-if="$store.tabState.mounted.includes('teknis-lama') || $store.tabState.searchActive">
+            <div class="space-y-6 searchable-section">
             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
                 <div class="px-5 py-3.5 bg-slate-50/50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
                     <span class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">Detail Teknis Jaringan Lama (Hasil Migrasi Database)</span>
@@ -1566,6 +1664,8 @@ unset($__errorArgs, $__bag); ?>
                     </div>
                 </div>
             </div>
+            </div>
+            </template>
         </div>
         <?php endif; ?>
 
@@ -1620,6 +1720,56 @@ unset($__errorArgs, $__bag); ?>
 
 <?php $__env->startPush('scripts'); ?>
     <script>
+        /* Panel rincian prorate "Ganti Paket" (tab Paket & Layanan) — fetch
+           GET view-only `customers.package.preview`, dirender server-side per
+           pelanggan lewat route() di x-data (ADHOC-20 langkah 3, bukan rakitan
+           client). Global function, bukan Alpine.data(), konsisten pola
+           materialRows()/comboBox() di komponen lain repo ini. */
+        function gantiPaketPanel(previewUrl) {
+            return {
+                open: false,
+                showDetail: false,
+                loading: false,
+                selectedId: '',
+                preview: null,
+                error: null,
+                loadPreview() {
+                    this.preview = null;
+                    this.error = null;
+                    if (!this.selectedId) {
+                        return;
+                    }
+                    this.loading = true;
+                    fetch(previewUrl + '?internet_package_id=' + encodeURIComponent(this.selectedId), {
+                        headers: { Accept: 'application/json' },
+                    })
+                        .then((res) => {
+                            if (!res.ok) {
+                                throw new Error('Gagal memuat rincian');
+                            }
+                            return res.json();
+                        })
+                        .then((data) => {
+                            this.preview = data;
+                            this.showDetail = true;
+                        })
+                        .catch(() => {
+                            this.error = 'Gagal memuat rincian tagihan. Coba pilih ulang paketnya.';
+                        })
+                        .finally(() => {
+                            this.loading = false;
+                        });
+                },
+            };
+        }
+
+        function formatRupiah(value) {
+            if (value === null || value === undefined) {
+                return '-';
+            }
+            return 'Rp ' + Number(value).toLocaleString('id-ID', { maximumFractionDigits: 0 });
+        }
+
         const CUSTOMER_INVOICE_STATUS_LABELS = {
             belum_dibayar: 'Belum Dibayar',
             sebagian: 'Sebagian',
@@ -1771,23 +1921,77 @@ unset($__errorArgs, $__bag); ?>
 
 <?php $__env->startSection('scripts'); ?>
 <script>
-    let currentViewMode = 'tabs'; // 'tabs' or 'all'
+    // 14 dari 15 tab dirender LAZY lewat <template x-if> (lihat
+    // $store.tabState di bawah) — tab yang belum pernah dibuka TIDAK ada di
+    // DOM sama sekali (bukan cuma disembunyikan `hidden`), supaya DOM size
+    // halaman ini gak langsung ~2000 elemen di awal (audit Lighthouse
+    // "Avoid an excessive DOM size"). Begitu sebuah tab pernah dibuka lewat
+    // switchTab(), dia TETAP termount selamanya (searchable-section-nya
+    // harus selalu bisa discan ulang kalau omni-search dipakai lagi) — tidak
+    // ada logic unmount balik.
+    //
+    // `searchActive` pengecualian terpisah: begitu true (dipicu ketik di
+    // omni-search ATAU klik mode "All-In-One"), SEMUA tab langsung termount
+    // sekaligus — fitur cari-di-semua-tab butuh seluruh teks ada di DOM buat
+    // discan. Ini SEKALI JALAN (gak pernah balik ke false) — menghindari
+    // kompleksitas unmount-saat-query-dikosongkan demi korbankan sedikit
+    // penghematan DOM buat user yang pernah search sekali.
+    // Registrasi dibungkus fungsi yang CEK dulu `window.Alpine` — lihat
+    // alasan lengkap di components/ui/pop-filter.blade.php.
+    (function () {
+        const register = () => {
+            Alpine.store('tabState', { mounted: ['ringkasan'], searchActive: false });
+        };
+
+        if (window.Alpine) {
+            register();
+        } else {
+            document.addEventListener('alpine:init', register, { once: true });
+        }
+    })();
+
+    function mountTab(tabId) {
+        const store = window.Alpine && Alpine.store('tabState');
+        if (store && ! store.mounted.includes(tabId)) {
+            store.mounted.push(tabId);
+        }
+    }
+
+    function mountAllTabs() {
+        const store = window.Alpine && Alpine.store('tabState');
+        if (store) {
+            store.searchActive = true;
+        }
+    }
+
+    // `var`, BUKAN `let`: hx-boost nge-swap SELURUH <body> tiap nav, script
+    // ini ikut ter-insert ulang tiap balik ke halaman detail pelanggan ini
+    // — `let` top-level gak bisa redeclare (lihat bug formToastLock/
+    // selectedCustomerData, 2026-11-04).
+    var currentViewMode = 'tabs'; // 'tabs' or 'all'
 
     function switchTab(tabId) {
         if (currentViewMode === 'all') {
             setViewMode('tabs');
         }
 
-        // Hide all tab panels
-        document.querySelectorAll('.tab-content').forEach(el => {
-            el.classList.add('hidden');
+        mountTab(tabId);
+
+        // Alpine.nextTick: tunggu <template x-if> tab yang baru di-mount
+        // benar-benar masuk DOM dulu sebelum di-unhide, kalau tidak sempat
+        // ke-skip satu frame kosong.
+        Alpine.nextTick(() => {
+            // Hide all tab panels
+            document.querySelectorAll('.tab-content').forEach(el => {
+                el.classList.add('hidden');
+            });
+
+            // Show active tab panel
+            const activeTab = document.getElementById('tab-content-' + tabId);
+            if (activeTab) {
+                activeTab.classList.remove('hidden');
+            }
         });
-        
-        // Show active tab panel
-        const activeTab = document.getElementById('tab-content-' + tabId);
-        if (activeTab) {
-            activeTab.classList.remove('hidden');
-        }
 
         // Reset active state for tab buttons
         document.querySelectorAll('.tab-button').forEach(btn => {
@@ -1813,8 +2017,11 @@ unset($__errorArgs, $__bag); ?>
         const navWrapper = document.getElementById('tab-nav-wrapper');
 
         if (mode === 'all') {
-            document.querySelectorAll('.tab-content').forEach(el => {
-                el.classList.remove('hidden');
+            mountAllTabs();
+            Alpine.nextTick(() => {
+                document.querySelectorAll('.tab-content').forEach(el => {
+                    el.classList.remove('hidden');
+                });
             });
             if (navWrapper) navWrapper.classList.add('hidden');
 
@@ -1843,31 +2050,42 @@ unset($__errorArgs, $__bag); ?>
     function filterContent() {
         const query = document.getElementById('omni-search')?.value.toLowerCase().trim() || '';
         const clearBtn = document.getElementById('clear-search-btn');
-        const sections = document.querySelectorAll('.searchable-section');
 
+        // Nyari butuh SEMUA tab ter-mount dulu (teks tab yang belum pernah
+        // dibuka belum ada di DOM sama sekali — lihat komentar $store.tabState
+        // di atas). Alpine.nextTick supaya querySelectorAll di bawah baca DOM
+        // yang sudah lengkap, bukan yang masih separuh jalan ke-mount.
         if (query.length > 0) {
-            if (clearBtn) clearBtn.classList.remove('hidden');
-            if (currentViewMode === 'tabs') {
-                document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('hidden'));
-            }
-        } else {
-            if (clearBtn) clearBtn.classList.add('hidden');
-            if (currentViewMode === 'tabs') {
-                switchTab('ringkasan');
-            }
+            mountAllTabs();
         }
 
-        sections.forEach(sec => {
-            if (query === '') {
-                if (currentViewMode === 'all') sec.classList.remove('hidden');
+        Alpine.nextTick(() => {
+            const sections = document.querySelectorAll('.searchable-section');
+
+            if (query.length > 0) {
+                if (clearBtn) clearBtn.classList.remove('hidden');
+                if (currentViewMode === 'tabs') {
+                    document.querySelectorAll('.tab-content').forEach(el => el.classList.remove('hidden'));
+                }
             } else {
-                const text = sec.innerText.toLowerCase();
-                if (text.includes(query)) {
-                    sec.classList.remove('hidden');
-                } else {
-                    sec.classList.add('hidden');
+                if (clearBtn) clearBtn.classList.add('hidden');
+                if (currentViewMode === 'tabs') {
+                    switchTab('ringkasan');
                 }
             }
+
+            sections.forEach(sec => {
+                if (query === '') {
+                    if (currentViewMode === 'all') sec.classList.remove('hidden');
+                } else {
+                    const text = sec.innerText.toLowerCase();
+                    if (text.includes(query)) {
+                        sec.classList.remove('hidden');
+                    } else {
+                        sec.classList.add('hidden');
+                    }
+                }
+            });
         });
     }
 

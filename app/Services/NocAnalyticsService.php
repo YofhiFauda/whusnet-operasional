@@ -338,6 +338,7 @@ class NocAnalyticsService
         $openTickets = (clone $baseQuery)
             ->where('status', TicketHandlingStatus::OPEN->value)
             ->whereIn('handler', [TicketHandler::NOC->value, TicketHandler::HELPDESK->value])
+            ->toBase()
             ->get(['id', 'ticket_number', 'handler', 'created_by', 'created_at', 'updated_at']);
 
         if ($openTickets->isEmpty()) {
@@ -350,11 +351,13 @@ class NocAnalyticsService
             ->whereIn('ticket_id', $ticketIds)
             ->whereNotNull('actor_id')
             ->orderBy('happened_at', 'desc')
+            ->toBase()
             ->get(['ticket_id', 'actor_id', 'action', 'happened_at'])
-            ->unique('ticket_id');
+            ->unique('ticket_id')
+            ->keyBy('ticket_id');
 
-        $ticketsWithActor = $openTickets->map(function (Ticket $t) use ($latestHistories) {
-            $history = $latestHistories->firstWhere('ticket_id', $t->id);
+        $ticketsWithActor = $openTickets->map(function (object $t) use ($latestHistories) {
+            $history = $latestHistories->get($t->id);
             $actorId = $history?->actor_id ?? $t->created_by;
 
             return [

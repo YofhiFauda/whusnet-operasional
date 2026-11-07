@@ -845,8 +845,8 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4m0-14v14m9-14v10l-9 4"/>
                                 </svg>
                                 <span class="sidebar-text">Gudang</span>
-                                @if((($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0)) > 0)
-                                <span class="sidebar-parent-badge rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white">{{ ($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) }}</span>
+                                @if((($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0)) > 0)
+                                <span class="sidebar-parent-badge rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white">{{ ($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0) }}</span>
                                 @endif
                             </div>
                             <svg id="chevron-warehouse"
@@ -892,6 +892,11 @@
                                 @endif                                @if(auth()->user()->hasPermission('warehouse_stock_request.view'))
                                 <a href="{{ route('warehouse.stock-requests.index', ['status' => 'open']) }}" class="flex items-center justify-between sidebar-subitem {{ Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : '' }}"><span>Permintaan Stok</span>
                                     @if(($badge_stock_request_count ?? 0) > 0)<span data-badge="stock-request" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">{{ $badge_stock_request_count }}</span>@endif
+                                </a>
+                                @endif
+                                @if(auth()->user()->hasPermission('warehouse_pengajuan_barang.view'))
+                                <a href="{{ route('warehouse.pengajuan-barang.index') }}" class="flex items-center justify-between sidebar-subitem {{ Request::is('warehouse/pengajuan-barang*') ? 'sidebar-subitem-active' : '' }}"><span>Pengajuan Barang</span>
+                                    @if(($badge_pengajuan_barang_count ?? 0) > 0)<span data-badge="pengajuan-barang" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">{{ $badge_pengajuan_barang_count }}</span>@endif
                                 </a>
                                 @endif
                             </div>

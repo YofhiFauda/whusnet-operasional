@@ -1,4 +1,5 @@
 import Echo from 'laravel-echo';
+import { shouldUseCurrentReverbHost } from './reverb-host';
 
 import Pusher from 'pusher-js';
 window.Pusher = Pusher;
@@ -9,7 +10,7 @@ const currentPort = window.location.port || (isSecure ? 443 : 80);
 
 // Gunakan hostname aktif jika berjalan di Cloudflare Tunnel (yang URL-nya dinamis) atau localhost
 const configuredHost = (import.meta.env.VITE_REVERB_HOST || '').replace(/^https?:\/\/|^https?\/\//, '');
-const useDynamicHost = !configuredHost || configuredHost.includes('trycloudflare.com') || configuredHost === 'localhost' || configuredHost === '127.0.0.1';
+const useDynamicHost = shouldUseCurrentReverbHost(configuredHost, currentHost);
 
 window.Echo = new Echo({
     broadcaster: 'reverb',
@@ -49,4 +50,3 @@ window.addEventListener('pagehide', () => {
         window.Echo.connector.pusher.disconnect();
     }
 });
-

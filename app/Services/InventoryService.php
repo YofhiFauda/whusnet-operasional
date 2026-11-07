@@ -1138,6 +1138,9 @@ class InventoryService
                 'condition_checked_by' => null,
                 'issued_from_pop_id' => $serial->issued_from_pop_id ?? $from?->cabangId,
                 'current_technician_id' => $actor->id,
+                // Custody episode baru (dicabut dari infra, balik ke tangan
+                // teknisi) — reset sinyal overdue episode sebelumnya.
+                'expired_at' => null,
                 ...$this->serialLocationColumns(null),
             ]);
 

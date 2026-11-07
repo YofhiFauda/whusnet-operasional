@@ -186,4 +186,38 @@ class UserCrudTest extends TestCase
         $this->assertContains('Password user wajib mengandung minimal 1 angka.', $errors);
         $this->assertContains('Password user wajib mengandung minimal 1 simbol (!@#$% dst).', $errors);
     }
+
+    public function test_admin_can_designate_single_fop_as_pengajuan_barang_approver(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $this->loginAsAdmin();
+
+        $fopRole = Role::where('code', 'fop')->firstOrFail();
+
+        $response = $this->post(route('users.store'), [
+            'name' => 'FOP Approver',
+            'email' => 'fop.approver@example.com',
+            'status' => 'active',
+            'role_id' => $fopRole->id,
+            'scope_type' => 'all_pop',
+            'is_pengajuan_barang_approver' => '1',
+            'password' => 'Password123!',
+            'password_confirmation' => 'Password123!',
+        ]);
+
+        $response->assertRedirect(route('users.index'));
+        $fop = User::where('email', 'fop.approver@example.com')->firstOrFail();
+        $this->assertTrue($fop->is_pengajuan_barang_approver);
+
+        // Centang dicabut (checkbox gak dikirim sama sekali kalau unchecked).
+        $this->put(route('users.update', $fop), [
+            'name' => $fop->name,
+            'email' => $fop->email,
+            'status' => 'active',
+            'role_id' => $fopRole->id,
+            'scope_type' => 'all_pop',
+        ]);
+
+        $this->assertFalse($fop->refresh()->is_pengajuan_barang_approver);
+    }
 }

@@ -785,8 +785,8 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4m0-14v14m9-14v10l-9 4"/>
                                 </svg>
                                 <span class="sidebar-text">Gudang</span>
-                                <?php if((($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0)) > 0): ?>
-                                <span class="sidebar-parent-badge rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white"><?php echo e(($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0)); ?></span>
+                                <?php if((($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0)) > 0): ?>
+                                <span class="sidebar-parent-badge rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white"><?php echo e(($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0)); ?></span>
                                 <?php endif; ?>
                             </div>
                             <svg id="chevron-warehouse"
@@ -832,6 +832,11 @@
                                 <?php endif; ?>                                <?php if(auth()->user()->hasPermission('warehouse_stock_request.view')): ?>
                                 <a href="<?php echo e(route('warehouse.stock-requests.index', ['status' => 'open'])); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/stock-requests*') ? 'sidebar-subitem-active' : ''); ?>"><span>Permintaan Stok</span>
                                     <?php if(($badge_stock_request_count ?? 0) > 0): ?><span data-badge="stock-request" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600"><?php echo e($badge_stock_request_count); ?></span><?php endif; ?>
+                                </a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('warehouse_pengajuan_barang.view')): ?>
+                                <a href="<?php echo e(route('warehouse.pengajuan-barang.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/pengajuan-barang*') ? 'sidebar-subitem-active' : ''); ?>"><span>Pengajuan Barang</span>
+                                    <?php if(($badge_pengajuan_barang_count ?? 0) > 0): ?><span data-badge="pengajuan-barang" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600"><?php echo e($badge_pengajuan_barang_count); ?></span><?php endif; ?>
                                 </a>
                                 <?php endif; ?>
                             </div>

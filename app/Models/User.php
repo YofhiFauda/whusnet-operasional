@@ -17,7 +17,7 @@ use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Cache;
 
-#[Fillable(['name', 'email', 'password', 'phone', 'status', 'role_id'])]
+#[Fillable(['name', 'email', 'password', 'phone', 'status', 'role_id', 'is_pengajuan_barang_approver'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
@@ -45,6 +45,7 @@ class User extends Authenticatable
             'email_verified_at' => 'datetime',
             'password' => 'hashed',
             'status' => UserStatus::class,
+            'is_pengajuan_barang_approver' => 'boolean',
         ];
     }
 

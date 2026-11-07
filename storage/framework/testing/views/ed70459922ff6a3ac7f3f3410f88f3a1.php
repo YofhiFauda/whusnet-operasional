@@ -168,12 +168,19 @@ unset($__defined_vars, $__key, $__value); ?>
     </div>
 </div>
 
-<?php if (! $__env->hasRenderedOnce('a270ab7b-62bf-4a37-a192-fe997966c303')): $__env->markAsRenderedOnce('a270ab7b-62bf-4a37-a192-fe997966c303'); ?>
+<?php if (! $__env->hasRenderedOnce('095f49f8-7bab-44c5-b87a-06648802fcd1')): $__env->markAsRenderedOnce('095f49f8-7bab-44c5-b87a-06648802fcd1'); ?>
 <script>
     /* Fase 5.4b - komponen filter POP (Cabang + Mini POP). Mini cascade dari
-       cabang terpilih. Semua fetch lewat endpoint ber-scope forUser. */
-    document.addEventListener('alpine:init', () => {
-        Alpine.data('popFilter', (cfg) => ({
+       cabang terpilih. Semua fetch lewat endpoint ber-scope forUser.
+       Registrasi dibungkus fungsi yang CEK dulu `window.Alpine`: hx-boost
+       (layouts/app.blade.php) nge-swap SELURUH <body> tiap nav, jadi script
+       ini ikut ter-insert ulang di halaman kedua-dst — pada titik itu Alpine
+       SUDAH start, jadi daftar langsung. Di load pertama (bukan boost), body
+       biasanya kebaca SEBELUM module Alpine dari @vite jalan ⇒ window.Alpine
+       belum ada ⇒ tunggu 'alpine:init' (nyala sekali, pas sebelum Alpine.start()). */
+    (function () {
+        const register = () => {
+            Alpine.data('popFilter', (cfg) => ({
             open: false,
             tab: 'cabang',
             cq: '', mq: '',
@@ -241,7 +248,14 @@ unset($__defined_vars, $__key, $__value); ?>
                 });
             },
         }));
-    });
+        };
+
+        if (window.Alpine) {
+            register();
+        } else {
+            document.addEventListener('alpine:init', register, { once: true });
+        }
+    })();
 </script>
 <?php endif; ?>
 <?php /**PATH /home/yopi/whusnet/whusnet-operasional/resources/views/components/ui/pop-filter.blade.php ENDPATH**/ ?>
