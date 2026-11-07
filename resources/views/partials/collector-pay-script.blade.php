@@ -359,11 +359,14 @@
                 // Invoice::recalculateFromPayments()) daripada reload.
                 cbApplyResults(data.results || []);
 
-                // Saldo yang terpakai tidak bisa dipatch di sisi klien (saldo
-                // tersisa tak ikut dikirim server per baris), jadi halaman
-                // disegarkan supaya "maks saldo" & pratinjau tak basi. Toast
-                // sempat tampil dulu.
-                if (CB_RELOAD_ON_SUCCESS || rows.some(r => r.use_balance_amount > 0)) {
+                // Saldo yang terpakai DIPATCH di sisi klien lewat
+                // cbUpdateCustomerBalance() (server sekarang ikut kirim
+                // customer_remaining_balance per baris) — gak perlu reload
+                // lagi cuma gara-gara saldo kepake (Tahap 2 §3). Reload cuma
+                // kalau pemanggil eksplisit minta (CB_RELOAD_ON_SUCCESS,
+                // dipakai technician-payments/index karena statistik lain di
+                // halaman itu belum di-patch).
+                if (CB_RELOAD_ON_SUCCESS) {
                     setTimeout(() => window.location.reload(), 1500);
                 }
             })
@@ -386,8 +389,26 @@
     // Lunas/batal â†’ baris hilang (bukan tujuan penagihan lagi). Masih ada sisa
     // (cicilan sebagian) â†’ sisa & input nominal disegarkan biar bisa lanjut
     // menagih sisanya tanpa reload.
+    // Nyegerin "maks saldo" (data-balance) semua baris pelanggan yang sama —
+    // bukan cuma baris yang barusan dibayar. Satu saldo dibagi antar baris
+    // (cbAutoFillSaldo()), jadi baris lain ikut berubah plafonnya begitu
+    // sebagian saldo terpakai baris ini.
+    function cbUpdateCustomerBalance(customerId, newBalance) {
+        document.querySelectorAll('tr[data-invoice-row][data-customer-id="' + customerId + '"] .cb-saldo').forEach(function (saldoInput) {
+            saldoInput.dataset.balance = newBalance;
+
+            const amountInput = saldoInput.closest('tr')?.querySelector('.cb-amount');
+            const rowRemaining = amountInput ? parseFloat(amountInput.dataset.max) : newBalance;
+            saldoInput.dataset.max = Math.min(newBalance, rowRemaining);
+        });
+    }
+
     function cbApplyResults(results) {
         results.forEach(function (result) {
+            if (typeof result.customer_remaining_balance === 'number') {
+                cbUpdateCustomerBalance(result.customer_id, result.customer_remaining_balance);
+            }
+
             const tr = document.querySelector('tr[data-invoice-row="' + result.invoice_id + '"]');
             if (!tr) return;
 

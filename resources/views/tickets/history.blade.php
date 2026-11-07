@@ -71,10 +71,10 @@
                 </button>
             </div>
 
-            {{-- Refresh Button --}}
-            <button type="button" onclick="window.location.reload()"
+            {{-- Refresh Button — tarik ulang partial lewat refetchAndSwap(), bukan reload penuh --}}
+            <button type="button" id="history-refresh-btn" @click="refetchAndSwap()"
                     class="inline-flex items-center gap-1.5 px-3 py-2 rounded-lg border border-border bg-surface hover:bg-surface-muted text-text-secondary hover:text-text-main text-xs font-semibold shadow-2xs transition-colors cursor-pointer"
-                    title="Muat Ulang Halaman">
+                    title="Muat Ulang Data">
                 <svg class="h-3.5 w-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
                 </svg>
@@ -97,7 +97,7 @@
     {{-- =========================================================================
          2. STAT KPI METRICS STRIP (Design System §1.3 & §1.6)
          ========================================================================= --}}
-    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+    <div id="history-stat-cards" class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
         {{-- Card 1: Total Tiket --}}
         <div class="rounded-lg border border-border bg-surface p-3.5 shadow-2xs hover:border-border-strong transition-colors">
             <div class="flex items-center justify-between">
@@ -485,7 +485,7 @@
     @else
 
         {{-- 4A. Table Mode (High-Density Spreadsheet View for Desktop & Laptop) --}}
-        <div x-show="viewMode === 'table'" class="rounded-lg border border-slate-200/70 dark:border-slate-800 bg-surface overflow-hidden shadow-2xs">
+        <div id="history-table-container" x-show="viewMode === 'table'" class="rounded-lg border border-slate-200/70 dark:border-slate-800 bg-surface overflow-hidden shadow-2xs">
             <div class="overflow-x-auto custom-scrollbar">
                 <table class="w-full text-xs whitespace-nowrap text-left border-collapse">
                     <thead class="bg-surface-muted/90 text-text-muted sticky top-0 z-10 border-b border-slate-200/60 dark:border-slate-800/80">
@@ -671,7 +671,7 @@
         </div>
 
         {{-- 4B. Card Mode (Operational Card Stream for Mobile & Tablet) --}}
-        <div x-show="viewMode === 'cards'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div id="history-cards-container" x-show="viewMode === 'cards'" class="grid grid-cols-1 md:grid-cols-2 gap-4">
             @foreach($tickets as $ticket)
                 @php
                     $isBatch = $ticket->isBatch();
@@ -813,7 +813,7 @@
         {{-- =========================================================================
              5. PAGINATION & RESULT COUNTER
              ========================================================================= --}}
-        <div class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
+        <div id="history-pagination-container" class="flex flex-col sm:flex-row items-center justify-between gap-4 pt-2">
             <p class="text-xs text-text-muted font-medium">
                 Menampilkan <span class="font-bold text-text-main font-mono">{{ $tickets->firstItem() ?? 0 }}</span> - <span class="font-bold text-text-main font-mono">{{ $tickets->lastItem() ?? 0 }}</span> dari <span class="font-bold text-text-main font-mono">{{ $tickets->total() }}</span> riwayat tiket
             </p>
@@ -840,6 +840,8 @@
         return {
             viewMode: localStorage.getItem('whusnet_ticket_history_view') || (window.innerWidth >= 768 ? 'table' : 'cards'),
 
+            refreshing: false,
+
             init() {
                 // Responsiveness listener jika resize layar
                 window.addEventListener('resize', () => {
@@ -847,6 +849,8 @@
                         this.viewMode = window.innerWidth >= 768 ? 'table' : 'cards';
                     }
                 });
+
+                this.initEchoListeners();
             },
 
             setViewMode(mode) {
@@ -858,6 +862,58 @@
                 window.dispatchEvent(new CustomEvent('open-ticket-drawer', {
                     detail: { id: ticketId }
                 }));
+            },
+
+            /**
+             * Auto-refresh — pola sama dengan tickets/partials/archive.blade.php:
+             * refetch URL sendiri (filter & pagination query string kepertahankan),
+             * innerHTML-swap container yang berubah. Tiket History gak punya
+             * data per-baris yang disimpan di JS (drawer fetch sendiri lewat
+             * API), jadi aman di-swap tanpa kehilangan state apa pun selain
+             * scroll position.
+             */
+            async refetchAndSwap() {
+                if (this.refreshing) return;
+                this.refreshing = true;
+                const btn = document.getElementById('history-refresh-btn');
+                btn?.classList.add('opacity-50');
+
+                try {
+                    const res = await fetch(window.location.href, { headers: { 'Accept': 'text/html' } });
+                    const html = await res.text();
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+
+                    ['history-stat-cards', 'history-table-container', 'history-cards-container', 'history-pagination-container'].forEach(id => {
+                        const el = document.getElementById(id);
+                        const newEl = doc.getElementById(id);
+                        if (el && newEl) {
+                            el.innerHTML = newEl.innerHTML;
+                            if (window.Alpine) window.Alpine.initTree(el);
+                        }
+                    });
+                } catch (e) {
+                    // Diam-diam gagal — tombol Refresh manual tetap bisa dicoba lagi.
+                } finally {
+                    this.refreshing = false;
+                    btn?.classList.remove('opacity-50');
+                }
+            },
+
+            initEchoListeners() {
+                const allowedPopIds = @json($allowedPopIds ?? []);
+                let attempts = 0;
+                const bind = () => {
+                    if (typeof window.Echo === 'undefined' || !window.Echo) {
+                        attempts++;
+                        if (attempts < 20) setTimeout(bind, 100);
+                        return;
+                    }
+                    allowedPopIds.forEach(popId => {
+                        window.Echo.private(`tickets.${popId}`)
+                            .listen('.TicketQueueUpdated', () => this.refetchAndSwap());
+                    });
+                };
+                bind();
             }
         };
     }

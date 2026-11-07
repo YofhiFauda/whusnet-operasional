@@ -428,6 +428,14 @@ class CollectorPaymentService
                     // bagian yang menutup invoice, supaya notifikasi/setoran
                     // admin menghitung uang fisik yang benar-benar masuk.
                     'amount' => $cashReceived,
+                    // Saldo TERSISA pelanggan setelah baris ini (bukan saldo
+                    // yang dipakai) — dipakai klien (collector-pay-script.blade.php
+                    // cbApplyResults()) buat patch "maks saldo" baris-baris LAIN
+                    // milik pelanggan yang sama tanpa reload penuh. Dulu gak
+                    // dikirim sama sekali, jadi satu-satunya cara nyegerin
+                    // "maks saldo" adalah reload (Tahap 2 §3, docs/plan/
+                    // notifications/urutan-pengerjaan-notifikasi.md).
+                    'customer_remaining_balance' => (float) $this->balances->balance($lockedInvoice->customer),
                 ];
             }
 

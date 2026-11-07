@@ -95,6 +95,31 @@ class CollectorMonthlyReportTest extends TestCase
     }
 
     #[Test]
+    public function agregasi_pembayaran_tagihan_hanya_membaca_invoice_periode_dan_pop_terpilih(): void
+    {
+        DB::enableQueryLog();
+
+        try {
+            $figures = $this->figuresA();
+            $queries = DB::getQueryLog();
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+
+        $tagihanQuery = collect($queries)->first(fn (array $query) => str_contains($query['query'], 'cash_paid')
+            && str_contains($query['query'], 'saldo_paid')
+            && str_contains($query['query'], 'from "invoices" as "i"'));
+
+        $this->assertNotNull($tagihanQuery);
+        $this->assertStringContainsString('"target_i"."billing_period"', $tagihanQuery['query']);
+        $this->assertStringContainsString('"target_i"."pop_id"', $tagihanQuery['query']);
+        $this->assertContains('2026-08', $tagihanQuery['bindings']);
+        $this->assertContains($this->miniA->id, $tagihanQuery['bindings']);
+        $this->assertEquals(200000, $figures['tagihan']['bulanan']);
+    }
+
+    #[Test]
     public function tagihan_terbit_bulanan_dan_total_pembayaran_terhitung_benar_dan_melipat_mini_pop(): void
     {
         $f = $this->figuresA();

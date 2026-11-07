@@ -2,15 +2,21 @@
 
 namespace Tests\Feature;
 
+use App\Enums\NotificationType;
+use App\Enums\ScopeType;
 use App\Models\City;
 use App\Models\Customer;
 use App\Models\District;
 use App\Models\InternetPackage;
 use App\Models\Pop;
+use App\Models\Role;
+use App\Models\User;
 use App\Models\Village;
+use App\Notifications\AppNotification;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
+use Illuminate\Support\Facades\Notification;
 use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
@@ -131,6 +137,92 @@ class CustomerCreateTest extends TestCase
             'internet_package_id' => $package->id,
             'package_name_snapshot' => $package->name,
         ]);
+    }
+
+    /**
+     * Customer Lifecycle: siapa pun yang pegang `customer_registration_verification.approve`
+     * di POP yang sama dikasih tau ada pendaftaran baru — sebelumnya nol notif
+     * (docs/plan/notifications/urutan-pengerjaan-notifikasi.md Tahap 3). Dua
+     * POP dipakai sekaligus biar kebuktinya BUKAN broadcast semua approver,
+     * cuma yang scope-nya nyakup POP pendaftaran ini.
+     */
+    public function test_registration_notifies_approvers_scoped_to_same_pop(): void
+    {
+        $this->seed(DatabaseSeeder::class);
+        $admin = $this->loginAsAdmin();
+
+        $pop = Pop::create([
+            'code' => 'SMN',
+            'pop_code' => 'SMN',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'D',
+            'name' => 'POP Sooko',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $otherPop = Pop::create([
+            'code' => 'SIM',
+            'pop_code' => 'SIM',
+            'registration_prefix' => 'C',
+            'cid_prefix' => 'E',
+            'name' => 'POP Siman',
+            'type' => 'cabang',
+            'status' => 'active',
+        ]);
+
+        $csRole = Role::where('code', 'customer_service')->firstOrFail();
+
+        $approverInPop = User::factory()->create(['role_id' => $csRole->id, 'status' => 'active']);
+        $approverInPop->roleScopes()->create([
+            'role_id' => $csRole->id,
+            'scope_type' => ScopeType::SELECTED_POP->value,
+        ])->targets()->create(['pop_id' => $pop->id]);
+
+        $approverInOtherPop = User::factory()->create(['role_id' => $csRole->id, 'status' => 'active']);
+        $approverInOtherPop->roleScopes()->create([
+            'role_id' => $csRole->id,
+            'scope_type' => ScopeType::SELECTED_POP->value,
+        ])->targets()->create(['pop_id' => $otherPop->id]);
+
+        $city = City::firstOrFail();
+        $district = District::where('city_id', $city->id)->firstOrFail();
+        $village = Village::where('district_id', $district->id)->firstOrFail();
+        $package = InternetPackage::firstOrFail();
+
+        $data = [
+            'full_name' => 'Pendaftar Baru Notif',
+            'identity_number' => '3502181010900099',
+            'gender' => 'Laki-laki',
+            'primary_phone' => '08123456700',
+            'registration_date' => '2026-06-09',
+            'pop_id' => $pop->id,
+            'address' => 'Jl. Diponegoro No. 46',
+            'city_id' => $city->id,
+            'district_id' => $district->id,
+            'village_id' => $village->id,
+            'internet_package_id' => $package->id,
+            'contract_period_months' => 12,
+            'status' => 'registered',
+        ];
+
+        Notification::fake();
+
+        $this->post('/customers', $data)->assertSessionHas('success');
+
+        $customer = Customer::where('full_name', 'Pendaftar Baru Notif')->firstOrFail();
+
+        Notification::assertSentTo(
+            $approverInPop,
+            AppNotification::class,
+            fn ($notification) => $notification->type === NotificationType::INFO
+                && str_contains($notification->title, $customer->full_name)
+        );
+
+        Notification::assertNotSentTo($approverInOtherPop, AppNotification::class);
+        // Owner (hasRole owner) lolos EffectiveAccessService::usersWithPermission()
+        // juga, tapi actor gak boleh notif diri sendiri.
+        Notification::assertNotSentTo($admin, AppNotification::class);
     }
 
     public function test_submitting_invalid_customer_data_fails_validation(): void

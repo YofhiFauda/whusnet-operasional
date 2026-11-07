@@ -63,29 +63,28 @@
             padding: 6mm;
             position: relative;
             display: flex;
-            flex-direction: row;
+            flex-direction: column;
             align-items: center;
-            justify-content: space-between;
-            gap: 5mm;
+            justify-content: center;
+            gap: 1.5mm;
             overflow: hidden;
+            text-align: center;
         }
 
-        /* Kolom Kiri: QR Code (25mm x 25mm ideal) */
+        /* QR Code, dibesarkan & ditaruh tengah */
         .sticker-qr-container {
-            width: 28mm;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
             text-align: center;
-            flex-shrink: 0;
         }
 
         .sticker-qr-container img {
-            width: 25mm;
-            height: 25mm;
+            width: 40mm;
+            height: 40mm;
             display: block;
-            margin-bottom: 2mm;
+            margin-bottom: 1.5mm;
         }
 
         .sticker-qr-container .hint {
@@ -94,13 +93,12 @@
             line-height: 1.25;
         }
 
-        /* Kolom Kanan: Detail & PIN */
+        /* Detail & PIN, di bawah QR */
         .sticker-content {
-            flex-grow: 1;
             display: flex;
             flex-direction: column;
-            justify-content: center;
-            height: 100%;
+            align-items: center;
+            width: 100%;
         }
 
         .sticker-content .name {
@@ -122,6 +120,7 @@
         .sticker-content .divider {
             border-top: 1px dashed #cbd5e1;
             margin: 2mm 0;
+            width: 100%;
         }
 
         .sticker-content .login-id {
@@ -140,6 +139,7 @@
 
         .sticker-content .pin-section {
             margin-top: 2mm;
+            width: 100%;
         }
 
         .sticker-content .pin-label {
@@ -217,21 +217,18 @@
     </div>
 
     <div class="sticker">
-        <!-- Kolom Kiri: QR Code & Hint Scan -->
+        <!-- QR Code, dibesarkan & di tengah -->
         <div class="sticker-qr-container">
             <img src="{{ $qrDataUri }}" alt="QR Pelanggan {{ $customer->full_name }}">
-            <div class="hint">Scan QR ini pakai HP untuk cek &amp; bayar tagihan.</div>
         </div>
 
-        <!-- Kolom Kanan: Detail Pelanggan & PIN -->
+        <!-- Nama, Login ID, lalu PIN -->
         <div class="sticker-content">
             <div class="name">{{ $customer->full_name }}</div>
-            <div class="meta">{{ $customer->customer_code }} · {{ $customer->pop?->name ?? '—' }}</div>
 
             @if ($customer->portal_login_id)
                 <div class="divider"></div>
                 <div class="login-id">Login ID: {{ $customer->portal_login_id }}</div>
-                <div class="login-hint">Gunakan Login ID &amp; PIN di bawah untuk aktivasi Portal Pelanggan.</div>
             @endif
 
             @if ($plainPin)

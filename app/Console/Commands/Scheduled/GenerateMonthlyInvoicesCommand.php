@@ -4,6 +4,8 @@ namespace App\Console\Commands\Scheduled;
 
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
+use App\Enums\NotificationType;
+use App\Enums\ScopeType;
 use App\Enums\WorkflowTransition;
 use App\Models\Customer;
 use App\Models\CustomerBillingWaiver;
@@ -11,7 +13,9 @@ use App\Models\Invoice;
 use App\Models\Pop;
 use App\Models\RevenueCategory;
 use App\Models\RevenueSubcategory;
+use App\Notifications\AppNotification;
 use App\Services\CustomerBalanceService;
+use App\Services\EffectiveAccessService;
 use App\Services\InvoiceItemBuilder;
 use App\Services\InvoiceNumberGenerator;
 use Carbon\Carbon;
@@ -108,6 +112,15 @@ class GenerateMonthlyInvoicesCommand extends Command
         $skipped = 0;
         $failed = 0;
 
+        // Ringkasan per-POP (Tahap 3, docs/plan/notifications/urutan-
+        // pengerjaan-notifikasi.md) — dipakai buat notif pop_admin yang
+        // POP-nya BENERAN kebagian invoice baru/gagal, bukan broadcast ke
+        // semua pop_admin walau POP-nya nihil aktivitas di run ini.
+        $perPop = [];
+        $bump = function (string $key, int $popId) use (&$perPop): void {
+            $perPop[$popId][$key] = ($perPop[$popId][$key] ?? 0) + 1;
+        };
+
         $periodStart = Carbon::parse($billingPeriod.'-01');
 
         foreach ($customers as $customer) {
@@ -115,6 +128,7 @@ class GenerateMonthlyInvoicesCommand extends Command
 
             if (! $service || (float) $service->monthly_price <= 0) {
                 $skipped++;
+                $bump('skipped', $customer->pop_id);
 
                 continue;
             }
@@ -125,6 +139,7 @@ class GenerateMonthlyInvoicesCommand extends Command
             // period — recurring billing only starts the month AFTER activation.
             if ($service->activation_date && $service->activation_date->isSameMonth($periodStart)) {
                 $skipped++;
+                $bump('skipped', $customer->pop_id);
 
                 continue;
             }
@@ -146,6 +161,7 @@ class GenerateMonthlyInvoicesCommand extends Command
 
             if ($alreadyExists) {
                 $skipped++;
+                $bump('skipped', $customer->pop_id);
 
                 continue;
             }
@@ -158,6 +174,7 @@ class GenerateMonthlyInvoicesCommand extends Command
             // (InvoiceObserver) menutup jalur pembuatan invoice manual/import.
             if (CustomerBillingWaiver::existsFor($customer->id, $billingPeriod)) {
                 $skipped++;
+                $bump('skipped', $customer->pop_id);
 
                 continue;
             }
@@ -238,8 +255,10 @@ class GenerateMonthlyInvoicesCommand extends Command
                 });
 
                 $created++;
+                $bump('created', $customer->pop_id);
             } catch (\Throwable $e) {
                 $failed++;
+                $bump('failed', $customer->pop_id);
                 $this->error("Gagal generate invoice untuk {$customer->customer_code}: {$e->getMessage()}");
             }
         }
@@ -248,7 +267,76 @@ class GenerateMonthlyInvoicesCommand extends Command
         $pauseNote = (! $pop && $pausedPops !== []) ? ' ['.count($pausedPops).' Pop di-pause, tidak diikutkan]' : '';
         $this->info("Periode {$billingPeriod} ({$scopeLabel}){$pauseNote}: ".($dryRun ? 'akan dibuat' : 'dibuat')." {$created}, dilewati {$skipped}, gagal {$failed}.");
 
+        if (! $dryRun) {
+            $this->notifyBatchSummary($created, $skipped, $failed, $perPop, $billingPeriod, $scopeLabel);
+        }
+
         return self::SUCCESS;
+    }
+
+    /**
+     * Ringkasan ke Finance (`invoices.approve` — di Role Matrix biasanya
+     * `admin`/`owner`, global lintas POP) dan ke tiap pop_admin yang POP-nya
+     * BENERAN kebagian invoice baru/gagal di run ini (`invoices.create`,
+     * di-scope ke target POP — ALL_POP sengaja dikecualikan supaya tidak
+     * dobel notif sama orang yang sudah dapat ringkasan global di atas).
+     * Tidak dipanggil sama sekali untuk dry-run — itu cuma preview, tidak ada
+     * yang benar-benar terjadi (docs/plan/notifications/urutan-pengerjaan-
+     * notifikasi.md Tahap 3).
+     */
+    private function notifyBatchSummary(int $created, int $skipped, int $failed, array $perPop, string $billingPeriod, string $scopeLabel): void
+    {
+        // Nihil aktivitas (semua dilewati, biasa pas re-run bulan yang sudah
+        // beres) tidak perlu kabar — cuma noise harian buat Finance.
+        if ($created === 0 && $failed === 0) {
+            return;
+        }
+
+        $title = "Generate Tagihan Bulanan {$billingPeriod}";
+        $actionUrl = route('invoices.index');
+        $type = $failed > 0 ? NotificationType::WARNING : NotificationType::SUCCESS;
+
+        $financeUsers = app(EffectiveAccessService::class)->usersWithPermission('invoices.approve')->get();
+        foreach ($financeUsers as $user) {
+            $user->notify(new AppNotification(
+                title: $title,
+                message: "{$scopeLabel}: {$created} tagihan terbit, {$skipped} dilewati, {$failed} gagal.",
+                actionUrl: $actionUrl,
+                type: $type
+            ));
+        }
+
+        foreach ($perPop as $popId => $counts) {
+            $popCreated = $counts['created'] ?? 0;
+            $popFailed = $counts['failed'] ?? 0;
+
+            if ($popCreated === 0 && $popFailed === 0) {
+                continue;
+            }
+
+            $popTarget = Pop::find($popId);
+            if (! $popTarget) {
+                continue;
+            }
+
+            $popUsers = app(EffectiveAccessService::class)
+                ->usersWithPermission('invoices.create')
+                ->whereHas('roleScopes', fn ($q) => $q->whereIn('scope_type', [ScopeType::SELECTED_POP->value, ScopeType::POP_TREE->value])
+                    ->whereHas('targets', fn ($t) => $t->where('pop_id', $popId))
+                )
+                ->get();
+
+            $popSkipped = $counts['skipped'] ?? 0;
+
+            foreach ($popUsers as $user) {
+                $user->notify(new AppNotification(
+                    title: $title,
+                    message: "{$popTarget->name}: {$popCreated} tagihan terbit, {$popSkipped} dilewati, {$popFailed} gagal.",
+                    actionUrl: $actionUrl,
+                    type: $popFailed > 0 ? NotificationType::WARNING : NotificationType::SUCCESS
+                ));
+            }
+        }
     }
 
     /**

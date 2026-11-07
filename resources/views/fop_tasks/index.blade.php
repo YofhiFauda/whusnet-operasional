@@ -1478,8 +1478,11 @@
                     if (data.success) {
                         this.showToast('success', data.message);
                         this.bulkTeamModal.open = false;
+                        // FopTaskUpdated sudah di-dispatch server-side per task (ShouldBroadcastNow),
+                        // jadi cukup tarik ulang baris yang barusan di-assign — gak perlu reload penuh.
+                        const refreshedTaskIds = [...this.selectedTaskIds];
                         this.selectedTaskIds = [];
-                        setTimeout(() => window.location.reload(), 800);
+                        refreshedTaskIds.forEach(id => this.refreshFopTaskRow(id));
                     } else {
                         this.showToast('error', data.message || 'Gagal menugaskan task ke tim.');
                     }

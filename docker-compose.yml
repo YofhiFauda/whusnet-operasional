@@ -187,10 +187,14 @@ services:
       - coolify
 
   horizon:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      target: runtime
+    # Tanpa `build:` sendiri — pakai image yang sama persis dengan `app`
+    # (Dockerfile.prod target `runtime`). `app`, `horizon`, `reverb`,
+    # `scheduler` dulu masing-masing punya `build:` identik (context,
+    # dockerfile, target SAMA, tag image SAMA) → Coolify/compose build
+    # keempatnya PARALEL, 4x `composer install` rebutan Packagist & cache
+    # disk bersamaan → salah satu kena rate-limit/korup →
+    # "composer install ... exit code: 100" (gagal acak, bukan tiap build).
+    # Cukup `app` yang build; yang lain tinggal pakai tag yang sama.
     image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
@@ -218,10 +222,7 @@ services:
       - coolify
 
   reverb:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      target: runtime
+    # Tanpa `build:` sendiri — lihat catatan di service `horizon`.
     image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
@@ -250,10 +251,7 @@ services:
       - coolify
 
   scheduler:
-    build:
-      context: .
-      dockerfile: Dockerfile.prod
-      target: runtime
+    # Tanpa `build:` sendiri — lihat catatan di service `horizon`.
     image: app:${APP_VERSION:-latest}
     restart: unless-stopped
     environment:
