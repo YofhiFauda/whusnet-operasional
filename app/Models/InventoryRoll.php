@@ -42,6 +42,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'current_technician_id',
     'issued_from_pop_id',
     'received_at',
+    'expired_at',
 ])]
 class InventoryRoll extends Model
 {
@@ -56,7 +57,19 @@ class InventoryRoll extends Model
             'length_remaining' => 'decimal:2',
             'unit_price_snapshot' => 'decimal:2',
             'received_at' => 'datetime',
+            'expired_at' => 'datetime',
         ];
+    }
+
+    /**
+     * Sinyal "sudah lewat waktu, belum dikembalikan" (auto-expire custody
+     * teknisi, laporan user 2026-11-05/06) — sama pola `InventorySerial::isExpired()`.
+     * BUKAN status terminal, murni visibilitas sampai
+     * `TechnicianCustodyExpiryService` auto-return roll ini ke Gudang Cabang.
+     */
+    public function isExpired(): bool
+    {
+        return $this->expired_at !== null;
     }
 
     public function item(): BelongsTo

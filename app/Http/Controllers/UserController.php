@@ -117,6 +117,7 @@ class UserController extends Controller
             'scope_type' => ['required', Rule::in(['all_pop', 'selected_pop'])],
             'pop_ids' => ['nullable', 'array'],
             'pop_ids.*' => ['exists:pops,id'],
+            'is_pengajuan_barang_approver' => ['nullable', 'boolean'],
             'password' => ['required', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
         ], [
             'name.required' => 'Nama user wajib diisi.',
@@ -175,6 +176,7 @@ class UserController extends Controller
             'phone' => $validated['phone'] ?? null,
             'status' => $validated['status'],
             'role_id' => $validated['role_id'],
+            'is_pengajuan_barang_approver' => $request->boolean('is_pengajuan_barang_approver'),
             'password' => Hash::make($validated['password']),
         ]);
 
@@ -186,7 +188,7 @@ class UserController extends Controller
             'action' => 'create',
             'auditable_type' => User::class,
             'auditable_id' => $user->id,
-            'new_values' => $user->only(['name', 'email', 'phone', 'status', 'role_id']),
+            'new_values' => $user->only(['name', 'email', 'phone', 'status', 'role_id', 'is_pengajuan_barang_approver']),
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'created_at' => now(),
@@ -214,6 +216,7 @@ class UserController extends Controller
             'scope_type' => ['required', Rule::in(['all_pop', 'selected_pop'])],
             'pop_ids' => ['nullable', 'array'],
             'pop_ids.*' => ['exists:pops,id'],
+            'is_pengajuan_barang_approver' => ['nullable', 'boolean'],
             'password' => ['nullable', Password::min(8)->mixedCase()->numbers()->symbols(), 'confirmed'],
         ], [
             'name.required' => 'Nama user wajib diisi.',
@@ -331,7 +334,7 @@ class UserController extends Controller
 
         $validated = $validator->validate();
 
-        $oldValues = $user->only(['name', 'email', 'phone', 'status', 'role_id']);
+        $oldValues = $user->only(['name', 'email', 'phone', 'status', 'role_id', 'is_pengajuan_barang_approver']);
 
         $user->fill([
             'name' => $validated['name'],
@@ -339,6 +342,7 @@ class UserController extends Controller
             'phone' => $validated['phone'] ?? null,
             'status' => $validated['status'],
             'role_id' => $validated['role_id'],
+            'is_pengajuan_barang_approver' => $request->boolean('is_pengajuan_barang_approver'),
         ]);
 
         if (! empty($validated['password'])) {
@@ -355,7 +359,7 @@ class UserController extends Controller
             'auditable_type' => User::class,
             'auditable_id' => $user->id,
             'old_values' => $oldValues,
-            'new_values' => $user->only(['name', 'email', 'phone', 'status', 'role_id']),
+            'new_values' => $user->only(['name', 'email', 'phone', 'status', 'role_id', 'is_pengajuan_barang_approver']),
             'ip_address' => $request->ip(),
             'user_agent' => $request->userAgent(),
             'created_at' => now(),

@@ -14,6 +14,7 @@ use App\Models\TicketHistory;
 use App\Models\User;
 use App\Services\NocAnalyticsService;
 use Closure;
+use Illuminate\Contracts\Cache\LockTimeoutException;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
@@ -88,7 +89,7 @@ class NocDashboardController extends Controller
             $dateTo?->toDateTimeString() ?? ''
         );
 
-        [$stats, $issueStats, $regionStats, $trendMatrix, $deltaStats, $dailyTrend, $slaCompliance, $agingBuckets] = Cache::remember(
+        [$stats, $issueStats, $regionStats, $trendMatrix, $deltaStats, $dailyTrend, $slaCompliance, $agingBuckets] = $this->rememberAnalytics(
             $cacheKey,
             60,
             function () use ($filteredQuery, $baseQuery, $dateFrom, $dateTo) {
@@ -129,16 +130,16 @@ class NocDashboardController extends Controller
                             ->orWhere('status', TicketHandlingStatus::CLOSED->value)
                             ->orWhere('handler', TicketHandler::FOP->value);
                     })
-                    ->get();
+                    ->toBase()
+                    ->get(['created_at', 'resolved_at', 'updated_at']);
 
                 $avgMinutes = null;
                 if ($resolvedTickets->isNotEmpty()) {
-                    $durations = $resolvedTickets->map(function (Ticket $t) {
-                        if ($t->resolved_at) {
-                            return (int) $t->created_at->diffInMinutes($t->resolved_at);
-                        }
+                    $durations = $resolvedTickets->map(function (object $ticket): int {
+                        $createdAt = Carbon::parse($ticket->created_at);
+                        $endedAt = Carbon::parse($ticket->resolved_at ?? $ticket->updated_at);
 
-                        return (int) $t->created_at->diffInMinutes($t->updated_at);
+                        return (int) $createdAt->diffInMinutes($endedAt);
                     });
                     $avgMinutes = (int) round($durations->avg());
                 }
@@ -166,67 +167,86 @@ class NocDashboardController extends Controller
                     'avg_duration_minutes' => $avgMinutes,
                 ];
 
-                // 5. Statistik per Issue (Categorized & Percentage)
-                $issueStatsRaw = (clone $filteredQuery)
-                    ->with('issueCategory:id,name')
-                    ->get()
-                    ->groupBy(fn (Ticket $t) => $t->issueCategory?->name ?? 'Lainnya')
-                    ->map->count()
-                    ->sortDesc()
-                    ->take(10);
+                // 5-7. Hitung pasangan daerah dan issue dari tiket yang sudah
+                // dibatasi scope POP dan periode. Nama yang sama tetap digabung
+                // sebagaimana groupBy pada Collection sebelumnya.
+                $scopedStatsTickets = (clone $filteredQuery)
+                    ->select(['id', 'customer_id', 'pop_id', 'issue_category_id'])
+                    ->toBase();
 
-                $issueStatsTotal = $issueStatsRaw->sum();
-                $issueStats = $issueStatsRaw->map(function ($count) use ($issueStatsTotal) {
-                    return [
-                        'count' => $count,
-                        'percentage' => $issueStatsTotal > 0 ? round(($count / $issueStatsTotal) * 100, 1) : 0,
-                    ];
-                });
-
-                // 6. Statistik per Daerah (District/POP Categorized & Percentage)
-                // Satu kali muat untuk statistik daerah DAN matriks tren di bawah —
-                // dulu query + hidrasi tiket yang sama dijalankan dua kali.
-                $allFilteredTickets = (clone $filteredQuery)
-                    ->with(['customer:id,district_id', 'customer.district:id,name', 'pop:id,name', 'issueCategory:id,name'])
+                $groupedStats = DB::query()
+                    ->fromSub($scopedStatsTickets, 'stats_tickets')
+                    ->leftJoin('customers as stats_customers', 'stats_customers.id', '=', 'stats_tickets.customer_id')
+                    ->leftJoin('districts as stats_districts', 'stats_districts.id', '=', 'stats_customers.district_id')
+                    ->leftJoin('pops as stats_pops', 'stats_pops.id', '=', 'stats_tickets.pop_id')
+                    ->leftJoin('ticket_issue_categories as stats_issues', 'stats_issues.id', '=', 'stats_tickets.issue_category_id')
+                    ->selectRaw(
+                        'COALESCE(stats_districts.name, stats_pops.name, ?) as region_name, COALESCE(stats_issues.name, ?) as issue_name, COUNT(*) as total, MIN(stats_tickets.id) as first_ticket_id',
+                        ['Tidak diketahui', 'Lainnya']
+                    )
+                    ->groupBy('region_name', 'issue_name')
                     ->get();
 
-                $regionStatsRaw = $allFilteredTickets
-                    ->groupBy(function (Ticket $t) {
-                        return $t->customer?->district?->name ?? $t->pop?->name ?? 'Tidak diketahui';
-                    })
-                    ->map->count()
-                    ->sortDesc()
-                    ->take(10);
+                $issueGroups = [];
+                $regionGroups = [];
+                $pairCounts = [];
 
-                $regionStatsTotal = $regionStatsRaw->sum();
-                $regionStats = $regionStatsRaw->map(function ($count) use ($regionStatsTotal) {
-                    return [
-                        'count' => $count,
-                        'percentage' => $regionStatsTotal > 0 ? round(($count / $regionStatsTotal) * 100, 1) : 0,
+                foreach ($groupedStats as $row) {
+                    $regionName = $row->region_name;
+                    $issueName = $row->issue_name;
+                    $count = (int) $row->total;
+                    $firstTicketId = (int) $row->first_ticket_id;
+
+                    if (! isset($regionGroups[$regionName])) {
+                        $regionGroups[$regionName] = ['count' => 0, 'first_id' => $firstTicketId];
+                    }
+                    if (! isset($issueGroups[$issueName])) {
+                        $issueGroups[$issueName] = ['count' => 0, 'first_id' => $firstTicketId];
+                    }
+
+                    $regionGroups[$regionName]['count'] += $count;
+                    $issueGroups[$issueName]['count'] += $count;
+                    $regionGroups[$regionName]['first_id'] = min($regionGroups[$regionName]['first_id'], $firstTicketId);
+                    $issueGroups[$issueName]['first_id'] = min($issueGroups[$issueName]['first_id'], $firstTicketId);
+                    $pairCounts[$regionName][$issueName] = $count;
+                }
+
+                $sortGroups = static function (array &$groups): void {
+                    uasort($groups, static fn (array $a, array $b): int => $b['count'] <=> $a['count'] ?: $a['first_id'] <=> $b['first_id']);
+                    $groups = array_slice($groups, 0, 10, true);
+                };
+
+                $sortGroups($issueGroups);
+                $sortGroups($regionGroups);
+
+                $issueTotal = array_sum(array_column($issueGroups, 'count'));
+                $regionTotal = array_sum(array_column($regionGroups, 'count'));
+                $issueStats = [];
+                $regionStats = [];
+
+                foreach ($issueGroups as $name => $group) {
+                    $issueStats[$name] = [
+                        'count' => $group['count'],
+                        'percentage' => $issueTotal > 0 ? round(($group['count'] / $issueTotal) * 100, 1) : 0,
                     ];
-                });
+                }
+                foreach ($regionGroups as $name => $group) {
+                    $regionStats[$name] = [
+                        'count' => $group['count'],
+                        'percentage' => $regionTotal > 0 ? round(($group['count'] / $regionTotal) * 100, 1) : 0,
+                    ];
+                }
 
-                // 7. Trend Matrix: Daerah vs Issue Category
-                $topRegions = $regionStatsRaw->keys()->take(6)->toArray();
-                $topIssues = $issueStatsRaw->keys()->take(6)->toArray();
-
+                $topRegions = array_slice(array_keys($regionGroups), 0, 6);
+                $topIssues = array_slice(array_keys($issueGroups), 0, 6);
                 $matrix = [];
                 $maxCellCount = 0;
 
                 foreach ($topRegions as $regionName) {
-                    $matrix[$regionName] = [];
                     foreach ($topIssues as $issueName) {
-                        $count = $allFilteredTickets->filter(function (Ticket $t) use ($regionName, $issueName) {
-                            $r = $t->customer?->district?->name ?? $t->pop?->name ?? 'Tidak diketahui';
-                            $i = $t->issueCategory?->name ?? 'Lainnya';
-
-                            return $r === $regionName && $i === $issueName;
-                        })->count();
-
+                        $count = $pairCounts[$regionName][$issueName] ?? 0;
                         $matrix[$regionName][$issueName] = $count;
-                        if ($count > $maxCellCount) {
-                            $maxCellCount = $count;
-                        }
+                        $maxCellCount = max($maxCellCount, $count);
                     }
                 }
 
@@ -253,7 +273,7 @@ class NocDashboardController extends Controller
                 // representatif buat seluruh antrean, bukan cuma yang tampil.
                 $agingBuckets = $this->buildAgingBuckets($baseQuery);
 
-                return [$stats, $issueStats->toArray(), $regionStats->toArray(), $trendMatrix, $deltaStats, $dailyTrend, $slaCompliance, $agingBuckets];
+                return [$stats, $issueStats, $regionStats, $trendMatrix, $deltaStats, $dailyTrend, $slaCompliance, $agingBuckets];
             }
         );
 
@@ -296,18 +316,17 @@ class NocDashboardController extends Controller
         // tiket 12 bulan yang SAMA persis (`loadComplaintWindow()`), jadi
         // gabung query-nya sekali di sini lebih murah daripada dua
         // Cache::remember terpisah yang masing-masing query ulang.
-        [$monthlyComplaintTrend, $perPopAnalytics] = Cache::remember(
-            sprintf('dashboard:noc:monthly-complaint:%d:%s', auth()->id(), $scopeFingerprint),
-            300,
-            function () {
-                $window = $this->loadComplaintWindow();
+        $monthlyCacheKey = sprintf('dashboard:noc:monthly-complaint:%d:%s', auth()->id(), $scopeFingerprint);
+        $buildMonthlyAnalytics = function (): array {
+            $window = $this->loadComplaintWindow();
 
-                return [
-                    $this->buildMonthlyComplaintTrend($window),
-                    $this->buildPerPopAnalytics($window),
-                ];
-            }
-        );
+            return [
+                $this->buildMonthlyComplaintTrend($window),
+                $this->buildPerPopAnalytics($window),
+            ];
+        };
+
+        [$monthlyComplaintTrend, $perPopAnalytics] = $this->rememberAnalytics($monthlyCacheKey, 300, $buildMonthlyAnalytics);
 
         // Data Live Command Center & Deep Analytics dari NocAnalyticsService
         // Cache 60 detik per user+filter+scope POP (hanya skalar array aman)
@@ -319,7 +338,7 @@ class NocDashboardController extends Controller
             $selectedPopId ?? ''
         );
 
-        [$liveTelemetry, $deepAnalytics] = Cache::remember(
+        [$liveTelemetry, $deepAnalytics] = $this->rememberAnalytics(
             $telemetryCacheKey,
             60,
             fn () => [
@@ -354,6 +373,28 @@ class NocDashboardController extends Controller
                 'date_to' => $dateTo ? $dateTo->toDateString() : '',
             ],
         ]);
+    }
+
+    /**
+     * Keep one scoped analytics computation in flight when its cache expires.
+     *
+     * @param  Closure(): array  $compute
+     */
+    private function rememberAnalytics(string $key, int $seconds, Closure $compute): array
+    {
+        $cached = Cache::get($key);
+        if ($cached !== null) {
+            return $cached;
+        }
+
+        try {
+            return Cache::lock($key.':lock', 60)->block(
+                30,
+                fn (): array => Cache::remember($key, $seconds, $compute)
+            );
+        } catch (LockTimeoutException) {
+            return Cache::remember($key, $seconds, $compute);
+        }
     }
 
     /**

@@ -45,6 +45,7 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
     'customer_id',
     'fop_task_id',
     'installed_at',
+    'expired_at',
 ])]
 class InventorySerial extends Model
 {
@@ -59,6 +60,7 @@ class InventorySerial extends Model
             'ownership' => DeviceOwnership::class,
             'condition_checked_at' => 'datetime',
             'installed_at' => 'datetime',
+            'expired_at' => 'datetime',
             'current_network_node_id' => 'integer',
             'current_mini_pop_id' => 'integer',
             'current_infrastructure_pop_id' => 'integer',
@@ -177,9 +179,35 @@ class InventorySerial extends Model
             && (($this->condition ?? ItemCondition::NEW) === ItemCondition::NEW || $this->condition_checked_at !== null);
     }
 
+    /**
+     * Khusus Jual Beli antar Cabang: beda dari isClearedForIssue(), barang
+     * rusak BOLEH dijual asal sudah diperiksa fisik (condition_checked_at
+     * terisi) — pembeli (Cabang lain) tahu kondisinya lewat badge kondisi.
+     * Jangan dipakai di luar alur Jual Beli (Issue/InventoryService tetap
+     * pakai isClearedForIssue() yang menolak barang rusak total).
+     */
+    public function isClearedForBranchSale(): bool
+    {
+        return ($this->condition ?? ItemCondition::NEW) === ItemCondition::NEW
+            || $this->condition_checked_at !== null;
+    }
+
     public function scopeStatus($query, SerialStatus $status)
     {
         return $query->where('status', $status->value);
+    }
+
+    /**
+     * Sinyal "sudah lewat waktu dipegang teknisi, belum dikembalikan/
+     * dipasang" (laporan user 2026-11-05 — auto-expire 24 jam/ganti hari).
+     * SENGAJA bukan status terminal (lihat docblock migration
+     * `add_expired_at_for_technician_custody_auto_expire`) — `status` tetap
+     * `ISSUED`, install/deploy/Reassign-return SEMUA tetap jalan normal
+     * walau SN ini sudah ditandai overdue.
+     */
+    public function isExpired(): bool
+    {
+        return $this->expired_at !== null;
     }
 
     /**

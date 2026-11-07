@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'unit_price_snapshot',
     'status',
     'issued_at',
+    'expired_at',
 ])]
 class TechnicianCustody extends Model
 {
@@ -49,6 +50,7 @@ class TechnicianCustody extends Model
             'unit_price_snapshot' => 'decimal:2',
             'status' => CustodyStatus::class,
             'issued_at' => 'datetime',
+            'expired_at' => 'datetime',
         ];
     }
 
@@ -75,6 +77,20 @@ class TechnicianCustody extends Model
     public function scopeActive($query)
     {
         return $query->where('qty_remaining', '>', 0);
+    }
+
+    /**
+     * Sinyal "sudah lewat waktu, belum dikembalikan/dipakai" (laporan user
+     * 2026-11-05 — auto-expire custody 24 jam/ganti hari). Dipasang
+     * `TechnicianCustodyExpiryService::expireOverdue()` lewat job tengah
+     * malam. BUKAN status terminal — qty_remaining masih > 0 dan tetap bisa
+     * dipakai (`consumeFromCustody()`) atau dikembalikan (Reassign) seperti
+     * biasa, cuma kebaca "overdue" di UI sampai salah satu dari dua hal itu
+     * terjadi.
+     */
+    public function isExpired(): bool
+    {
+        return $this->expired_at !== null;
     }
 
     /**

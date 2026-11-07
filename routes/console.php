@@ -38,6 +38,13 @@ Schedule::command('webhook-outbox:prune')->dailyAt('01:15');
 // SEBALIKNYA: melepas task yang belum final, bukan menghidupkan yang sudah.
 Schedule::command('tasks:auto-pending-overdue')->dailyAt('00:05');
 
+// '00:07' — auto-expire barang di tangan teknisi (laporan user 2026-11-05).
+// Setelah `tasks:auto-pending-overdue` (gak saling tergantung, cuma hindari
+// bentrok jam yang sama) — begitu hari berganti, custody qty/SN/Roll kemarin
+// langsung AUTO-DIKREDIT ke stok Gudang Cabang (keputusan user 2026-11-06,
+// presumptif, tanpa konfirmasi fisik), lihat docblock TechnicianCustodyExpiryService.
+Schedule::command('inventory:expire-overdue-custody')->dailyAt('00:07');
+
 // Peringatan belum setor teknisi (ADHOC-122). Jam sama dengan config
 // `billing.technician_close_time` (default 23:59). Hanya notifikasi.
 Schedule::command('technicians:notify-unsettled')->dailyAt((string) config('billing.technician_close_time', '23:59'));

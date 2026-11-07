@@ -168,11 +168,13 @@ class BranchInventorySaleController extends Controller
                 ->whereNotIn('id', InventorySerialSale::query()->select('inventory_serial_id'))
                 ->when($search !== '', fn ($q) => $q->where('serial_number', 'like', '%'.addcslashes($search, '%_\\').'%'))
                 ->whereHas('item', fn ($q) => $q->where('tracking_type', TrackingType::SERIALIZED->value))
-                // Cermin InventorySerial::isClearedForIssue() di SQL (bukan filter PHP
-                // setelah limit) — SN tak layak gak lagi makan jatah baris SN layak.
+                // Cermin InventorySerial::isClearedForBranchSale() di SQL (bukan filter
+                // PHP setelah limit) — SN tak layak gak lagi makan jatah baris SN layak.
+                // Beda dari gate Issue: USED_DAMAGED yang sudah diperiksa fisik ikut
+                // lolos di sini (badge kondisi kasih tau pembeli).
                 ->where(fn ($q) => $q->whereNull('condition')
                     ->orWhere('condition', ItemCondition::NEW->value)
-                    ->orWhere(fn ($used) => $used->where('condition', ItemCondition::USED_GOOD->value)->whereNotNull('condition_checked_at')))
+                    ->orWhere(fn ($used) => $used->whereIn('condition', [ItemCondition::USED_GOOD->value, ItemCondition::USED_DAMAGED->value])->whereNotNull('condition_checked_at')))
                 ->orderBy('serial_number')->paginate(100)->withQueryString()
             : null;
 

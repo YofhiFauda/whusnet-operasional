@@ -106,6 +106,7 @@ use App\Http\Controllers\Warehouse\WarehouseDamagedStockController;
 use App\Http\Controllers\Warehouse\WarehouseHistoryController;
 use App\Http\Controllers\Warehouse\WarehouseInfraStockController;
 use App\Http\Controllers\Warehouse\WarehouseIssueController;
+use App\Http\Controllers\Warehouse\WarehousePengajuanBarangController;
 use App\Http\Controllers\Warehouse\WarehousePicGudangController;
 use App\Http\Controllers\Warehouse\WarehouseReassignController;
 use App\Http\Controllers\Warehouse\WarehouseReceiveController;
@@ -1116,6 +1117,28 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('permission:warehouse_stock_request.reject')->group(function () {
         Route::post('/warehouse/stock-requests/{stockRequest}/reject', [WarehouseStockRequestController::class, 'reject'])->name('warehouse.stock-requests.reject');
+    });
+
+    // Surat Pengajuan Barang (gap #2 dari 3 feature report 2026-11-05) —
+    // barang yang BELUM ada di gudang, beda dari Permintaan Stok Cabang di
+    // atas (yang buat barang YANG SUDAH ada di katalog tapi stoknya kosong).
+    // Static routes (create) WAJIB di atas dynamic ({pengajuanBarang}) —
+    // kalau kebalik, "/pengajuan-barang/create" ketelen route-model-binding
+    // show() (CLAUDE.md "Urutan route: static dulu, dynamic belakangan").
+    Route::middleware('permission:warehouse_pengajuan_barang.view')->get('/warehouse/pengajuan-barang', [WarehousePengajuanBarangController::class, 'index'])->name('warehouse.pengajuan-barang.index');
+    Route::middleware('permission:warehouse_pengajuan_barang.create')->group(function () {
+        Route::get('/warehouse/pengajuan-barang/create', [WarehousePengajuanBarangController::class, 'create'])->name('warehouse.pengajuan-barang.create');
+        Route::post('/warehouse/pengajuan-barang', [WarehousePengajuanBarangController::class, 'store'])->name('warehouse.pengajuan-barang.store');
+    });
+    Route::middleware('permission:warehouse_pengajuan_barang.view')->group(function () {
+        Route::get('/warehouse/pengajuan-barang/{pengajuanBarang}', [WarehousePengajuanBarangController::class, 'show'])->name('warehouse.pengajuan-barang.show');
+        Route::get('/warehouse/pengajuan-barang/{pengajuanBarang}/pdf', [WarehousePengajuanBarangController::class, 'pdf'])->name('warehouse.pengajuan-barang.pdf');
+    });
+    Route::middleware('permission:warehouse_pengajuan_barang.approve')->group(function () {
+        Route::post('/warehouse/pengajuan-barang/{pengajuanBarang}/approve', [WarehousePengajuanBarangController::class, 'approve'])->name('warehouse.pengajuan-barang.approve');
+    });
+    Route::middleware('permission:warehouse_pengajuan_barang.reject')->group(function () {
+        Route::post('/warehouse/pengajuan-barang/{pengajuanBarang}/reject', [WarehousePengajuanBarangController::class, 'reject'])->name('warehouse.pengajuan-barang.reject');
     });
     Route::middleware('permission:warehouse_stock_request.cancel')->group(function () {
         Route::post('/warehouse/stock-requests/{stockRequest}/cancel', [WarehouseStockRequestController::class, 'cancel'])->name('warehouse.stock-requests.cancel');

@@ -47,7 +47,7 @@ class BranchInventorySaleService
                     || $serial->current_pop_id !== $fromCabang->id
                     || $serial->current_technician_id !== null
                     || $serial->ownership === DeviceOwnership::CUSTOMER
-                    || ! $serial->isClearedForIssue()
+                    || ! $serial->isClearedForBranchSale()
                     || InventorySerialSale::query()->where('inventory_serial_id', $serial->id)->exists()) {
                     throw new InvalidArgumentException("SN {$serial->serial_number} tidak layak dijual dari {$fromCabang->name}.");
                 }

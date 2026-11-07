@@ -4,9 +4,11 @@ namespace Tests\Feature;
 
 use App\Enums\CashDepositStatus;
 use App\Enums\DepositStatus;
+use App\Enums\PengajuanBarangStatus;
 use App\Enums\StockRequestStatus;
 use App\Models\CashDeposit;
 use App\Models\CollectorDeposit;
+use App\Models\PengajuanBarang;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\StockRequest;
@@ -102,5 +104,25 @@ class ActionQueueBadgeTest extends TestCase
         $this->actingAs($owner)->get(route('cash-deposits.index', ['status' => 'menunggu']))
             ->assertOk()->assertSee('data-badge="cash-deposit"', false)
             ->assertSee('KAS-AQB-1')->assertDontSee('KAS-AQB-2');
+    }
+
+    public function test_pengajuan_barang_badge_counts_menunggu_fop_and_respects_pop_scope(): void
+    {
+        $fop = $this->user('fop');
+        $fop->update(['is_pengajuan_barang_approver' => true]);
+        $branch = $this->pop('AQB4');
+        $other = $this->pop('AQB5');
+        $this->scope($fop, $branch);
+
+        $menunggu = PengajuanBarang::create(['nomor_request' => 'SPB-AQB-1', 'pengaju_id' => $fop->id, 'nama_kegiatan' => 'Uji badge', 'pop_id' => $branch->id, 'status' => PengajuanBarangStatus::MENUNGGU_FOP]);
+        PengajuanBarang::create(['nomor_request' => 'SPB-AQB-2', 'pengaju_id' => $fop->id, 'nama_kegiatan' => 'Di luar scope', 'pop_id' => $other->id, 'status' => PengajuanBarangStatus::MENUNGGU_FOP]);
+        PengajuanBarang::create(['nomor_request' => 'SPB-AQB-3', 'pengaju_id' => $fop->id, 'nama_kegiatan' => 'Sudah diputuskan', 'pop_id' => $branch->id, 'status' => PengajuanBarangStatus::DISETUJUI, 'decided_by' => $fop->id, 'decided_at' => now()]);
+
+        $queue = app(ActionQueueBadgeService::class);
+        $this->assertSame(1, $queue->pengajuanBarang($fop)->count());
+        $this->assertTrue($queue->pengajuanBarang($fop)->pluck('id')->contains($menunggu->id));
+
+        $this->actingAs($fop)->get(route('warehouse.pengajuan-barang.index'))
+            ->assertOk()->assertSee('data-badge="pengajuan-barang"', false);
     }
 }

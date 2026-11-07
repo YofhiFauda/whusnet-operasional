@@ -41,6 +41,10 @@ use Illuminate\Database\Seeder;
  *                              jawaban gap "cabang habis stok, Pusat gak
  *                              sadar" (sebelumnya cuma badge Stok Rendah
  *                              pasif, gak ada sinyal aktif ke Pusat).
+ *   warehouse_pengajuan_barang — Surat Pengajuan Barang (2026-11-06) — buat
+ *                              barang yang BELUM ADA di katalog/gudang sama
+ *                              sekali (beda dari warehouse_stock_request di
+ *                              atas yang barangnya sudah ada di katalog).
  *
  * Tujuh root TERPISAH (bukan satu root `warehouse` dengan banyak sub-feature)
  * karena masing-masing punya audience beda: `warehouse_transfer`/`warehouse_issue`
@@ -80,6 +84,11 @@ class WarehouseFeatureSeeder extends Seeder
             // satuan barang, audience-nya lebih sempit (Gudang Pusat doang,
             // BUKAN pop_admin cabang yang juga pegang `warehouse_transfer.view`).
             ['code' => 'warehouse_transfer_invoice', 'name' => 'Invoice Transfer Gudang', 'sort_order' => 22],
+            // Surat Pengajuan Barang (gap #2 dari 3 feature report
+            // 2026-11-05) — barang yang BELUM ada di gudang, beda dari
+            // `warehouse_stock_request` (barang YANG SUDAH ada di katalog
+            // tapi stoknya kosong). Satu keputusan approval: FOP.
+            ['code' => 'warehouse_pengajuan_barang', 'name' => 'Surat Pengajuan Barang', 'sort_order' => 25],
         ];
 
         foreach ($roots as $root) {

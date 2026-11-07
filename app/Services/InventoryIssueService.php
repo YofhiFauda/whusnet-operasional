@@ -116,6 +116,9 @@ class InventoryIssueService
                 'current_pop_id' => null,
                 'current_technician_id' => $technician->id,
                 'issued_from_pop_id' => $cabang->id,
+                // Custody episode baru — reset sinyal overdue dari episode lama
+                // (kalau SN ini pernah expired, direturn, lalu diissue ulang).
+                'expired_at' => null,
             ]);
 
             $transactions[] = InventoryTransaction::create([
@@ -170,6 +173,8 @@ class InventoryIssueService
                 'current_pop_id' => null,
                 'current_technician_id' => $technician->id,
                 'issued_from_pop_id' => $cabang->id,
+                // Custody episode baru — reset sinyal overdue dari episode lama.
+                'expired_at' => null,
             ]);
 
             $transactions[] = InventoryTransaction::create([

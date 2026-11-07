@@ -394,8 +394,10 @@
                                 </div>
                             @endif
 
-                            @if ($deposit->status->isVerified() && auth()->user()->hasPermission('collector_worksheet.print'))
-                                <div class="px-4 pb-3 pt-1 border-t border-border">
+                            {{-- Rincian pelanggan selalu tampil, tanpa syarat status/verifikasi —
+                                 justru ini yang dicek admin SAAT memeriksa setoran, bukan sesudahnya.
+                                 Cetak kwitansi (di dalamnya) tetap terkunci ke yang sudah diperiksa. --}}
+                            <div class="px-4 pb-3 pt-1 border-t border-border">
                                     <div class="flex items-center justify-between gap-2 pt-2.5">
                                         <button type="button" @click="expandedPayments = !expandedPayments"
                                                 class="flex items-center gap-1.5 text-[11px] font-semibold text-text-muted uppercase tracking-wider hover:text-text-main cursor-pointer">
@@ -405,7 +407,11 @@
                                             </svg>
                                             <span>Pelanggan yang Bayar ({{ $deposit->payments->count() }})</span>
                                         </button>
-                                        @if ($deposit->payments->isNotEmpty())
+                                        {{-- Cetak kwitansi TETAP terkunci ke setoran yang sudah diperiksa
+                                             kantor — kwitansi adalah dokumen kantor (§ komentar di
+                                             CollectorWorksheetController::show()), beda dari sekadar
+                                             melihat rincian pelanggan yang boleh dilihat sejak awal. --}}
+                                        @if ($deposit->payments->isNotEmpty() && $deposit->status->isVerified() && auth()->user()->hasPermission('collector_worksheet.print'))
                                             <form action="{{ route('payment-receipts.print', $collector->id) }}" method="POST" target="_blank" class="no-confirm">
                                                 @csrf
                                                 @foreach ($deposit->payments as $payment)
@@ -457,7 +463,6 @@
                                         @endif
                                     </div>
                                 </div>
-                            @endif
 
                             {{-- Form Verifikasi --}}
                             @if ($isPending && auth()->user()->hasPermission('collector_worksheet.validate'))

@@ -8,6 +8,7 @@ use App\Models\InventoryTransaction;
 use App\Models\InventoryTransfer;
 use App\Models\Invoice;
 use App\Models\Payment;
+use App\Models\PengajuanBarang;
 use App\Models\StockRequest;
 use App\Models\Task;
 use App\Models\Ticket;
@@ -73,6 +74,19 @@ class NumberSequenceService
         ));
 
         return sprintf('TFOP-%s-%06d', $ymd, $value);
+    }
+
+    /**
+     * Surat Pengajuan Barang (gap #2 dari 3 feature report 2026-11-05).
+     */
+    public function pengajuanBarangNumber(): string
+    {
+        $ymd = date('Ymd');
+        $value = $this->next("SPB:{$ymd}", fn () => $this->lastSuffix(
+            PengajuanBarang::where('nomor_request', 'like', "SPB-{$ymd}-%")->pluck('nomor_request')
+        ));
+
+        return sprintf('SPB-%s-%06d', $ymd, $value);
     }
 
     public function taskNumber(): string

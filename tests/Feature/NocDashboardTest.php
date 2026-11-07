@@ -26,6 +26,7 @@ use Database\Seeders\RolePermissionSeeder;
 use Database\Seeders\RoleSeeder;
 use Database\Seeders\TicketFeatureSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Cache;
 use ReflectionMethod;
 use Tests\TestCase;
 
@@ -97,6 +98,54 @@ class NocDashboardTest extends TestCase
     public function test_noc_can_access_dashboard(): void
     {
         $this->actingAs($this->nocUser)->get(route('noc.dashboard'))->assertOk();
+    }
+
+    public function test_cold_monthly_trend_waits_for_existing_scope_lock(): void
+    {
+        $this->actingAs($this->nocUser);
+
+        $popIds = Pop::forUser($this->nocUser)->pluck('id')->sort()->values()->implode(',');
+        $cacheKey = sprintf(
+            'dashboard:noc:monthly-complaint:%d:%s',
+            $this->nocUser->id,
+            hash('sha256', $popIds)
+        );
+        $lock = Cache::lock($cacheKey.':lock', 2);
+        $this->assertTrue($lock->get());
+
+        try {
+            $started = microtime(true);
+            $this->get(route('noc.dashboard'))->assertOk();
+            $this->assertTrue(Cache::has($cacheKey), implode(', ', array_keys(Cache::getStore()->all())));
+            $this->assertGreaterThan(1.2, microtime(true) - $started);
+        } finally {
+            $lock->release();
+        }
+    }
+
+    public function test_cold_telemetry_waits_for_existing_scope_lock(): void
+    {
+        $this->actingAs($this->nocUser);
+
+        $popIds = Pop::forUser($this->nocUser)->pluck('id')->sort()->values()->implode(',');
+        $cacheKey = sprintf(
+            'dashboard:noc:telemetry:%d:%s:%s:%s',
+            $this->nocUser->id,
+            hash('sha256', $popIds),
+            'month_to_date',
+            ''
+        );
+        $lock = Cache::lock($cacheKey.':lock', 2);
+        $this->assertTrue($lock->get());
+
+        try {
+            $started = microtime(true);
+            $this->get(route('noc.dashboard'))->assertOk();
+            $this->assertTrue(Cache::has($cacheKey), implode(', ', array_keys(Cache::getStore()->all())));
+            $this->assertGreaterThan(1.2, microtime(true) - $started);
+        } finally {
+            $lock->release();
+        }
     }
 
     public function test_role_without_noc_dashboard_permission_gets_403(): void
@@ -501,6 +550,7 @@ class NocDashboardTest extends TestCase
         $before = $this->actingAs($this->nocUser)->get(route('noc.dashboard'));
         $before->assertOk();
         $this->assertSame(2, $before->viewData('stats')['total_ticket']);
+        $this->assertSame(2, $before->viewData('issueStats')['Lainnya']['count']);
         $this->assertSame(2, $before->viewData('monthlyComplaintTrend')['total']);
 
         $scope = $this->nocUser->roleScopes()->firstOrFail();
@@ -511,6 +561,7 @@ class NocDashboardTest extends TestCase
         $after = $this->actingAs($this->nocUser)->get(route('noc.dashboard'));
         $after->assertOk();
         $this->assertSame(1, $after->viewData('stats')['total_ticket']);
+        $this->assertSame(1, $after->viewData('issueStats')['Lainnya']['count']);
         $this->assertSame(1, $after->viewData('monthlyComplaintTrend')['total']);
         $this->assertCount(1, $after->viewData('perPopAnalytics'));
         $this->assertCount(1, $after->viewData('deepAnalytics')['regional_complaint_rates']);
@@ -656,6 +707,129 @@ class NocDashboardTest extends TestCase
         $this->assertSame($this->customer->full_name, $rows[0]['name']);
         $this->assertSame('Koneksi Putus', $rows[0]['top_issue']);
         $this->assertSame(2, $rows[0]['count']);
+    }
+
+    public function test_issue_region_and_matrix_stats_do_not_hydrate_period_tickets(): void
+    {
+        $category = TicketIssueCategory::create([
+            'name' => 'Kabel Putus',
+            'default_priority' => 'High',
+            'is_active' => true,
+        ]);
+        $districtId = Village::findOrFail($this->customer->village_id)->district_id;
+        Customer::query()->whereKey($this->customer->id)->update(['district_id' => $districtId]);
+        $customerWithoutDistrict = Customer::factory()->create([
+            'pop_id' => $this->pop->id,
+            'district_id' => null,
+        ]);
+
+        for ($i = 0; $i < 40; $i++) {
+            Ticket::create([
+                'ticket_number' => "TK-AGGREGATE-{$i}",
+                'type' => TaskType::MAINTENANCE->value,
+                'customer_id' => $i < 25 ? $this->customer->id : $customerWithoutDistrict->id,
+                'pop_id' => $this->pop->id,
+                'issue_category_id' => $i < 30 ? $category->id : null,
+                'detail_keluhan' => 'Keluhan statistik.',
+                'priority' => 'High',
+                'handler' => TicketHandler::HELPDESK->value,
+                'status' => 'cancelled',
+                'created_by' => $this->helpdeskUser->id,
+                'created_at' => now()->subDay(),
+            ]);
+        }
+
+        $hydratedTickets = 0;
+        Ticket::retrieved(function () use (&$hydratedTickets): void {
+            $hydratedTickets++;
+        });
+
+        $response = $this->actingAs($this->nocUser)->get(route('noc.dashboard'));
+
+        $response->assertOk();
+        $this->assertSame(30, $response->viewData('issueStats')['Kabel Putus']['count']);
+        $this->assertSame(10, $response->viewData('issueStats')['Lainnya']['count']);
+        $this->assertSame(25, $response->viewData('regionStats')['Babadan']['count']);
+        $this->assertSame(15, $response->viewData('regionStats')[$this->pop->name]['count']);
+        $this->assertSame(25, $response->viewData('trendMatrix')['matrix']['Babadan']['Kabel Putus']);
+        $this->assertSame(5, $response->viewData('trendMatrix')['matrix'][$this->pop->name]['Kabel Putus']);
+        $this->assertSame(10, $response->viewData('trendMatrix')['matrix'][$this->pop->name]['Lainnya']);
+        $this->assertLessThan(130, $hydratedTickets);
+    }
+
+    public function test_average_duration_uses_resolved_time_without_loading_period_tickets(): void
+    {
+        $createdAt = now()->subDay()->startOfHour();
+        for ($i = 0; $i < 40; $i++) {
+            $ticket = Ticket::create([
+                'ticket_number' => "TK-DURATION-{$i}",
+                'type' => TaskType::MAINTENANCE->value,
+                'customer_id' => $this->customer->id,
+                'pop_id' => $this->pop->id,
+                'detail_keluhan' => 'Keluhan durasi.',
+                'priority' => 'High',
+                'handler' => TicketHandler::HELPDESK->value,
+                'status' => 'closed',
+                'created_by' => $this->helpdeskUser->id,
+                'resolved_at' => $createdAt->copy()->addMinutes(90),
+            ]);
+            Ticket::query()->whereKey($ticket->id)->update(['created_at' => $createdAt]);
+        }
+
+        $hydratedTickets = 0;
+        Ticket::retrieved(function () use (&$hydratedTickets): void {
+            $hydratedTickets++;
+        });
+
+        $response = $this->actingAs($this->nocUser)->get(route('noc.dashboard'));
+
+        $response->assertOk();
+        $this->assertSame(90, $response->viewData('stats')['avg_duration_minutes']);
+        $this->assertSame('1 Jam 30 Mns', $response->viewData('stats')['avg_duration_label']);
+        $this->assertLessThan(180, $hydratedTickets);
+    }
+
+    public function test_operator_workload_uses_latest_history_without_hydrating_all_open_tickets(): void
+    {
+        for ($i = 0; $i < 40; $i++) {
+            $ticket = Ticket::create([
+                'ticket_number' => "TK-WORKLOAD-{$i}",
+                'type' => TaskType::MAINTENANCE->value,
+                'customer_id' => $this->customer->id,
+                'pop_id' => $this->pop->id,
+                'detail_keluhan' => 'Keluhan operator.',
+                'priority' => 'High',
+                'handler' => TicketHandler::NOC->value,
+                'status' => 'open',
+                'created_by' => $this->helpdeskUser->id,
+            ]);
+            TicketHistory::create([
+                'ticket_id' => $ticket->id,
+                'action' => TicketHistoryAction::DIESKALASI->value,
+                'actor_id' => $this->nocUser->id,
+                'happened_at' => now()->subSeconds(40 - $i),
+            ]);
+        }
+
+        $hydratedTickets = 0;
+        $hydratedHistories = 0;
+        Ticket::retrieved(function () use (&$hydratedTickets): void {
+            $hydratedTickets++;
+        });
+        TicketHistory::retrieved(function () use (&$hydratedHistories): void {
+            $hydratedHistories++;
+        });
+
+        $this->actingAs($this->nocUser);
+        $rows = (new ReflectionMethod(NocAnalyticsService::class, 'buildOperatorWorkloads'))
+            ->invoke(app(NocAnalyticsService::class), Ticket::query()->applyUserScope());
+
+        $this->assertCount(1, $rows);
+        $this->assertSame($this->nocUser->id, $rows[0]['user_id']);
+        $this->assertSame(40, $rows[0]['active_count']);
+        $this->assertSame('TK-WORKLOAD-39', $rows[0]['latest_ticket']);
+        $this->assertSame(0, $hydratedTickets);
+        $this->assertSame(0, $hydratedHistories);
     }
 
     public function test_pop_without_any_customer_is_skipped_from_per_pop_analytics(): void

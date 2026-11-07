@@ -462,7 +462,8 @@ class BranchInventorySaleTest extends TestCase
             'tanpa kondisi dianggap baru' => [null, false, true],
             'bekas baik sudah diperiksa' => ['used_good', true, true],
             'bekas baik belum diperiksa' => ['used_good', false, false],
-            'bekas rusak walau sudah diperiksa' => ['used_damaged', true, false],
+            'bekas rusak sudah diperiksa boleh dijual' => ['used_damaged', true, true],
+            'bekas rusak belum diperiksa' => ['used_damaged', false, false],
         ];
     }
 

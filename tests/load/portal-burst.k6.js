@@ -43,6 +43,7 @@ http.setResponseCallback(http.expectedStatuses({ min: 200, max: 499 }));
 
 const loginOk = new Counter('login_ok_200');
 const loginRejected = new Counter('login_rejected_401');
+const loginLocked = new Counter('login_locked_423'); // lockout akun (5x gagal beruntun), beda dari limiter 429
 const loginLimited = new Counter('login_limited_429');
 const loginServerError = new Counter('login_server_error_5xx');
 const loginDuration = new Trend('login_duration_ms', true);
@@ -103,6 +104,7 @@ export default function () {
 
   if (res.status === 200) loginOk.add(1);
   else if (res.status === 401) loginRejected.add(1);
+  else if (res.status === 423) loginLocked.add(1); // akun terkunci, bukan limiter — lihat PortalAuthController
   else if (res.status === 429) loginLimited.add(1);
   else if (res.status >= 500) loginServerError.add(1);
 
@@ -111,9 +113,19 @@ export default function () {
   // Pelanggan yang berhasil login membuka dashboard seperti sesi nyata.
   if (res.status === 200) {
     const token = res.json('access_token');
-    http.get(`${BASE}/api/customer-portal/me`, { headers: portalHeaders(vu, token), tags: { name: 'me' } });
-    sleep(1);
-    http.get(`${BASE}/api/customer-portal/me/invoices`, { headers: portalHeaders(vu, token), tags: { name: 'me/invoices' } });
-    http.get(`${BASE}/api/customer-portal/me/balance`, { headers: portalHeaders(vu, token), tags: { name: 'me/balance' } });
+    const hasToken = check(res, { 'ada access_token': () => !!token });
+
+    if (hasToken) {
+      http.get(`${BASE}/api/customer-portal/me`, { headers: portalHeaders(vu, token), tags: { name: 'me' } });
+      sleep(1);
+      http.get(`${BASE}/api/customer-portal/me/invoices`, { headers: portalHeaders(vu, token), tags: { name: 'me/invoices' } });
+      http.get(`${BASE}/api/customer-portal/me/balance`, { headers: portalHeaders(vu, token), tags: { name: 'me/balance' } });
+    }
   }
+
+  // Jeda antar iterasi: MODE=spike cuma 1 iterasi/VU jadi gak kepake, tapi
+  // MODE=ramp mengulang default() tanpa batas selama stage durasi — tanpa
+  // jeda ini VU yang gagal login (401/423/429) langsung loop lagi secepat
+  // mungkin, jadi stress test murni bukan simulasi pelanggan nyata.
+  sleep(1);
 }

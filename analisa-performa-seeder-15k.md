@@ -8,11 +8,84 @@ Data saat ini sekitar 50 ribu pelanggan. Angka dari `perf:pages` di bawah bukan 
 
 | Route | ms | Query | Model | Sisa masalah |
 | --- | ---: | ---: | ---: | --- |
-| `/noc/dashboard` | 6.827 | 86 | 12.512 | Setelah query tren 12 bulan dan pelanggan kronis dipadatkan; sebelumnya sekitar 39 ribu model. Masih lambat. |
+| `/noc/dashboard` | 1.268 | 78 | 2.597 | ADHOC-278: agregasi issue/daerah/matriks SQL, durasi dan workload ringkas. Baseline giliran ini 6.450 ms/87 query/12.515 model; hasil satu run development; bukti p95 lokal ada di ADHOC-279 di bawah. |
 | `/warehouse/reports` | 948 | 47 | 9.814 | Setelah batch saldo QUANTITY/SERIALIZED/ROLL; tidak ada pola 20+ query identik. Sebelumnya 3.229 ms/221 query. |
 | `/fop-tasks` | 3.064 | 51 | 21.782 | Hidrasi besar dan query survei. |
 | `/collector-worksheet` | 2.060 | 32 | 74 | Setelah agregasi kas admin/teknisi; sebelumnya 2.896 ms/50.108 model. Endpoint summary 998 ms/13 model; query agregat pembayaran dan invoice masih mahal. |
 | `/reports/collector-monthly` | 6.451 | 24 | — | JOIN/agregat historis masih berat. |
+
+### Bukti p95 Dashboard NOC — ADHOC-279 (2026-11-05)
+
+Metode: `php artisan perf:pages --uri=/noc/dashboard --user=superadmin@whusnet.com`, satu proses PHP per sampel yang mengukur request internal Laravel Kernel (belum termasuk jaringan dan render browser). P95 memakai nearest-rank: urutkan waktu lalu ambil posisi `ceil(0,95 × n)`. Semua sampel berstatus 200. Dataset 15k adalah schema MySQL terisolasi dari `DummyScaleSeeder` (15.007 pelanggan, 3.150 tiket); dataset development 50k berisi 50.107 pelanggan dan 10.500 tiket. Seeder dan distribusi POP kedua dataset berbeda, sehingga angka bukan perbandingan skala yang sepenuhnya terkendali.
+
+| Dataset / kondisi | Sampel | p50 | p95 | Maksimum | Request ≥1.500 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 15k, cache NOC dihapus sebelum tiap request | 100 | 364 ms | 647 ms | 1.181 ms | 0 |
+| 15k, cache berjalan normal | 30 | 114 ms | 162 ms | 169 ms | 0 |
+| 15k, 5 pekerja ×20 dari cache kosong | 100 | 185 ms | 304 ms | 844 ms | 0 |
+| 50k, cache NOC dihapus sebelum tiap request | 100 | 542 ms | 918 ms | 5.311 ms | 2 |
+| 50k, cache berjalan normal | 30 | 266 ms | 576 ms | 1.808 ms | 1 |
+| 50k, 5 pekerja ×20, run pertama | 100 | 322 ms | 747 ms | 16.779 ms | 5 |
+| 50k, 5 pekerja ×20 dari cache kosong, ulang | 100 | 251 ms | 432 ms | 1.935 ms | 2 |
+
+Tiga key yang dihapus secara spesifik untuk sampel dingin adalah statistik, telemetri, dan tren bulanan milik akun benchmark; cache global tidak dibersihkan. Pengukuran cache normal mengikuti TTL aplikasi. Pada 50k, outlier pertama uji paralel memiliki 8,5–14,7 detik waktu SQL dan muncul pada query berbeda; pengulangan jauh lebih cepat. Penyebab pasti lonjakan belum ditetapkan. Request pertama setelah menyiapkan dataset, di luar 100 sampel terukur, adalah 1.742 ms (15k) dan 5.460 ms (50k).
+
+**Kesimpulan terbatas:** p95 request internal pada dua titik skala tersebut berada di bawah target 1.500 ms dalam rangkaian lokal ini. Klaim "setiap request <1.500 ms" tidak berlaku pada 50k; p95 produksi, latensi HTTP/browser, dan beban serentak yang lebih tinggi dari lima pekerja belum dibuktikan. Artefak mentah: `storage/app/perf/noc-15k-cold-100.json`, `noc-15k-normal-cache-30.json`, `noc-15k-concurrent-cold-start-5x20.json`, `noc-50k-cold-100.json`, `noc-50k-warm-30.json`, `noc-50k-concurrent-5x20.json`, dan `noc-50k-concurrent-cold-start-5x20.json`. Schema benchmark 15k adalah `whusnet_perf_noc_15k_20261105` dan tidak mengganti database aplikasi utama.
+
+### Pengukuran HTTP lokal Dashboard NOC — ADHOC-280 (2026-11-06)
+
+Request GET terautentikasi diukur dengan `curl` sampai respons selesai, memakai Owner all-POP yang sama dan rumus p95 nearest-rank di atas. Dataset 50k lewat Nginx/PHP-FPM lokal pada port aplikasi; dataset 15k terisolasi lewat `php artisan serve` sementara di container aplikasi dengan `DB_DATABASE=whusnet_perf_noc_15k_20261105`. Keduanya memakai MySQL lokal, tetapi stack server dan distribusi data berbeda. Angka ini mencakup HTTP loopback dan transfer respons, belum mencakup render browser atau jaringan pengguna.
+
+| Dataset / kondisi HTTP | Sampel | p50 | p95 | Maksimum | Request ≥1.500 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 15k, `artisan serve`, tiga cache NOC dihapus sebelum tiap request | 100 | 233 ms | 269 ms | 314 ms | 0 |
+| 50k, Nginx/PHP-FPM, tiga cache NOC dihapus sebelum tiap request | 100 | 538 ms | 678 ms | 1.145 ms | 0 |
+| 50k, Nginx/PHP-FPM, cache berjalan normal | 100 | 124 ms | 154 ms | 322 ms | 0 |
+| 50k, Nginx/PHP-FPM, 5 pekerja ×20, cache dikosongkan di awal, run 1 | 100 | 207 ms | 331 ms | 651 ms | 0 |
+| 50k, Nginx/PHP-FPM, 5 pekerja ×20, cache dikosongkan di awal, run 2 | 100 | 197 ms | 280 ms | 698 ms | 0 |
+
+Semua 500 sampel di tabel berstatus HTTP 200. Eviksi tiga key berhasil pada 100/100 sampel 15k dan 99/100 sampel 50k; pada satu sampel 50k dua key sudah kedaluwarsa sebelum eviksi. Kedua run paralel dimulai setelah tiga key terisi dan eviksi `1,1,1`. Satu run paralel tambahan setelah jeda memiliki eviksi awal `0,0,1`, p95 382 ms dan maksimum 1.035 ms (100 respons 200), sehingga tidak dimasukkan sebagai run awal tiga-key-dingin. Request pertama untuk login dan pemanasan tidak masuk sampel.
+
+Artefak mentah: `storage/app/perf/noc-15k-http-serve-cold-100.json`, `noc-50k-http-cold-100.json`, `noc-50k-http-sequential-100.json`, `noc-50k-http-concurrent-5x20.json`, `noc-50k-http-concurrent-cold-repeat-5x20.json`, dan `noc-50k-http-concurrent-repeat-5x20.json`. Tidak ada perubahan kode aplikasi. Instrumentasi `perf:pages` memasang listener SQL/model dan menjalankan Laravel Kernel di proses CLI; hasil HTTP yang lebih rendah tidak membuktikan listener sebagai penyebab outlier CLI. Lonjakan SQL 8,5–14,7 detik pada run CLI sebelumnya belum terdiagnosis dan masih dapat berulang pada kondisi lain. P95 produksi, beban lebih dari lima pekerja, render browser, serta jaminan setiap request <1.500 ms belum terbukti.
+
+### Reproduksi lonjakan dan perbaikan cache NOC — ADHOC-281 (2026-11-06)
+
+Pada 50.107 pelanggan, uji ulang `perf:pages` lima pekerja ×20 saat cache kedaluwarsa mereproduksi lonjakan: p95 592 ms, maksimum 14.719 ms, tiga request ≥1.500 ms. Tiga pekerja pertama menghitung cache yang sama secara serentak; masing-masing menghabiskan 11,4–11,8 detik pada query tren tiket, dengan SQL total 12,8–13,8 detik. Pekerja berikutnya membaca cache dan jauh lebih cepat. `EXPLAIN ANALYZE` query tren saat sendiri selesai sekitar 377 ms untuk 8.940 tiket, memakai index `tickets_type_index` dan 8.940 lookup primary key `customers`. Full scan `pops` yang pernah 2,56 detik hanya menyentuh sekitar dua baris; itu bukan bukti kebutuhan indeks POP. Pola serentak dan penurunan waktu setelah serialisasi mendukung cache stampede sebagai penyebab lonjakan lokal, meski faktor beban host/MySQL tetap bisa memengaruhi angka absolut.
+
+Cache statistik (TTL 60 detik), tren bulanan (300 detik), dan telemetri (60 detik) kini memakai lock atomik per key user+fingerprint scope POP saat miss. Request yang menunggu memeriksa cache ulang setelah memperoleh lock; bila tunggu 30 detik habis, jalur `Cache::remember` lama dipakai agar request tidak berubah menjadi error lock. Lock otomatis kedaluwarsa setelah 60 detik. Key dan isi cache, rumus analitik, serta pembatasan POP tidak diubah.
+
+| Kondisi 50k, lima pekerja ×20 | Sampel | p50 | p95 | Maksimum | Request ≥1.500 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| Sebelum lock, cache sudah kedaluwarsa | 100 | — | 592 ms | 14.719 ms | 3 |
+| Hanya cache tren memakai lock | 100 | 256 ms | 461 ms | 2.099 ms | 2 |
+| Ketiga cache memakai lock, run 1, eviksi `1,1,1` | 100 | 248 ms | 407 ms | 1.341 ms | 0 |
+| Ketiga cache memakai lock, run 2, eviksi `1,1,1` | 100 | 251 ms | 390 ms | 838 ms | 0 |
+| HTTP Nginx/PHP-FPM, ketiga cache memakai lock, eviksi `1,1,1` | 100 | 217 ms | 308 ms | 734 ms | 0 |
+
+Semua 500 sampel pada tabel berstatus 200. Artefak mentah: `storage/app/perf/noc-50k-cli-repro-5x20.json`, `noc-50k-cli-after-lock-5x20.json`, `noc-50k-cli-all-locks-5x20.json`, `noc-50k-cli-all-locks-repeat-5x20.json`, dan `noc-50k-http-all-locks-5x20.json`. Tes `NocDashboardTest`: 27 lulus/127 assertion, termasuk perubahan scope POP; Pint lulus. Hasil ini membuktikan perbaikan pada rangkaian lokal tersebut, bukan jaminan setiap request <1.500 ms atau p95 produksi. Tes awal yang menahan lock dua detik mengandalkan ambang waktu, sehingga dapat sensitif terhadap mesin CI yang sangat lambat.
+
+### P95 pada replika image produksi — ADHOC-285 (2026-11-07)
+
+Pengukuran ini memakai image lokal `whusnet-perf-prod-app:20261106` dan `whusnet-perf-prod-web:20261106` dari `Dockerfile.prod`, tanpa bind mount kode. Hash controller NOC dalam image sama dengan workspace saat pengukuran. Aplikasi berjalan dengan `APP_ENV=production`, `APP_DEBUG=false`, config/route/view/event cache, OPcache aktif (`validate_timestamps=0`), PHP `memory_limit=512M`, dan pool FPM 20 worker. Container aplikasi dibatasi 2 CPU/2 GiB, Nginx 0,5 CPU/256 MiB. Entrypoint migrasi dilewati; hanya schema dummy terisolasi yang dipakai: 15.007 pelanggan/3.150 tiket (`whusnet_perf_noc_15k_20261105`) dan 50.000 pelanggan/10.500 tiket (`whusnet_perf_prod_50k_20261107`). Schema 50k dibuat dari migrasi dan seeder yang tersedia; schema 15k masih memiliki beberapa migrasi setelah 2026-11-05 yang tertunda, tetapi indeks NOC 2026-11-05 sudah ada. Distribusi data kedua schema tidak identik.
+
+GET `/noc/dashboard` dijalankan sebagai Owner all-POP melalui Nginx/PHP-FPM pada loopback. `curl` mencatat status, waktu total sampai respons selesai, TTFB, dan ukuran respons. P95 memakai nearest-rank `ceil(0,95 × n)`. Cache dingin menghapus hanya key statistik, tren bulanan, dan telemetri akun benchmark sebelum tiap request. Pada masing-masing seri dingin 99/100 eviksi menghasilkan `1,1,1`; satu sampel lainnya menemui key yang telah kedaluwarsa secara alami. Seri paralel dimulai setelah key diisi lalu eviksi `1,1,1`. Cache normal mengikuti TTL aplikasi. Login dan satu request pemeriksaan awal tidak masuk sampel.
+
+| Dataset / kondisi HTTP | n | p50 | p95 | Maksimum | ≥1.500 ms |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| 15k, cache normal | 100 | 309 ms | 402 ms | 1.605 ms | 1 |
+| 15k, cache dingin per request | 100 | 482 ms | 609 ms | 699 ms | 0 |
+| 15k, lima pekerja ×20, cache kosong di awal | 100 | 305 ms | 365 ms | 680 ms | 0 |
+| 50k, cache normal | 100 | 351 ms | 388 ms | 468 ms | 0 |
+| 50k, cache dingin per request | 100 | 776 ms | 858 ms | 1.004 ms | 0 |
+| 50k, lima pekerja ×20, cache kosong, run 1 | 100 | 382 ms | 756 ms | 1.695 ms | 2 |
+| 50k, lima pekerja ×20, cache kosong, run 2 | 100 | 373 ms | 508 ms | 900 ms | 0 |
+| 50k, sepuluh pekerja ×20, cache kosong | 200 | 488 ms | 773 ms | 1.256 ms | 0 |
+
+Semua 900 sampel berstatus HTTP 200. Satu request awal di luar sampel memakan 1.130 ms pada 15k dan 2.946 ms pada 50k. Dua outlier 50k run pertama ada pada sampel pertama pekerja 1/2 (1.667/1.695 ms); TTFB masing-masing 1.643/1.688 ms, sehingga jeda utamanya terjadi sebelum transfer respons. Run ulang tidak mereproduksi outlier tersebut. P95 di bawah 1.500 ms pada rangkaian ini, tetapi target **setiap request <1.500 ms tidak tercapai**.
+
+Artefak mentah: `storage/app/perf/noc-prodlike-15k-warm-100.json`, `noc-prodlike-15k-cold-100.json`, `noc-prodlike-15k-concurrent-5x20.json`, `noc-prodlike-50k-warm-100.json`, `noc-prodlike-50k-cold-100.json`, `noc-prodlike-50k-concurrent-5x20.json`, `noc-prodlike-50k-concurrent-repeat-5x20.json`, dan `noc-prodlike-50k-concurrent-10x20.json`. Tidak ada perubahan kode aplikasi dan **full test suite tidak dijalankan** sesuai arahan user; verifikasi task ini adalah request HTTP dan perhitungan ulang JSON.
+
+**Batas kesetaraan:** image, OPcache, dan FPM mengikuti konfigurasi produksi, tetapi database/Redis berada pada host Docker lokal yang sama, bukan layanan produksi; proxy Coolify/Traefik, TLS, jaringan pengguna, lalu lintas modul lain, dan kapasitas CPU/RAM server produksi asli tidak termasuk. Cookie secure dimatikan khusus HTTP loopback. Karena itu hasil ini adalah p95 **replika software produksi lokal**, bukan p95 produksi aktual atau jaminan kapasitas produksi. Container, jaringan, env minimum, dan cookie sementara sudah dibersihkan; kedua schema benchmark sengaja disimpan untuk reproduksi.
 
 **Bug yang ditemukan pada NOC:** kunci cache statistik filter tanggal custom sebelumnya memakai variabel yang tidak didefinisikan, sehingga dua rentang tanggal berbagi hasil; sudah diperbaiki dan diuji. Cache statistik, tren, dan telemetri sebelumnya tidak memuat scope POP, sehingga penyempitan akses bisa menampilkan data lama sampai TTL habis; sudah diperbaiki dan diuji setelah persetujuan user. Di `NocAnalyticsService`, pembagian MTTR remote/field dan remote solve rate membandingkan enum `TicketHandler` dengan string `fop`; ini berpotensi salah klasifikasi, belum diubah dalam task performa agar angka operasional tidak berubah tanpa review terpisah.
 

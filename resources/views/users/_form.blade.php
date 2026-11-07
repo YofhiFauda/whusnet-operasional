@@ -66,6 +66,25 @@
         @error('scope_type')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
     </div>
 
+    {{--
+        Approver Pengajuan Barang (gap #2, keputusan user 2026-11-07) —
+        SEMUA FOP ALL_POP, scope POP gak bisa membedakan "siapa di antara
+        role yang sama" yang berwenang approve. Flag ini satu-satunya gate
+        tambahan (dicek jg di PengajuanBarangService, bukan cuma UI).
+        Checkbox-nya cuma relevan buat role 'fop' — disembunyikan via JS
+        kalau role lain dipilih (lihat updateApproverVisibility() di bawah).
+    --}}
+    <div id="pengajuan_barang_approver_container" class="col-span-1 md:col-span-2" style="display:none">
+        <label class="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300">
+            <input type="checkbox" id="is_pengajuan_barang_approver" name="is_pengajuan_barang_approver" value="1"
+                   @checked(old('is_pengajuan_barang_approver', $user->is_pengajuan_barang_approver ?? false))
+                   class="rounded border-slate-300 dark:border-slate-600 text-sky-600 focus:ring-sky-500">
+            <span>Berwenang approve/reject Surat Pengajuan Barang</span>
+        </label>
+        <p class="mt-1 text-xs text-slate-400 dark:text-slate-500">Dari semua user role FOP, cuma yang dicentang ini yang bisa approve/reject — yang lain tetap bisa ajukan/lihat saja.</p>
+        @error('is_pengajuan_barang_approver')<p class="mt-1 text-xs text-rose-600">{{ $message }}</p>@enderror
+    </div>
+
     <div class="col-span-1 md:col-span-2 grid gap-4 md:grid-cols-2 pt-2 border-t border-slate-100 dark:border-slate-700/60"
          x-data="{
              showPassword: false,
@@ -314,11 +333,12 @@
 
 <script>
 document.addEventListener('DOMContentLoaded', function () {
-    const roleSelect   = document.getElementById('role_id');
-    const scopeSelect  = document.getElementById('scope_type');
-    const popContainer = document.getElementById('pop_selection_container');
-    const scopeDesc    = document.getElementById('scope_description');
-    const popHint      = document.getElementById('pop_selection_hint');
+    const roleSelect     = document.getElementById('role_id');
+    const scopeSelect    = document.getElementById('scope_type');
+    const popContainer   = document.getElementById('pop_selection_container');
+    const scopeDesc      = document.getElementById('scope_description');
+    const popHint        = document.getElementById('pop_selection_hint');
+    const approverContainer = document.getElementById('pengajuan_barang_approver_container');
 
     // Deskripsi tiap scope
     const scopeDescriptions = {
@@ -349,6 +369,14 @@ document.addEventListener('DOMContentLoaded', function () {
         'sales':     ['selected_pop'],
         'pop_admin': ['selected_pop'],
     };
+
+    function updateApproverVisibility() {
+        const roleCode = roleSelect.options[roleSelect.selectedIndex]?.getAttribute('data-code') ?? '';
+
+        if (approverContainer) {
+            approverContainer.style.display = roleCode === 'fop' ? 'block' : 'none';
+        }
+    }
 
     function updateScopeOptions() {
         const roleCode      = roleSelect.options[roleSelect.selectedIndex]?.getAttribute('data-code') ?? '';
@@ -389,10 +417,12 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     roleSelect.addEventListener('change', updateScopeOptions);
+    roleSelect.addEventListener('change', updateApproverVisibility);
     scopeSelect.addEventListener('change', updatePopContainer);
 
     // Init
     updateScopeOptions();
+    updateApproverVisibility();
 });
 
 // ---- Preview Access Modal ----

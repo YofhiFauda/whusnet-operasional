@@ -1,14 +1,15 @@
 @props([
-    'status' => null, // App\Enums\SerialStatus|App\Enums\RollStatus|string|null
+    'status' => null, // App\Enums\SerialStatus|App\Enums\RollStatus|App\Enums\PengajuanBarangStatus|string|null
 ])
 
 {{--
-    Badge status SN/roll — satu sumber warna+label untuk modul gudang
-    (analisa-ui-ux §U4/V6). Warna dari ->badgeVariant() di enum, label dari
-    ->label(). String mentah (mis. data lama) jatuh ke neutral apa adanya.
+    Badge status SN/roll/pengajuan — satu sumber warna+label untuk modul
+    gudang (analisa-ui-ux §U4/V6). Warna dari ->badgeVariant() di enum,
+    label dari ->label(). String mentah (mis. data lama) jatuh ke neutral
+    apa adanya.
 --}}
 @php
-    if ($status instanceof \App\Enums\SerialStatus || $status instanceof \App\Enums\RollStatus) {
+    if ($status instanceof \App\Enums\SerialStatus || $status instanceof \App\Enums\RollStatus || $status instanceof \App\Enums\PengajuanBarangStatus) {
         $variant = $status->badgeVariant();
         $label = $status->label();
     } else {
