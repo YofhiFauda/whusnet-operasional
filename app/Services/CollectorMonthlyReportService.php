@@ -250,7 +250,7 @@ class CollectorMonthlyReportService
     private function fillTagihanDanPelanggan(array &$figures, array $map, array $popIds, string $period, string $nextStart): void
     {
         $rows = DB::table('invoices as i')
-            ->leftJoinSub($this->paidPerInvoiceByMethod(null, $nextStart), 'p', 'p.invoice_id', '=', 'i.id')
+            ->leftJoinSub($this->paidPerInvoiceByMethod(null, $nextStart, $period, $popIds), 'p', 'p.invoice_id', '=', 'i.id')
             ->where('i.billing_period', $period)
             ->where('i.invoice_type', InvoiceType::BULANAN->value)
             ->where('i.invoice_status', '!=', InvoiceStatus::BATAL->value)
@@ -503,9 +503,14 @@ class CollectorMonthlyReportService
      * `saldo`) vs saldo pelanggan (`payment_method = 'saldo'`). Dibatasi sampai
      * awal bulan berikutnya — lihat catatan basis di docblock kelas.
      */
-    private function paidPerInvoiceByMethod(?string $from, string $before): QueryBuilder
+    private function paidPerInvoiceByMethod(?string $from, string $before, string $period, array $popIds): QueryBuilder
     {
         return DB::table('payments')
+            ->join('invoices as target_i', 'target_i.id', '=', 'payments.invoice_id')
+            ->where('target_i.billing_period', $period)
+            ->where('target_i.invoice_type', InvoiceType::BULANAN->value)
+            ->where('target_i.invoice_status', '!=', InvoiceStatus::BATAL->value)
+            ->whereIn('target_i.pop_id', $popIds)
             ->where(self::countedAsOf($before))
             ->when($from, fn ($q) => $q->where('payment_date', '>=', $from))
             ->where('payment_date', '<', $before)
@@ -687,7 +692,7 @@ class CollectorMonthlyReportService
     private function tagihanRowsQuery(array $popIds, string $period, string $nextStart)
     {
         return DB::table('invoices as i')
-            ->leftJoinSub($this->paidPerInvoiceByMethod(null, $nextStart), 'p', 'p.invoice_id', '=', 'i.id')
+            ->leftJoinSub($this->paidPerInvoiceByMethod(null, $nextStart, $period, $popIds), 'p', 'p.invoice_id', '=', 'i.id')
             ->join('customers as c', 'c.id', '=', 'i.customer_id')
             ->where('i.billing_period', $period)
             ->where('i.invoice_type', InvoiceType::BULANAN->value)

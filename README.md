@@ -48,7 +48,7 @@ flowchart LR
 ## 🚀 Fitur Utama Sistem
 
 ### 1. 🔐 Hierarchical Dynamic RBAC (Role & Permission Management)
-* **Pemisahan Role & Data Scope:** Role menentukan *kapabilitas fitur*, sedangkan Scope menentukan *wilayah data* (`all_pop`, `selected_pop`, `pop_tree`, `assigned_only`, `own_created`).
+* **Pemisahan Role & Data Scope:** Role menentukan *kapabilitas fitur*, sedangkan Scope menentukan *wilayah data* (`all_pop`, `selected_pop`, `pop_tree`). Pembatasan per-user lain (mis. "hanya task milik sendiri") ditangani di level query, bukan ScopeType.
 * **Matrix Role Interaktif:** Konfigurasi izin granular berbasis string format lowercase (misal: `customers.view`, `invoices.create`, `cash_deposit.verify`).
 * **Audit Trail Komprehensif:** Setiap tindakan mutasi data penting dicatat lengkap dengan actor ID, IP, snapshot sebelum & sesudah perubahan.
 
@@ -61,6 +61,7 @@ flowchart LR
   * Cuti Berlangganan & Pembebasan Tagihan Periode (*Billing Waiver*).
   * Pelanggan Gagal & Alasan Terminasi terarsip terpisah.
 * **Import Pelanggan Batch:** Upload Excel/CSV massal dengan validasi baris real-time, deteksi anomali/warning, dan riwayat batch.
+* **Ownership Modem (Sewa/Beli) & Perangkat Tambahan:** Pencatatan status kepemilikan modem (sewa, beli sendiri, beli dari Gudang) dengan baris Jual Modem otomatis di tagihan awal, serta CRUD perangkat tambahan pelanggan dengan batas kuota per Paket Internet dan tautan ke stok Gudang.
 
 ### 3. 💳 Billing, Invoice & Pembayaran Terintegrasi
 * **Penerbitan Invoice Otomatis & Manual:** Perhitungan pro-rata, tanggal jatuh tempo dinamis, dan status tagihan (*Unpaid*, *Partial*, *Paid*, *Write-Off / Tak Tertagih*).
@@ -106,12 +107,21 @@ flowchart LR
   * Permintaan Stok Cabang (*Stock Request Approval & Fulfillment*).
 * **Traceability 360°:** Pelacakan jejak riwayat satu unit modem dari pabrik, rak gudang pusat, kurir transfer, tangan teknisi, hingga rumah pelanggan.
 * **Scan-First Lookup:** Pencarian cepat status barang via barcode/QR scanner kamera atau barcode reader.
+* **Auto-Expire Custody Teknisi:** Barang yang terlalu lama di tangan teknisi tanpa laporan ditandai otomatis untuk ditindaklanjuti admin gudang.
+* **Penjualan Barang Antar-Cabang:** Pencatatan penjualan stok lintas cabang dengan laporan rekonsiliasi tersendiri.
 
-### 8. 📊 Laporan & Analytics Eksekutif
+### 8. 🏗️ Infrastruktur Jaringan (Network Node Tree)
+* **Pohon Aset Dinamis (`network_nodes`):** Satu struktur hierarkis untuk seluruh perangkat jaringan (Server, OLT chassis/slot/kartu, Splitter, ODP/ODC), tipe node dikelola admin (bukan hardcode) dengan flag perilaku per tipe.
+* **Halaman Inventaris & Peta Infrastruktur (`/network/nodes`):** Visualisasi kapasitas port/slot per node, generate struktur turunan otomatis, dan inspector node untuk telusur koneksi.
+* **Deploy/Retrieve Aset dari Gudang:** Pasang & tarik aset infrastruktur (kabel, splitter, kartu OLT) langsung dari stok Gudang dengan ledger `infrastructure_balances` terpisah dari stok umum, serta halaman Barang Terpasang per node.
+* **Registrasi Aset Lama:** Jalur migrasi aset infrastruktur eksisting ke pohon node tanpa mengulang alur pembelian Gudang.
+
+### 9. 📊 Laporan & Analytics Eksekutif
 * **Laporan Keuangan & Kas:** Rekap tagihan bulanan, pembayaran harian, buku kas admin, dan mutasi deposit.
 * **Laporan Kinerja Kolektor:** Matriks performa penagihan kolektor dan persentase keberhasilan.
 * **Dashboard Omset Sales & Business Development:** Monitoring pertumbuhan pelanggan baru, referral agent mitra, dan pendapatan bulanan.
 * **Laporan Konsumsi Material:** Rekap pemakaian material harian oleh teknisi di lapangan.
+* **Laporan Barang Terjual ke Pelanggan:** Rekap penjualan modem/perangkat ke pelanggan dengan POP scope.
 
 ---
 
@@ -198,6 +208,7 @@ sequenceDiagram
 | **Verifikasi C-REQ** | `/tasks-creq-billing` | Approval penagihan biaya pekerjaan teknisi / permintaan khusus oleh CS. | [Rancangan C-REQ](docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md) |
 | **Gudang (Warehouse)** | `/warehouse` & `/warehouse/stock`| Monitoring stok barang serial/roll/non-serial, mutasi, dan surat jalan. | [Overview](docs/warehouse/README.md) • [Logic](docs/warehouse/business-logic.md) • [User Flow](docs/warehouse/user-flow.md) |
 | **Lacak Barang (Traceability)**| `/warehouse/traceability` | Riwayat perjalanan lengkap serial number perangkat (ONT/Router). | [Traceability Advanced](docs/plan/warehouse/warehouse_inventory_asset_traceability_analysis_advanced.md) |
+| **Infrastruktur / Network Node** | `/network/nodes` | Pohon aset jaringan (OLT chassis/slot/kartu, splitter, ODP), kapasitas port, deploy/retrieve aset dari Gudang. | [Rancangan Pohon Node](docs/plan/infrastruktur/rancangan-hierarki-infrastruktur-server-pop-mini-pop.md) • [Inventaris Infrastruktur](docs/plan/infrastruktur/analisa-inventaris-infrastruktur.md) • [Manual Book](docs/plan/infrastruktur/manual-book-penataan-infrastruktur.md) |
 | **Business Development** | `/business-development/agents` | Manajemen mitra agent referral, restriksi paket, dan dashboard omset. | [Tabel Bisnis](docs/plan/bussiness-development/tabel_paket_bisnis.md) |
 | **Master Wilayah** | `/master/wilayah` | Referensi Kota, Kecamatan, Desa/Kelurahan, dan API search. | [Overview](docs/master/wilayah/README.md) • [User Flow](docs/master/wilayah/user-flow.md) • [Schema](docs/master/wilayah/database-schema.md) |
 | **Master POP / Cabang** | `/master/pop` | Pengelolaan Cabang POP & Mini POP hierarkis. | [Overview](docs/master/pop/README.md) • [Business Logic](docs/master/pop/business-logic.md) • [Flowchart](docs/master/pop/flowchart.md) |
@@ -281,7 +292,15 @@ Gunakan tautan di bawah untuk mempelajari arsitektur, user flow, dan skema tekni
 * 🚚 [Rancangan Surat Jalan & Invoice Transfer](docs/plan/warehouse/rancangan-invoice-surat-jalan-transfer.md)
 * 🔄 [Alur Retur & Penerimaan Modem Bekas Pelanggan](docs/plan/warehouse/analisa-riwayat-dan-terima-modem-dari-pelanggan.md)
 
-### 9. Hierarchical Dynamic RBAC & Keamanan
+### 9. Infrastruktur Jaringan (Network Node Tree)
+* 📄 [Penjelasan Infrastruktur Baru](docs/plan/infrastruktur/penjelasan-infrastruktur-baru.md)
+* 🌳 [Rancangan Hierarki Server/POP/Mini POP](docs/plan/infrastruktur/rancangan-hierarki-infrastruktur-server-pop-mini-pop.md)
+* 📦 [Analisa Inventaris Infrastruktur](docs/plan/infrastruktur/analisa-inventaris-infrastruktur.md)
+* 🗺️ [Peta Infrastruktur ISP](docs/plan/infrastruktur/peta-infrastruktur-isp.md)
+* 📖 [Manual Book Penataan Infrastruktur](docs/plan/infrastruktur/manual-book-penataan-infrastruktur.md)
+* 🔍 [Audit Transisi Hierarki Infrastruktur](docs/plan/infrastruktur/audit-transisi-hierarki-infrastruktur.md)
+
+### 10. Hierarchical Dynamic RBAC & Keamanan
 * 📄 [Overview RBAC System](docs/rbac/README.md)
 * 🛡️ [RBAC Matrix Lengkap (Role & Permission)](docs/RBAC_MATRIX.md)
 * 💼 [Business Logic Hak Akses & Scope](docs/rbac/business-logic.md)
@@ -289,7 +308,7 @@ Gunakan tautan di bawah untuk mempelajari arsitektur, user flow, dan skema tekni
 * 🗄️ [Database Schema RBAC](docs/rbac/database-schema.md)
 * 🔒 [Pemisahan Role & User Scope POP](docs/docs/analisa-rbac-dinamis-whusnett.md)
 
-### 10. Sistem & Database Utama
+### 11. Sistem & Database Utama
 * 📑 [Indeks Dokumentasi Pusat](docs/README.md)
 * 🏗️ [Konsep Basis Data Utama](docs/DATABASE_CONCEPT.md)
 * 🗄️ [Database Schema Aktual](docs/database-schema.md)
@@ -304,7 +323,7 @@ Gunakan tautan di bawah untuk mempelajari arsitektur, user flow, dan skema tekni
 |---|---|---|
 | **Backend Framework** | [Laravel 13.x](https://laravel.com) | Arsitektur modern dengan Service Layer, Action classes, & Policy Guards |
 | **Bahasa Pemrograman**| [PHP 8.4](https://php.net) | Tipe data kuat (*strict types*), constructor property promotion |
-| **Frontend & UI** | [Blade](https://laravel.com/docs/blade) + [Tailwind CSS v4](https://tailwindcss.com) + [Alpine.js](https://alpinejs.dev) | UI responsif modern, dark/light harmonious color palette |
+| **Frontend & UI** | [Blade](https://laravel.com/docs/blade) + [Tailwind CSS v4](https://tailwindcss.com) + [Alpine.js](https://alpinejs.dev) + [htmx](https://htmx.org) | UI responsif modern, dark/light harmonious color palette; navigasi "SPA-feel" lewat `hx-boost` tanpa full page reload |
 | **Asset Bundler** | [Vite](https://vitejs.dev) | Hot Module Replacement (HMR) & build frontend super cepat |
 | **Realtime WebSockets**| [Laravel Reverb](https://laravel.com/docs/reverb) + Laravel Echo | Push event instan untuk task teknisi & status update tanpa reload |
 | **Database** | [MySQL 8.0+](https://mysql.com) / MariaDB | Relasi data transaksional terindeks dengan foreign key integrity |

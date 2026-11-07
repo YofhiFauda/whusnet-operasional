@@ -43,17 +43,17 @@
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
     <div class="bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-500/30 rounded-lg p-4 flex items-center justify-between">
         <div>
-            <span class="block text-[10px] font-bold text-orange-600 dark:text-orange-500 uppercase tracking-wider mb-1">Total Nunggak — Tagihan Awal</span>
+            <span class="block text-[10px] font-bold text-orange-600 dark:text-orange-500 uppercase tracking-wider mb-1">Belum Dibayar — Biaya Pendaftaran/Pasang Baru</span>
             <span class="block text-lg font-bold text-slate-800 dark:text-slate-200 font-mono">Rp {{ number_format($unpaidAwalTotal, 0, ',', '.') }}</span>
         </div>
-        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border uppercase tracking-wide bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20">Awal</span>
+        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border uppercase tracking-wide bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20">Sekali Bayar</span>
     </div>
     <div class="bg-white dark:bg-slate-800 border border-sky-200 dark:border-sky-500/30 rounded-lg p-4 flex items-center justify-between">
         <div>
-            <span class="block text-[10px] font-bold text-sky-600 dark:text-sky-500 uppercase tracking-wider mb-1">Total Nunggak — Tagihan Bulanan</span>
+            <span class="block text-[10px] font-bold text-sky-600 dark:text-sky-500 uppercase tracking-wider mb-1">Belum Dibayar — Langganan Bulanan</span>
             <span class="block text-lg font-bold text-slate-800 dark:text-slate-200 font-mono">Rp {{ number_format($unpaidBulananTotal, 0, ',', '.') }}</span>
         </div>
-        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border uppercase tracking-wide bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20">Bulanan</span>
+        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border uppercase tracking-wide bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20">Rutin</span>
     </div>
 </div>
 

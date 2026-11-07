@@ -16,6 +16,7 @@ Dasar: baseline `php artisan perf:pages --with-samples` (179 halaman, 15k pelang
 
 **ADHOC-285 (replika image produksi lokal):** Image `Dockerfile.prod` tanpa bind mount, APP_ENV production, OPcache, cache bootstrap, FPM 20 worker, aplikasi 2 CPU/2 GiB, Nginx 0,5 CPU/256 MiB, dan dua schema dummy terisolasi dipakai untuk 900 request HTTP. P95 cache dingin 100 sampel: 609 ms pada 15k dan 858 ms pada 50k. Pada 50k, p95 lima pekerja ×20 adalah 756/508 ms (dua run) dan sepuluh pekerja ×20 adalah 773 ms. Semua status 200, tetapi maksimum 1.605 ms (15k normal) dan 1.695 ms (50k paralel pertama) melewati target setiap request <1.500 ms. Infrastruktur database/Redis, Traefik/TLS, dan jaringan produksi asli belum diuji; ini bukti software produksi lokal, bukan p95 produksi aktual. Detail dan JSON mentah ada di analisis ADHOC-285.
 
+**ADHOC-287 (laporan kolektor bulanan, parsial):** Agregasi pembayaran invoice bulanan dibatasi ke periode dan POP target; rumus dan scope hasil tetap. Satu GET lokal 50k sebelum: 2.870 ms; dua GET sesudah: 2.086/1.776 ms, 25 query, 10 model, 92,5 MB. Tes laporan 17 lulus dan detail 12 lulus. Target <1.500 ms belum tercapai; piutang historis masih full scan sekitar 123.841 invoice dan agregasi kas sekitar 103.849 pembayaran. Angka bukan p95; rincian ada di analisis ADHOC-287.
 ## Alat ukur
 
 `php artisan perf:pages [--only=/uri] [--with-samples] [--slow=1500]` — satu proses PHP per halaman.

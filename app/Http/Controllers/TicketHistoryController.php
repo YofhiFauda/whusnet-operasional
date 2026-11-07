@@ -80,6 +80,9 @@ class TicketHistoryController extends Controller
             'statusOptions' => $this->statusOptions(),
             'typeOptions' => TaskType::ticketOptions(),
             'canExport' => auth()->user()->hasPermission('tickets.history.export'),
+            // Auto-refresh (sama pola dengan TicketArchiveController) — channel
+            // tickets.{popId} per POP yang user ini boleh lihat.
+            'allowedPopIds' => Pop::forUser(auth()->user())->pluck('id'),
         ]);
     }
 

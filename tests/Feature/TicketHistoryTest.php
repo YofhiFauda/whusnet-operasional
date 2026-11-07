@@ -404,6 +404,39 @@ class TicketHistoryTest extends TestCase
             ->assertDontSee($foreign->ticket_number);
     }
 
+    /**
+     * `allowedPopIds` dipakai view buat subscribe channel `tickets.{popId}`
+     * per POP (auto-refresh, docs/plan/notifications/urutan-pengerjaan-notifikasi.md
+     * Tahap 2 #4) — scope-nya wajib sama dengan Pop::forUser(), bukan semua POP.
+     */
+    public function test_allowed_pop_ids_for_realtime_match_user_scope(): void
+    {
+        $otherPop = Pop::create([
+            'name' => 'POP Siman',
+            'code' => 'POP-SMN',
+            'type' => 'branch',
+            'address' => 'Siman',
+            'status' => 'active',
+            'city_id' => $this->pop->city_id,
+        ]);
+
+        $scopedRole = Role::where('code', 'helpdesk')->first();
+        $scopedUser = User::factory()->create(['role_id' => $scopedRole->id, 'status' => 'active']);
+        $scope = $scopedUser->roleScopes()->create([
+            'role_id' => $scopedRole->id,
+            'scope_type' => ScopeType::SELECTED_POP->value,
+        ]);
+        $scope->targets()->create(['pop_id' => $this->pop->id]);
+
+        $this->actingAs($scopedUser)
+            ->get(route('tickets.history'))
+            ->assertOk()
+            ->assertViewHas('allowedPopIds', function ($allowedPopIds) use ($otherPop) {
+                return $allowedPopIds->contains($this->pop->id)
+                    && ! $allowedPopIds->contains($otherPop->id);
+            });
+    }
+
     // ── RBAC ─────────────────────────────────────────────────────
 
     public function test_history_page_rbac(): void

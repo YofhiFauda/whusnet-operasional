@@ -280,6 +280,29 @@ class CollectorBatchPaymentParityTest extends TestCase
         $this->assertEqualsWithDelta(0.0, app(CustomerBalanceService::class)->balance($invoice->customer), 0.001);
     }
 
+    /**
+     * `customer_remaining_balance` per baris — dipakai collector-pay-script.blade.php
+     * (cbUpdateCustomerBalance()) buat nyegerin "maks saldo" baris LAIN milik
+     * pelanggan yang sama tanpa reload (Tahap 2 §3, docs/plan/notifications/
+     * urutan-pengerjaan-notifikasi.md). Saldo awal 200rb, dipakai 50rb → sisa
+     * 150rb, BUKAN 50rb (saldo yang dipakai) atau 0.
+     */
+    #[Test]
+    public function response_includes_customer_remaining_balance_for_client_side_patch(): void
+    {
+        $invoice = $this->createInvoice('PRT-SISA-SALDO');
+        app(CustomerBalanceService::class)->creditWithoutPayment($invoice->customer, 200000, $this->pop->id, 'uji');
+
+        $response = $this->submit('prt-sisa-saldo', [
+            'invoice_id' => $invoice->id,
+            'amount' => 100000,
+            'use_balance_amount' => 50000,
+        ])->assertOk();
+
+        $this->assertSame(150000.0, (float) $response->json('results.0.customer_remaining_balance'));
+        $this->assertEqualsWithDelta(150000.0, app(CustomerBalanceService::class)->balance($invoice->customer), 0.001);
+    }
+
     #[Test]
     public function balance_over_available_amount_rejects_whole_batch(): void
     {

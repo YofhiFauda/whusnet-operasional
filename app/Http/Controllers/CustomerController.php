@@ -8,6 +8,7 @@ use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
 use App\Enums\NotificationType;
 use App\Enums\PaymentStatus;
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Enums\WorkflowTransition;
@@ -683,6 +684,15 @@ class CustomerController extends Controller
             return $customer;
         });
 
+        // Customer Lifecycle: siapa pun yang berwenang approve pendaftaran di
+        // POP ini (customer_registration_verification.approve — lihat gate di
+        // CustomerRegistrationVerificationController) dikasih tau ada
+        // pendaftaran baru masuk (docs/plan/notifications/analisa-status-
+        // implementasi-notifikasi.md §5, Tahap 3). Skip Survey tidak melewati
+        // antrean approve itu (langsung waiting_installation), tapi tetap
+        // diberitahu — bukan "perlu approve", sekadar "pelanggan baru masuk".
+        $this->notifyRegistrationReviewers($customer);
+
         // Landing di detail (bukan list) setelah registrasi: registrasi = awal
         // workflow pelanggan (draft → survey → verifikasi), jadi user biasanya
         // lanjut kerja di record yang baru dibuat (lengkapi data, assign survey).
@@ -695,6 +705,38 @@ class CustomerController extends Controller
         // Fallback: balik ke form registrasi kosong, siap input berikutnya.
         return $this->redirectToCustomer($customer, 'customers.create')
             ->with('success', "Pelanggan {$validated['full_name']} berhasil ditambahkan dengan ID REG {$customerCode}!");
+    }
+
+    /**
+     * Penerima = siapa pun yang pegang permission
+     * `customer_registration_verification.approve` DAN scope POP-nya nyakup
+     * POP pelanggan ini (ALL_POP, atau SELECTED_POP/POP_TREE dengan target
+     * POP yang sama) — bukan role hardcode (Admin POP/FOP/Sales di dokumen),
+     * karena siapa yang benar-benar berwenang approve ditentukan Role Matrix,
+     * bukan nama role. Actor sendiri dikecualikan (dia sudah tahu dia baru
+     * daftar).
+     */
+    private function notifyRegistrationReviewers(Customer $customer): void
+    {
+        $users = app(EffectiveAccessService::class)
+            ->usersWithPermission('customer_registration_verification.approve')
+            ->where('id', '!=', auth()->id())
+            ->where(function ($query) use ($customer) {
+                $query->whereHas('roleScopes', fn ($q) => $q->where('scope_type', ScopeType::ALL_POP->value))
+                    ->orWhereHas('roleScopes', fn ($q) => $q->whereIn('scope_type', [ScopeType::SELECTED_POP->value, ScopeType::POP_TREE->value])
+                        ->whereHas('targets', fn ($t) => $t->where('pop_id', $customer->pop_id))
+                    );
+            })
+            ->get();
+
+        foreach ($users as $user) {
+            $user->notify(new AppNotification(
+                title: 'Pendaftaran Baru: '.$customer->full_name,
+                message: "Pelanggan {$customer->full_name} (REG {$customer->customer_code}) baru mendaftar, perlu diperiksa.",
+                actionUrl: route('customers.show', $customer->id),
+                type: NotificationType::INFO
+            ));
+        }
     }
 
     /**
