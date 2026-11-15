@@ -155,8 +155,12 @@ return [
         // Skip Survey saat Registrasi — Sales input data survey langsung,
         // pelanggan lompat ke antrean ACC Admin. Sempit & terpisah dari
         // customers.create biasa (lihat ActionCode::SKIP_SURVEY).
+        // + Bypass Pelanggan (2026-11-15): pelanggan legacy terlewat migrasi
+        // langsung aktif dari form registrasi, halaman sendiri `/bypass`
+        // (lihat ActionCode::BYPASS).
         'customers.registration' => [
             ActionCode::SKIP_SURVEY->value,
+            ActionCode::BYPASS->value,
         ],
 
         'customers.detail.identity' => [
@@ -925,6 +929,7 @@ return [
         'customers.terminated.view' => 'Lihat List Pelanggan Putus',
         'customers.failed.view' => 'Lihat List Pelanggan Gagal',
         'customers.registration.skip_survey' => 'Skip Survey saat Registrasi (Input Data Survey Langsung)',
+        'customers.registration.bypass' => 'Bypass Pelanggan (Langsung Aktif, Data Migrasi Terlewat)',
 
         // QR pelanggan (docs/plan/qr-code/rancangan-qr-pelanggan-final.md)
         'customers.qr.view' => 'Lihat Status Token QR Pelanggan',

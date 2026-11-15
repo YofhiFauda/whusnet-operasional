@@ -17,6 +17,7 @@ use App\Http\Controllers\CollectorWorksheetController;
 use App\Http\Controllers\CustomerAcquisitionController;
 use App\Http\Controllers\CustomerAdditionalDeviceController;
 use App\Http\Controllers\CustomerBillingWaiverController;
+use App\Http\Controllers\CustomerBypassController;
 use App\Http\Controllers\CustomerCableCrossingController;
 use App\Http\Controllers\CustomerController;
 use App\Http\Controllers\CustomerDeviceController;
@@ -317,6 +318,14 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:customers.create')->group(function () {
         Route::get('/customers/create', [CustomerController::class, 'create'])->name('customers.create');
         Route::post('/customers', [CustomerController::class, 'store'])->name('customers.store');
+    });
+
+    // Bypass Pelanggan (2026-11-15) — pelanggan legacy terlewat migrasi
+    // langsung aktif tanpa workflow. Permission sendiri (Owner & CS), bukan
+    // numpang customers.create, karena melompati verifikasi + Tagihan Awal.
+    Route::middleware('permission:customers.registration.bypass')->group(function () {
+        Route::get('/bypass', [CustomerBypassController::class, 'create'])->name('customers.bypass.create');
+        Route::post('/bypass', [CustomerBypassController::class, 'store'])->name('customers.bypass.store');
     });
 
     // Autocomplete "ID Referral Pelanggan" (Skema 3, 2026-09-12) — dipakai

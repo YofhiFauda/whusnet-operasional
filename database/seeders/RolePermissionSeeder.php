@@ -348,6 +348,9 @@ class RolePermissionSeeder extends Seeder
             ],
 
             'customer_service' => [
+                // Bypass Pelanggan (2026-11-15) — keputusan user: cuma Owner
+                // (lewat `*`) & CS. Melompati seluruh workflow aktivasi.
+                'customers.registration.bypass',
                 'creq_billing_verification.approve',
                 'creq_billing_verification.reject',
                 'creq_billing_verification.view',

@@ -1,7 +1,5 @@
 <?php
 
-use Dedoc\Scramble\Http\Middleware\RestrictedDocsAccess;
-
 return [
     /*
      * Which routes to document. String or array form; use Scramble::routes() for custom selection.
@@ -202,9 +200,14 @@ return [
      */
     'flatten_deep_query_parameters' => true,
 
+    // `auth` = tamu diarahkan ke login (samakan dengan /log-viewer).
+    // `can:viewApiDocs` menggantikan RestrictedDocsAccess bawaan Scramble,
+    // yang membuka dokumen untuk SIAPA PUN di env local. Gate: owner saja
+    // (AppServiceProvider).
     'middleware' => [
         'web',
-        RestrictedDocsAccess::class,
+        'auth',
+        'can:viewApiDocs',
     ],
 
     'extensions' => [],

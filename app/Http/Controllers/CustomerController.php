@@ -24,7 +24,6 @@ use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerBalanceMutation;
 use App\Models\CustomerDevice;
-use App\Models\CustomerDocument;
 use App\Models\CustomerInstallation;
 use App\Models\CustomerService;
 use App\Models\CustomerStatusLog;
@@ -57,6 +56,7 @@ use App\Services\CustomerCidService;
 use App\Services\CustomerDeviceProfileService;
 use App\Services\CustomerDeviceSerialGuard;
 use App\Services\CustomerPackageService;
+use App\Services\CustomerRegistrationService;
 use App\Services\CustomerRelocationService;
 use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
@@ -369,39 +369,7 @@ class CustomerController extends Controller
      */
     public function create()
     {
-        // Fase 5.4 — $districts TIDAK dimuat: form create memakai cascade async
-        // (city → /api/cities/{city}/districts → /api/districts/{d}/villages),
-        // jadi memuat SELURUH district di sini sia-sia (dead weight yang meledak
-        // saat wilayah bertambah). $cities dipertahankan — top-level, kecil,
-        // memang dirender.
-        $user = request()->user();
-        // Restriksi Paket per Role (Skema 1) — lihat InternetPackage::scopeAvailableFor().
-        $packages = InternetPackage::availableFor($user)->orderBy('name')->get();
-        $cities = City::orderBy('name')->get();
-        $pops = Pop::forUser()->where('type', 'cabang')->get();
-
-        // Skema 3 (2026-09-12) — dropdown ID Sales/Agent di form registrasi.
-        // Diganti dari hardcode role code 'sales' (2026-09-12, koreksi user)
-        // jadi berbasis flag `roles.is_package_restricted` — SATU sumber
-        // kebenaran dipakai dua kali: role yang paketnya dibatasi (Skema 1)
-        // otomatis JUGA jadi "role penjual" yang muncul di dropdown ID Sales
-        // & ke-agregasi Dashboard Omset (Skema 2). Kalau nanti Teknisi diberi
-        // akses registrasi pelanggan, dia otomatis ikut tanpa ubah kode ini.
-        $salesUsers = User::whereHas('role', fn ($q) => $q->where('is_package_restricted', true))->orderBy('name')->get();
-        $agents = $user->hasPermission('agents.view') ? Agent::active()->orderBy('name')->get() : collect();
-        // Nama-nama role yang diatur (2026-09-14, permintaan user) — dipakai
-        // blade buat kasih pesan ke actor DI LUAR role itu, jelasin kenapa
-        // ID Sales gak auto-terisi buat dia.
-        $restrictedRoleNames = Role::where('is_package_restricted', true)->pluck('name');
-
-        // Paket yang butuh FAB (Formulir Akan Berlangganan Bisnis) saat
-        // Registrasi — paket berkategori Bisnis (lihat komentar
-        // CustomerRegistrationRequest::rules() kenapa BUKAN restricted_packages).
-        // Dikirim ke JS supaya blok upload FAB cuma muncul begitu paket yang
-        // relevan dipilih; validasi sebenarnya tetap di server.
-        $fabRequiredPackageIds = $packages->filter(fn ($package) => stripos((string) $package->category, 'bisnis') !== false)->pluck('id');
-
-        return view('customers.create', compact('packages', 'cities', 'pops', 'salesUsers', 'agents', 'restrictedRoleNames', 'fabRequiredPackageIds'));
+        return view('customers.create', app(CustomerRegistrationService::class)->formData(request()->user()));
     }
 
     /**
@@ -418,63 +386,25 @@ class CustomerController extends Controller
         $skipSurvey = (bool) ($validated['skip_survey'] ?? false);
         unset($validated['skip_survey']);
 
-        $validated['created_by'] = auth()->id();
         // Skip Survey lompat langsung ke antrean Pemasangan — pelanggan gak
         // pernah masuk antrean Survey teknisi maupun ACC Admin sama sekali
-        // (lihat blok 5 di bawah yang di-skip kalau $skipSurvey).
+        // (lihat blok Skip Survey di bawah).
         //
         // Non-Skip-Survey TIDAK LAGI langsung `waiting_survey` (ADHOC-73,
         // Verifikasi Registrasi) — berhenti dulu di `registered` sampai
         // Admin/CS approve di CustomerRegistrationVerificationController,
         // yang baru memindahkan ke `waiting_survey` + bikin Task/FopTask
         // Survey. Lihat docs/plan/pendaftaran-pelanggan/analisa-verifikasi-registrasi.md.
-        $validated['status'] = $skipSurvey ? 'waiting_installation' : 'registered';
-        $validated['updated_by'] = auth()->id();
+        $status = $skipSurvey ? 'waiting_installation' : 'registered';
 
-        // Skema 3 (2026-09-12) — ID Sales/Agent/Referral. Actor ber-role
-        // "restricted paket" (lihat komentar di create(), 2026-09-12 —
-        // BUKAN lagi hardcode role code 'sales') TIDAK BOLEH mendaftarkan
-        // pelanggan atas nama orang lain (paksa `sales_user_id` = dirinya
-        // sendiri, abaikan apa pun yang disubmit klien — cegah spoofing
-        // komisi). Role lain (Busdev/admin/owner) pakai nilai dari dropdown
-        // form. `agent_id` cuma berlaku dari actor yang punya akses Master
-        // Agent (Busdev/admin/owner) — Agent gak pernah login, jadi kalau
-        // field ini nyelip dari role lain, abaikan.
-        $user = $request->user();
-        $validated['sales_user_id'] = $user->role?->is_package_restricted
-            ? $user->id
-            : ($validated['sales_user_id'] ?? null);
-        if (! $user->hasPermission('agents.view')) {
-            $validated['agent_id'] = null;
-        }
-
-        $statusMapping = [
-            'active' => 'aktif',
-            'suspended' => 'isolir',
-            'terminated' => 'berhenti',
-            'rejected' => 'nonaktif',
-            'waiting_survey' => 'survey',
-            'surveyed' => 'survey',
-            'waiting_acc' => 'survey',
-            'waiting_installation' => 'menunggu_pemasangan',
-            'installed' => 'menunggu_pemasangan',
-            'registered' => 'calon_pelanggan',
+        $files = [
+            'foto_rumah' => $request->file('foto_rumah'),
+            'foto_kontrak' => $request->file('foto_kontrak'),
+            'fab_document' => $request->file('fab_document'),
         ];
-        // Nilai turunan status buat customer_services.service_status. Dulu
-        // disimpan di kolom customers.customer_status (zombie — duplikat `status`
-        // yang gampang menyimpang). Sekarang variabel lokal, tak dipersist ke
-        // customers. Sumber kebenaran service_status = customer_services.
-        $serviceStatus = $statusMapping[$validated['status']] ?? 'calon_pelanggan';
-
-        $fotoRumah = $request->file('foto_rumah');
-        unset($validated['foto_rumah']);
-        $fotoKontrak = $request->file('foto_kontrak');
-        unset($validated['foto_kontrak']);
-        $fabDocument = $request->file('fab_document');
-        unset($validated['fab_document']);
 
         // Data survey (Skip Survey) — bukan kolom customers, ditangani
-        // terpisah di blok 5 lewat CustomerSurvey::create().
+        // terpisah di blok Skip Survey lewat CustomerSurvey::create().
         $surveyPhoto = $request->file('survey_photo');
         $nearestOdp = $validated['nearest_odp'] ?? null;
         $cableEstimationMeter = $validated['cable_estimation_meter'] ?? null;
@@ -482,139 +412,14 @@ class CustomerController extends Controller
         $requestedInstallationDate = $validated['requested_installation_date'] ?? null;
         unset($validated['survey_photo'], $validated['nearest_odp'], $validated['cable_estimation_meter'], $validated['difficulty_level'], $validated['requested_installation_date']);
 
-        // jenis_kontrak bukan kolom customers — punya customer_services
-        // (contract_type). Cabut dari $validated sebelum Customer::create()
-        // supaya gak diam-diam ke-drop lewat filter Fillable (aman, tapi
-        // membingungkan kalau dibiarkan nebeng).
-        $jenisKontrak = $validated['jenis_kontrak'] ?? null;
-        unset($validated['jenis_kontrak']);
+        $actor = $request->user();
 
-        // Generate customer_code via POP sequence generator
-        $pop = Pop::findOrFail($validated['pop_id']);
-        $customerCode = $pop->generateRegistrationNumber();
-        $validated['customer_code'] = $customerCode;
+        $customer = DB::transaction(function () use ($validated, $actor, $status, $files, $skipSurvey, $surveyPhoto, $nearestOdp, $cableEstimationMeter, $difficultyLevel, $requestedInstallationDate) {
+            // Customer + alamat + layanan lewat satu pintu yang juga dipakai
+            // Bypass Pelanggan (CustomerRegistrationService, 2026-11-15).
+            $customer = app(CustomerRegistrationService::class)->create($validated, $actor, $status, $files);
 
-        $customer = DB::transaction(function () use ($validated, $serviceStatus, $fotoRumah, $fotoKontrak, $fabDocument, $skipSurvey, $surveyPhoto, $nearestOdp, $cableEstimationMeter, $difficultyLevel, $requestedInstallationDate, $jenisKontrak) {
-            // Pendaftaran baru lewat UI = orang baru → person baru berdiri sendiri
-            // (tanpa legacy_key). Pencarian "mungkin orang yang sama?" saat
-            // registrasi adalah pekerjaan gel.2; di sini cukup jaga invarian
-            // "tiap customer punya person".
-            $validated['person_id'] = Person::create()->id;
-
-            // 1. Create customer record
-            $customer = Customer::create($validated);
-
-            $updates = [];
-            if ($fotoRumah instanceof UploadedFile) {
-                $updates['foto_rumah'] = FileUploadService::uploadSurveyPhoto($fotoRumah, $customer, 'house');
-            }
-            if ($fotoKontrak instanceof UploadedFile) {
-                $updates['foto_kontrak'] = FileUploadService::uploadInstallationPhoto($fotoKontrak, $customer, 'kontrak');
-            }
-            if (! empty($updates)) {
-                $customer->update($updates);
-            }
-
-            // FAB (Formulir Akan Berlangganan Bisnis) — wajib untuk paket
-            // berkategori Bisnis (lihat CustomerRegistrationRequest::rules()).
-            // Beda dari foto_rumah/foto_kontrak (kolom langsung di customers),
-            // FAB disimpan lewat CustomerDocument (DocumentType::FAB) supaya
-            // konsisten dengan jalur upload dokumen lain di Detail Pelanggan &
-            // gampang ditambah tanpa migrasi kolom baru tiap ada dokumen baru.
-            if ($fabDocument instanceof UploadedFile) {
-                $fabPath = FileUploadService::uploadCustomerRegistrationDoc($fabDocument, $customer, 'fab');
-
-                CustomerDocument::create([
-                    'customer_id' => $customer->id,
-                    'document_type' => DocumentType::FAB->value,
-                    'file_path' => $fabPath,
-                    'uploaded_by' => auth()->id(),
-                ]);
-            }
-
-            // 2. Create customer address
-            $cityName = null;
-            if (! empty($validated['city_id'])) {
-                $cityName = City::where('id', $validated['city_id'])->value('name');
-            }
-            $districtName = null;
-            if (! empty($validated['district_id'])) {
-                $districtName = District::where('id', $validated['district_id'])->value('name');
-            }
-            $villageName = null;
-            if (! empty($validated['village_id'])) {
-                $villageName = Village::where('id', $validated['village_id'])->value('name');
-            }
-
-            $customer->customerAddress()->create([
-                'full_address' => $validated['address'] ?? null,
-                'province' => 'Jawa Timur',
-                'city' => $cityName,
-                'district' => $districtName,
-                'village' => $villageName,
-                'city_id' => $validated['city_id'] ?? null,
-                'district_id' => $validated['district_id'] ?? null,
-                'village_id' => $validated['village_id'] ?? null,
-                'latitude' => $validated['latitude'] ?? null,
-                'longitude' => $validated['longitude'] ?? null,
-                'house_photo' => $validated['foto_rumah'] ?? null,
-                'contract_photo' => $validated['foto_kontrak'] ?? null,
-            ]);
-
-            // 3. Create customer service if package is chosen
-            if (! empty($validated['internet_package_id'])) {
-                $package = InternetPackage::findOrFail($validated['internet_package_id']);
-
-                $monthlyPrice = (float) $package->monthly_price;
-                $discount = (float) ($validated['discount_amount'] ?? 0.00);
-                $ppn = (float) ($validated['tax_percent'] ?? 0.00);
-                $otherFee = (float) ($validated['other_fee'] ?? 0.00);
-
-                // Calculate total bill — SENGAJA TIDAK ikutkan $otherFee (2026-09-14).
-                // customer_services.total_monthly_bill wajib murni tagihan bulanan
-                // berulang: GenerateMonthlyInvoicesCommand men-generate Tagihan
-                // Bulanan sungguhan cuma dari monthly_price+discount+ppn, TIDAK
-                // PERNAH baca other_fee sama sekali (lihat komentarnya). other_fee
-                // (materai dkk) cuma sekali di Tagihan Awal/Registrasi —
-                // InitialInvoiceService::calculate() docblock eksplisit: "TIDAK
-                // PERNAH ikut tagihan bulanan". Dulu di sini malah di-fold ke
-                // total_monthly_bill, bikin field itu berbohong soal nominal
-                // tagihan bulanan asli (temuan nyata: CID C1X4ARQ000004). Kolom
-                // other_fee TETAP disimpan (baris di bawah), cuma tidak lagi
-                // menambah total_monthly_bill.
-                $discountedPrice = max(0, $monthlyPrice - $discount);
-                $totalBill = $discountedPrice * (1 + $ppn / 100);
-
-                $downLabel = isset($package->download_speed_mbps) ? $package->download_speed_mbps.' Mbps' : null;
-                $upLabel = isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null;
-
-                $activationDate = $validated['registration_date'] ?? null;
-                $dueDate = null;
-                if ($activationDate) {
-                    $dueDate = Carbon::parse($activationDate)->addMonth()->format('Y-m-d');
-                }
-
-                $customer->customerService()->create([
-                    'internet_package_id' => $package->id,
-                    'package_name_snapshot' => $package->name,
-                    'download_speed_snapshot' => $downLabel,
-                    'upload_speed_snapshot' => $upLabel,
-                    'monthly_price' => $monthlyPrice,
-                    'discount' => $discount,
-                    'ppn' => $ppn,
-                    'other_fee' => $otherFee,
-                    'total_monthly_bill' => $totalBill,
-                    'activation_date' => $activationDate,
-                    'due_date' => $dueDate,
-                    'billing_cycle' => 'monthly',
-                    'service_status' => $serviceStatus,
-                    'billing_status' => ($validated['status'] === 'active' || $serviceStatus === 'aktif') ? 'active' : 'pending',
-                    'contract_type' => $jenisKontrak,
-                ]);
-            }
-
-            // 4. Evaluate data completeness via service and flash warning to user
-            $customer->load('customerService');
+            // Evaluasi kelengkapan data → peringatan ke user.
             /** @var CustomerValidationService $validationService */
             $validationService = app(CustomerValidationService::class);
             $completenessResult = $validationService->validate($customer);
@@ -646,7 +451,7 @@ class CustomerController extends Controller
                     // uploadSurveyPhoto('house') di atas nulis ke folder yang sama
                     // persis dipakai Laporan Survey teknisi — path-nya reuse, bukan
                     // upload dobel.
-                    'house_photo' => $updates['foto_rumah'] ?? null,
+                    'house_photo' => $customer->foto_rumah,
                     'survey_photo' => $surveyPhotoPath,
                     'survey_note' => $note,
                     'technician_id' => auth()->id(),
@@ -705,7 +510,7 @@ class CustomerController extends Controller
         // redirect buta ke customers.show (dead end, data padahal tersimpan).
         // Fallback: balik ke form registrasi kosong, siap input berikutnya.
         return $this->redirectToCustomer($customer, 'customers.create')
-            ->with('success', "Pelanggan {$validated['full_name']} berhasil ditambahkan dengan ID REG {$customerCode}!");
+            ->with('success', "Pelanggan {$validated['full_name']} berhasil ditambahkan dengan ID REG {$customer->customer_code}!");
     }
 
     /**

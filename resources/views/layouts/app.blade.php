@@ -1311,10 +1311,12 @@
         {{-- Peta Infrastruktur butuh kanvas penuh tanpa margin/scroll halaman
              (topologi di-pan di dalam, drawer detail buka-tutup sendiri) —
              satu-satunya rute yang melepas padding+scroll <main> default. --}}
-        <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto scroll-smooth focus:outline-none {{ Request::routeIs('network.map.*') ? '' : 'p-4 sm:p-6 lg:p-5 xl:p-8' }}">
-            @unless(Request::routeIs('network.map.*'))
+        <main id="main-content" tabindex="-1" @if (Request::routeIs('network.map.*')) data-pull-to-refresh="off" @endif class="flex-1 overflow-y-auto scroll-smooth focus:outline-none {{ Request::routeIs('network.map.*') ? '' : 'p-4 sm:p-6 lg:p-5 xl:p-8' }}">
+            {{-- Tanpa VAPID_PUBLIC_KEY server, subscribe PASTI gagal — nawarin
+                 popup cuma bikin user ketemu error di tiap halaman. --}}
+            @if (! Request::routeIs('network.map.*') && filled(config('webpush.vapid.public_key')))
                 <x-webpush-banner />
-            @endunless
+            @endif
             @yield('content')
         </main>
     </div>

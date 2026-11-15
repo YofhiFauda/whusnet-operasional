@@ -11,6 +11,7 @@ window.addEventListener('beforeunload', () => {
 import './bootstrap';
 import './image-source-picker';
 import './webpush';
+import './pull-to-refresh';
 
 /* htmx — nav instant lintas semua halaman lewat hx-boost="true" di <body>
    (layouts/app.blade.php). Dibundel lokal lewat Vite sama seperti Alpine,

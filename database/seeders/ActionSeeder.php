@@ -135,6 +135,11 @@ class ActionSeeder extends Seeder
                 'description' => 'Melewati tahap survey lapangan saat registrasi, input data survey langsung',
             ],
             [
+                'code' => ActionCode::BYPASS,
+                'name' => 'Bypass',
+                'description' => 'Mendaftarkan pelanggan lama (terlewat migrasi) langsung aktif tanpa workflow',
+            ],
+            [
                 'code' => ActionCode::RECEIVE,
                 'name' => 'Receive',
                 'description' => 'Konfirmasi fisik penerimaan barang (Transfer gudang Pusat ke Cabang)',

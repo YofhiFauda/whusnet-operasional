@@ -1,6 +1,7 @@
-<?php $__env->startSection('title', 'Tambah Pelanggan Baru — WHUSNET Operasional'); ?>
-<?php $__env->startSection('page_title', 'Tambah Pelanggan Baru'); ?>
-<?php $__env->startSection('breadcrumb_parent', 'Pelanggan'); ?>
+<?php ($bypassMode = $bypassMode ?? false); ?>
+
+<?php $__env->startSection('title', $bypassMode ? 'Bypass Pelanggan' : 'Tambah Pelanggan Baru'); ?>
+<?php $__env->startSection('page_title', $bypassMode ? 'Bypass Pelanggan' : 'Tambah Pelanggan Baru'); ?>
 <?php $__env->startSection('breadcrumb_parent_url', route('customers.index')); ?>
 
 <?php $__env->startSection('content'); ?>
@@ -10,32 +11,14 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <div class="flex items-center gap-2.5 flex-wrap">
-                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Registrasi Pelanggan Baru</h1>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700/60">
-                    <?php if (isset($component)) { $__componentOriginal56804098dcf376a0e2227cb77b6cd00a = $component; } ?>
-<?php if (isset($attributes)) { $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a = $attributes; } ?>
-<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.icon','data' => ['name' => 'sparkles','class' => 'w-2.5 h-2.5 mr-1.5']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
-<?php $component->withName('ui.icon'); ?>
-<?php if ($component->shouldRender()): ?>
-<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
-<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
-<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
-<?php endif; ?>
-<?php $component->withAttributes(['name' => 'sparkles','class' => 'w-2.5 h-2.5 mr-1.5']); ?>
-<?php echo $__env->renderComponent(); ?>
-<?php endif; ?>
-<?php if (isset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $attributes = $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?>
-<?php if (isset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
-<?php $component = $__componentOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
-<?php unset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
-<?php endif; ?> Form Wizard
-                </span>
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight"><?php echo e($bypassMode ? 'Bypass Pelanggan (Langsung Aktif)' : 'Registrasi Pelanggan Baru'); ?></h1>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                Masukkan data identitas calon pelanggan, wilayah pemasangan, dan paket layanan internet.
+                <?php if($bypassMode): ?>
+                    Khusus pelanggan lama yang terlewat saat migrasi — sudah terpasang dan administrasinya sudah selesai.
+                <?php else: ?>
+                    Masukkan data identitas calon pelanggan, wilayah pemasangan, dan paket layanan internet.
+                <?php endif; ?>
             </p>
         </div>
 
@@ -67,7 +50,36 @@
     </div>
 
     <!-- MAIN FORM CONTAINER -->
-    <form action="<?php echo e(route('customers.store')); ?>" method="POST" enctype="multipart/form-data" id="wizard-form" class="space-y-6">
+    <?php if($bypassMode): ?>
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 rounded-xl p-4 flex items-start gap-3">
+        <?php if (isset($component)) { $__componentOriginal56804098dcf376a0e2227cb77b6cd00a = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.ui.icon','data' => ['name' => 'triangle-alert','class' => 'w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('ui.icon'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['name' => 'triangle-alert','class' => 'w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
+<?php $attributes = $__attributesOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
+<?php unset($__attributesOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a)): ?>
+<?php $component = $__componentOriginal56804098dcf376a0e2227cb77b6cd00a; ?>
+<?php unset($__componentOriginal56804098dcf376a0e2227cb77b6cd00a); ?>
+<?php endif; ?>
+        <div class="text-xs text-amber-800 dark:text-amber-200 leading-relaxed space-y-1">
+            <p class="font-bold">Pelanggan langsung berstatus AKTIF setelah disimpan.</p>
+            <p>Tanpa verifikasi registrasi, survey, pemasangan, dan tanpa Tagihan Awal. CID digenerate otomatis dari POP; Mini POP &amp; Distribusi dibiarkan kosong. Tagihan bulanan mulai periode setelah bulan Tanggal Aktivasi. Data lain dilengkapi belakangan lewat Edit.</p>
+        </div>
+    </div>
+    <?php endif; ?>
+
+    <form action="<?php echo e($bypassMode ? route('customers.bypass.store') : route('customers.store')); ?>" method="POST" enctype="multipart/form-data" id="wizard-form" class="space-y-6">
         <?php echo csrf_field(); ?>
 
         <!-- TOP PANEL: Dynamic Completeness Progress Bar -->
@@ -331,7 +343,7 @@ unset($__errorArgs, $__bag); ?>
                             </div>
 
                             <div>
-                                <label for="registration_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tanggal Registrasi <span class="text-rose-500">*</span></label>
+                                <label for="registration_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300"><?php echo e($bypassMode ? 'Tanggal Aktivasi' : 'Tanggal Registrasi'); ?> <span class="text-rose-500">*</span></label>
                                 <input type="date" name="registration_date" id="registration_date" value="<?php echo e(old('registration_date', today()->format('Y-m-d'))); ?>" class="w-full text-xs font-sans px-3 py-2.5 border <?php $__errorArgs = ['registration_date'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
 if ($__bag->has($__errorArgs[0])) :
@@ -523,6 +535,8 @@ unset($__errorArgs, $__bag); ?>
                             </div>
                         </div>
 
+                        
+                        <?php if(! $bypassMode): ?>
                         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.registration.skip_survey')): ?>
                         
                         <div class="pt-4 mt-2 border-t border-slate-100 dark:border-slate-700/60">
@@ -701,6 +715,26 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
                                         Pilih Foto Rumah
                                     </label>
                                     <span id="file-label-foto_rumah" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                    <?php if (isset($component)) { $__componentOriginala82975a30b9db16b9f8ce6ba13694d76 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.upload-limit-hint','data' => ['class' => 'text-center','format' => 'JPG, PNG, WEBP']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('upload-limit-hint'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'text-center','format' => 'JPG, PNG, WEBP']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $attributes = $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $component = $__componentOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
                                 </div>
                                 <?php $__errorArgs = ['foto_rumah'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
@@ -783,6 +817,26 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
                                         Pilih Foto ODP
                                     </label>
                                     <span id="file-label-survey_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                    <?php if (isset($component)) { $__componentOriginala82975a30b9db16b9f8ce6ba13694d76 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.upload-limit-hint','data' => ['class' => 'text-center','format' => 'JPG, PNG, WEBP']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('upload-limit-hint'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'text-center','format' => 'JPG, PNG, WEBP']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $attributes = $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $component = $__componentOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
                                 </div>
                                 <?php $__errorArgs = ['survey_photo'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
@@ -796,6 +850,7 @@ endif;
 unset($__errorArgs, $__bag); ?>
                             </div>
                         </div>
+                        <?php endif; ?>
                         <?php endif; ?>
                     </div>
 
@@ -908,6 +963,26 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
                                         Pilih Berkas FAB
                                     </label>
                                     <span id="file-label-fab_document" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                    <?php if (isset($component)) { $__componentOriginala82975a30b9db16b9f8ce6ba13694d76 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.upload-limit-hint','data' => ['class' => 'text-center','format' => 'JPG, PNG, PDF']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('upload-limit-hint'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['class' => 'text-center','format' => 'JPG, PNG, PDF']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $attributes = $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $component = $__componentOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
                                 </div>
                                 <?php $__errorArgs = ['fab_document'];
 $__bag = $errors->getBag($__errorArgs[1] ?? 'default');
@@ -1195,8 +1270,11 @@ unset($__errorArgs, $__bag); ?>
 <script>
     /* Skema 3 (2026-09-12) — autocomplete ID Referral Pelanggan, cari
        pelanggan existing lewat CID/nama. Nol dependency baru (vanilla fetch
-       + Alpine yang sudah dibundel), pola sama komponen Alpine lain di app. */
-    document.addEventListener('alpine:init', () => {
+       + Alpine yang sudah dibundel), pola sama komponen Alpine lain di app.
+       Registrasi dibungkus fungsi yang CEK dulu `window.Alpine` — lihat
+       alasan lengkap di components/ui/pop-filter.blade.php. */
+    (function () {
+        const register = () => {
         Alpine.data('referralSearch', () => ({
             query: '',
             results: [],
@@ -1215,13 +1293,24 @@ unset($__errorArgs, $__bag); ?>
                 this.results = [];
             },
         }));
-    });
+        };
 
-    /* ── Wizard Form Stepper & Live Validation Logic ── */
-    let currentActiveStep = 1;
-    const totalStepsCount = 2;
+        if (window.Alpine) {
+            register();
+        } else {
+            document.addEventListener('alpine:init', register, { once: true });
+        }
+    })();
 
-    const formFields = {
+    /* ── Wizard Form Stepper & Live Validation Logic ──
+       `var`, BUKAN `let`/`const`: hx-boost nge-swap SELURUH <body> tiap
+       nav, script ini ikut ter-insert ulang tiap balik ke halaman create
+       pelanggan ini — `let`/`const` top-level gak bisa redeclare (lihat
+       bug formToastLock/selectedCustomerData, 2026-11-04). */
+    var currentActiveStep = 1;
+    var totalStepsCount = 2;
+
+    var formFields = {
         'data-diri': {
             required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date', 'pop_id', 'address', 'city_id', 'district_id', 'village_id'],
             optional: ['email', 'alternative_phone', 'npwp', 'latitude', 'longitude']
@@ -1235,7 +1324,7 @@ unset($__errorArgs, $__bag); ?>
     // Paket yang butuh FAB (Formulir Akan Berlangganan Bisnis) — paket
     // berkategori Bisnis (dikirim server lewat CustomerController::create()).
     // Cuma dipakai buat toggle tampilan; guard sebenarnya tetap di server.
-    const fabRequiredPackageIds = <?php echo json_encode($fabRequiredPackageIds->map(fn ($id) => (string) $id)->values(), 15, 512) ?>;
+    var fabRequiredPackageIds = <?php echo json_encode($fabRequiredPackageIds->map(fn ($id) => (string) $id)->values(), 15, 512) ?>;
 
     function toggleFabRequirement() {
         const select = document.getElementById('internet_package_id');
@@ -1255,14 +1344,14 @@ unset($__errorArgs, $__bag); ?>
         runLiveProgressUpdates();
     }
 
-    const stepKeys = {
+    var stepKeys = {
         1: 'data-diri',
         2: 'layanan'
     };
 
     // Field yang pindah jadi wajib di Step 1 begitu Skip Survey aktif —
     // lat/long dari 'optional' data-diri, sisanya baru muncul lewat toggle.
-    const skipSurveyRequiredFields = ['latitude', 'longitude', 'nearest_odp', 'cable_estimation_meter', 'difficulty_level', 'foto_rumah', 'survey_photo'];
+    var skipSurveyRequiredFields = ['latitude', 'longitude', 'nearest_odp', 'cable_estimation_meter', 'difficulty_level', 'foto_rumah', 'survey_photo'];
 
     /* Toggle Skip Survey — tampilkan/sembunyikan blok data survey & pindahkan
        field-nya antara required/optional di formFields['data-diri']. */
@@ -1287,7 +1376,7 @@ unset($__errorArgs, $__bag); ?>
         runLiveProgressUpdates();
     }
 
-    document.addEventListener("DOMContentLoaded", function() {
+    window.onPageReady(function() {
         const inputs = document.querySelectorAll('#wizard-form input, #wizard-form select, #wizard-form textarea');
         inputs.forEach(input => {
             input.addEventListener('input', runLiveProgressUpdates);

@@ -1,7 +1,13 @@
 @extends('layouts.app')
 
-@section('title', 'Tambah Pelanggan Baru')
-@section('page_title', 'Tambah Pelanggan Baru')
+{{-- View ini dipakai DUA pintu: Registrasi biasa (customers.store) dan
+     Bypass Pelanggan (customers.bypass.store, $bypassMode = true) — pelanggan
+     legacy terlewat migrasi yang langsung aktif. Isian sama persis supaya
+     yang wajib di registrasi juga wajib di bypass. --}}
+@php($bypassMode = $bypassMode ?? false)
+
+@section('title', $bypassMode ? 'Bypass Pelanggan' : 'Tambah Pelanggan Baru')
+@section('page_title', $bypassMode ? 'Bypass Pelanggan' : 'Tambah Pelanggan Baru')
 @section('breadcrumb_parent_url', route('customers.index'))
 
 @section('content')
@@ -11,10 +17,14 @@
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
             <div class="flex items-center gap-2.5 flex-wrap">
-                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Registrasi Pelanggan Baru</h1>
+                <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">{{ $bypassMode ? 'Bypass Pelanggan (Langsung Aktif)' : 'Registrasi Pelanggan Baru' }}</h1>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
-                Masukkan data identitas calon pelanggan, wilayah pemasangan, dan paket layanan internet.
+                @if($bypassMode)
+                    Khusus pelanggan lama yang terlewat saat migrasi — sudah terpasang dan administrasinya sudah selesai.
+                @else
+                    Masukkan data identitas calon pelanggan, wilayah pemasangan, dan paket layanan internet.
+                @endif
             </p>
         </div>
 
@@ -27,7 +37,17 @@
     </div>
 
     <!-- MAIN FORM CONTAINER -->
-    <form action="{{ route('customers.store') }}" method="POST" enctype="multipart/form-data" id="wizard-form" class="space-y-6">
+    @if($bypassMode)
+    <div class="bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/60 rounded-xl p-4 flex items-start gap-3">
+        <x-ui.icon name="triangle-alert" class="w-4 h-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+        <div class="text-xs text-amber-800 dark:text-amber-200 leading-relaxed space-y-1">
+            <p class="font-bold">Pelanggan langsung berstatus AKTIF setelah disimpan.</p>
+            <p>Tanpa verifikasi registrasi, survey, pemasangan, dan tanpa Tagihan Awal. CID digenerate otomatis dari POP; Mini POP &amp; Distribusi dibiarkan kosong. Tagihan bulanan mulai periode setelah bulan Tanggal Aktivasi. Data lain dilengkapi belakangan lewat Edit.</p>
+        </div>
+    </div>
+    @endif
+
+    <form action="{{ $bypassMode ? route('customers.bypass.store') : route('customers.store') }}" method="POST" enctype="multipart/form-data" id="wizard-form" class="space-y-6">
         @csrf
 
         <!-- TOP PANEL: Dynamic Completeness Progress Bar -->
@@ -178,7 +198,7 @@
                             </div>
 
                             <div>
-                                <label for="registration_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">Tanggal Registrasi <span class="text-rose-500">*</span></label>
+                                <label for="registration_date" class="block mb-1.5 font-bold uppercase text-[10px] tracking-wide text-slate-700 dark:text-slate-300">{{ $bypassMode ? 'Tanggal Aktivasi' : 'Tanggal Registrasi' }} <span class="text-rose-500">*</span></label>
                                 <input type="date" name="registration_date" id="registration_date" value="{{ old('registration_date', today()->format('Y-m-d')) }}" class="w-full text-xs font-sans px-3 py-2.5 border @error('registration_date') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
                                 @error('registration_date')
                                     <p class="text-[11px] text-rose-600 dark:text-rose-400 mt-1">{{ $message }}</p>
@@ -258,6 +278,10 @@
                             </div>
                         </div>
 
+                        {{-- Bypass: pelanggan sudah terpasang, blok Skip Survey (termasuk
+                             Foto Rumah) tidak relevan — server juga mencabut field-nya
+                             (CustomerBypassRequest). --}}
+                        @if(! $bypassMode)
                         @can('customers.registration.skip_survey')
                         {{-- Skip Survey — Sales lompat tahap survey lapangan, input data
                              survey langsung di sini. Permission sempit
@@ -379,6 +403,7 @@
                             </div>
                         </div>
                         @endcan
+                        @endif
                     </div>
 
                     <!-- STEP 2 PANEL: Layanan & Paket Internet -->

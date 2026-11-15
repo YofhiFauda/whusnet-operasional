@@ -82,14 +82,59 @@ async function isEnabledForCurrentUser() {
     return own.some(function (row) { return row.endpoint === subscription.endpoint; });
 }
 
+// Error yang pesannya SUDAH ramah pengguna (ditulis sendiri di file ini) —
+// dibedakan dari DOMException/TypeError bawaan browser yang pesannya teknis
+// (mis. "Registration failed - push service error", "Failed to fetch") dan
+// dulu langsung nongol mentah di toast.
+class WebPushUserError extends Error {}
+
+// Terjemahkan error apa pun dari alur subscribe jadi kalimat yang bisa
+// ditindaklanjuti pengguna. Detail teknis tetap ke console buat debugging.
+function friendlySubscribeError(err) {
+    if (err instanceof WebPushUserError) {
+        return err;
+    }
+
+    console.error('[WebPush] Gagal mengaktifkan notifikasi:', err);
+
+    const name = err && err.name;
+    const message = String((err && err.message) || '');
+
+    if (name === 'NotAllowedError') {
+        return new WebPushUserError('Izin notifikasi ditolak. Izinkan notifikasi untuk situs ini lewat ikon gembok di address bar, lalu coba lagi.');
+    }
+    // Layanan push milik browser gak bisa dihubungi. Paling sering di Brave
+    // (push dimatikan bawaan), browser mode privat/incognito, atau jaringan
+    // yang memblokir server push browser.
+    if (name === 'AbortError' || /push service/i.test(message)) {
+        return new WebPushUserError('Browser ini belum bisa menerima notifikasi push. Pastikan tidak dalam mode Incognito/Private; di Brave, aktifkan "Use Google services for push messaging" di Settings > Privacy and security, lalu coba lagi.');
+    }
+    if (name === 'InvalidStateError') {
+        return new WebPushUserError('Notifikasi lama di browser ini bentrok. Muat ulang halaman lalu coba aktifkan lagi.');
+    }
+    if (err instanceof TypeError) {
+        return new WebPushUserError('Gagal terhubung ke server. Periksa koneksi internet lalu coba lagi.');
+    }
+
+    return new WebPushUserError('Notifikasi perangkat gagal diaktifkan di browser ini. Muat ulang halaman lalu coba lagi.');
+}
+
 async function subscribe() {
+    try {
+        return await subscribeOrThrow();
+    } catch (err) {
+        throw friendlySubscribeError(err);
+    }
+}
+
+async function subscribeOrThrow() {
     if (!isSupported()) {
-        throw new Error('Browser ini tidak mendukung Web Push.');
+        throw new WebPushUserError('Browser ini tidak mendukung notifikasi push.');
     }
 
     const permission = await Notification.requestPermission();
     if (permission !== 'granted') {
-        throw new Error('Izin notifikasi ditolak.');
+        throw new WebPushUserError('Izin notifikasi ditolak. Izinkan notifikasi untuk situs ini lewat ikon gembok di address bar, lalu coba lagi.');
     }
 
     const registration = await registerServiceWorker();
@@ -99,7 +144,14 @@ async function subscribe() {
         const keyResponse = await fetch(routeFor('vapidKey'), {
             headers: { 'Accept': 'application/json' },
         });
-        const { publicKey } = await keyResponse.json();
+        const { publicKey } = keyResponse.ok ? await keyResponse.json() : {};
+
+        // VAPID_PUBLIC_KEY belum diisi di .env server ⇒ endpoint balikin null
+        // dan urlBase64ToUint8Array(null) crash "Cannot read properties of
+        // null (reading 'length')". Bukan salah user — bilang apa adanya.
+        if (!publicKey) {
+            throw new WebPushUserError('Notifikasi perangkat belum disiapkan di server. Hubungi admin.');
+        }
 
         subscription = await registration.pushManager.subscribe({
             userVisibleOnly: true,
@@ -118,8 +170,11 @@ async function subscribe() {
         }),
     });
 
+    if (response.status === 419 || response.status === 401) {
+        throw new WebPushUserError('Sesi login sudah berakhir. Muat ulang halaman lalu coba lagi.');
+    }
     if (!response.ok) {
-        throw new Error('Gagal mendaftarkan subscription ke server.');
+        throw new WebPushUserError('Server gagal menyimpan pendaftaran notifikasi. Coba lagi beberapa saat lagi.');
     }
 
     return subscription;

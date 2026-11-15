@@ -13,6 +13,7 @@ use App\Models\Invoice;
 use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Task;
+use App\Models\User;
 use App\Observers\CustomerBalanceMutationObserver;
 use App\Observers\CustomerObserver;
 use App\Observers\CustomerQrTokenObserver;
@@ -80,13 +81,22 @@ class AppServiceProvider extends ServiceProvider
             throw new \RuntimeException('QR_HMAC_SECRET wajib diisi di production — generate dengan `openssl rand -base64 32`.');
         }
 
-        // Akses UI dokumentasi Scramble (/docs/api) di luar env local — bebas
-        // di local, tapi di production/staging cuma staf full-access
-        // (Owner/Admin) yang boleh buka. Bukan gerbang permission granular
-        // (RBAC matrix) karena ini dokumentasi teknis, bukan fitur bisnis —
-        // tanpa Gate ini RestrictedDocsAccess default-nya 403 SEMUA orang di
-        // luar local (dedoc/scramble), dokumen jadi gak bisa diakses staf pun.
-        Gate::define('viewApiDocs', fn ($user) => $user->hasFullAccess());
+        // Akses UI dokumentasi Scramble (/docs/api) — khusus role `owner`,
+        // berlaku di SEMUA env termasuk local (samakan dengan Horizon &
+        // /log-viewer). Dulu `hasFullAccess()` + bebas di local lewat
+        // RestrictedDocsAccess; middleware itu sudah diganti `can:viewApiDocs`
+        // di config/scramble.php supaya bypass local-nya hilang. Bukan gerbang
+        // permission granular (RBAC matrix) karena ini dokumentasi teknis,
+        // bukan fitur bisnis.
+        Gate::define('viewApiDocs', fn (?User $user = null): bool => $user?->hasRole('owner') ?? false);
+
+        // Log Viewer (/log-viewer, opcodesio/log-viewer) — khusus role `owner`,
+        // sama alasannya dengan gate Horizon: isi log bisa memuat data
+        // pelanggan, stack trace, dan payload request, dan UI-nya bisa
+        // menghapus file log. Jangan dilonggarkan ke hasFullAccess(); kalau
+        // suatu hari role lain dapat wildcard `*`, log tetap tertutup.
+        // Gate ini juga berlaku di env local (paket mengutamakan Gate bila ada).
+        Gate::define('viewLogViewer', fn (?User $user = null): bool => $user?->hasRole('owner') ?? false);
 
         // Centralized invoice/payment guards — applies to every insert path
         // (controllers, artisan commands, future API), not just one controller.

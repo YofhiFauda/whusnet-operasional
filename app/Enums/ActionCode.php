@@ -61,6 +61,16 @@ enum ActionCode: string
     case SKIP_SURVEY = 'skip_survey';
 
     /**
+     * Bypass Pelanggan (2026-11-15) — pelanggan legacy yang terlewat migrasi
+     * (sudah terpasang & administrasinya beres di luar sistem) didaftarkan
+     * lewat form registrasi dan LANGSUNG `active`: tanpa verifikasi
+     * registrasi, survey, pemasangan, maupun Tagihan Awal. Lebih lebar dari
+     * SKIP_SURVEY (yang masih lewat pemasangan + verifikasi), jadi dipisah
+     * supaya Role Matrix bisa memberi salah satunya saja.
+     */
+    case BYPASS = 'bypass';
+
+    /**
      * Konfirmasi FISIK "barang sudah nyampe" (Transfer Pusat→Cabang). SENGAJA
      * bukan APPROVE: itu keputusan setuju/tolak berbasis kebijakan, ini
      * pengakuan kejadian fisik oleh penerima sendiri (acknowledgment digital
