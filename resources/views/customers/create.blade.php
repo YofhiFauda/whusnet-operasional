@@ -1,8 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Tambah Pelanggan Baru — WHUSNET Operasional')
+@section('title', 'Tambah Pelanggan Baru')
 @section('page_title', 'Tambah Pelanggan Baru')
-@section('breadcrumb_parent', 'Pelanggan')
 @section('breadcrumb_parent_url', route('customers.index'))
 
 @section('content')
@@ -13,9 +12,6 @@
         <div>
             <div class="flex items-center gap-2.5 flex-wrap">
                 <h1 class="text-xl sm:text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">Registrasi Pelanggan Baru</h1>
-                <span class="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-sky-100 dark:bg-sky-900/50 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-700/60">
-                    <x-ui.icon name="sparkles" class="w-2.5 h-2.5 mr-1.5" /> Form Wizard
-                </span>
             </div>
             <p class="text-xs sm:text-sm text-slate-500 dark:text-slate-400 mt-1 leading-relaxed">
                 Masukkan data identitas calon pelanggan, wilayah pemasangan, dan paket layanan internet.
@@ -344,6 +340,7 @@
                                         Pilih Foto Rumah
                                     </label>
                                     <span id="file-label-foto_rumah" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                    <x-upload-limit-hint class="text-center" format="JPG, PNG, WEBP" />
                                 </div>
                                 @error('foto_rumah')
                                     <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
@@ -374,6 +371,7 @@
                                         Pilih Foto ODP
                                     </label>
                                     <span id="file-label-survey_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                    <x-upload-limit-hint class="text-center" format="JPG, PNG, WEBP" />
                                 </div>
                                 @error('survey_photo')
                                     <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
@@ -433,6 +431,7 @@
                                         Pilih Berkas FAB
                                     </label>
                                     <span id="file-label-fab_document" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1.5 font-mono truncate">Belum ada file</span>
+                                    <x-upload-limit-hint class="text-center" format="JPG, PNG, PDF" />
                                 </div>
                                 @error('fab_document')
                                     <p class="text-[10px] text-rose-600 dark:text-rose-400 mt-2">{{ $message }}</p>
@@ -705,7 +704,7 @@
         runLiveProgressUpdates();
     }
 
-    document.addEventListener("DOMContentLoaded", function() {
+    window.onPageReady(function() {
         const inputs = document.querySelectorAll('#wizard-form input, #wizard-form select, #wizard-form textarea');
         inputs.forEach(input => {
             input.addEventListener('input', runLiveProgressUpdates);

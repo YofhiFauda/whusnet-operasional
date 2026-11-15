@@ -38,6 +38,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'extra_device_shortage',
     'extra_device_shortage_reason',
     'extra_devices_reported_at',
+    'extra_device_serial_ids',
 ])]
 class CustomerInstallation extends Model
 {
@@ -51,6 +52,35 @@ class CustomerInstallation extends Model
         'installation_photo',
     ];
 
+    /**
+     * Nominal "Beli dari Gudang" yang ikut Invoice Awal. SATU sumber untuk
+     * CustomerVerificationController::finalVerify() (yang menagih) DAN
+     * halaman Verifikasi Admin (yang menampilkan) — dulu cuma dihitung di
+     * controller, jadi admin gak bisa lihat modemnya dijual/disewa sebelum
+     * menyetujui (laporan user 2026-11-14). 'beli_sendiri'/'sewa_gudang'/
+     * pelanggan kontrak sewa = 0.
+     */
+    public function modemSaleAmountForInvoice(): float
+    {
+        return $this->modem_acquisition_choice === 'beli_gudang'
+            ? (float) $this->modem_sale_price
+            : 0.0;
+    }
+
+    /**
+     * Label cara pemilikan modem untuk tampilan. Null = belum dipilih
+     * (pelanggan kontrak sewa memang tidak pernah memilih — modem sewa).
+     */
+    public function modemAcquisitionLabel(): ?string
+    {
+        return match ($this->modem_acquisition_choice) {
+            'beli_gudang' => 'Beli dari Gudang',
+            'beli_sendiri' => 'Beli Sendiri (milik pelanggan)',
+            'sewa_gudang' => 'Sewa Gudang',
+            default => null,
+        };
+    }
+
     protected function casts(): array
     {
         return [
@@ -63,6 +93,7 @@ class CustomerInstallation extends Model
             'modem_sale_price' => 'decimal:2',
             'extra_device_shortage' => 'boolean',
             'extra_devices_reported_at' => 'datetime',
+            'extra_device_serial_ids' => 'array',
         ];
     }
 

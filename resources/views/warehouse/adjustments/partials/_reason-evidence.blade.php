@@ -61,6 +61,7 @@
     <input id="{{ $idPrefix }}-evidence" type="file" name="evidence" accept="image/*"
            @if($evidence === 'required') required @elseif($evidence === 'when') :required="{{ $evidenceWhen }}" @endif
            class="w-full rounded-lg border border-slate-200 bg-slate-50/50 px-3 py-2 text-xs text-slate-800 file:mr-3 file:rounded-lg file:border-0 file:bg-amber-100 file:px-3 file:py-1 file:text-xs file:font-semibold file:text-amber-700 dark:border-slate-700 dark:bg-slate-900/60 dark:text-slate-200 dark:file:bg-amber-900/40 dark:file:text-amber-300">
+    <x-upload-limit-hint />
     @if(! empty($evidenceHint)) <p class="mt-1 text-[11px] text-slate-400">{{ $evidenceHint }}</p> @endif
     @error('evidence') <p class="mt-1 text-xs text-rose-600">{{ $message }}</p> @enderror
 </div>

@@ -117,6 +117,7 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_transfer.view',
                 'warehouse_branch_sale.view',
                 'warehouse_branch_sale_price.view',
+                'webpush_dashboard.view', // ADHOC-288 Tahap 8 — delivery rate push per merek/OS
             ],
 
             'admin' => [
@@ -182,6 +183,7 @@ class RolePermissionSeeder extends Seeder
                 'termination_reasons.update',
                 'termination_reasons.view',
                 'tickets.qr.create',
+                'webpush_dashboard.view', // ADHOC-288 Tahap 8 — delivery rate push per merek/OS
             ],
 
             // NOC sekarang (2026-10-02) juga pegang administrasi task.* penuh
@@ -217,6 +219,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.survey.view',
                 'customers.detail.view',
                 'customers.failed.view',
+                'customers.isolir',
                 'customers.terminated.view',
                 'customers.update',
                 'customers.view',
@@ -319,6 +322,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.survey.view',
                 'customers.detail.view',
                 'customers.failed.view',
+                'customers.isolir',
                 'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
                 'customers.terminated.view',
                 'customers.update',
@@ -379,6 +383,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.survey.view',
                 'customers.detail.view',
                 'customers.failed.view',
+                'customers.isolir',
                 'customers.qr.cancel',
                 'customers.qr.create',
                 'customers.qr.print',
@@ -591,22 +596,28 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_branch_sale_price.view',
             ],
 
+            // Sales SENGAJA tanpa customers.update/customers.isolir (2026-11-10):
+            // dulu numpang customers.update buat edit field pelanggan biasa,
+            // yang otomatis juga membuka toggleSuspend (isolir). Sales cuma
+            // boleh create + lihat; isolir & edit data pelanggan bukan
+            // kewenangannya. Sub-permission `.update` per-tab (address/
+            // identity/packages) ikut dicabut — masih numpang customers.update
+            // sampai field-level enforcement diaktifkan (lihat
+            // resources/views/roles/matrix.blade.php), jadi kalau tetap
+            // dibiarkan di sini bisa diam-diam membuka lagi aksi edit begitu
+            // enforcement itu nyala.
             'sales' => [
                 'customers.create',
-                'customers.detail.address.update',
                 'customers.detail.address.view',
                 'customers.detail.documents.download',
                 'customers.detail.documents.upload',
                 'customers.detail.documents.view',
-                'customers.detail.identity.update',
                 'customers.detail.identity.view',
-                'customers.detail.packages.update',
                 'customers.detail.packages.view',
                 'customers.detail.view',
                 'customers.failed.view',
                 'customers.registration.skip_survey',
                 'customers.terminated.view',
-                'customers.update',
                 'customers.view',
                 'tickets.qr.create',
             ],
@@ -635,6 +646,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.packages.view',
                 'customers.detail.view',
                 'customers.failed.view',
+                'customers.isolir',
                 'customers.qr.create',
                 'customers.qr.print',
                 'customers.qr.view',
@@ -702,6 +714,7 @@ class RolePermissionSeeder extends Seeder
                 'customers.failed.view', // List Pelanggan Gagal — permission sendiri, bukan wildcard customers.detail.*
                 'customers.import.import',
                 'customers.import.view',
+                'customers.isolir',
                 'customers.qr.print', // Cetak stiker QR — pop_admin cetak buat cabangnya sendiri
                 'customers.qr.view', // Lihat status token QR pelanggan (docs/plan/qr-code/)
                 'customers.terminated.view', // List Pelanggan Putus — permission sendiri, bukan wildcard customers.detail.*

@@ -413,7 +413,7 @@
     }
 
     // Escape listener to close modal
-    document.addEventListener('keydown', (e) => {
+    window.pageListen(document, 'keydown', (e) => {
         if (e.key === 'Escape') {
             const modal = document.getElementById('reason-modal-wrapper');
             if (modal && !modal.classList.contains('hidden')) {

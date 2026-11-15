@@ -925,7 +925,7 @@
      * Listener Aksi Drawer / Baris:
      * Menghubungkan dispatch event aksi ke Modal Konfirmasi & API request.
      */
-    window.addEventListener('ticket-drawer-action', (event) => {
+    window.pageListen(window, 'ticket-drawer-action', (event) => {
         const { id, action } = event.detail;
         const row = document.querySelector(`[data-ticket-row="${id}"]`);
 

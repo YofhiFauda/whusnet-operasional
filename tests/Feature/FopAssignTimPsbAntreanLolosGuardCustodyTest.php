@@ -81,9 +81,9 @@ class FopAssignTimPsbAntreanLolosGuardCustodyTest extends TestCase
         $this->assertSame(TaskStatus::TERJADWAL, $queuedTask->refresh()->status);
         $this->assertTrue($queuedTask->teamMembers()->where('user_id', $this->teknisi->id)->exists());
 
-        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($queuedTask));
+        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForExtraDevice($queuedTask));
         $this->issueExtraDeviceSerial($this->teknisi, 'GQA-AP-SETELAH-ASSIGN');
-        $this->assertCount(1, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($queuedTask->fresh()));
+        $this->assertCount(1, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForExtraDevice($queuedTask->fresh()));
     }
 
     #[Test]

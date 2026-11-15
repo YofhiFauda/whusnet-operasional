@@ -165,9 +165,13 @@ class WarehouseMaterialUsageReportTest extends TestCase
             'scope_type' => ScopeType::ALL_POP->value,
         ]);
 
+        // Regresi header gudang: sebelum perbaikan ini, menu "Laporan & Mutasi"
+        // cuma dicek lewat $canViewWarehouse, jadi fop gak pernah liat tombol
+        // masuk ke halaman ini walau rutenya sendiri sudah kebuka di atas.
         $this->actingAs($fopUser)
             ->get(route('warehouse.usage.index'))
-            ->assertOk();
+            ->assertOk()
+            ->assertSee(route('warehouse.usage.index'), false);
 
         $this->actingAs($fopUser)
             ->get(route('warehouse.usage.export'))

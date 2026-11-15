@@ -13,6 +13,7 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
+use App\Notifications\AppPushNotification;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
@@ -223,6 +224,15 @@ class CustomerCreateTest extends TestCase
         // Owner (hasRole owner) lolos EffectiveAccessService::usersWithPermission()
         // juga, tapi actor gak boleh notif diri sendiri.
         Notification::assertNotSentTo($admin, AppNotification::class);
+
+        // Push device (ADHOC-288 Tahap 6, event disetujui #4) — sama
+        // penerima/scope dengan in-app, cuma reviewer dalam POP yang sama.
+        Notification::assertSentTo(
+            $approverInPop,
+            AppPushNotification::class,
+            fn ($notification) => str_contains($notification->title, $customer->full_name)
+        );
+        Notification::assertNotSentTo($approverInOtherPop, AppPushNotification::class);
     }
 
     public function test_submitting_invalid_customer_data_fails_validation(): void

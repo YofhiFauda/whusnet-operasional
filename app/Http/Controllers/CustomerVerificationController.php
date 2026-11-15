@@ -283,7 +283,7 @@ class CustomerVerificationController extends Controller
                 $this->notifyRoleUsersInPop('fop', $customer->pop_id,
                     'Task Pemasangan Baru: '.$installTaskForNotif->task_number,
                     "Survey {$customer->full_name} disetujui, Task Pemasangan menunggu tim ditugaskan.",
-                    route('tasks.show', $installTaskForNotif->id)
+                    route('tasks.show', $installTaskForNotif->id, false)
                 );
             }
 
@@ -320,12 +320,13 @@ class CustomerVerificationController extends Controller
         // Biaya tambahan & override prorata diketik berformat ribuan. Salah
         // baca di sini langsung mengubah nominal tagihan PERTAMA pelanggan.
         $request->merge(RupiahInput::parseKeys(
-            $request->only(['extra_installation_fee', 'extra_cable_fee', 'extra_pole_fee', 'other_fee', 'prorate_amount_override']),
+            $request->only(['extra_installation_fee', 'extra_cable_fee', 'extra_pole_fee', 'other_fee', 'prorate_amount_override', 'modem_sale_amount']),
             'extra_installation_fee',
             'extra_cable_fee',
             'extra_pole_fee',
             'other_fee',
             'prorate_amount_override',
+            'modem_sale_amount',
         ));
 
         $validated = $request->validate([
@@ -335,6 +336,12 @@ class CustomerVerificationController extends Controller
             'extra_pole_fee' => 'nullable|numeric|min:0',
             'other_fee' => 'nullable|numeric|min:0',
             'prorate_amount_override' => 'nullable|numeric|min:0',
+            // Harga modem "Beli dari Gudang" — boleh dikoreksi admin (permintaan
+            // user 2026-11-14), default harga isian teknisi. Min 0.01: modem
+            // yang tidak dijual = Sewa, bukan Beli dengan harga 0.
+            'modem_sale_amount' => 'nullable|numeric|min:0.01',
+        ], [
+            'modem_sale_amount.min' => 'Harga modem minimal Rp 1 — kalau modem tidak dijual, pemilikannya bukan Beli dari Gudang.',
         ]);
 
         $service = $customer->customerService;
@@ -363,7 +370,15 @@ class CustomerVerificationController extends Controller
         // selamanya null.
         $latestInstallation = $customer->installations()->latest()->first();
         $isModemBeliGudang = $latestInstallation && $latestInstallation->modem_acquisition_choice === 'beli_gudang';
-        $modemSaleAmount = $isModemBeliGudang ? (float) $latestInstallation->modem_sale_price : 0.0;
+        $modemSaleAmount = $latestInstallation?->modemSaleAmountForInvoice() ?? 0.0;
+        // Koreksi admin cuma berlaku untuk 'beli_gudang' — pelanggan sewa/beli
+        // sendiri tidak punya penjualan modem, kiriman field ini diabaikan.
+        $modemSaleAmountEdited = $isModemBeliGudang
+            && isset($validated['modem_sale_amount'])
+            && (float) $validated['modem_sale_amount'] !== $modemSaleAmount;
+        if ($modemSaleAmountEdited) {
+            $modemSaleAmount = (float) $validated['modem_sale_amount'];
+        }
         // Keterangan + penaut sale (rancangan 2026-10-31 §3/§5) — dibangun
         // dari SN yang sama dipakai `installSerial()`/`recordSerialSale()`
         // di laporan teknisi. SN pointer draft (`selectedInventorySerial`)
@@ -412,6 +427,18 @@ class CustomerVerificationController extends Controller
             $targetStatus = $needsBusinessDevelopmentVerification
                 ? WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value
                 : WorkflowTransition::ACTIVE->value;
+
+            // Harga modem dikoreksi admin ⇒ ledger penjualan SN
+            // (inventory_serial_sales, dipakai laporan gudang & rekonsiliasi
+            // "SN terjual belum ditagih") dan draft pointer instalasi ikut
+            // disamakan. Tanpa ini invoice bilang X tapi laporan penjualan
+            // bilang harga teknisi — dua angka untuk satu modem.
+            if ($modemSaleAmountEdited) {
+                $latestInstallation->update(['modem_sale_price' => $modemSaleAmount]);
+                if ($modemSaleId) {
+                    InventorySerialSale::whereKey($modemSaleId)->update(['price' => $modemSaleAmount]);
+                }
+            }
 
             $pendingInitialInvoice = null;
             if ($needsBusinessDevelopmentVerification) {
@@ -880,7 +907,7 @@ class CustomerVerificationController extends Controller
     private function notifyTaskTeam(Task $task, string $title, string $message, NotificationType $type): void
     {
         $task->loadMissing('teamMembers.user');
-        $url = route('tasks.show', $task->id);
+        $url = route('tasks.show', $task->id, false);
 
         foreach ($task->teamMembers as $member) {
             if ($member->user) {
@@ -946,7 +973,7 @@ class CustomerVerificationController extends Controller
         $creator->notify(new AppNotification(
             title: $title,
             message: $message,
-            actionUrl: route('customers.show', $customer->id),
+            actionUrl: route('customers.show', $customer->id, false),
             type: $type
         ));
     }

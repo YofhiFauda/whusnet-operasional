@@ -1466,7 +1466,7 @@ $taskData = [
         }
 
         function bind() {
-            window.Echo.private(`fop.${popId}`)
+            window.pageEcho(`fop.${popId}`)
                 .listen('TaskStarted', (e) => { if (e.id === taskId) refreshStatusPanel(); })
                 .listen('TaskCompleted', (e) => { if (e.id === taskId) refreshStatusPanel(); });
         }

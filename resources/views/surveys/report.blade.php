@@ -408,6 +408,7 @@
                                         <span>{{ $existingHousePhoto ? 'Ganti Foto Rumah' : 'Pilih / Ambil Foto Rumah' }}</span>
                                     </label>
                                     <span id="file-label-house_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ $existingHousePhoto ? 'Sudah diunggah — klik untuk ganti' : 'Belum ada file dipilih' }}</span>
+                                    <x-upload-limit-hint class="text-center" />
                                 </div>
 
                                 @error('house_photo')
@@ -447,6 +448,7 @@
                                         <span>{{ $existingSurveyPhoto ? 'Ganti Foto ODP' : 'Pilih / Ambil Foto ODP' }}</span>
                                     </label>
                                     <span id="file-label-survey_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ $existingSurveyPhoto ? 'Sudah diunggah — klik untuk ganti' : 'Belum ada file dipilih' }}</span>
+                                    <x-upload-limit-hint class="text-center" />
                                 </div>
 
                                 @error('survey_photo')
@@ -758,10 +760,12 @@
     }
 
     /* ── Wizard Form Stepper & Live Validation Logic ── */
-    let currentActiveStep = 1;
-    const totalStepsCount = 4;
+    // `var`, BUKAN `let`/`const` — lihat komentar padanan di
+    // installations/report.blade.php (redeclare saat navigasi hx-boost).
+    var currentActiveStep = 1;
+    var totalStepsCount = 4;
 
-    const formFields = {
+    var formFields = {
         'dokumen': {
             required: ['house_photo', 'survey_photo'],
             optional: []
@@ -772,15 +776,15 @@
         }
     };
 
-    const stepKeys = {
+    var stepKeys = {
         2: 'dokumen',
         4: 'laporan'
     };
 
-    const inputSteps = [2, 4];
-    const readOnlySteps = [1, 3];
+    var inputSteps = [2, 4];
+    var readOnlySteps = [1, 3];
 
-    document.addEventListener("DOMContentLoaded", function() {
+    window.onPageReady(function () {
         const inputs = document.querySelectorAll('#wizard-form input, #wizard-form select, #wizard-form textarea');
         inputs.forEach(input => {
             input.addEventListener('input', runLiveProgressUpdates);

@@ -29,7 +29,7 @@
                 || !document.getElementById('package-change-modal-wrapper')?.classList.contains('hidden');
         }
 
-        document.addEventListener('keydown', e => {
+        window.pageListen(document, 'keydown', e => {
             const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
                         || document.activeElement.isContentEditable;
 

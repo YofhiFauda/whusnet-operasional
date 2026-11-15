@@ -23,6 +23,7 @@ use App\Support\Money;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
 use App\Support\SortRequest;
+use App\Support\UploadLimit;
 use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
@@ -582,7 +583,7 @@ class PaymentController extends Controller
         $recorder->notify(new AppNotification(
             title: 'Pembayaran Dikembalikan: '.$payment->payment_number,
             message: "Pembayaran {$payment->payment_number} yang Anda catat dikembalikan {$actor->name}. Alasan: {$reason}",
-            actionUrl: route('payments.show', $payment->id),
+            actionUrl: route('payments.show', $payment->id, false),
             type: NotificationType::ERROR
         ));
     }
@@ -706,7 +707,7 @@ class PaymentController extends Controller
                     }
                 },
             ],
-            'proof_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:2048',
+            'proof_file' => 'nullable|file|mimes:jpg,jpeg,png,pdf|'.UploadLimit::rule(),
             'note' => 'required_if:payment_method,lainnya|nullable|string|max:1000',
         ];
 

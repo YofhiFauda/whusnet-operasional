@@ -25,15 +25,15 @@
         m: @js($selectedMini->map(fn ($x) => ['id' => (int) $x->id, 'name' => $x->name, 'parent_id' => (int) ($x->parent_id ?? 0), 'parent' => optional($x->parent)->name])->values()),
         formId: @js($formId)
     })"
-    @click.outside="open = false"
     @keydown.escape="open = false"
+    @scroll.window="open = false" @resize.window="open = false"
     class="relative"
 >
     <template x-for="c in selC" :key="'hc' + c.id"><input type="hidden" name="pop_id[]" :value="c.id"></template>
     <template x-for="m in selM" :key="'hm' + m.id"><input type="hidden" name="mini_pop_id[]" :value="m.id"></template>
 
     {{-- Pill trigger --}}
-    <button type="button" @click="toggle()"
+    <button type="button" @click="open ? (open = false) : openPanel($event)"
         :aria-expanded="open ? 'true' : 'false'"
         aria-label="Filter POP atau Cabang"
         class="h-[38px] w-full inline-flex items-center gap-2 px-3 rounded-lg border border-border bg-surface
@@ -49,12 +49,22 @@
         </svg>
     </button>
 
-    {{-- Dropdown panel --}}
+    {{-- Dropdown panel — diteleport ke <body>, BUKAN absolute di dalam bar ini:
+         bar filter (_list_filters.blade.php) punya `overflow-hidden` di section
+         induk (buat rapihin sudut rounded header mobile) + x-collapse pada
+         konten filter, yang diam-diam memotong dropdown absolute mana pun
+         yang nongol di dalamnya — persis gejala yang dilaporkan user: tombol
+         ke-klik (open jadi true) tapi panel gak pernah kelihatan. Posisi
+         dihitung manual dari bounding rect tombol, pola sama dipakai dropdown
+         "Kolom" di komponen ini juga (_list_filters.blade.php). --}}
+    <template x-teleport="body">
     <div x-show="open" x-cloak
          x-transition:enter="transition ease-out duration-100"
          x-transition:enter-start="opacity-0 -translate-y-1"
          x-transition:enter-end="opacity-100 translate-y-0"
-         class="absolute z-40 mt-1 w-72 rounded-lg border border-border bg-surface shadow-lg overflow-hidden">
+         @click.outside="open = false" @keydown.escape.window="open = false"
+         :style="`position: fixed; top: ${pos.top}px; left: ${pos.left}px; z-index: 9999;`"
+         class="w-72 rounded-lg border border-border bg-surface shadow-lg overflow-hidden">
 
         {{-- Tabs --}}
         <div class="flex border-b border-border text-xs font-medium">
@@ -148,6 +158,7 @@
             <button type="button" @click="apply()" class="text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-md px-3 py-1.5 transition-colors">Terapkan</button>
         </div>
     </div>
+    </template>
 </div>
 
 @once
@@ -170,16 +181,23 @@
             selC: Array.isArray(cfg.c) ? cfg.c : [],
             selM: Array.isArray(cfg.m) ? cfg.m : [],
             formId: cfg.formId || 'filterForm',
+            pos: { top: 0, left: 0 },
 
             label() {
                 const n = this.selC.length + this.selM.length;
                 return n ? (n + ' POP dipilih') : 'POP / Cabang';
             },
 
-            // Buka/tutup dropdown; saat dibuka langsung muat list tab aktif.
-            toggle() {
-                this.open = !this.open;
-                if (this.open) { this.tab === 'cabang' ? this.searchC() : this.searchM(); }
+            // Buka dropdown (diteleport ke <body>, lihat komentar di blade) —
+            // posisi dihitung dari bounding rect tombol, baru muat list tab aktif.
+            openPanel(e) {
+                const panelWidth = 288; // w-72
+                const r = e.currentTarget.getBoundingClientRect();
+                let left = r.left;
+                if (left + panelWidth > window.innerWidth - 8) left = Math.max(8, window.innerWidth - panelWidth - 8);
+                this.pos = { top: Math.round(r.bottom + 4), left: Math.round(left) };
+                this.open = true;
+                this.tab === 'cabang' ? this.searchC() : this.searchM();
             },
 
             async searchC() {

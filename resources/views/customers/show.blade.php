@@ -1120,22 +1120,32 @@
                     </div>
                 </div>
 
-                {{-- RINCIAN TAGIHAN AWAL / REGISTRASI — kolom dibaca 1:1 dari tabel
-                     `invoices` (prorate_amount, extra_installation_fee, extra_cable_fee,
-                     extra_pole_fee, other_fee, discount, ppn). Tidak ada kolom
-                     formula/qty di skema, jadi keterangan cuma label deskriptif. --}}
+                {{-- RINCIAN TAGIHAN AWAL / REGISTRASI. Dulu ada kolom "Kolom di Sistem"
+                     berisi nama kolom DB (prorate_amount, extra_installation_fee, …) —
+                     bahasa teknis yang gak berarti buat CS/admin (laporan user
+                     2026-11-14). Sumber utama baris invoice_items (ADHOC-60, sama
+                     dengan Detail Tagihan — termasuk Pembelian Modem); tagihan lama
+                     tanpa baris jatuh ke kolom biaya lama dengan keterangan biasa. --}}
                 @php
                     $initialInvoice = $customer->invoices->first(fn ($inv) => $inv->invoice_type?->value === 'awal');
                 @endphp
                 @if($initialInvoice)
                     @php
-                        $initialRows = [
-                            ['label' => 'Tagihan Prorate Bulan Pertama', 'column' => 'prorate_amount — proporsional dari tanggal aktivasi sampai akhir periode', 'value' => (float) $initialInvoice->prorate_amount],
-                            ['label' => 'Jasa Instalasi & Pemasangan', 'column' => 'extra_installation_fee — default Master Paket + tambahan setting perangkat', 'value' => (float) $initialInvoice->extra_installation_fee],
-                            ['label' => 'Biaya Kabel Tambahan', 'column' => 'extra_cable_fee — kabel FO di luar jarak standar', 'value' => (float) $initialInvoice->extra_cable_fee],
-                            ['label' => 'Tambahan Tiang', 'column' => 'extra_pole_fee — tiang galvanis penambat udara', 'value' => (float) $initialInvoice->extra_pole_fee],
-                            ['label' => 'Biaya Lain-lain', 'column' => 'other_fee', 'value' => (float) $initialInvoice->other_fee],
-                        ];
+                        $initialRows = $initialInvoice->items->isNotEmpty()
+                            ? $initialInvoice->items->map(fn ($item) => [
+                                'label' => $item->subcategory_name_snapshot,
+                                'note' => $item->description ?: $item->category_name_snapshot,
+                                'value' => (float) $item->amount,
+                            ])->all()
+                            : [
+                                ['label' => 'Tagihan Prorata Bulan Pertama', 'note' => 'Proporsional dari tanggal aktivasi sampai akhir periode', 'value' => (float) $initialInvoice->prorate_amount],
+                                ['label' => 'Jasa Instalasi & Pemasangan', 'note' => 'Biaya pemasangan sesuai paket', 'value' => (float) $initialInvoice->extra_installation_fee],
+                                ['label' => 'Biaya Kabel Tambahan', 'note' => 'Kabel di luar jarak standar', 'value' => (float) $initialInvoice->extra_cable_fee],
+                                ['label' => 'Tambahan Tiang', 'note' => 'Tiang penambat tambahan', 'value' => (float) $initialInvoice->extra_pole_fee],
+                                ['label' => 'Biaya Lain-lain', 'note' => 'Materai / biaya lain', 'value' => (float) $initialInvoice->other_fee],
+                            ];
+                        $initialAfterDiscount = max(0, (float) $initialInvoice->subtotal - (float) $initialInvoice->discount);
+                        $initialPpnAmount = round($initialAfterDiscount * ((float) $initialInvoice->ppn / 100), 2);
                     @endphp
                     <div class="pt-4 border-t border-slate-200 dark:border-slate-700">
                         <div class="flex flex-wrap gap-2 items-center justify-between mb-3">
@@ -1151,7 +1161,7 @@
                                 <thead>
                                     <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
                                         <th class="px-4 py-2">Komponen Biaya Awal</th>
-                                        <th class="px-4 py-2">Kolom di Sistem</th>
+                                        <th class="px-4 py-2">Keterangan</th>
                                         <th class="px-4 py-2 text-right">Nominal Biaya</th>
                                     </tr>
                                 </thead>
@@ -1160,31 +1170,31 @@
                                         @if($row['value'] > 0)
                                             <tr>
                                                 <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100">{{ $row['label'] }}</td>
-                                                <td class="px-4 py-2 font-sans text-slate-500">{{ $row['column'] }}</td>
-                                                <td class="px-4 py-2 text-right font-bold text-slate-900 dark:text-slate-100 searchable-text">Rp {{ number_format($row['value'], 2, ',', '.') }}</td>
+                                                <td class="px-4 py-2 font-sans text-slate-500">{{ $row['note'] }}</td>
+                                                <td class="px-4 py-2 text-right font-bold text-slate-900 dark:text-slate-100 searchable-text">Rp {{ number_format($row['value'], 0, ',', '.') }}</td>
                                             </tr>
                                         @endif
                                     @endforeach
                                     <tr class="bg-slate-50/40 dark:bg-slate-900/30">
-                                        <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100">Subtotal</td>
-                                        <td class="px-4 py-2 font-sans text-slate-500">subtotal</td>
-                                        <td class="px-4 py-2 text-right font-bold text-slate-900 dark:text-slate-100 searchable-text">Rp {{ number_format((float) $initialInvoice->subtotal, 2, ',', '.') }}</td>
+                                        <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100" colspan="2">Subtotal</td>
+                                        <td class="px-4 py-2 text-right font-bold text-slate-900 dark:text-slate-100 searchable-text">Rp {{ number_format((float) $initialInvoice->subtotal, 0, ',', '.') }}</td>
                                     </tr>
+                                    @if((float) $initialInvoice->discount > 0)
                                     <tr class="text-emerald-600 dark:text-emerald-400">
-                                        <td class="px-4 py-2 font-sans font-semibold">Potongan Diskon</td>
-                                        <td class="px-4 py-2 font-sans text-slate-500">discount</td>
-                                        <td class="px-4 py-2 text-right font-bold searchable-text">- Rp {{ number_format((float) $initialInvoice->discount, 2, ',', '.') }}</td>
+                                        <td class="px-4 py-2 font-sans font-semibold" colspan="2">Potongan Diskon</td>
+                                        <td class="px-4 py-2 text-right font-bold searchable-text">- Rp {{ number_format((float) $initialInvoice->discount, 0, ',', '.') }}</td>
                                     </tr>
+                                    @endif
                                     <tr>
-                                        <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100">PPN</td>
-                                        <td class="px-4 py-2 font-sans text-slate-500">ppn</td>
+                                        {{-- invoices.ppn = PERSEN, bukan rupiah (dulu ditampilkan "Rp 11,00"). --}}
+                                        <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100" colspan="2">PPN{{ (float) $initialInvoice->ppn > 0 ? ' '.rtrim(rtrim(number_format((float) $initialInvoice->ppn, 2, ',', '.'), '0'), ',').'%' : '' }}</td>
                                         <td class="px-4 py-2 text-right {{ (float) $initialInvoice->ppn > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-sans text-slate-500 dark:text-slate-400' }} searchable-text">
-                                            {{ (float) $initialInvoice->ppn > 0 ? 'Rp '.number_format((float) $initialInvoice->ppn, 2, ',', '.') : 'Tidak dikenakan' }}
+                                            {{ (float) $initialInvoice->ppn > 0 ? 'Rp '.number_format($initialPpnAmount, 0, ',', '.') : 'Tidak dikenakan' }}
                                         </td>
                                     </tr>
                                     <tr class="bg-slate-100/60 dark:bg-slate-700/60 font-bold">
-                                        <td class="px-4 py-2 font-sans text-slate-900 dark:text-slate-100" colspan="2">TOTAL PEMBAYARAN REGISTRASI AWAL (total_amount)</td>
-                                        <td class="px-4 py-2 text-right text-sky-600 dark:text-sky-400 text-sm searchable-text">Rp {{ number_format((float) $initialInvoice->total_amount, 2, ',', '.') }}</td>
+                                        <td class="px-4 py-2 font-sans text-slate-900 dark:text-slate-100" colspan="2">TOTAL PEMBAYARAN REGISTRASI AWAL</td>
+                                        <td class="px-4 py-2 text-right text-sky-600 dark:text-sky-400 text-sm searchable-text">Rp {{ number_format((float) $initialInvoice->total_amount, 0, ',', '.') }}</td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1530,16 +1540,29 @@
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         @foreach($customer->documents->sortByDesc('created_at') as $document)
                             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex flex-col justify-between hover:border-sky-500 transition-colors shadow-sm bg-white dark:bg-slate-800">
-                                <div class="p-4 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-center h-36 border-b border-slate-200 dark:border-slate-700">
+                                {{-- Dokumen PDF (mis. FAB) dulu cuma ikon statis "PDF FILE" —
+                                     tidak bisa dipratinjau (laporan user 2026-11-14). Sekarang
+                                     thumbnail halaman pertama lewat <object> (fallback ikon kalau
+                                     browser, mis. Chrome HP, tidak bisa render PDF inline) dan klik
+                                     kartu membuka modal pratinjau (aksi view-only = modal). --}}
+                                <button type="button"
+                                        onclick="openDocumentPreview(this)"
+                                        data-url="{{ route('customers.documents.show', $document->id) }}"
+                                        data-image="{{ $document->isImage() ? '1' : '0' }}"
+                                        data-title="{{ $document->typeLabel() }}"
+                                        class="relative p-4 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-center h-36 border-b border-slate-200 dark:border-slate-700 cursor-zoom-in w-full"
+                                        title="Pratinjau {{ $document->typeLabel() }}">
                                     @if($document->isImage())
                                         <img src="{{ route('customers.documents.show', $document->id) }}" alt="{{ $document->typeLabel() }}" class="max-h-28 max-w-full rounded object-contain shadow-sm">
                                     @else
-                                        <div class="h-24 w-24 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-lg flex flex-col items-center justify-center text-rose-600 shadow-sm">
-                                            <i class="fa-solid fa-file-pdf text-3xl mb-1"></i>
-                                            <span class="text-[10px] font-bold">PDF FILE</span>
-                                        </div>
+                                        <object data="{{ route('customers.documents.show', $document->id) }}#toolbar=0&navpanes=0&view=FitH" type="application/pdf" class="w-full h-28 rounded bg-white pointer-events-none" tabindex="-1" aria-hidden="true">
+                                            <div class="h-24 w-24 mx-auto bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-lg flex flex-col items-center justify-center text-rose-600 shadow-sm">
+                                                <i class="fa-solid fa-file-pdf text-3xl mb-1"></i>
+                                                <span class="text-[10px] font-bold">PDF FILE</span>
+                                            </div>
+                                        </object>
                                     @endif
-                                </div>
+                                </button>
                                 <div class="p-3 flex items-center justify-between gap-3 text-xs">
                                     <div class="min-w-0">
                                         <span class="block text-xs font-semibold text-slate-900 dark:text-slate-100 truncate searchable-text">{{ $document->typeLabel() }}</span>
@@ -1645,6 +1668,24 @@
 <!-- MODALS SECTION -->
 
 <!-- MODAL: Document Upload Modal -->
+{{-- Modal pratinjau dokumen (gambar & PDF) — satu modal untuk semua kartu
+     di tab Dokumen & Berkas, diisi openDocumentPreview(). SENGAJA di luar
+     @if izin upload: pratinjau = izin lihat dokumen, bukan izin upload. --}}
+<div id="document-preview-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 hidden" onclick="if (event.target === this) closeDocumentPreview()">
+    <div class="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+            <h3 id="document-preview-title" class="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">Pratinjau Dokumen</h3>
+            <div class="flex items-center gap-2 shrink-0">
+                <a id="document-preview-open" href="#" target="_blank" rel="noopener" class="px-3 py-1.5 text-xs font-semibold text-sky-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">Buka di tab baru ↗</a>
+                <button type="button" onclick="closeDocumentPreview()" aria-label="Tutup" class="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+        <div id="document-preview-body" class="flex-1 min-h-0 bg-slate-100 dark:bg-slate-950 flex items-center justify-center"></div>
+    </div>
+</div>
+
 @if(auth()->user()->hasPermission('upload_customer_documents'))
 <div id="document-upload-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
@@ -1668,6 +1709,7 @@
                 <div>
                     <label for="document_file" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">File Gambar / PDF</label>
                     <input type="file" name="document_file" id="document_file" accept="image/*,application/pdf" class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" required>
+                    <x-upload-limit-hint format="Gambar / PDF" />
                 </div>
                 <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                     <button type="button" onclick="closeModal('document-upload-modal')" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>
@@ -1783,19 +1825,22 @@
         }
 
         // Aksi sendiri lewat modal Bayar Cepat.
-        document.addEventListener('payment-recorded', function (e) {
+        window.pageListen(document, 'payment-recorded', function (e) {
             if (applyCustomerInvoiceUpdate(e.detail)) {
                 e.preventDefault();
             }
         });
 
         // Aksi user lain di POP yang sama, lewat Reverb.
-        document.addEventListener('DOMContentLoaded', function () {
+        // onPageReady, bukan DOMContentLoaded: event itu cuma nyala sekali per
+        // tab — buka halaman ini lewat navigasi boost ⇒ listener tak pernah
+        // terpasang dan update realtime mati diam-diam (ADHOC-297 P4).
+        window.onPageReady(function () {
             if (typeof window.Echo === 'undefined' || !window.Echo) {
                 return;
             }
 
-            window.Echo.private('invoices.{{ $customer->pop_id }}')
+            window.pageEcho('invoices.{{ $customer->pop_id }}')
                 .listen('.InvoiceStatusUpdated', applyCustomerInvoiceUpdate);
         });
     </script>
@@ -2061,6 +2106,43 @@
     }
 
     function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
+
+    // Pratinjau dokumen pelanggan. URL datang dari data-url yang dirender
+    // server (route customers.documents.show — cek permission + POP scope),
+    // klien tidak merakit path sendiri. Elemen dibangun lewat DOM, bukan
+    // innerHTML, supaya judul dokumen tidak pernah ditafsirkan sebagai HTML.
+    function openDocumentPreview(trigger) {
+        const url = trigger.dataset.url;
+        const body = document.getElementById('document-preview-body');
+        body.replaceChildren();
+
+        if (trigger.dataset.image === '1') {
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = trigger.dataset.title;
+            img.className = 'max-h-full max-w-full object-contain';
+            body.appendChild(img);
+        } else {
+            const viewer = document.createElement('object');
+            viewer.data = url;
+            viewer.type = 'application/pdf';
+            viewer.className = 'w-full h-full';
+            const fallback = document.createElement('p');
+            fallback.className = 'p-6 text-xs text-slate-500 text-center';
+            fallback.textContent = 'Browser ini tidak bisa menampilkan PDF langsung — gunakan "Buka di tab baru".';
+            viewer.appendChild(fallback);
+            body.appendChild(viewer);
+        }
+
+        document.getElementById('document-preview-title').textContent = trigger.dataset.title;
+        document.getElementById('document-preview-open').href = url;
+        openModal('document-preview-modal');
+    }
+
+    function closeDocumentPreview() {
+        document.getElementById('document-preview-body').replaceChildren();
+        document.getElementById('document-preview-modal')?.classList.add('hidden');
+    }
     function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
 
     // Modal milik partial tab Pemasangan & Perangkat. Sebelumnya fungsi ini HANYA

@@ -18,7 +18,7 @@
                     </svg>
                 </div>
                 <div>
-                    <h1 class="text-xl font-bold text-text-main leading-tight tracking-tight font-sans">FOP Operational Command Center</h1>
+                    <h1 class="text-xl font-bold text-text-main leading-tight tracking-tight font-sans">FOP Dashboard</h1>
                     <p class="text-xs text-text-muted mt-0.5 font-sans">Monitoring terpadu modul lapangan, armada teknisi, material, & SLA · {{ now()->translatedFormat('l, d F Y') }}</p>
                 </div>
             </div>
@@ -805,14 +805,14 @@ function fopDashboardHandler() {
 
         init() {
             this.initEchoListeners();
-            window.addEventListener('dragover', (e) => this.autoScrollOnDragOver(e));
+            window.pageListen(window, 'dragover', (e) => this.autoScrollOnDragOver(e));
         },
 
         initEchoListeners() {
             const popIds = @json($pops->pluck('id'));
             const bind = () => {
                 popIds.forEach(popId => {
-                    window.Echo.private(`fop.${popId}`)
+                    window.pageEcho(`fop.${popId}`)
                         .listen('TaskStarted', () => this.refreshTaskStats())
                         .listen('TaskCompleted', () => this.refreshTaskStats())
                         .listen('SurveyStarted', () => this.refreshDashboardContainers())

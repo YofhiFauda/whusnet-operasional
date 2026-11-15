@@ -5,11 +5,42 @@ namespace App\Observers;
 use App\Exceptions\DuplicateInvoiceException;
 use App\Models\CustomerBillingWaiver;
 use App\Models\Invoice;
+use App\Notifications\AppPushNotification;
 use BackedEnum;
 use InvalidArgumentException;
 
 class InvoiceObserver
 {
+    /**
+     * Push device pelanggan (ADHOC-288 Tahap 7, event disetujui "Tagihan
+     * terbit"). `old_invoice_id` dilewati — replay data legacy (migrasi,
+     * import) bukan tagihan BARU yang perlu diberitahukan ke pelanggan.
+     */
+    public function created(Invoice $invoice): void
+    {
+        if (! empty($invoice->old_invoice_id)) {
+            return;
+        }
+
+        $customer = $invoice->customer;
+
+        if (! $customer) {
+            return;
+        }
+
+        // Mayoritas pelanggan tidak pernah mengaktifkan push — tanpa cek ini
+        // generate ~15 ribu tagihan bulanan = ~15 ribu job antrean kosong
+        // (review ADHOC-297 #7).
+        if (! $customer->pushSubscriptions()->exists()) {
+            return;
+        }
+
+        $customer->notify(new AppPushNotification(
+            'Tagihan Terbit: Rp'.number_format((float) $invoice->total_amount, 0, ',', '.'),
+            "Tagihan {$invoice->invoice_number} sudah terbit. Bayar sebelum jatuh tempo."
+        ));
+    }
+
     /**
      * Reject invoices with no invoice_type, and reject an exact-duplicate burst
      * insert (same customer, type, billing period, and amount, seconds/minutes

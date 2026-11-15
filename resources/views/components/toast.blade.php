@@ -151,48 +151,6 @@
         info(title, description, duration) { this.show('info', title, description, duration); }
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const container = window.Toast.container;
-        if (container) {
-            container.addEventListener('mouseenter', () => {
-                window.Toast.isHovered = true;
-                window.Toast.updateToasts();
-            });
-            container.addEventListener('mouseleave', () => {
-                window.Toast.isHovered = false;
-                window.Toast.updateToasts();
-            });
-        }
-
-        // Handle Laravel Session Flashes automatically
-        @if(session('success'))
-            Toast.success('Berhasil', @json(session('success')));
-        @endif
-
-        @if(session('error'))
-            Toast.error('Gagal', @json(session('error')));
-        @endif
-
-        @if(session('warning'))
-            Toast.warning('Peringatan', @json(session('warning')));
-        @endif
-
-        @if(session('info'))
-            Toast.info('Informasi', @json(session('info')));
-        @endif
-
-        @if($errors->any())
-            let errorHtml = `
-                <ul class="list-disc list-inside space-y-0.5">
-                    @foreach($errors->all() as $error)
-                        <li>{{ $error }}</li>
-                    @endforeach
-                </ul>
-            `;
-            Toast.error('Terdapat Kesalahan', errorHtml, 6000);
-        @endif
-    });
-
     // Intercept native browser HTML form validation 'invalid' events and display via Toast component.
     // `var`, BUKAN `let`: hx-preserve di atas SEHARUSNYA sudah cegah script
     // ini re-execute, tapi kalau tab browser masih pegang DOM dari SEBELUM
@@ -236,4 +194,68 @@
             el.focus({ preventScroll: false });
         } catch (err) {}
     }, true);
+</script>
+
+{{--
+    Flash session SENGAJA di script terpisah, BUKAN di #toast-script di atas.
+    hx-boost submit form = swap <body>, bukan page load: #toast-script
+    (hx-preserve) gak dieksekusi ulang — node lama yang dipertahankan, berisi
+    flash kosong dari load pertama — dan `DOMContentLoaded` gak pernah nyala
+    lagi. Dulu flash ditaruh di sana ⇒ SEMUA error/success sesudah submit
+    hilang tanpa jejak (ketauan 2026-11-11: "Serahkan Barang Sekarang"
+    ditolak server tapi layar diam). Script ini ikut ter-swap & re-execute
+    tiap nav, jadi wajib: tanpa `let`/`const` top-level (bungkus IIFE) dan
+    langsung jalan kalau dokumen sudah siap. Penjaga:
+    FlashToastHilangSetelahNavigasiBoostTest.
+--}}
+<script id="toast-flash">
+(function () {
+    function fireFlash() {
+        var container = window.Toast.container;
+        if (container && ! container.dataset.hoverBound) {
+            container.dataset.hoverBound = '1';
+            container.addEventListener('mouseenter', function () {
+                window.Toast.isHovered = true;
+                window.Toast.updateToasts();
+            });
+            container.addEventListener('mouseleave', function () {
+                window.Toast.isHovered = false;
+                window.Toast.updateToasts();
+            });
+        }
+
+        @if(session('success'))
+            window.Toast.success('Berhasil', @json(session('success')));
+        @endif
+
+        @if(session('error'))
+            window.Toast.error('Gagal', @json(session('error')));
+        @endif
+
+        @if(session('warning'))
+            window.Toast.warning('Peringatan', @json(session('warning')));
+        @endif
+
+        @if(session('info'))
+            window.Toast.info('Informasi', @json(session('info')));
+        @endif
+
+        @if($errors->any())
+            var errorHtml = `
+                <ul class="list-disc list-inside space-y-0.5">
+                    @foreach($errors->all() as $error)
+                        <li>{{ $error }}</li>
+                    @endforeach
+                </ul>
+            `;
+            window.Toast.error('Terdapat Kesalahan', errorHtml, 6000);
+        @endif
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fireFlash);
+    } else {
+        fireFlash();
+    }
+})();
 </script>

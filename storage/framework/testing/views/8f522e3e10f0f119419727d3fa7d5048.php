@@ -16,7 +16,7 @@
          class="fixed md:absolute md:right-0 md:left-auto md:w-80 left-4 right-4 top-16 md:top-auto mt-2 w-auto bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl shadow-xl z-50 overflow-hidden">
         <div class="px-4 py-3 border-b border-slate-100 dark:border-slate-700/80 flex items-center justify-between bg-slate-50/80 dark:bg-slate-900/60">
             <h3 class="text-sm font-semibold text-slate-900 dark:text-slate-100">Notifikasi</h3>
-            <button @click="markAllAsRead" x-show="unreadCount > 0" 
+            <button @click="markAllAsRead" x-show="unreadCount > 0"
                     class="text-xs text-sky-600 dark:text-sky-400 hover:text-sky-800 dark:hover:text-sky-300 font-medium hover:underline transition-colors">Tandai semua dibaca</button>
         </div>
         <div class="max-h-96 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700/60 custom-scrollbar">
@@ -73,61 +73,95 @@ function notificationDropdown() {
         // URL-nya tetap berasal dari routes/web.php. ADHOC-20 langkah 3.
         markReadUrlTemplate: '<?php echo e(route('notifications.markRead', ['id' => '__ID__'])); ?>',
         markAllReadUrl: '<?php echo e(route('notifications.markAllRead')); ?>',
-        
+
         init() {
+            // Toggle notifikasi perangkat (Web Push) ada di halaman Profil,
+            // bukan di sini lagi — lebih gampang ditemukan daripada nyelip
+            // di dropdown. Aktivasi awal ditawarkan lewat banner dismissible
+            // di layout (components/webpush-banner.blade.php). ADHOC-288.
+
             // Komponen ini mount di layout global (tiap halaman) — kalau Alpine
             // init() jalan sebelum bundle Vite selesai load echo.js, window.Echo
             // masih undefined dan listener gak pernah nempel sekali pun ke
             // channel-nya. Badge jadi keliatan realtime tapi sebenernya statis
             // (cuma reflect state saat page load), sampai reload manual. Retry
             // pattern sama kayak technicianNotifier() di tasks/own.blade.php.
-            let attempts = 0;
-            const maxAttempts = 10;
+            // Listener Echo dipasang SEKALI per dokumen (ADHOC-297 bug #1).
+            // Lonceng ini ada di header yang ikut terganti tiap navigasi
+            // `hx-boost` — tiap navigasi membuat komponen baru, sedangkan
+            // `Echo.private()` mengembalikan channel yang SAMA. Dulu tiap init()
+            // menumpuk `.notification()` baru ⇒ setelah pindah halaman N kali,
+            // satu notifikasi tampil sebagai N toast & badge naik N. Handler
+            // meneruskan ke komponen yang sedang tampil
+            // (window.__notificationDropdown); toast tetap sekali.
+            const userId = <?php echo e(auth()->id()); ?>;
+            window.__notificationDropdown = this;
+            if (window.__notificationEchoBound === userId) {
+                return;
+            }
+
+            // Flag di-set SETELAH listener benar-benar terpasang (review
+            // ADHOC-297 #3). Dulu flag di-set duluan lalu attach() menyerah
+            // setelah 10x300 ms kalau Echo lambat siap — navigasi berikutnya
+            // return lebih awal dan realtime mati sampai reload penuh.
+            // Sekarang: Echo sudah ada → pasang; belum → tunggu `echo:ready`
+            // (didispatch resources/js/echo.js), tanpa batas waktu.
+
+            const current = () => window.__notificationDropdown;
 
             const attach = () => {
-                if (typeof window.Echo !== 'undefined') {
-                    window.Echo.private('App.Models.User.' + <?php echo e(auth()->id()); ?>)
-                        .notification((notification) => {
-                            this.notifications.unshift({
+                if (window.__notificationEchoBound === userId || typeof window.Echo === 'undefined') {
+                    return;
+                }
+                window.__notificationEchoBound = userId;
+                window.Echo.private('App.Models.User.' + userId)
+                    .notification((notification) => {
+                        const dropdown = current();
+                        if (dropdown) {
+                            dropdown.notifications.unshift({
                                 id: notification.id,
                                 data: notification,
                                 created_at: new Date().toISOString(),
                                 read_at: null
                             });
-                            this.unreadCount++;
+                            dropdown.unreadCount++;
+                        }
 
-                            // Sebelumnya notif baru cuma nambah angka badge
-                            // diam-diam — gak ada yang nyadar ada kejadian baru
-                            // kalau dropdown-nya gak lagi dibuka (mis. tiket
-                            // masuk NOC, task selesai buat FOP, laporan disetujui
-                            // buat teknisi). Toast pop-up biar kelihatan LANGSUNG
-                            // tanpa harus klik lonceng dulu.
-                            if (window.Toast) {
-                                const type = notification.type || 'info';
-                                (window.Toast[type] || window.Toast.info)(notification.title, notification.message);
-                            }
-                        })
-                        // Sinkron lintas tab — mark-read di tab lain (device sama,
-                        // login sama) langsung nurunin badge di sini juga, gak
-                        // nunggu reload manual. toOthers() di controller udah
-                        // nyaring biar tab yang barusan aksi gak dapet balik
-                        // event punya sendiri (state lokalnya udah di-update
-                        // optimistically di markAsRead()/markAllAsRead()).
-                        .listen('.NotificationsMarkedRead', (e) => {
-                            this.unreadCount = e.unread_count;
-                        });
-                    return;
-                }
-
-                attempts++;
-                if (attempts < maxAttempts) {
-                    setTimeout(attach, 300);
-                } else {
-                    console.warn('[notificationDropdown] window.Echo tidak tersedia setelah 3 detik. Notifikasi real-time tidak aktif.');
-                }
+                        // Sebelumnya notif baru cuma nambah angka badge
+                        // diam-diam — gak ada yang nyadar ada kejadian baru
+                        // kalau dropdown-nya gak lagi dibuka (mis. tiket
+                        // masuk NOC, task selesai buat FOP, laporan disetujui
+                        // buat teknisi). Toast pop-up biar kelihatan LANGSUNG
+                        // tanpa harus klik lonceng dulu.
+                        if (window.Toast) {
+                            // Wajib dipanggil SEBAGAI method (`Toast[type](...)`),
+                            // bukan `(Toast[type] || Toast.info)(...)` — bentuk itu
+                            // melepas fungsinya dari objek, `this` hilang ⇒
+                            // "this.show is not a function", toast gak muncul
+                            // (browser log 2026-11-11).
+                            const type = typeof window.Toast[notification.type] === 'function' ? notification.type : 'info';
+                            window.Toast[type](notification.title, notification.message);
+                        }
+                    })
+                    // Sinkron lintas tab — mark-read di tab lain (device sama,
+                    // login sama) langsung nurunin badge di sini juga, gak
+                    // nunggu reload manual. toOthers() di controller udah
+                    // nyaring biar tab yang barusan aksi gak dapet balik
+                    // event punya sendiri (state lokalnya udah di-update
+                    // optimistically di markAsRead()/markAllAsRead()).
+                    .listen('.NotificationsMarkedRead', (e) => {
+                        const dropdown = current();
+                        if (dropdown) {
+                            dropdown.unreadCount = e.unread_count;
+                        }
+                    });
             };
 
-            attach();
+            if (typeof window.Echo !== 'undefined') {
+                attach();
+            } else {
+                window.addEventListener('echo:ready', attach, { once: true });
+            }
         },
         
         // fetch() gak otomatis nempelin header X-Socket-ID kayak axios global

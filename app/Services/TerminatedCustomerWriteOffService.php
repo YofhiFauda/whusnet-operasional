@@ -173,7 +173,7 @@ class TerminatedCustomerWriteOffService
         $notification = new AppNotification(
             title: 'Piutang Tak Tertagih: '.$customer->full_name,
             message: "{$count} tagihan senilai ".format_rupiah($total).' otomatis dihapus buku karena masa tenggang setelah putus langganan habis. Bisa dikembalikan dari List Putus Langganan.',
-            actionUrl: route('customers.terminated'),
+            actionUrl: route('customers.terminated', [], false),
             type: NotificationType::WARNING
         );
 

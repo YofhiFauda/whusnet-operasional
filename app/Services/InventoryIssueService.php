@@ -286,12 +286,17 @@ class InventoryIssueService
      * Kelompok H2). Berlaku dari SEMUA jalur masuk — jangan diduplikasi di
      * controller.
      *
-     * 1. Siapa pun gak boleh issue ke diri sendiri (§7.3) — bukan cuma PIC,
-     *    gak pernah masuk akal pengeluar = penerima.
+     * 1. Issue ke diri sendiri DITOLAK, KECUALI pelakunya `pic_gudang` yang
+     *    mengeluarkan dari gudang cabang penunjukannya sendiri (§7.3, direvisi
+     *    keputusan user 2026-11-14 "Opsi B"). Alasannya lapangan: PIC juga
+     *    teknisi yang dapat task FOP, dan menunggu POP Admin bikin barang
+     *    telat. Kontrolnya pindah dari PENCEGAHAN ke PEMANTAUAN — transaksi
+     *    self-issue (`created_by` = `to_technician_id`) muncul di Laporan
+     *    Gudang bagian "Dikeluarkan untuk Diri Sendiri"
+     *    (WarehouseReportController::buildSelfIssueRows()). Role lain tetap
+     *    ditolak: buat mereka pengeluar = penerima tidak pernah masuk akal.
      * 2. `pop_admin` di cabang yang SUDAH punya PIC aktif cuma boleh issue ke
-     *    salah satu PIC cabang itu (§7.1) — barang buat PIC lewat POP Admin,
-     *    PIC gak boleh issue ke dirinya sendiri (poin 1 di atas sudah
-     *    menutup itu).
+     *    salah satu PIC cabang itu (§7.1).
      * 3. `pic_gudang` cuma boleh issue dari gudang cabang yang jadi
      *    penunjukannya (`warehouse_pop_pics`) — PENTING buat PIC yang
      *    scope-nya `all_pop` (teknisi keliling): scope mengizinkan dia
@@ -300,11 +305,22 @@ class InventoryIssueService
      */
     private function assertIssueAllowed(Pop $cabang, User $technician, User $actor): void
     {
-        if ($actor->is($technician)) {
-            throw new InvalidArgumentException('Barang tidak bisa dikeluarkan untuk diri sendiri.');
+        $actorRoleCode = $actor->role?->code;
+
+        // Cek penunjukan PIC DULU, sebelum aturan "diri sendiri". Kalau urutannya
+        // terbalik, PIC yang belum ditunjuk ke cabang mana pun (role sudah
+        // `pic_gudang`, baris `warehouse_pop_pics` belum ada) dapat pesan
+        // "tidak bisa untuk diri sendiri" — menyesatkan, padahal masalahnya
+        // penunjukan (kejadian 2026-11-14).
+        if ($actorRoleCode === 'pic_gudang' && ! $actor->isPicGudangOf($cabang)) {
+            throw new InvalidArgumentException($actor->picGudangPops()->exists()
+                ? "Cabang {$cabang->name} bukan gudang yang Anda kelola sebagai PIC Gudang."
+                : 'Anda belum ditunjuk sebagai PIC Gudang cabang mana pun. Minta admin menunjuk Anda lewat menu Gudang › PIC Gudang.');
         }
 
-        $actorRoleCode = $actor->role?->code;
+        if ($actor->is($technician) && $actorRoleCode !== 'pic_gudang') {
+            throw new InvalidArgumentException('Barang tidak bisa dikeluarkan untuk diri sendiri.');
+        }
 
         if ($actorRoleCode === 'pop_admin' && $cabang->hasActivePicGudang()) {
             $picIds = $cabang->gudangPics()->pluck('users.id');
@@ -313,12 +329,6 @@ class InventoryIssueService
                     "Gudang {$cabang->name} sudah punya PIC Gudang — POP Admin cuma boleh keluarkan barang untuk PIC Gudang cabang ini."
                 );
             }
-        }
-
-        if ($actorRoleCode === 'pic_gudang' && ! $actor->isPicGudangOf($cabang)) {
-            throw new InvalidArgumentException(
-                "Cabang {$cabang->name} bukan gudang yang Anda kelola sebagai PIC Gudang."
-            );
         }
     }
 }

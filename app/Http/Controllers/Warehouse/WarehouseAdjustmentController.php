@@ -15,6 +15,7 @@ use App\Models\TechnicianCustody;
 use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\InventoryAdjustmentService;
+use App\Support\UploadLimit;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -201,7 +202,7 @@ class WarehouseAdjustmentController extends Controller
             'is_present' => ['required_if:tracking_type,serialized', 'nullable', 'boolean'],
             'counted_length' => ['required_if:tracking_type,roll', 'nullable', 'numeric', 'min:0'],
             'reason' => ['required', 'string', 'max:500'],
-            'evidence' => ['required', 'image', 'max:4096'],
+            'evidence' => ['required', 'image', UploadLimit::rule()],
         ]);
 
         $pop = Pop::findOrFail($validated['pop_id']);
@@ -250,7 +251,7 @@ class WarehouseAdjustmentController extends Controller
             // required_if di sini cuma UX (pesan error cepat) — penegak
             // SEBENARNYA tetap InventoryAdjustmentService::assertEvidenceIfRequired(),
             // biar request langsung ke endpoint (skip form) gak bisa lolos.
-            'evidence' => ['required_if:reason,lost,damaged', 'nullable', 'image', 'max:4096'],
+            'evidence' => ['required_if:reason,lost,damaged', 'nullable', 'image', UploadLimit::rule()],
         ]);
 
         if ((float) $validated['qty_delta'] === 0.0) {
@@ -292,7 +293,7 @@ class WarehouseAdjustmentController extends Controller
             'notes' => 'nullable|string|max:500',
             // required_if UX doang — penegak sebenarnya
             // InventoryAdjustmentService::adjustSerialStatus() sendiri.
-            'evidence' => ['required_if:new_status,lost,damaged,scrapped', 'nullable', 'image', 'max:4096'],
+            'evidence' => ['required_if:new_status,lost,damaged,scrapped', 'nullable', 'image', UploadLimit::rule()],
         ]);
 
         $evidencePath = $request->hasFile('evidence')
@@ -339,7 +340,7 @@ class WarehouseAdjustmentController extends Controller
 
         $validated = $request->validate([
             'reason' => ['required', 'string', 'max:500'],
-            'evidence' => ['required', 'image', 'max:4096'],
+            'evidence' => ['required', 'image', UploadLimit::rule()],
         ]);
 
         $evidencePath = FileUploadService::uploadWarehouseEvidence($request->file('evidence'), 'repaired');
@@ -370,7 +371,7 @@ class WarehouseAdjustmentController extends Controller
             'new_status' => ['required', Rule::in(['lost', 'damaged', 'scrapped', 'quarantine'])],
             'reason' => 'required|string|max:255',
             'notes' => 'nullable|string|max:500',
-            'evidence' => ['required_if:new_status,lost,damaged,scrapped', 'nullable', 'image', 'max:4096'],
+            'evidence' => ['required_if:new_status,lost,damaged,scrapped', 'nullable', 'image', UploadLimit::rule()],
         ]);
 
         $evidencePath = $request->hasFile('evidence')

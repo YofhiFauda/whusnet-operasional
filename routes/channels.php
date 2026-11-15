@@ -67,6 +67,26 @@ Broadcast::channel('customers.{popId}', function ($user, $popId) {
 });
 
 /**
+ * Badge sidebar Verifikasi Registrasi (App\Events\RegistrationVerificationQueueChanged).
+ * Gate sama dengan route antreannya (customer_registration_verification.view)
+ * + POP scope — BUKAN numpang customers.{popId} di atas, karena verifikator
+ * registrasi belum tentu punya customers.detail.installation.view.
+ */
+Broadcast::channel('registration-verifications.{popId}', function ($user, $popId) {
+    if (! $user->hasPermission('customer_registration_verification.view')) {
+        return false;
+    }
+
+    $access = app(EffectiveAccessService::class);
+
+    if ($access->hasAllPopAccess($user)) {
+        return true;
+    }
+
+    return in_array((int) $popId, $access->getAllowedPopIds($user), true);
+});
+
+/**
  * Perubahan baris Task FOP (App\Events\FopTaskUpdated) — dipakai /fop-tasks
  * (fop_tasks/index.blade.php), BEDA dari fop.{pop_id} di bawah (itu buat
  * /fop/dashboard, gate-nya fop.dashboard). Gate di sini fop_tasks.view biar

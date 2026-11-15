@@ -374,6 +374,7 @@
                             <input type="hidden" name="document_type" value="{{ $berkas['type'] }}">
                             <input type="file" name="document_file" required accept="image/*,application/pdf"
                                    class="w-full text-[10px] text-slate-500 dark:text-slate-400 file:mr-2 file:py-1.5 file:px-2.5 file:rounded-lg file:border-0 file:text-[10px] file:font-semibold file:bg-slate-100 dark:file:bg-slate-800 file:text-slate-700 dark:file:text-slate-200">
+                            <x-upload-limit-hint size="xs" format="Gambar / PDF" />
                             <button type="submit" class="w-full py-2 rounded-xl border border-sky-200 dark:border-sky-900/60 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 text-xs font-semibold touch-target btn-interactive transition-colors">
                                 {{ $berkas['upload_label'] }}
                             </button>
@@ -475,11 +476,13 @@
                 </button>
                 @endif
 
+                @if(auth()->user()->hasPermission('customers.isolir'))
                 <button type="button" onclick="triggerHubToggleConnection()" title="Isolir / Aktifkan Layanan"
                         class="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-slate-800 transition-colors btn-interactive touch-target">
                     <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"/></svg>
                     <span id="btn-hub-footer-toggle-text" class="text-[9px] sm:text-[10px] font-semibold leading-none">Isolir</span>
                 </button>
+                @endif
 
                 @if(auth()->user()->hasPermission('customers.deactivate'))
                 <button type="button" onclick="triggerTerminate()" title="Putus Langganan"

@@ -164,7 +164,7 @@
                     <label for="proof_file" class="block text-[10px] font-bold text-text-muted uppercase tracking-wider mb-1.5">Bukti Pembayaran (Opsional)</label>
                     <input type="file" name="proof_file" id="proof_file" accept="image/*,application/pdf"
                            class="w-full px-3 py-2 border border-border rounded-lg shadow-2xs text-xs bg-surface text-text-main file:mr-3 file:py-1 file:px-2.5 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-surface-muted file:text-text-main hover:file:bg-border transition-colors">
-                    <p class="text-[10px] text-text-muted mt-1">Kosongkan untuk mempertahankan berkas bukti lama. Format: JPG, PNG, atau PDF maksimal 2 MB.</p>
+                    <x-upload-limit-hint format="Kosongkan untuk mempertahankan berkas bukti lama. Format: JPG, PNG, atau PDF" />
                     @error('proof_file')<p class="mt-1 text-[11px] text-red-600">{{ $message }}</p>@enderror
                 </div>
 
@@ -307,7 +307,7 @@
         note.placeholder = isLainnya ? 'Jelaskan metode pembayaran (mis. OVO, Dana, GoPay)...' : 'Tuliskan catatan transaksi jika ada...';
         noteLabel.textContent = isLainnya ? 'Keterangan Metode (wajib)' : 'Catatan Pembayaran';
     }
-    document.addEventListener('DOMContentLoaded', peToggleMethodFields);
+    window.onPageReady(peToggleMethodFields);
 
     (function () {
         const useBalanceToggle = document.getElementById('use-balance-toggle');

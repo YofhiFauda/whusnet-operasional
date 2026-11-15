@@ -271,6 +271,7 @@
             <label class="{{ $labelClass }}">Foto Bukti Fisik Perangkat yang Diserahkan <span class="text-rose-500">*</span></label>
             <div class="p-4 rounded-2xl border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/40 space-y-3">
                 <input type="file" name="condition_photo" @change="handlePhoto" accept="image/*" required class="w-full text-xs file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-sky-600 file:text-white hover:file:bg-sky-700 cursor-pointer">
+                <x-upload-limit-hint />
                 <template x-if="photoPreview">
                     <div class="relative w-36 h-28 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 shadow-sm mt-2">
                         <img :src="photoPreview" alt="Preview Foto" class="w-full h-full object-cover">

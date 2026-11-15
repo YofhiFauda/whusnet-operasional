@@ -449,6 +449,17 @@
                     </div>
 
                     <div class="space-y-3 text-xs">
+                        {{-- Baris per komponen (Langganan/Prorata, Biaya Pemasangan,
+                             Pembelian Modem, dst.) — dulu cuma ada di versi cetak. --}}
+                        @if($invoice->items->isNotEmpty())
+                        <div class="border-b border-slate-200 dark:border-slate-700">
+                            @include('invoices.partials.line-items', ['invoice' => $invoice])
+                        </div>
+                        <div class="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
+                            <p class="font-semibold text-slate-900 dark:text-slate-100">Subtotal</p>
+                            <span class="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">Rp {{ number_format((float) $invoice->subtotal, 0, ',', '.') }}</span>
+                        </div>
+                        @else
                         <div class="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700">
                             <div class="space-y-0.5">
                                 <p class="font-semibold text-slate-900 dark:text-slate-100">Harga Paket Internet (Subtotal)</p>
@@ -456,6 +467,7 @@
                             </div>
                             <span class="font-mono font-bold text-slate-900 dark:text-slate-100 text-sm">Rp {{ number_format((float) $invoice->subtotal, 0, ',', '.') }}</span>
                         </div>
+                        @endif
 
                         @if((float)$invoice->discount > 0)
                         <div class="flex justify-between items-center py-2 border-b border-slate-200 dark:border-slate-700 text-emerald-600 dark:text-emerald-400">
@@ -755,7 +767,7 @@
         if (menu) menu.classList.add('hidden');
     }
 
-    document.addEventListener('click', function(e) {
+    window.pageListen(document, 'click', function(e) {
         const btn = document.getElementById('printDropdownBtn');
         const menu = document.getElementById('printDropdownMenu');
         if (menu && !menu.classList.contains('hidden') && !menu.contains(e.target) && !btn?.contains(e.target)) {

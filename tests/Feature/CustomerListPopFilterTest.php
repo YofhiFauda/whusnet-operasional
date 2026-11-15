@@ -60,6 +60,26 @@ class CustomerListPopFilterTest extends TestCase
         $res->assertDontSee('Di Cabang A Mini2');
     }
 
+    /**
+     * Regresi: panel dropdown POP/Cabang & Wilayah dulu `absolute` biasa di
+     * dalam bar filter — section pembungkusnya (_list_filters.blade.php)
+     * punya `overflow-hidden` + `x-collapse`, yang diam-diam memotong panel
+     * absolute itu sampai gak kelihatan sama sekali walau tombolnya ke-klik
+     * (dilaporkan user 2026-11-09). Fix: panel diteleport ke <body> + posisi
+     * fixed dihitung dari bounding rect tombol — pola sama kayak dropdown
+     * "Kolom". Guard ini cuma cek markup `x-teleport` masih ada, bukan
+     * perilaku visual (gak bisa diuji PHPUnit) — kalau dihapus lagi,
+     * clipping-nya balik.
+     */
+    public function test_pop_dan_wilayah_filter_panel_diteleport_ke_body(): void
+    {
+        $this->loginAsAdmin();
+
+        $res = $this->get('/customers');
+        $res->assertStatus(200);
+        $res->assertSee('x-teleport="body"', false);
+    }
+
     public function test_endpoint_mini_cascade_dari_cabang(): void
     {
         $this->loginAsAdmin();

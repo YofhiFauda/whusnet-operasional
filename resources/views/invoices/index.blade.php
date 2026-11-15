@@ -388,21 +388,24 @@
         }
 
         // Aksi sendiri lewat modal Bayar Cepat — lihat quick-payment-modal.blade.php.
-        document.addEventListener('payment-recorded', function (e) {
+        window.pageListen(document, 'payment-recorded', function (e) {
             if (applyInvoiceUpdate(e.detail)) {
                 e.preventDefault();
             }
         });
 
         // Aksi user lain di POP yang sama, lewat Reverb.
-        document.addEventListener('DOMContentLoaded', function () {
+        // onPageReady, bukan DOMContentLoaded: event itu cuma nyala sekali per
+        // tab — buka halaman ini lewat navigasi boost ⇒ listener tak pernah
+        // terpasang dan update realtime mati diam-diam (ADHOC-297 P4).
+        window.onPageReady(function () {
             if (typeof window.Echo === 'undefined' || !window.Echo) {
                 return;
             }
 
             const popIds = @json($invoices->pluck('pop_id')->unique()->values());
             popIds.forEach(function (popId) {
-                window.Echo.private('invoices.' + popId)
+                window.pageEcho('invoices.' + popId)
                     .listen('.InvoiceStatusUpdated', applyInvoiceUpdate);
             });
         });

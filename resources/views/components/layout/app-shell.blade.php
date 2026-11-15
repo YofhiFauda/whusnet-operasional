@@ -7,6 +7,9 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
+    {{-- PWA: tiap layout ber-<head> sendiri WAJIB bawa manifest. Tanpa itu "Install aplikasi" dari halaman ini bikin pintasan biasa berikon favicon (logo penuh tanpa padding), bukan ikon PWA ber-padding. Lihat auth/login.blade.php. --}}
+    <link rel="manifest" href="{{ asset('manifest.json') }}?v=2">
+    <link rel="apple-touch-icon" href="{{ asset('images/apple-touch-icon.png') }}?v=2">
     @include('partials.web-fonts')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
 </head>

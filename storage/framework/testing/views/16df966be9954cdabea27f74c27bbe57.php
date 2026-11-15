@@ -141,48 +141,6 @@
         info(title, description, duration) { this.show('info', title, description, duration); }
     };
 
-    document.addEventListener('DOMContentLoaded', () => {
-        const container = window.Toast.container;
-        if (container) {
-            container.addEventListener('mouseenter', () => {
-                window.Toast.isHovered = true;
-                window.Toast.updateToasts();
-            });
-            container.addEventListener('mouseleave', () => {
-                window.Toast.isHovered = false;
-                window.Toast.updateToasts();
-            });
-        }
-
-        // Handle Laravel Session Flashes automatically
-        <?php if(session('success')): ?>
-            Toast.success('Berhasil', <?php echo json_encode(session('success'), 15, 512) ?>);
-        <?php endif; ?>
-
-        <?php if(session('error')): ?>
-            Toast.error('Gagal', <?php echo json_encode(session('error'), 15, 512) ?>);
-        <?php endif; ?>
-
-        <?php if(session('warning')): ?>
-            Toast.warning('Peringatan', <?php echo json_encode(session('warning'), 15, 512) ?>);
-        <?php endif; ?>
-
-        <?php if(session('info')): ?>
-            Toast.info('Informasi', <?php echo json_encode(session('info'), 15, 512) ?>);
-        <?php endif; ?>
-
-        <?php if($errors->any()): ?>
-            let errorHtml = `
-                <ul class="list-disc list-inside space-y-0.5">
-                    <?php $__currentLoopData = $errors->all(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $error): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
-                        <li><?php echo e($error); ?></li>
-                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
-                </ul>
-            `;
-            Toast.error('Terdapat Kesalahan', errorHtml, 6000);
-        <?php endif; ?>
-    });
-
     // Intercept native browser HTML form validation 'invalid' events and display via Toast component.
     // `var`, BUKAN `let`: hx-preserve di atas SEHARUSNYA sudah cegah script
     // ini re-execute, tapi kalau tab browser masih pegang DOM dari SEBELUM
@@ -226,5 +184,58 @@
             el.focus({ preventScroll: false });
         } catch (err) {}
     }, true);
+</script>
+
+
+<script id="toast-flash">
+(function () {
+    function fireFlash() {
+        var container = window.Toast.container;
+        if (container && ! container.dataset.hoverBound) {
+            container.dataset.hoverBound = '1';
+            container.addEventListener('mouseenter', function () {
+                window.Toast.isHovered = true;
+                window.Toast.updateToasts();
+            });
+            container.addEventListener('mouseleave', function () {
+                window.Toast.isHovered = false;
+                window.Toast.updateToasts();
+            });
+        }
+
+        <?php if(session('success')): ?>
+            window.Toast.success('Berhasil', <?php echo json_encode(session('success'), 15, 512) ?>);
+        <?php endif; ?>
+
+        <?php if(session('error')): ?>
+            window.Toast.error('Gagal', <?php echo json_encode(session('error'), 15, 512) ?>);
+        <?php endif; ?>
+
+        <?php if(session('warning')): ?>
+            window.Toast.warning('Peringatan', <?php echo json_encode(session('warning'), 15, 512) ?>);
+        <?php endif; ?>
+
+        <?php if(session('info')): ?>
+            window.Toast.info('Informasi', <?php echo json_encode(session('info'), 15, 512) ?>);
+        <?php endif; ?>
+
+        <?php if($errors->any()): ?>
+            var errorHtml = `
+                <ul class="list-disc list-inside space-y-0.5">
+                    <?php $__currentLoopData = $errors->all(); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $error): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
+                        <li><?php echo e($error); ?></li>
+                    <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
+                </ul>
+            `;
+            window.Toast.error('Terdapat Kesalahan', errorHtml, 6000);
+        <?php endif; ?>
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', fireFlash);
+    } else {
+        fireFlash();
+    }
+})();
 </script>
 <?php /**PATH /home/yopi/whusnet/whusnet-operasional/resources/views/components/toast.blade.php ENDPATH**/ ?>

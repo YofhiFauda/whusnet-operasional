@@ -58,7 +58,7 @@ class CheckFopTaskSlaBreach extends Command
                 $user->notify(new AppNotification(
                     title: 'SLA Handling Terlewat: '.$fopTask->task_number,
                     message: "{$fopTask->tugas} — batas waktu respons/assign sudah lewat sejak {$fopTask->slaDeadline()->diffForHumans()}.",
-                    actionUrl: route('fop-tasks.index'),
+                    actionUrl: route('fop-tasks.index', [], false),
                     type: NotificationType::WARNING
                 ));
             }

@@ -92,8 +92,11 @@
 
 @section('scripts')
 <script>
-    document.addEventListener('DOMContentLoaded', function() {
-        const form = document.querySelector('form');
+    window.onPageReady(function() {
+        // Form milik halaman, BUKAN document.querySelector('form') — itu
+        // mengembalikan #logout-form di sidebar layout (muncul lebih dulu di
+        // DOM), jadi spinner submit dulu nempel ke form logout (ADHOC-297 P3).
+        const form = document.querySelector('#main-content form');
         if (form) {
             form.addEventListener('submit', function() {
                 const submitBtn = this.querySelector('button[type="submit"]');

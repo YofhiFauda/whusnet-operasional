@@ -1,8 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'List Pelanggan Bisnis - Whusnet Operasional')
+@section('title', 'List Pelanggan Bisnis')
 @section('page_title', 'List Pelanggan Bisnis')
-@section('breadcrumb_parent', 'Busdev')
 @section('breadcrumb_parent_url', route('business-development.business-customers.index'))
 
 @section('content')

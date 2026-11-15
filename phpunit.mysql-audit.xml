@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
+         bootstrap="vendor/autoload.php"
+         colors="true"
+>
+    <testsuites>
+        <testsuite name="Unit">
+            <directory>tests/Unit</directory>
+        </testsuite>
+        <testsuite name="Feature">
+            <directory>tests/Feature</directory>
+        </testsuite>
+    </testsuites>
+    <source>
+        <include>
+            <directory>app</directory>
+        </include>
+    </source>
+    <php>
+        <ini name="memory_limit" value="1024M"/>
+        <env name="APP_ENV" value="testing" force="true"/>
+        <env name="APP_TIMEZONE" value="Asia/Jakarta"/>
+        <env name="APP_LOCALE" value="id"/>
+        <env name="APP_FALLBACK_LOCALE" value="id"/>
+        <env name="APP_FAKER_LOCALE" value="id_ID"/>
+        <env name="APP_MAINTENANCE_DRIVER" value="file"/>
+        <env name="BCRYPT_ROUNDS" value="4"/>
+        <!--
+            force="true" WAJIB untuk semua koneksi yang keluar dari proses test.
+            Tanpa itu, env var level-OS dari docker-compose menang: `app` kini
+            menyetel QUEUE_CONNECTION=redis, sehingga test yang seharusnya
+            `sync` justru mendorong job ke Redis ASLI. Horizon lalu menjalankan
+            job berisi model yang di-serialize dengan koneksi `sqlite` test —
+            576 job gagal dengan SQLiteDatabaseDoesNotExistException sebelum ini
+            diperbaiki. Alasannya sama persis dengan catatan DB_* di
+            docker-compose.yml.
+        -->
+
+        <!-- <env name="DB_CONNECTION" value="mysql" force="true"/>
+        <env name="DB_HOST" value="db" force="true"/>
+        <env name="DB_PORT" value="3306" force="true"/>
+        <env name="DB_DATABASE" value="whusnet_operasional_testing" force="true"/>
+        <env name="DB_USERNAME" value="root" force="true"/>
+        <env name="DB_PASSWORD" value="root" force="true"/> -->
+
+
+        <env name="BROADCAST_CONNECTION" value="null" force="true"/>
+        <env name="CACHE_STORE" value="array" force="true"/>
+  <!-- DIGUNAKAN HANYA UNTUK PENGUJIAN VIA SQLITE -->
+        <env name="DB_CONNECTION" value="mysql" force="true"/><env name="DB_HOST" value="db" force="true"/><env name="DB_PORT" value="3306" force="true"/><env name="DB_USERNAME" value="root" force="true"/>
+        <env name="DB_DATABASE" value="whusnet_audit_migrasi" force="true"/>
+
+
+        <env name="DB_URL" value=""/>
+        <env name="MAIL_MAILER" value="array" force="true"/>
+        <env name="QUEUE_CONNECTION" value="sync" force="true"/>
+        <env name="SESSION_DRIVER" value="array" force="true"/>
+        <env name="VIEW_COMPILED_PATH" value="storage/framework/testing/views"/>
+        <env name="PULSE_ENABLED" value="false"/>
+        <env name="TELESCOPE_ENABLED" value="false"/>
+        <env name="NIGHTWATCH_ENABLED" value="false"/>
+    </php>
+</phpunit>

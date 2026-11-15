@@ -19,6 +19,7 @@ use App\Models\Village;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 use Tests\TestCase;
 
 /**
@@ -129,10 +130,30 @@ class CollectorWorksheetTest extends TestCase
             'invoice_status' => 'belum_dibayar',
         ]);
 
+        $otherPop = $this->createPop('HUB-OUT');
+        $otherCustomer = $this->createCustomer($otherPop, 'C-HUB-OUT', $kolektor->id);
+        $otherService = $service->replicate();
+        $otherService->customer_id = $otherCustomer->id;
+        $otherService->save();
+        $otherInvoice = Invoice::query()->where('invoice_number', 'INV-HUB-001')->firstOrFail()->replicate();
+        $otherInvoice->invoice_number = 'INV-HUB-OUT';
+        $otherInvoice->customer_id = $otherCustomer->id;
+        $otherInvoice->customer_service_id = $otherService->id;
+        $otherInvoice->pop_id = $otherPop->id;
+        $otherInvoice->save();
+        DB::enableQueryLog();
         $response = $this->actingAs($admin)->get(route('collector-worksheet.index'));
 
+        $ledgerQueries = collect(DB::getQueryLog())
+            ->pluck('query')
+            ->filter(fn (string $query) => str_contains($query, 'remaining_amount') && str_contains($query, 'collector_id'));
+        DB::disableQueryLog();
+
+        $this->assertCount(1, $ledgerQueries);
+        $this->assertStringContainsString('join', strtolower($ledgerQueries->first()));
         $response->assertOk();
         $response->assertSee('Budi Kolektor');
+        $this->assertEquals(150000.0, $response->viewData('collectors')->firstWhere('id', $kolektor->id)->unpaid_total);
         $response->assertSee('150.000'); // total tunggakan tampil
     }
 

@@ -2,7 +2,6 @@
 
 @section('title', 'Edit Pelanggan - Whusnet Operasional')
 @section('page_title', 'Edit Data Pelanggan')
-@section('breadcrumb_parent', 'Pelanggan')
 @section('breadcrumb_parent_url', '/customers')
 
 @section('content')
@@ -370,7 +369,7 @@
                                         <x-ui.icon name="house" class="w-4 h-4" />
                                     </div>
                                     <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO RUMAH</span>
-                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Format: JPG, PNG (Max 2MB)</span>
+                                    <x-upload-limit-hint size="xs" format="Format: JPG, PNG" />
                                 </div>
 
                                 <div id="preview-container-foto_rumah" style="display: {{ $fotoRumahUrl ? '' : 'none' }};" class="py-2 flex flex-col items-center justify-center">
@@ -417,7 +416,7 @@
                                         <x-ui.icon name="file-text" class="w-4 h-4" />
                                     </div>
                                     <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO KONTRAK</span>
-                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Format: JPG, PNG, PDF (Max 2MB)</span>
+                                    <x-upload-limit-hint size="xs" format="Format: JPG, PNG, PDF" />
                                 </div>
 
                                 <div id="preview-container-foto_kontrak" style="display: {{ $fotoKontrakUrl ? '' : 'none' }};" class="py-2 flex flex-col items-center justify-center">
@@ -1016,7 +1015,7 @@
         filterChildOptions(distributionSelect, 'miniPopId', miniPopSelect.value);
     }
 
-    document.addEventListener("DOMContentLoaded", function() {
+    window.onPageReady(function() {
         syncNetworkDropdowns();
         document.getElementById('pop_id')?.addEventListener('change', syncNetworkDropdowns);
         document.getElementById('mini_pop_id')?.addEventListener('change', syncNetworkDropdowns);

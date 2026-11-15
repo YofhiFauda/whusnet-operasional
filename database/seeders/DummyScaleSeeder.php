@@ -126,6 +126,7 @@ class DummyScaleSeeder extends Seeder
         $roles = DB::table('roles')->pluck('id', 'code');
         $nodeTypes = DB::table('network_node_types')->pluck('id', 'code');
         $items = DB::table('items')->get()->keyBy('code');
+        $adminId = DB::table('users')->orderBy('id')->value('id');
 
         $needed = ['teknisi', 'kolektor', 'pic_gudang', 'sales', 'business_development'];
         $villages = DB::table('villages')
@@ -133,7 +134,7 @@ class DummyScaleSeeder extends Seeder
             ->where('districts.city_id', 1)
             ->get(['villages.id', 'villages.name', 'villages.district_id', 'districts.name as district_name']);
 
-        if ($cabang->isEmpty() || ! $pusat || $packages->isEmpty() || $businessPackages->isEmpty() || $villages->isEmpty() || $items->isEmpty()
+        if ($cabang->isEmpty() || ! $pusat || $packages->isEmpty() || $businessPackages->isEmpty() || $villages->isEmpty() || $items->isEmpty() || ! $adminId
             || collect($needed)->contains(fn ($code) => ! $roles->has($code))
             || collect(['olt_chassis', 'olt_slot', 'olt_pon', 'odp', 'switch_mini_pop'])->contains(fn ($c) => ! $nodeTypes->has($c))) {
             $this->command?->error('Master dasar belum lengkap — jalankan php artisan db:seed (+ MasterPopSeeder) dulu.');
@@ -161,7 +162,7 @@ class DummyScaleSeeder extends Seeder
             return false;
         }
 
-        $this->ref = compact('pusat', 'packages', 'businessPackages', 'roles', 'nodeTypes', 'items', 'villages', 'branches')
+        $this->ref = compact('pusat', 'packages', 'businessPackages', 'roles', 'nodeTypes', 'items', 'villages', 'branches', 'adminId')
             + ['revenue' => $this->loadRevenue()];
 
         $now = Carbon::now('Asia/Jakarta');
@@ -368,7 +369,7 @@ class DummyScaleSeeder extends Seeder
                 'lot_no' => null, 'serial_id' => null, 'roll_id' => null, 'qty' => 1, 'unit_price_snapshot' => null,
                 'from_pop_id' => null, 'from_network_node_id' => null, 'to_pop_id' => null, 'to_network_node_id' => null,
                 'from_technician_id' => null, 'to_technician_id' => null, 'fop_task_id' => null, 'reason' => null,
-                'notes' => '[DUMMY]', 'evidence_file_path' => null, 'resulting_status' => null, 'created_by' => 1,
+                'notes' => '[DUMMY]', 'evidence_file_path' => null, 'resulting_status' => null, 'created_by' => $this->ref['adminId'],
                 'created_at' => now()->subDays(mt_rand(10, 180)), 'updated_at' => now(),
             ], $o);
         };
@@ -488,8 +489,8 @@ class DummyScaleSeeder extends Seeder
                 $created = now()->subDays(mt_rand(5, 120));
                 $transfers[] = [
                     'id' => $tid, 'reference_number' => sprintf('DMYTRF-%d-%02d', $branch['pop']->id, $n), 'from_pop_id' => $pusat,
-                    'to_pop_id' => $branch['pop']->id, 'status' => $status, 'created_by' => 1,
-                    'received_by' => $status === 'in_transit' ? null : ($this->ref['staff'][$b]['pic_gudang'][0] ?? 1),
+                    'to_pop_id' => $branch['pop']->id, 'status' => $status, 'created_by' => $this->ref['adminId'],
+                    'received_by' => $status === 'in_transit' ? null : ($this->ref['staff'][$b]['pic_gudang'][0] ?? $this->ref['adminId']),
                     'received_at' => $status === 'in_transit' ? null : $created->copy()->addDays(2), 'created_at' => $created, 'updated_at' => now(),
                 ];
                 foreach ($items->filter(fn ($i) => $i->tracking_type === 'quantity')->random(4) as $item) {
@@ -717,7 +718,7 @@ class DummyScaleSeeder extends Seeder
                         'inventory_transfer_id' => null, 'item_id' => $ontItem->id, 'lot_no' => null, 'serial_id' => $sid, 'roll_id' => null, 'qty' => 1,
                         'unit_price_snapshot' => 350000, 'from_pop_id' => null, 'from_network_node_id' => null, 'to_pop_id' => null, 'to_network_node_id' => null,
                         'from_technician_id' => $techId, 'to_technician_id' => null, 'fop_task_id' => null, 'reason' => "Pemasangan pelanggan {$code}",
-                        'notes' => '[DUMMY]', 'evidence_file_path' => null, 'resulting_status' => 'installed', 'created_by' => $techId ?? 1,
+                        'notes' => '[DUMMY]', 'evidence_file_path' => null, 'resulting_status' => 'installed', 'created_by' => $techId ?? $this->ref['adminId'],
                         'created_at' => $activation->copy()->setTime(10, 0), 'updated_at' => now(),
                     ];
                 }
@@ -741,7 +742,7 @@ class DummyScaleSeeder extends Seeder
                     'agent_code' => $agentId ? array_search($agentId, $this->ref['agents'], true) : null,
                     'referral_customer_code' => $referrer['code'] ?? null, 'sales_user_id' => $salesUserId, 'agent_id' => $agentId, 'referral_customer_id' => $referrer['id'] ?? null, 'foto_kontrak' => null,
                     'ont_sn' => $ontSerial, 'odp_code' => $odp['code'] ?? null, 'olt_code' => $odp['olt'] ?? null, 'vlan_id' => isset($odp['vlan']) ? (string) $odp['vlan'] : null,
-                    'created_at' => $registeredAt, 'updated_at' => now(), 'created_by' => 1, 'updated_by' => null,
+                    'created_at' => $registeredAt, 'updated_at' => now(), 'created_by' => $this->ref['adminId'], 'updated_by' => null,
                 ];
 
                 $rows['customer_addresses'][] = [
@@ -821,16 +822,16 @@ class DummyScaleSeeder extends Seeder
                 }
 
                 if ($installed) {
-                    $rows['customer_status_logs'][] = ['customer_id' => $customerId, 'from_status' => 'verification_admin', 'to_status' => 'active', 'changed_by' => 1, 'note' => 'Dummy seed', 'created_at' => $activation];
+                    $rows['customer_status_logs'][] = ['customer_id' => $customerId, 'from_status' => 'verification_admin', 'to_status' => 'active', 'changed_by' => $this->ref['adminId'], 'note' => 'Dummy seed', 'created_at' => $activation];
                     if ($terminatedAt) {
-                        $rows['customer_status_logs'][] = ['customer_id' => $customerId, 'from_status' => 'active', 'to_status' => 'terminated', 'changed_by' => 1, 'note' => 'Dummy seed', 'created_at' => $terminatedAt];
+                        $rows['customer_status_logs'][] = ['customer_id' => $customerId, 'from_status' => 'active', 'to_status' => 'terminated', 'changed_by' => $this->ref['adminId'], 'note' => 'Dummy seed', 'created_at' => $terminatedAt];
                     }
                 }
 
                 if ($odp && $portNo) {
                     $rows['network_port_assignments'][] = [
                         'id' => $ids['network_port_assignments']++, 'network_node_port_id' => $odp['first_port'] + $portNo - 1, 'customer_id' => $customerId, 'target_node_id' => null,
-                        'manual_label' => null, 'active_key' => 1, 'assigned_by' => 1, 'released_by' => null, 'assigned_at' => $activation, 'released_at' => null,
+                        'manual_label' => null, 'active_key' => 1, 'assigned_by' => $this->ref['adminId'], 'released_by' => null, 'assigned_at' => $activation, 'released_at' => null,
                         'created_at' => $activation, 'updated_at' => now(), 'release_note' => null, 'target_port_id' => null,
                     ];
                     $rows['ports_used'][] = $odp['first_port'] + $portNo - 1;

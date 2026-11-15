@@ -75,6 +75,8 @@ use App\Http\Controllers\PaymentController;
 use App\Http\Controllers\PaymentReceiptController;
 use App\Http\Controllers\PaymentReportController;
 use App\Http\Controllers\ProfileController;
+use App\Http\Controllers\PushDeliveryAckController;
+use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\QrAttendanceController;
 use App\Http\Controllers\QrInAppScanController;
 use App\Http\Controllers\QrScanController;
@@ -125,6 +127,7 @@ use App\Http\Controllers\Warehouse\WarehouseSwitchPopController;
 use App\Http\Controllers\Warehouse\WarehouseTraceabilityController;
 use App\Http\Controllers\Warehouse\WarehouseTransferController;
 use App\Http\Controllers\Warehouse\WarehouseUsageController;
+use App\Http\Controllers\WebPushDashboardController;
 use App\Models\City;
 use App\Models\District;
 use App\Models\Pop;
@@ -193,10 +196,32 @@ Route::middleware('auth')->group(function () {
     });
 });
 
+// Ack delivery Web Push (ADHOC-288, Tahap 6) — dipanggil sw.js, DI LUAR auth
+// (Service Worker gak punya sesi login). Dilindungi signed URL + throttle,
+// bukan middleware auth.
+Route::middleware('throttle:qr-public')->group(function () {
+    Route::get('/webpush/ack/{delivery}', PushDeliveryAckController::class)
+        ->middleware('signed')
+        ->name('webpush.ack');
+});
+
 // Authenticated Admin Routes
 Route::middleware('auth')->group(function () {
     Route::post('/logout', [LoginController::class, 'logout'])->name('logout');
     Route::get('/', [DashboardController::class, 'index'])->name('dashboard');
+
+    // Web Push (ADHOC-288, docs/plan/notifications/rancangan-arsitektur-web-push-pwa-nextjs.md §5A)
+    Route::get('/webpush/vapid-public-key', [PushSubscriptionController::class, 'vapidPublicKey'])->name('webpush.vapid-key');
+    Route::post('/webpush/subscribe', [PushSubscriptionController::class, 'subscribe'])->name('webpush.subscribe');
+    Route::post('/webpush/unsubscribe', [PushSubscriptionController::class, 'unsubscribe'])->name('webpush.unsubscribe');
+    Route::get('/webpush/subscriptions', [PushSubscriptionController::class, 'subscriptions'])->name('webpush.subscriptions');
+    Route::post('/webpush/test', [PushSubscriptionController::class, 'sendTest'])->name('webpush.test');
+
+    // Dashboard delivery rate per merek HP/OS (ADHOC-288 Tahap 8, ditunda
+    // dari Tahap 6 item 4) — static route, sebelum bagian dynamic lain.
+    Route::middleware('permission:webpush_dashboard.view')->group(function () {
+        Route::get('/webpush/dashboard', [WebPushDashboardController::class, 'index'])->name('webpush.dashboard');
+    });
 
     Route::get('/panduan', [ManualBookController::class, 'index'])->name('manuals.index');
     Route::get('/panduan/konteks', [ManualBookController::class, 'context'])->name('manuals.context');
@@ -315,6 +340,12 @@ Route::middleware('auth')->group(function () {
         Route::get('/customers/{customer}/edit', [CustomerController::class, 'edit'])->name('customers.edit');
         Route::put('/customers/{customer}', [CustomerController::class, 'update'])->name('customers.update');
         Route::delete('/customers/{customer}', [CustomerController::class, 'destroy'])->name('customers.destroy');
+    });
+
+    // Isolir/aktivasi-kembali layanan — permission SENDIRI (customers.isolir),
+    // BUKAN numpang customers.update lagi. Sebelumnya role yang cuma bisa
+    // edit field pelanggan biasa (Sales) otomatis bisa isolir juga.
+    Route::middleware('permission:customers.isolir')->group(function () {
         Route::post('/customers/{customer}/toggle-suspend', [CustomerController::class, 'toggleSuspend'])->name('customers.toggle-suspend');
     });
 
@@ -361,6 +392,10 @@ Route::middleware('auth')->group(function () {
     });
     Route::middleware('permission:customers.qr.print')->group(function () {
         Route::get('/customers/{customer}/qr/cetak', [CustomerQrController::class, 'print'])->name('customers.qr.print');
+        // "Cetak QR" — stiker tempel modem: QR + CID saja, NOL PIN/Login ID
+        // (stiker ini terpajang di rumah pelanggan, siapa pun bisa lihat).
+        // Beda dari `customers.qr.print` di atas yang dikirim ke pelanggan.
+        Route::get('/customers/{customer}/qr/cetak-label', [CustomerQrController::class, 'printLabel'])->name('customers.qr.print-label');
     });
     Route::middleware('permission:customers.qr.create')->group(function () {
         // Terbitkan QR + PIN BARENG (koreksi 2026-08-26, §6.5.3) — aman
@@ -1473,6 +1508,7 @@ Route::middleware('auth')->group(function () {
         Route::get('/fop-tasks/technicians-availability', [FopTaskController::class, 'techniciansAvailability'])->name('fop-tasks.technicians-availability');
         Route::get('/fop-tasks/infrastructure-scope-options', [InfrastructureLocationOptionsController::class, 'scopeOptions'])->name('fop-tasks.infrastructure-scope-options');
         Route::get('/fop-tasks/{fop_task}/row', [FopTaskController::class, 'row'])->name('fop-tasks.row');
+        Route::get('/fop-tasks/{fop_task}/available-teams', [FopTaskController::class, 'availableTeams'])->name('fop-tasks.available-teams');
     });
     Route::middleware('permission:fop_tasks.create')->group(function () {
         Route::post('/fop-tasks', [FopTaskController::class, 'store'])->name('fop-tasks.store');
@@ -1539,6 +1575,9 @@ Route::middleware('auth')->group(function () {
     // di atas) — dua aksi independen yang wajar dipisah PIC-nya.
     Route::middleware('permission:customer_registration_verification.view')->group(function () {
         Route::get('/customer-registration-verifications', [CustomerRegistrationVerificationController::class, 'index'])->name('customer-registration-verifications.index');
+        // Angka badge sidebar, diambil ulang klien tiap RegistrationVerificationQueueChanged
+        // masuk. Statis — wajib di atas {customer}.
+        Route::get('/customer-registration-verifications/badge-count', [CustomerRegistrationVerificationController::class, 'badgeCount'])->name('customer-registration-verifications.badge-count');
         Route::get('/customer-registration-verifications/{customer}', [CustomerRegistrationVerificationController::class, 'show'])->name('customer-registration-verifications.show');
     });
     Route::middleware('permission:customer_registration_verification.approve')->group(function () {

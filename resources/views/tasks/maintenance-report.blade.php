@@ -325,7 +325,7 @@
                 </div>
             </div>
 
-            {{-- ── Section 2b-2: Ganti Perangkat Tambahan (AP/STB, Opsional) ── --}}
+            {{-- ── Section 2b-2: Ganti Perangkat Tambahan (Opsional) ── --}}
             @include('tasks.partials.extra-device-replacement')
 
             {{-- ── Section 2d: Pasang/Ganti Infrastruktur (O-REQ/INFR REQ) ──
@@ -541,7 +541,7 @@
                             </div>
                             <div>
                                 <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO HASIL OPM <span class="font-normal normal-case text-slate-500 dark:text-slate-400">(opsional)</span></span>
-                                <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Gunakan tag lokasi · Maks 2MB</span>
+                                <x-upload-limit-hint size="xs" format="Gunakan tag lokasi" />
                             </div>
                         </div>
 
@@ -576,7 +576,7 @@
                             </div>
                             <div>
                                 <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO HASIL SPEEDTEST <span class="font-normal normal-case text-slate-500 dark:text-slate-400">(opsional)</span></span>
-                                <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Screenshot Speedtest · Maks 2MB</span>
+                                <x-upload-limit-hint size="xs" format="Screenshot Speedtest" />
                             </div>
                         </div>
 
@@ -729,7 +729,7 @@ function mtnToggleBillable() {
     if (note) note.required = checkbox.checked;
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+window.onPageReady(function () {
     mtnToggleBillable();
 });
 
@@ -776,7 +776,7 @@ function creqToggleBillable() {
     if (note) note.required = checkbox.checked;
 }
 
-document.addEventListener('DOMContentLoaded', function () {
+window.onPageReady(function () {
     creqToggleFields();
     creqToggleBillable();
 });

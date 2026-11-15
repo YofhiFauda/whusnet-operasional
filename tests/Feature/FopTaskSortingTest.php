@@ -3,6 +3,7 @@
 namespace Tests\Feature;
 
 use App\Enums\FopTaskPriority;
+use App\Enums\ScopeType;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\City;
@@ -12,7 +13,10 @@ use App\Models\FopTask;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
+use App\Models\UserRoleScope;
+use App\Models\UserRoleScopeTarget;
 use App\Models\Village;
+use App\Services\EffectiveAccessService;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -20,6 +24,7 @@ use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Event;
 use Tests\TestCase;
 
 class FopTaskSortingTest extends TestCase
@@ -293,6 +298,57 @@ class FopTaskSortingTest extends TestCase
         }
     }
 
+    public function test_switch_target_payload_tidak_membocorkan_task_pop_lain(): void
+    {
+        $allowedPop = Pop::create([
+            'name' => 'Cabang Terpilih',
+            'code' => 'POP-SEL',
+            'type' => 'cabang',
+            'address' => 'Cabang Terpilih',
+            'status' => 'active',
+            'city_id' => $this->pop->city_id,
+        ]);
+
+        $allowedTask = $this->makeFopTask(['pop_id' => $allowedPop->id]);
+        $outsideTask = $this->makeFopTask();
+
+        $scope = UserRoleScope::where('user_id', $this->fopUser->id)->firstOrFail();
+        $scope->update(['scope_type' => ScopeType::SELECTED_POP]);
+        UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $allowedPop->id]);
+        app(EffectiveAccessService::class)->clearCache($this->fopUser);
+
+        $targets = $this->actingAs($this->fopUser)
+            ->get(route('fop-tasks.index'))
+            ->assertOk()
+            ->viewData('switchTargetTasks');
+
+        $this->assertContains($allowedTask->id, $targets->pluck('id')->all());
+        $this->assertNotContains($outsideTask->id, $targets->pluck('id')->all());
+    }
+
+    public function test_switch_target_payload_memuat_semua_task_aktif_tanpa_hidrasi_task_tambahan(): void
+    {
+        $technician = User::factory()->create([
+            'role_id' => Role::where('code', 'teknisi')->value('id'),
+            'status' => 'active',
+        ]);
+
+        $tasks = collect(range(1, 25))->map(fn () => $this->makeFopTask());
+        $tasks->first()->technicians()->sync([$technician->id]);
+
+        $retrievedTasks = 0;
+        Event::listen('eloquent.retrieved: '.FopTask::class, function () use (&$retrievedTasks): void {
+            $retrievedTasks++;
+        });
+
+        $response = $this->actingAs($this->fopUser)->get(route('fop-tasks.index'))->assertOk();
+        $targets = $response->viewData('switchTargetTasks');
+
+        $this->assertCount(25, $targets);
+        $this->assertSame([$technician->id], $targets->firstWhere('id', $tasks->first()->id)['technician_ids']);
+        $this->assertLessThanOrEqual(25, $retrievedTasks);
+    }
+
     /**
      * Regresi ANALISA_REDUNDANSI_LOGIC.md §1: dedupe guard auto-sync survey
      * (FopTaskController::autoSyncAndCalculatePriority(), sebelumnya
@@ -332,6 +388,46 @@ class FopTaskSortingTest extends TestCase
 
         $this->assertEquals(1, $surveyTaskCount, 'Auto-sync gak boleh bikin FopTask survey duplikat buat customer yg udah punya task aktif.');
         $this->assertTrue(FopTask::where('id', $existingSurveyTask->id)->exists());
+    }
+
+    public function test_auto_sync_memperbarui_prioritas_banyak_task_dalam_satu_query(): void
+    {
+        $taskIds = [];
+
+        foreach (range(1, 5) as $number) {
+            $customer = Customer::create([
+                'customer_code' => 'C00RQ1'.str_pad((string) $number, 5, '0', STR_PAD_LEFT),
+                'full_name' => 'Pelanggan SLA '.$number,
+                'primary_phone' => '081200001'.str_pad((string) $number, 3, '0', STR_PAD_LEFT),
+                'registration_date' => now()->subDays(2),
+                'village_id' => $this->village->id,
+                'pop_id' => $this->pop->id,
+                'status' => 'waiting_survey',
+            ]);
+
+            DB::table('customers')->where('id', $customer->id)->update(['created_at' => now()->subDays(2)]);
+            $taskIds[] = $this->makeFopTask([
+                'category' => TaskType::SURVEY->value,
+                'status' => TaskStatus::DRAFT->value,
+                'priority' => 'low',
+                'customer_id' => $customer->id,
+            ])->id;
+        }
+
+        $updates = [];
+        DB::listen(function ($query) use (&$updates): void {
+            if (str_starts_with(strtolower(trim($query->sql)), 'update') && str_contains($query->sql, 'fop_tasks')) {
+                $updates[] = $query->sql;
+            }
+        });
+
+        $this->actingAs($this->fopUser)->get(route('fop-tasks.index'))->assertOk();
+
+        $this->assertCount(1, $updates);
+        $this->assertSame(5, FopTask::whereKey($taskIds)->where('priority', FopTaskPriority::URGENT->value)->count());
+
+        $this->actingAs($this->fopUser)->get(route('fop-tasks.index'))->assertOk();
+        $this->assertCount(1, $updates);
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Observers;
 
 use App\Enums\WorkflowTransition;
 use App\Events\CustomerVerificationStatusChanged;
+use App\Events\RegistrationVerificationQueueChanged;
 use App\Exceptions\CustomerRelocationBlockedException;
 use App\Models\Customer;
 use App\Models\CustomerAcquisition;
@@ -101,8 +102,24 @@ class CustomerObserver
      * (CustomerVerificationController::finalVerify, CustomerInstallationController)
      * — lihat CustomerVerificationStatusChanged.
      */
+    public function created(Customer $customer): void
+    {
+        if ($customer->status === WorkflowTransition::REGISTERED->value) {
+            $this->broadcastRegistrationQueue($customer->pop_id);
+        }
+    }
+
+    public function deleted(Customer $customer): void
+    {
+        if ($customer->status === WorkflowTransition::REGISTERED->value) {
+            $this->broadcastRegistrationQueue($customer->pop_id);
+        }
+    }
+
     public function updated(Customer $customer): void
     {
+        $this->broadcastRegistrationQueueIfAffected($customer);
+
         if ($customer->wasChanged('status')) {
             CustomerVerificationStatusChanged::dispatch($customer);
 
@@ -180,6 +197,38 @@ class CustomerObserver
             // dengan sendirinya (GenerateMonthlyInvoicesCommand memakai
             // pop_id pelanggan). Aturan lengkap: CustomerRelocationService.
             CustomerRelocationService::moveCurrentInvoices($customer, (int) $customer->pop_id);
+        }
+    }
+
+    /**
+     * Badge Verifikasi Registrasi berubah kalau pelanggan masuk/keluar status
+     * `registered`, atau pindah POP selagi `registered` (antrean POP lama
+     * berkurang, POP baru bertambah — dua-duanya diberi tahu). Perubahan lain
+     * pada pelanggan yang tetap `registered` (edit data diri/paket) tidak
+     * mengubah angka, jadi tidak di-broadcast.
+     */
+    private function broadcastRegistrationQueueIfAffected(Customer $customer): void
+    {
+        $registered = WorkflowTransition::REGISTERED->value;
+        $wasRegistered = $customer->getOriginal('status') === $registered;
+        $isRegistered = $customer->status === $registered;
+
+        if (! $wasRegistered && ! $isRegistered) {
+            return;
+        }
+
+        if ($customer->wasChanged('status') || $customer->wasChanged('pop_id')) {
+            $this->broadcastRegistrationQueue($customer->getOriginal('pop_id'));
+            if ((int) $customer->getOriginal('pop_id') !== (int) $customer->pop_id) {
+                $this->broadcastRegistrationQueue($customer->pop_id);
+            }
+        }
+    }
+
+    private function broadcastRegistrationQueue(mixed $popId): void
+    {
+        if ($popId !== null) {
+            RegistrationVerificationQueueChanged::dispatch((int) $popId);
         }
     }
 

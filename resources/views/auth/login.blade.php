@@ -10,6 +10,9 @@
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
+    {{-- PWA: halaman login WAJIB punya manifest juga. Setelah data situs dihapus user selalu mendarat di sini; tanpa manifest, "Install aplikasi" dari halaman ini bikin pintasan biasa berikon favicon (logo penuh tanpa padding), bukan ikon PWA. --}}
+    <link rel="manifest" href="{{ asset('manifest.json') }}?v=2">
+    <link rel="apple-touch-icon" href="{{ asset('images/apple-touch-icon.png') }}?v=2">
 
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>

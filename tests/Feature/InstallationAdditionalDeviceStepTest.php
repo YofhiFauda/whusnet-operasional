@@ -33,9 +33,9 @@ use Tests\TestCase;
 
 /**
  * ADHOC-190 task 4 — langkah "Perangkat Tambahan" di Laporan Pemasangan:
- * teknisi memberi keputusan per SN perangkat tambahan di custody tim
- * (terpasang / kembali_gudang / rusak / hilang), dengan jalur kekurangan +
- * alasan wajib sebagai pengecualian (spec §4.2).
+ * teknisi memilih SN dari custody tim yang dipasang ke pelanggan (sejak
+ * 2026-11-14 tanpa dropdown Status, dan semua perangkat ber-SN — bukan cuma
+ * AP/STB), dengan jalur kekurangan + alasan wajib sebagai pengecualian (spec §4.2).
  */
 class InstallationAdditionalDeviceStepTest extends TestCase
 {
@@ -131,7 +131,7 @@ class InstallationAdditionalDeviceStepTest extends TestCase
             ->from(route('customers.installation.report', $this->customer))
             ->post(route('customers.installation.additional-devices.store', $this->customer), [
                 'decisions' => [
-                    ['inventory_serial_id' => $ap1->id, 'outcome' => 'terpasang'],
+                    ['inventory_serial_id' => $ap1->id],
                 ],
             ]);
 
@@ -150,7 +150,7 @@ class InstallationAdditionalDeviceStepTest extends TestCase
         $response = $this->actingAs($this->technician)
             ->post(route('customers.installation.additional-devices.store', $this->customer), [
                 'decisions' => [
-                    ['inventory_serial_id' => $ap1->id, 'outcome' => 'terpasang'],
+                    ['inventory_serial_id' => $ap1->id],
                 ],
                 'kekurangan_perangkat' => '1',
                 'kekurangan_perangkat_alasan' => 'AP kedua pecah di jalan sebelum sampai lokasi.',
@@ -158,7 +158,7 @@ class InstallationAdditionalDeviceStepTest extends TestCase
 
         $response->assertSessionHasNoErrors();
         $response->assertRedirect();
-        $this->assertSame(1, CustomerAdditionalDevice::where('customer_id', $this->customer->id)->count());
+        $this->assertSame([$ap1->id], $this->customer->installations()->latest()->first()->extra_device_serial_ids);
 
         $installation = $this->customer->installations()->latest()->first();
         $this->assertTrue($installation->extra_device_shortage);
@@ -166,9 +166,11 @@ class InstallationAdditionalDeviceStepTest extends TestCase
     }
 
     #[Test]
-    public function submit_installs_selected_serial_without_retiring_primary_ont(): void
+    public function speedtest_installs_selected_serial_without_retiring_primary_ont(): void
     {
+        Storage::fake('public');
         $this->givePackage(1);
+        $this->makeReadyForSpeedtest();
 
         // ONT utama sudah INSTALLED ke pelanggan ini (ownership default COMPANY).
         $ontCategory = ItemCategory::create(['code' => 'ont_step_test', 'name' => 'ONT Step Test', 'default_unit' => 'pcs', 'is_active' => true]);
@@ -189,12 +191,20 @@ class InstallationAdditionalDeviceStepTest extends TestCase
         $response = $this->actingAs($this->technician)
             ->post(route('customers.installation.additional-devices.store', $this->customer), [
                 'decisions' => [
-                    ['inventory_serial_id' => $ap->id, 'outcome' => 'terpasang'],
+                    ['inventory_serial_id' => $ap->id],
                 ],
             ]);
 
         $response->assertSessionHasNoErrors();
         $response->assertRedirect();
+
+        // Simpan langkah ini cuma pilihan — belum terpasang.
+        $this->assertSame(SerialStatus::ISSUED, $ap->refresh()->status);
+        $this->assertDatabaseCount('customer_additional_devices', 0);
+
+        $this->actingAs($this->technician)
+            ->post(route('customers.installation.speedtest', $this->customer), $this->speedtestPayload())
+            ->assertSessionHasNoErrors();
 
         $ap->refresh();
         $this->assertSame(SerialStatus::INSTALLED, $ap->status);
@@ -210,40 +220,38 @@ class InstallationAdditionalDeviceStepTest extends TestCase
         $ont->refresh();
         $this->assertSame(SerialStatus::INSTALLED, $ont->status, 'ONT utama tidak boleh di-RETURN saat AP dipasang');
         $this->assertSame($this->customer->id, $ont->customer_id);
+
+        // Pointer dikosongkan setelah dieksekusi — revisi gak meng-install ulang.
+        $this->assertNull($this->customer->installations()->latest()->first()->extra_device_serial_ids);
     }
 
+    /**
+     * Dropdown Status dihapus (keputusan user 2026-11-14): SN yang dipilih di
+     * langkah ini PSB = akan dipasang. Simpan cuma mencatat pilihan (draft
+     * pointer), pemasangan sungguhan di Laporan Speedtest.
+     */
     #[Test]
-    public function device_marked_not_installed_requires_final_status(): void
+    public function sn_yang_dipilih_tersimpan_sebagai_pilihan_tanpa_pilih_status(): void
     {
         $this->givePackage(1);
         $ap = $this->issueAp('SN-ADS-AP-031');
 
-        // Baris tanpa outcome = belum ada keputusan, gak dihitung → paket
-        // butuh 1 keputusan, jadi submit ditolak lewat cek agregat.
         $this->actingAs($this->technician)
             ->post(route('customers.installation.additional-devices.store', $this->customer), [
-                'decisions' => [
-                    ['inventory_serial_id' => $ap->id, 'outcome' => ''],
-                ],
+                'decisions' => [['inventory_serial_id' => $ap->id]],
             ])
-            ->assertSessionHasErrors('decisions');
-        $this->assertNull($this->customer->installations()->latest()->first()->extra_devices_reported_at);
+            ->assertSessionHasNoErrors()
+            ->assertRedirect();
 
-        $response = $this->actingAs($this->technician)
-            ->post(route('customers.installation.additional-devices.store', $this->customer), [
-                'decisions' => [
-                    ['inventory_serial_id' => $ap->id, 'outcome' => 'kembali_gudang'],
-                ],
-            ]);
-
-        $response->assertSessionHasNoErrors();
-        $response->assertRedirect();
-
+        $this->assertSame(SerialStatus::ISSUED, $ap->refresh()->status);
+        $this->assertSame([$ap->id], $this->customer->installations()->latest()->first()->extra_device_serial_ids);
         $this->assertDatabaseCount('customer_additional_devices', 0);
-        $ap->refresh();
-        $this->assertSame(SerialStatus::ISSUED, $ap->status);
-        $this->assertSame($this->technician->id, $ap->current_technician_id);
-        $this->assertStringContainsString('SN-ADS-AP-031', (string) $this->customer->installations()->latest()->first()->installation_note);
+
+        $this->actingAs($this->technician)
+            ->get(route('customers.installation.report', $this->customer))
+            ->assertOk()
+            ->assertDontSee('— Pilih status —')
+            ->assertDontSee('Kembali ke Gudang');
     }
 
     #[Test]
@@ -256,7 +264,7 @@ class InstallationAdditionalDeviceStepTest extends TestCase
         $this->actingAs($this->technician)
             ->post(route('customers.installation.additional-devices.store', $this->customer), [
                 'decisions' => [
-                    ['inventory_serial_id' => $foreignAp->id, 'outcome' => 'terpasang'],
+                    ['inventory_serial_id' => $foreignAp->id],
                 ],
             ])
             ->assertSessionHasErrors('decisions.0.inventory_serial_id');
@@ -283,13 +291,8 @@ class InstallationAdditionalDeviceStepTest extends TestCase
             ->assertSessionHasErrors('selected_inventory_serial_id');
     }
 
-    /**
-     * Review fix 2 — custody tim bisa memuat AP untuk pelanggan LAIN di hari
-     * yang sama. Baris yang dibiarkan kosong bukan keputusan: tidak dihitung,
-     * tidak dicatat, SN-nya tetap utuh di custody.
-     */
     #[Test]
-    public function unrelated_custody_devices_left_blank_do_not_block_submit(): void
+    public function perangkat_untuk_pelanggan_lain_cukup_tidak_dipilih(): void
     {
         $this->givePackage(1);
         $mine = $this->issueAp('SN-ADS-AP-081');
@@ -297,19 +300,169 @@ class InstallationAdditionalDeviceStepTest extends TestCase
 
         $response = $this->actingAs($this->technician)
             ->post(route('customers.installation.additional-devices.store', $this->customer), [
-                'decisions' => [
-                    ['inventory_serial_id' => $mine->id, 'outcome' => 'terpasang'],
-                    ['inventory_serial_id' => $otherCustomers->id, 'outcome' => ''],
-                ],
+                'decisions' => [['inventory_serial_id' => $mine->id]],
             ]);
 
         $response->assertSessionHasNoErrors();
         $response->assertRedirect();
-        $this->assertSame(SerialStatus::INSTALLED, $mine->refresh()->status);
+        $this->assertSame([$mine->id], $this->customer->installations()->latest()->first()->extra_device_serial_ids);
         $this->assertSame(SerialStatus::ISSUED, $otherCustomers->refresh()->status);
         $this->assertSame($this->technician->id, $otherCustomers->current_technician_id);
-        $this->assertSame(1, CustomerAdditionalDevice::where('customer_id', $this->customer->id)->count());
-        $this->assertStringNotContainsString('SN-ADS-AP-082', (string) $this->customer->installations()->latest()->first()->installation_note);
+    }
+
+    /**
+     * Permintaan user 2026-11-14: daftar Perangkat Tambahan memuat SEMUA
+     * perangkat ber-SN di custody tim, bukan cuma kategori AP/STB.
+     */
+    #[Test]
+    public function perangkat_ber_sn_non_ap_ikut_tampil_dan_bisa_dipasang(): void
+    {
+        $this->givePackage(1);
+        $router = $this->issueSerialOfCategory('router_step_test', 'Router', 'SN-ADS-RTR-401');
+
+        $this->actingAs($this->technician)
+            ->get(route('customers.installation.report', $this->customer))
+            ->assertOk()
+            ->assertSee('SN-ADS-RTR-401');
+
+        $this->actingAs($this->technician)
+            ->post(route('customers.installation.additional-devices.store', $this->customer), [
+                'decisions' => [['inventory_serial_id' => $router->id]],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame([$router->id], $this->customer->installations()->latest()->first()->extra_device_serial_ids);
+    }
+
+    /**
+     * SN yang sudah dipilih jadi perangkat UTAMA di Step 5 baru di-install di
+     * Laporan Speedtest — kalau boleh dipasang duluan sebagai perangkat
+     * tambahan, Speedtest gagal karena SN-nya sudah INSTALLED.
+     */
+    #[Test]
+    public function sn_perangkat_utama_step_5_tidak_bisa_dipilih_jadi_perangkat_tambahan(): void
+    {
+        $this->givePackage(1);
+        $ont = $this->issueSerialOfCategory('ont_step_test', 'ONT', 'SN-ADS-ONT-501');
+        $this->customer->installations()->latest()->first()->update(['selected_inventory_serial_id' => $ont->id]);
+
+        $this->actingAs($this->technician)
+            ->post(route('customers.installation.additional-devices.store', $this->customer), [
+                'decisions' => [['inventory_serial_id' => $ont->id]],
+            ])
+            ->assertSessionHasErrors('decisions.0.inventory_serial_id');
+
+        $this->assertSame(SerialStatus::ISSUED, $ont->refresh()->status);
+    }
+
+    /**
+     * Permintaan user 2026-11-14: pilihan Perangkat Tambahan yang sudah
+     * disimpan harus tetap tampil setelah refresh dan bisa diganti — sama
+     * Barang Dipasang Step 5. Dulu SN langsung terpasang begitu disimpan.
+     */
+    #[Test]
+    public function pilihan_tersimpan_tampil_lagi_dan_bisa_diganti_dengan_simpan_ulang(): void
+    {
+        $this->givePackage(1);
+        $first = $this->issueAp('SN-ADS-AP-601');
+        $second = $this->issueAp('SN-ADS-AP-602');
+
+        $this->actingAs($this->technician)
+            ->post(route('customers.installation.additional-devices.store', $this->customer), [
+                'decisions' => [['inventory_serial_id' => $first->id]],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->technician)
+            ->get(route('customers.installation.report', $this->customer))
+            ->assertOk()
+            // @js() meng-encode kutip jadi \u0022 — baris prefill membawa SN tersimpan.
+            ->assertSee('\u0022serial\u0022:\u0022'.$first->id.'\u0022', false);
+
+        $this->actingAs($this->technician)
+            ->post(route('customers.installation.additional-devices.store', $this->customer), [
+                'decisions' => [['inventory_serial_id' => $second->id]],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame([$second->id], $this->customer->installations()->latest()->first()->extra_device_serial_ids);
+        $this->assertSame(SerialStatus::ISSUED, $first->refresh()->status);
+        $this->assertSame(SerialStatus::ISSUED, $second->refresh()->status);
+    }
+
+    /**
+     * Pilihan Perangkat Tambahan belum terpasang (SN masih ISSUED), jadi SN
+     * yang sama bisa muncul di dropdown modem utama Step 5. Kalau lolos,
+     * Speedtest meng-install SN yang sama dua kali.
+     */
+    #[Test]
+    public function sn_pilihan_perangkat_tambahan_ditolak_jadi_modem_utama_step_5(): void
+    {
+        $this->givePackage(1);
+        $router = $this->issueSerialOfCategory('router_step_test', 'Router', 'SN-ADS-RTR-701');
+
+        $this->actingAs($this->technician)
+            ->post(route('customers.installation.additional-devices.store', $this->customer), [
+                'decisions' => [['inventory_serial_id' => $router->id]],
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->technician)
+            ->get(route('customers.installation.report', $this->customer))
+            ->assertViewHas('eligibleSerials', fn ($serials) => ! $serials->pluck('id')->contains($router->id));
+
+        $response = $this->actingAs($this->technician)
+            ->post(route('customers.installation.pemasangan', $this->customer), [
+                'device_type' => 'ont',
+                'connection_mode' => 'pppoe',
+                'wifi_ssid' => 'WHUSNET_ADS',
+                'wifi_password' => 'password123',
+                'odp_number' => 'ODP-01',
+                'odp_port' => '1',
+                'selected_inventory_serial_id' => $router->id,
+            ]);
+
+        $response->assertSessionHasErrors('selected_inventory_serial_id');
+        $this->assertStringContainsString('Perangkat Tambahan', session('errors')->first('selected_inventory_serial_id'));
+    }
+
+    #[Test]
+    public function speedtest_ditolak_kalau_sn_pilihan_sudah_keluar_dari_custody_tim(): void
+    {
+        Storage::fake('public');
+        $this->givePackage(1);
+        $ap = $this->issueAp('SN-ADS-AP-801');
+        $this->makeReadyForSpeedtest();
+
+        $this->actingAs($this->technician)
+            ->post(route('customers.installation.additional-devices.store', $this->customer), [
+                'decisions' => [['inventory_serial_id' => $ap->id]],
+            ])
+            ->assertSessionHasNoErrors();
+
+        // Gudang mengalihkan SN ke teknisi lain setelah pilihan disimpan.
+        $ap->update(['current_technician_id' => User::factory()->create()->id]);
+
+        $this->actingAs($this->technician)
+            ->post(route('customers.installation.speedtest', $this->customer), $this->speedtestPayload())
+            ->assertSessionHasErrors('extra_devices');
+
+        $this->assertSame('installation_in_progress', $this->customer->refresh()->status);
+        $this->assertDatabaseCount('customer_additional_devices', 0);
+    }
+
+    private function issueSerialOfCategory(string $categoryCode, string $categoryName, string $serialNumber): InventorySerial
+    {
+        $category = ItemCategory::create(['code' => $categoryCode, 'name' => $categoryName, 'default_unit' => 'pcs', 'is_active' => true, 'is_customer_extra_device' => false]);
+        $item = Item::create([
+            'code' => strtoupper($categoryCode), 'name' => $categoryName.' Step Test', 'unit' => 'pcs',
+            'item_category_id' => $category->id, 'tracking_type' => 'serialized', 'ownership_mode' => OwnershipMode::INSTALLABLE->value,
+        ]);
+
+        return InventorySerial::create([
+            'item_id' => $item->id, 'serial_number' => $serialNumber, 'status' => SerialStatus::ISSUED->value,
+            'current_technician_id' => $this->technician->id, 'issued_from_pop_id' => $this->pop->id,
+        ]);
     }
 
     /**
@@ -341,7 +494,7 @@ class InstallationAdditionalDeviceStepTest extends TestCase
 
         $this->actingAs($this->technician)
             ->post(route('customers.installation.additional-devices.store', $this->customer), [
-                'decisions' => [['inventory_serial_id' => $ap->id, 'outcome' => 'terpasang']],
+                'decisions' => [['inventory_serial_id' => $ap->id]],
             ])
             ->assertSessionHasNoErrors();
         $this->assertNotNull($this->customer->installations()->latest()->first()->extra_devices_reported_at);
@@ -352,6 +505,8 @@ class InstallationAdditionalDeviceStepTest extends TestCase
         $response->assertSessionHasNoErrors();
         $response->assertSessionHas('success');
         $this->assertSame('verification_admin', $this->customer->refresh()->status);
+        $this->assertSame(SerialStatus::INSTALLED, $ap->refresh()->status);
+        $this->assertSame('terpasang', CustomerAdditionalDevice::where('customer_id', $this->customer->id)->sole()->status);
     }
 
     #[Test]
@@ -405,8 +560,8 @@ class InstallationAdditionalDeviceStepTest extends TestCase
             ->assertSee('SN-ADS-STB-301');
 
         $mixedDecisions = [
-            ['inventory_serial_id' => $aps[0]->id, 'outcome' => 'terpasang'],
-            ['inventory_serial_id' => $aps[1]->id, 'outcome' => 'terpasang'],
+            ['inventory_serial_id' => $aps[0]->id],
+            ['inventory_serial_id' => $aps[1]->id],
         ];
 
         // 2 dari 3 barang (2 AP + 0 STB) tanpa kekurangan → ditolak, cuma soal total.
@@ -416,12 +571,12 @@ class InstallationAdditionalDeviceStepTest extends TestCase
         $this->assertDatabaseCount('customer_additional_devices', 0);
 
         // 2 AP + 1 STB = 3 barang campuran → lolos, jenis barang tidak dibatasi.
-        $mixedDecisions[] = ['inventory_serial_id' => $stb->id, 'outcome' => 'terpasang'];
+        $mixedDecisions[] = ['inventory_serial_id' => $stb->id];
         $this->actingAs($this->technician)
             ->post(route('customers.installation.additional-devices.store', $this->customer), ['decisions' => $mixedDecisions])
             ->assertSessionHasNoErrors();
-        $this->assertDatabaseCount('customer_additional_devices', 3);
-        $this->assertSame(SerialStatus::INSTALLED, $stb->refresh()->status);
+        $this->assertCount(3, $this->customer->installations()->latest()->first()->extra_device_serial_ids);
+        $this->assertSame(SerialStatus::ISSUED, $stb->refresh()->status);
     }
 
     #[Test]
@@ -435,6 +590,33 @@ class InstallationAdditionalDeviceStepTest extends TestCase
             ->assertOk()
             ->assertSee('form-additional-devices', false)
             ->assertSee('SN-ADS-AP-061');
+    }
+
+    /**
+     * ADHOC-297 lanjutan (permintaan user 2026-11-13): picker perangkat
+     * tambahan pakai pola Kategori → Nama Barang seperti "Barang Dipasang"
+     * Step 5, bukan <select> tunggal "Kategori — Nama · SN" yang gak bisa
+     * dicari. Field yang dikirim ke server tetap decisions[i][inventory_serial_id].
+     */
+    #[Test]
+    public function picker_perangkat_tambahan_pakai_kategori_lalu_nama_barang(): void
+    {
+        $this->givePackage(1);
+        $this->issueAp('SN-ADS-AP-081');
+
+        $response = $this->actingAs($this->technician)
+            ->get(route('customers.installation.report', $this->customer))
+            ->assertOk();
+
+        // @js() meng-escape kutip jadi 0022 — dibuka supaya JSON opsi bisa dibaca.
+        $html = str_replace('\u0022', '"', html_entity_decode($response->getContent(), ENT_QUOTES));
+
+        $this->assertStringContainsString('categoryOptionsFor(index)', $html);
+        $this->assertStringContainsString('serialOptionsFor(index)', $html);
+        $this->assertStringContainsString('"category_name":"Access Point"', $html);
+        $this->assertStringContainsString('SN-ADS-AP-081', $html);
+        $this->assertStringContainsString('`decisions[${index}][inventory_serial_id]`', $html);
+        $this->assertStringNotContainsString('x-model="row.serial"', $html);
     }
 
     #[Test]

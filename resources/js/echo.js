@@ -1,5 +1,9 @@
 import Echo from 'laravel-echo';
 import { shouldUseCurrentReverbHost } from './reverb-host';
+// window.pageEcho — listener per halaman yang lepas sendiri saat navigasi
+// boost. Diimpor SEBELUM `echo:ready` didispatch supaya listener echo:ready
+// di view sudah bisa memanggilnya.
+import './page-echo';
 
 import Pusher from 'pusher-js';
 window.Pusher = Pusher;

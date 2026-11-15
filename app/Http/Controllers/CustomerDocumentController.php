@@ -8,6 +8,7 @@ use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerDocument;
 use App\Services\FileUploadService;
+use App\Support\UploadLimit;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
@@ -24,7 +25,7 @@ class CustomerDocumentController extends Controller
 
         $validated = $request->validate([
             'document_type' => ['required', 'string', Rule::enum(DocumentType::class)],
-            'document_file' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|max:4096',
+            'document_file' => 'required|file|mimes:jpg,jpeg,png,webp,pdf|'.UploadLimit::rule(),
         ]);
 
         $file = $request->file('document_file');

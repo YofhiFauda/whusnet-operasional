@@ -16,13 +16,14 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Foundation\Auth\User as Authenticatable;
 use Illuminate\Notifications\Notifiable;
 use Illuminate\Support\Facades\Cache;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 
 #[Fillable(['name', 'email', 'password', 'phone', 'status', 'role_id', 'is_pengajuan_barang_approver'])]
 #[Hidden(['password', 'remember_token'])]
 class User extends Authenticatable
 {
     /** @use HasFactory<UserFactory> */
-    use HasFactory, Notifiable, RecordsAuditLogs;
+    use HasFactory, HasPushSubscriptions, Notifiable, RecordsAuditLogs;
 
     protected string $auditModule = 'User Management';
 

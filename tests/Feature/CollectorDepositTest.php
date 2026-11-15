@@ -20,11 +20,13 @@ use App\Models\Role;
 use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Models\UserRoleScopeTarget;
+use App\Notifications\AppPushNotification;
 use App\Services\CollectorBalanceService;
 use App\Services\EffectiveAccessService;
 use Database\Seeders\DatabaseSeeder;
 use Illuminate\Contracts\Notifications\Dispatcher as NotificationDispatcher;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Notification;
 use Tests\TestCase;
 
 /**
@@ -474,6 +476,50 @@ class CollectorDepositTest extends TestCase
         // terpisah, tidak boleh saling menutupi.
         $this->assertSame(0.0, $this->balance());
         $this->assertSame(30000.0, $this->shortfall());
+    }
+
+    /**
+     * Push device (ADHOC-288 Tahap 6, event disetujui #3 "Setoran Collector
+     * Approved/Rejected") — "approved" dipetakan ke TERVERIFIKASI (clean).
+     */
+    public function test_verification_clean_also_pushes_collector(): void
+    {
+        $this->collect('C-DEP-PUSH1', 350000);
+        $this->actingAs($this->kolektor)->post(route('collector-worklist.deposit'));
+        $deposit = CollectorDeposit::query()->firstOrFail();
+
+        Notification::fake();
+
+        $this->actingAs($this->admin)->post(route('collector-deposits.verify', $deposit->id), [
+            'declared_amount' => 350000,
+        ])->assertRedirect();
+
+        Notification::assertSentTo(
+            $this->kolektor,
+            AppPushNotification::class,
+            fn ($notification) => str_contains($notification->title, $deposit->deposit_number)
+        );
+    }
+
+    /** "Rejected" dipetakan ke SELISIH (kurang setor) — tetap push. */
+    public function test_verification_shortfall_also_pushes_collector(): void
+    {
+        $this->collect('C-DEP-PUSH2', 350000);
+        $this->actingAs($this->kolektor)->post(route('collector-worklist.deposit'));
+        $deposit = CollectorDeposit::query()->firstOrFail();
+
+        Notification::fake();
+
+        $this->actingAs($this->admin)->post(route('collector-deposits.verify', $deposit->id), [
+            'declared_amount' => 320000,
+            'note' => 'Kolektor mengaku terpakai dulu.',
+        ])->assertRedirect();
+
+        Notification::assertSentTo(
+            $this->kolektor,
+            AppPushNotification::class,
+            fn ($notification) => str_contains($notification->title, $deposit->deposit_number)
+        );
     }
 
     public function test_difference_requires_note(): void

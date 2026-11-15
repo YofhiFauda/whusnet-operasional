@@ -21,6 +21,7 @@ use App\Services\FileUploadService;
 use App\Services\InventoryReassignService;
 use App\Services\LegacyDeviceHintService;
 use App\Support\LikeSearch;
+use App\Support\UploadLimit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -115,7 +116,7 @@ class WarehouseCustomerReturnController extends Controller
             'serials.*.serial_number' => ['required', 'string', 'max:100'],
             'serials.*.item_id' => ['nullable', 'integer', 'exists:items,id'],
             'condition' => ['required', Rule::in([ItemCondition::USED_GOOD->value, ItemCondition::USED_DAMAGED->value])],
-            'condition_photo' => ['required', 'image', 'max:2048'],
+            'condition_photo' => ['required', 'image', UploadLimit::rule()],
             'accessories' => ['nullable', 'array'],
             'accessories.*' => ['string', Rule::in(array_keys(TaskDeviceRetrieval::ACCESSORY_OPTIONS))],
             'estimated_value' => ['prohibited'],

@@ -1,8 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Omset Sales - Whusnet Operasional')
+@section('title', 'Omset Sales')
 @section('page_title', 'Dashboard Omset Sales')
-@section('breadcrumb_parent', 'Busdev')
 @section('breadcrumb_parent_url', route('business-development.sales-omset.index'))
 
 @section('content')

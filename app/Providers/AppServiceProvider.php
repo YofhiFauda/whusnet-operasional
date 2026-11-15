@@ -4,7 +4,6 @@ namespace App\Providers;
 
 use App\Enums\CReqVerificationStatus;
 use App\Enums\TaskType;
-use App\Enums\WorkflowTransition;
 use App\Models\Customer;
 use App\Models\CustomerBalanceMutation;
 use App\Models\CustomerQrToken;
@@ -366,6 +365,7 @@ class AppServiceProvider extends ServiceProvider
             $surveyCount = 0;
             $verificationCount = 0;
             $registrationVerificationCount = 0;
+            $registrationVerificationPopIds = [];
             $creqBillingVerificationCount = 0;
             $nodeAttentionCount = 0;
 
@@ -374,10 +374,15 @@ class AppServiceProvider extends ServiceProvider
 
                 // Antrean "Verifikasi Registrasi" (ADHOC-73) — pelanggan yang
                 // baru diregistrasi (non-Skip-Survey), belum disetujui Admin/CS.
+                // Realtime: sidebar subscribe registration-verifications.{popId}
+                // untuk POP di sini lalu ambil ulang angkanya (lihat
+                // RegistrationVerificationQueueChanged).
                 if ($user->hasPermission('customer_registration_verification.view')) {
-                    $registrationVerificationCount = Customer::applyUserScope($user)
-                        ->where('status', WorkflowTransition::REGISTERED->value)
-                        ->count();
+                    $registrationVerificationCount = Customer::awaitingRegistrationVerificationCount($user);
+                    $access = app(EffectiveAccessService::class);
+                    $registrationVerificationPopIds = $access->hasAllPopAccess($user)
+                        ? Pop::query()->pluck('id')->all()
+                        : array_values($access->getAllowedPopIds($user));
                 }
 
                 // Antrean "Verifikasi Biaya C-REQ" — task C-REQ berbayar yang
@@ -441,6 +446,7 @@ class AppServiceProvider extends ServiceProvider
             $view->with('badge_survey_count', $surveyCount)
                 ->with('badge_verification_count', $verificationCount)
                 ->with('badge_registration_verification_count', $registrationVerificationCount)
+                ->with('badge_registration_verification_pop_ids', $registrationVerificationPopIds)
                 ->with('badge_creq_billing_verification_count', $creqBillingVerificationCount)
                 ->with('badge_node_attention_count', $nodeAttentionCount);
         });

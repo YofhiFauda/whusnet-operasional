@@ -407,7 +407,7 @@
                 </button>
             </div>
 
-            <form :action="'/network/nodes/' + editModal.id" method="POST" class="p-6 overflow-y-auto space-y-4">
+            <form :action="'/network/nodes/' + editModal.id" method="POST" hx-boost="false" class="p-6 overflow-y-auto space-y-4">
                 @csrf
                 @method('PATCH')
 
@@ -554,7 +554,7 @@
                          physical_removal_confirmed & release_note). Dulu form ini hanya
                          mengirim is_used=0 → selalu gagal validasi, port tak pernah
                          lepas dari Master Node. Isian sama dengan halaman Detail. --}}
-                    <form :action="assignModal.updateUrl" method="POST" class="no-confirm space-y-2 border-t border-border pt-3" data-port-release-form>
+                    <form :action="assignModal.updateUrl" method="POST" hx-boost="false" class="no-confirm space-y-2 border-t border-border pt-3" data-port-release-form>
                         @csrf
                         @method('PUT')
                         <input type="hidden" name="is_used" value="0">
@@ -599,7 +599,7 @@
                     {{-- Opsi 1: Sambung Pelanggan --}}
                     <div x-show="assignModal.type === 'customer'">
                         <template x-if="modalCustomers.length > 0">
-                            <form :action="assignModal.assignCustomerUrl" method="POST" class="no-confirm space-y-3">
+                            <form :action="assignModal.assignCustomerUrl" method="POST" hx-boost="false" class="no-confirm space-y-3">
                                 @csrf
                                 <div>
                                     <label class="block text-xs font-bold text-text-secondary mb-1">Pilih Pelanggan <span class="text-rose-500">*</span></label>
@@ -633,7 +633,7 @@
                     {{-- Opsi 2: Hubungkan Anak Node (ODP / Sub-Node) --}}
                     <div x-show="assignModal.type === 'node'">
                         <template x-if="unconnectedChildren.length > 0">
-                            <form :action="assignModal.assignNodeUrl" method="POST" class="no-confirm space-y-3">
+                            <form :action="assignModal.assignNodeUrl" method="POST" hx-boost="false" class="no-confirm space-y-3">
                                 @csrf
                                 <div>
                                     <label class="block text-xs font-bold text-text-secondary mb-1">Pilih Anak Langsung <span class="text-rose-500">*</span></label>
@@ -684,7 +684,7 @@
 
                     {{-- Opsi 3: Tandai Manual --}}
                     <div x-show="assignModal.type === 'manual'">
-                        <form :action="assignModal.updateUrl" method="POST" class="no-confirm space-y-3">
+                        <form :action="assignModal.updateUrl" method="POST" hx-boost="false" class="no-confirm space-y-3">
                             @csrf
                             @method('PUT')
                             <input type="hidden" name="is_used" value="1">

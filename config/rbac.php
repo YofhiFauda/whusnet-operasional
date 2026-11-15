@@ -122,6 +122,12 @@ return [
             // destruktif/service-impacting, wajib permission sendiri — pola
             // sama kayak customers.detail.devices.retrieve.
             ActionCode::DEACTIVATE->value,
+            // Isolir/aktivasi-kembali layanan — sebelumnya numpang
+            // customers.update juga (CustomerController::toggleSuspend gak
+            // punya guard sendiri), jadi role yang cuma bisa edit field
+            // pelanggan biasa (Sales) otomatis bisa isolir pelanggan.
+            // Permission sendiri, TIDAK numpang Edit (2026-11-10).
+            ActionCode::ISOLIR->value,
         ],
 
         'customers.import' => [
@@ -772,6 +778,14 @@ return [
             ActionCode::APPROVE->value,
             ActionCode::REJECT->value,
         ],
+
+        // Dashboard Delivery Push Notification (ADHOC-288 Tahap 8, ditunda
+        // dari Tahap 6 item 4) — delivery rate `push_deliveries` per merek
+        // HP/OS dari `push_subscriptions.device_name`. Cuma VIEW, read-only
+        // murni, audiens manajemen/infra bukan operasional harian.
+        'webpush_dashboard' => [
+            ActionCode::VIEW->value,
+        ],
     ],
 
     /*
@@ -992,5 +1006,7 @@ return [
         // Rekap Pemakaian Material Lapangan (/warehouse/usage)
         'warehouse.usage.view' => 'Lihat Rekap Pemakaian Material Lapangan',
         'warehouse.infra_stock.view' => 'Lihat Barang Terpasang di Infrastruktur',
+
+        'webpush_dashboard.view' => 'Lihat Dashboard Delivery Push Notification',
     ],
 ];

@@ -493,7 +493,7 @@
                 return;
             }
             allowedPopIds.forEach(popId => {
-                window.Echo.private(`tickets.${popId}`)
+                window.pageEcho(`tickets.${popId}`)
                     .listen('.TicketQueueUpdated', () => refetchAndSwap());
             });
         };

@@ -11,6 +11,7 @@ use App\Services\CashDepositService;
 use App\Services\OwnerCashBalanceService;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
+use App\Support\UploadLimit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -124,7 +125,7 @@ class CashDepositController extends Controller
             'account_number' => 'nullable|string|max:50',
             'reference_no' => 'nullable|string|max:100',
             'note' => 'nullable|string|max:1000',
-            'proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|max:5120',
+            'proof' => 'nullable|file|mimes:jpg,jpeg,png,pdf|'.UploadLimit::rule(),
             'idempotency_key' => 'nullable|string|max:191',
             // PENANDA halaman asal, bukan URL. Tujuannya dipilih dari daftar
             // tertutup di kembaliKe() — URL redirect yang datang mentah dari

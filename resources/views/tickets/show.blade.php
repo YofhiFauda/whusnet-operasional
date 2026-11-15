@@ -1199,7 +1199,7 @@
         }
 
         function bind() {
-            window.Echo.private(`tickets.${popId}`).listen('.TicketQueueUpdated', refreshStatusPanel);
+            window.pageEcho(`tickets.${popId}`).listen('.TicketQueueUpdated', refreshStatusPanel);
         }
 
         if (window.Echo) {

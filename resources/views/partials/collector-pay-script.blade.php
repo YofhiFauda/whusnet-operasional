@@ -94,7 +94,7 @@
         }
     }
 
-    document.addEventListener('change', function (e) {
+    window.pageListen(document, 'change', function (e) {
         if (e.target.classList.contains('cb-row-checkbox')) {
             cbUpdateCount();
         }
@@ -590,7 +590,7 @@
     }
 
     // Ketik nominal/saldo â†’ pratinjau baris itu ikut berubah.
-    document.addEventListener('input', function (e) {
+    window.pageListen(document, 'input', function (e) {
         if (e.target.classList.contains('cb-saldo')) {
             cbOnSaldoChange(e.target);
         }

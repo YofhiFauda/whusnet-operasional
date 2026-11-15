@@ -646,7 +646,156 @@
             </div>
         </div>
 
+        {{-- ── 5. NOTIFIKASI PERANGKAT (Web Push) — full width ── --}}
+        <div id="webpush-settings" class="lg:col-span-2 bg-white dark:bg-slate-800 p-5 sm:p-7 scroll-mt-20" x-data="webpushSettings()">
+            <div class="flex items-center justify-between pb-4 mb-5 border-b border-slate-100 dark:border-slate-700/70">
+                <div class="flex items-center gap-2.5">
+                    <div class="w-8 h-8 rounded-lg bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center shrink-0">
+                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                        </svg>
+                    </div>
+                    <div>
+                        <h2 class="text-base font-bold text-slate-800 dark:text-slate-100 leading-tight">Notifikasi Perangkat</h2>
+                        <p class="text-xs text-slate-400 dark:text-slate-500">Terima notifikasi push di perangkat ini walau tab/browser tertutup</p>
+                    </div>
+                </div>
+            </div>
+
+            {{-- iOS Safari di luar mode standalone sama sekali gak punya Push API
+                 (bukan "didukung tapi ditolak") — panduan "Add to Home Screen"
+                 beda total dari battery saver Android, jadi dicek duluan
+                 sebelum fallback !pushSupported generik. ADHOC-288 Tahap 8. --}}
+            <template x-if="!pushSupported && iosNeedsInstall">
+                <div class="p-4 rounded-xl bg-sky-50 dark:bg-sky-950/30 border border-sky-200 dark:border-sky-900/50 text-xs text-sky-800 dark:text-sky-300 space-y-1.5">
+                    <p class="font-semibold">iPhone/iPad: notifikasi push cuma aktif setelah aplikasi di-install ke Home Screen.</p>
+                    <p class="leading-relaxed">Buka halaman ini di Safari &rarr; tombol Share (kotak dengan tanda panah ke atas) &rarr; "Tambah ke Layar Utama" (Add to Home Screen). Buka lagi lewat ikon di Home Screen, baru aktifkan notifikasi di sini.</p>
+                </div>
+            </template>
+
+            <template x-if="!pushSupported && !iosNeedsInstall">
+                <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/30 border border-dashed border-slate-200 dark:border-slate-700 text-xs text-slate-500 dark:text-slate-400">
+                    Browser ini tidak mendukung notifikasi push, atau diakses lewat koneksi yang tidak aman (bukan HTTPS).
+                </div>
+            </template>
+
+            <template x-if="pushSupported && permissionDenied">
+                <div class="p-4 rounded-xl bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900/50 text-xs text-amber-800 dark:text-amber-300">
+                    Izin notifikasi untuk situs ini sudah pernah ditolak di browser. Ubah izinnya lewat ikon gembok di address bar, lalu muat ulang halaman.
+                </div>
+            </template>
+
+            <template x-if="pushSupported && !permissionDenied">
+                <div class="space-y-3">
+                    <div class="p-4 rounded-xl bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-700/60 flex items-center justify-between gap-3">
+                        <span class="text-sm text-slate-600 dark:text-slate-300" x-text="pushEnabled ? 'Notifikasi perangkat aktif di perangkat ini.' : 'Notifikasi perangkat belum aktif di perangkat ini.'"></span>
+                        <div class="flex items-center gap-2 shrink-0">
+                            <button x-show="pushEnabled" @click="sendTestPush" :disabled="testBusy"
+                                    class="text-xs font-semibold px-3.5 py-2 rounded-xl transition-colors disabled:opacity-50 text-sky-600 dark:text-sky-400 bg-sky-50 dark:bg-sky-950/40 hover:bg-sky-100 dark:hover:bg-sky-950/60"
+                                    x-text="testBusy ? 'Mengirim...' : 'Kirim Notifikasi Uji'"></button>
+                            <button @click="togglePush" :disabled="pushBusy"
+                                    class="text-xs font-semibold px-3.5 py-2 rounded-xl transition-colors disabled:opacity-50"
+                                    :class="pushEnabled ? 'text-rose-600 dark:text-rose-400 bg-rose-50 dark:bg-rose-950/40 hover:bg-rose-100 dark:hover:bg-rose-950/60' : 'text-white bg-sky-600 hover:bg-sky-700'"
+                                    x-text="pushBusy ? 'Memproses...' : (pushEnabled ? 'Nonaktifkan' : 'Aktifkan')"></button>
+                        </div>
+                    </div>
+
+                    {{-- Panduan battery saver per merek HP — notifikasi "aktif" di
+                         sini bisa tetap gak muncul kalau sistem Android-nya
+                         ngebatasin background app. ADHOC-288 Tahap 8. --}}
+                    <div x-show="pushEnabled && batterySaverGuide" class="p-3.5 rounded-xl bg-amber-50/70 dark:bg-amber-950/20 border border-amber-100 dark:border-amber-900/40 flex items-start gap-2.5 text-xs text-amber-800 dark:text-amber-300">
+                        <svg class="w-4 h-4 shrink-0 mt-0.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M13 10V3L4 14h7v7l9-11h-7z" />
+                        </svg>
+                        <p class="leading-relaxed" x-text="batterySaverGuide"></p>
+                    </div>
+                </div>
+            </template>
+        </div>
+
     </div>
 
 </div>
+
+<script>
+function webpushSettings() {
+    return {
+        pushSupported: false,
+        permissionDenied: false,
+        pushEnabled: false,
+        pushBusy: false,
+        testBusy: false,
+        iosNeedsInstall: false,
+        batterySaverGuide: null,
+
+        init() {
+            if (!window.WebPush) {
+                return;
+            }
+
+            this.iosNeedsInstall = window.WebPush.isIosSafariNonStandalone();
+            this.batterySaverGuide = window.WebPush.batterySaverGuide(window.WebPush.detectBrand());
+
+            if (!window.WebPush.isSupported()) {
+                return;
+            }
+            this.pushSupported = true;
+            this.permissionDenied = Notification.permission === 'denied';
+
+            // isEnabledForCurrentUser() (bukan getActiveSubscription() doang)
+            // — PushManager browser cuma satu per origin, jadi kalau device
+            // ini abis dipakai user lain yang juga subscribe, browser tetap
+            // "ada subscription", padahal itu belum tentu milik user yang
+            // login SEKARANG. Dicocokin ke daftar subscription user ini dulu.
+            window.WebPush.isEnabledForCurrentUser()
+                .then((enabled) => { this.pushEnabled = enabled; })
+                .catch(() => {});
+        },
+
+        async togglePush() {
+            if (this.pushBusy) return;
+            this.pushBusy = true;
+
+            try {
+                if (this.pushEnabled) {
+                    await window.WebPush.unsubscribe();
+                    this.pushEnabled = false;
+                } else {
+                    await window.WebPush.subscribe();
+                    this.pushEnabled = true;
+                    this.permissionDenied = Notification.permission === 'denied';
+                }
+                // Banner "aktifkan notifikasi" gak perlu nawarin lagi begitu
+                // status diubah dari sini (kedua arah). Kunci per-user, sama
+                // kayak components/webpush-banner.blade.php.
+                localStorage.setItem('webpush_banner_dismissed_{{ auth()->id() }}', '1');
+            } catch (e) {
+                if (window.Toast) {
+                    window.Toast.error('Notifikasi Perangkat', e.message || 'Gagal mengubah status notifikasi.');
+                }
+            } finally {
+                this.pushBusy = false;
+            }
+        },
+
+        async sendTestPush() {
+            if (this.testBusy) return;
+            this.testBusy = true;
+
+            try {
+                await window.WebPush.sendTest();
+                if (window.Toast) {
+                    window.Toast.success('Notifikasi Uji', 'Terkirim — tunggu beberapa saat, cek notifikasi di perangkat ini.');
+                }
+            } catch (e) {
+                if (window.Toast) {
+                    window.Toast.error('Notifikasi Uji', e.message || 'Gagal mengirim notifikasi uji.');
+                }
+            } finally {
+                this.testBusy = false;
+            }
+        },
+    };
+}
+</script>
 @endsection

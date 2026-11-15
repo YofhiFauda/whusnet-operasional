@@ -177,7 +177,7 @@
             if (! window.Echo) return;
 
             CHANNELS.forEach(function (nama) {
-                window.Echo.private(nama)
+                window.pageEcho(nama)
                     .listen('.CollectorDepositUpdated', tangani)
                     .listen('.CollectorActivityUpdated', tanganiAktivitas)
                     .listen('.CashDepositUpdated', tanganiCashDeposit);

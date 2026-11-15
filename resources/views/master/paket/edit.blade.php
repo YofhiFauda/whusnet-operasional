@@ -209,7 +209,7 @@
 <script>
     // Sama seperti halaman create — kategori baru langsung tersisip &
     // terpilih di <select> tanpa reload.
-    document.addEventListener('package-category-created', function (e) {
+    window.pageListen(document, 'package-category-created', function (e) {
         const select = document.getElementById('category');
         const option = document.createElement('option');
         option.value = e.detail.name;

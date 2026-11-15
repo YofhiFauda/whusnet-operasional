@@ -151,7 +151,7 @@
         wrap.classList.toggle('hidden', !isLainnya);
         input.required = isLainnya;
     }
-    document.addEventListener('DOMContentLoaded', miToggleCategoryFields);
+    window.onPageReady(miToggleCategoryFields);
 </script>
 @endif
 @endsection

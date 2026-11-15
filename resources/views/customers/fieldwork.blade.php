@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Perangkat & Pemasangan - Whusnet Operasional')
+@section('title', 'Perangkat & Pemasangan')
 @section('page_title', 'Perangkat & Pemasangan')
 
 @section('content')

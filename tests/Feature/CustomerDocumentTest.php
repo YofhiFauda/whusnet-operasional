@@ -102,6 +102,47 @@ class CustomerDocumentTest extends TestCase
         $response->assertSee(route('customers.documents.show', $document->id));
     }
 
+    /**
+     * Laporan user 2026-11-14: Dokumen FAB (PDF, disimpan di disk public saat
+     * Registrasi) tidak bisa dipratinjau di tab Dokumen & Berkas — kartu PDF
+     * cuma ikon statis. Sekarang kartu memuat thumbnail <object> PDF dan
+     * membuka modal pratinjau dengan URL dari server.
+     */
+    public function test_dokumen_fab_pdf_bisa_dipratinjau_di_tab_dokumen(): void
+    {
+        Storage::fake('public');
+
+        $pop = $this->createPop('DOC9');
+        $user = $this->createUserWithRole('NOC');
+        $user->pops()->attach($pop->id);
+        $this->grantPopScope($user, $pop);
+        $customer = $this->createCustomer($pop, 'TEST-DOC-009');
+
+        $path = 'registrations/fab/fab_TEST-DOC-009.pdf';
+        Storage::disk('public')->put($path, '%PDF-1.7 fake');
+        $document = CustomerDocument::create([
+            'customer_id' => $customer->id,
+            'document_type' => 'fab',
+            'file_path' => $path,
+            'uploaded_by' => $user->id,
+        ]);
+        $documentUrl = route('customers.documents.show', $document->id);
+
+        $this->actingAs($user)
+            ->get(route('customers.show', $customer->id))
+            ->assertOk()
+            ->assertSee('Formulir Akan Berlangganan Bisnis (FAB)')
+            ->assertSee('data-url="'.$documentUrl.'"', false)
+            ->assertSee('data-image="0"', false)
+            ->assertSee('<object data="'.$documentUrl.'#toolbar=0', false)
+            ->assertSee('id="document-preview-modal"', false);
+
+        $this->actingAs($user)
+            ->get($documentUrl)
+            ->assertOk()
+            ->assertHeader('content-type', 'application/pdf');
+    }
+
     public function test_user_without_document_permission_cannot_access_customer_document(): void
     {
         Storage::fake('local');

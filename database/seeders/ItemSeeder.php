@@ -89,7 +89,7 @@ class ItemSeeder extends Seeder
             //    menyembunyikannya, PSB macet.
             ['code' => 'DC-1C', 'name' => 'Kabel Dropcore 1 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter', 'tracking_type' => 'roll'],
             ['code' => 'DC-2C', 'name' => 'Kabel Dropcore 2 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter', 'tracking_type' => 'roll'],
-            ['code' => 'KBL-FEEDER-12C', 'name' => 'Kabel Fiber Optik Feeder 12 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter', 'tracking_type' => 'roll', 'ownership_mode' => 'infrastructure_asset'],
+            ['code' => 'DC-12C', 'name' => 'Kabel Dropcore 12 Core', 'category' => 'kabel_dropcore', 'unit' => 'meter', 'tracking_type' => 'roll', 'ownership_mode' => 'infrastructure_asset'],
 
             // ── Patch Cord — passive, quantity ──────────────────────────
             ['code' => 'PC-SCUPC-1M', 'name' => 'Patch Cord SC/UPC 1 Meter', 'category' => 'patch_cord', 'unit' => 'pcs'],

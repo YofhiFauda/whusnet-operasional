@@ -1,8 +1,8 @@
 @extends('layouts.app')
 
-@section('title', 'Dashboard - Whusnet Operasional')
-@section('page_title', 'Operational Command Center')
-@section('meta_description', 'Dashboard Operational Command Center ISP Whusnet - Monitoring Pelanggan, Finansial, dan Jaringan secara Real-time')
+@section('title', 'Dashboard')
+@section('page_title', 'Dashboard Operasional')
+@section('meta_description', 'Dashboard Operasional - Monitoring Pelanggan, Finansial, dan Jaringan secara Real-time')
 
 @section('content')
 @php
@@ -1183,7 +1183,7 @@
     if (window.Chart) {
         renderDashboardCharts();
     } else {
-        window.addEventListener('chart:ready', renderDashboardCharts);
+        window.addEventListener('chart:ready', renderDashboardCharts, { once: true });
     }
     document.addEventListener('DOMContentLoaded', renderDashboardCharts);
 })();

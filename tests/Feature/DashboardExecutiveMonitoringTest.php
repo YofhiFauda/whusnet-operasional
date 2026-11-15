@@ -97,7 +97,7 @@ class DashboardExecutiveMonitoringTest extends TestCase
         $response = $this->actingAs($this->owner)->get('/');
 
         $response->assertOk();
-        $response->assertSee('Operational Command Center');
+        $response->assertSee('Dashboard Operasional');
         $response->assertSee('Executive Operational Pulse');
         $response->assertSee('chart-financial-trend');
         $response->assertSee('chart-payment-channels');

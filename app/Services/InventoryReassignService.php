@@ -828,7 +828,10 @@ class InventoryReassignService
      * `InventoryIssueService::assertIssueAllowed()` (ADHOC-120,
      * docs/plan/warehouse/rancangan-teknisi-pic-gudang-cabang.md §7.3, §8
      * Kelompok H4):
-     *   1. Gak boleh reassign custody ke diri sendiri.
+     *   1. Gak boleh reassign custody ke diri sendiri — TERMASUK PIC. Beda
+     *      dengan Issue (PIC boleh ke diri sendiri sejak 2026-11-14): issue
+     *      mengambil dari stok gudang yang memang dia kelola, sedangkan
+     *      reassign mengambil barang yang sedang dipegang teknisi LAIN.
      *   2. `pic_gudang` cuma boleh reassign custody yang asal gudangnya
      *      (`issued_from_pop_id`) salah satu cabang penunjukannya — penting
      *      buat PIC scope `all_pop` yang hak gudangnya tetap dibatasi ke

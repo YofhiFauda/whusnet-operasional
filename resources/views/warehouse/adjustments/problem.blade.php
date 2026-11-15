@@ -31,7 +31,7 @@
 <div class="max-w-2xl rounded-lg border border-slate-200 bg-white p-6 shadow-xs dark:border-slate-700 dark:bg-slate-800/90 sm:p-8">
     {{-- session('error') sudah tampil lewat toast global (x-toast di layout) —
          kotak di sini dulu bikin pesan yang sama muncul dua kali di layar. --}}
-    <form method="POST" enctype="multipart/form-data" class="space-y-4"
+    <form method="POST" enctype="multipart/form-data" class="space-y-4" hx-boost="false"
           action="{{ route('warehouse.adjustments.balance.store') }}"
           data-url-qty="{{ route('warehouse.adjustments.balance.store') }}"
           data-resolve-url="{{ $resolveUrl }}"

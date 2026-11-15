@@ -97,7 +97,7 @@ sama begitu kartu ber-PIN sampai, bukan lewat password sementara yang diketik pe
 
 | Metode | Path | Fungsi |
 |---|---|---|
-| GET | `/qr/resolve` | `code` (dari `/q1/{code}` QR) → `login_id` + status akun, TANPA PIN |
+| GET | `/qr/resolve` | `code` (dari `/q1/{code}` QR) → `login_id` + status akun + `billing` (ringkasan tagihan belum lunas TERSAMAR, sejak 2026-11-14), TANPA PIN |
 | POST | `/auth/login` | `login_id` + password → access + refresh token |
 | POST | `/auth/claim` | `login_id` + PIN → tetapkan password pertama |
 | POST | `/auth/refresh` | refresh token → pasangan token baru (rotating) |

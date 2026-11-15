@@ -10,12 +10,38 @@ window.addEventListener('beforeunload', () => {
 
 import './bootstrap';
 import './image-source-picker';
+import './webpush';
 
 /* htmx — nav instant lintas semua halaman lewat hx-boost="true" di <body>
    (layouts/app.blade.php). Dibundel lokal lewat Vite sama seperti Alpine,
    bukan CDN — alasan sama: app operasional internal, jaringan luar gak
    boleh jadi titik gagal buat interaksi dasar (lihat catatan Alpine di atas). */
 import 'htmx.org';
+
+/* Boost cuma untuk NAVIGASI LINK — semua <form> dikeluarkan (ADHOC-297,
+   keputusan user 2026-11-13). hx-boost di <body> ikut mem-boost form, dan
+   listener submit htmx di elemen form memanggil preventDefault() lalu
+   LANGSUNG kirim XHR tanpa peduli handler lain sudah membatalkan event.
+   Terbukti (simulasi jsdom, htmx 2.0.11): dialog konfirmasi global gak
+   pernah tampil, `onsubmit="return confirm()"` tetap terkirim walau Batal,
+   handler confirmAction/fetch terkirim dobel, `form.action` yang diubah JS
+   terkirim ke URL lama (akar ADHOC-291), `target="_blank"` menimpa tab.
+   Submit native mengembalikan semua itu ke perilaku yang dirancang (dialog,
+   PRG, withErrors()->withInput()), harganya cuma reload penuh setelah simpan.
+
+   `htmx:beforeProcessNode` dipicu per elemen (termasuk tiap form, baik saat
+   load awal maupun konten hasil swap) SEBELUM htmx memutuskan boost lewat
+   atribut hx-boost terdekat — jadi `hx-boost="false"` di form itu sendiri
+   menang. Listener dipasang di sini (module jalan sebelum DOMContentLoaded,
+   saat htmx memproses body pertama kali). Form yang sengaja menulis
+   hx-boost sendiri (opt-in "true") tidak ditimpa. Atribut hx-post/hx-get
+   di form tetap jalan — itu bukan boost. */
+document.addEventListener('htmx:beforeProcessNode', (e) => {
+    const elt = e.target;
+    if (elt instanceof HTMLElement && elt.tagName === 'FORM' && !elt.hasAttribute('hx-boost')) {
+        elt.setAttribute('hx-boost', 'false');
+    }
+});
 
 // Hapus snapshot lama yang masih berisi DOM hasil render Alpine di tab terbuka.
 // Snapshot baru dicegah oleh hx-history="false" pada body layout.
@@ -29,6 +55,12 @@ try {
    gak nyangkut blank/stuck di halaman lama. Lihat docs/superpowers/specs/
    2026-11-03-spa-feel-htmx-design.md § Error Handling. */
 window.addEventListener('htmx:responseError', (e) => {
+    // Cuma navigasi GET yang boleh diulang lewat location.href — request
+    // POST/PUT/DELETE yang di-GET-kan ulang ke URL yang sama cuma berakhir
+    // 405 "tidak terjadi apa-apa" (ADHOC-297).
+    if (String(e.detail.requestConfig.verb).toLowerCase() !== 'get') {
+        return;
+    }
     window.location.href = e.detail.requestConfig.path;
 });
 
@@ -94,6 +126,32 @@ import collapse from '@alpinejs/collapse';
 import focus from '@alpinejs/focus';
 import { infrastructureReport } from './task-infrastructure-report';
 
+/* Dipakai material-rows.blade.php (itemOptionsFor) & installation-item-rows.blade.php
+   (itemOptionsWithLegacy) — dua komponen beda yang sama-sama butuh "baris lama
+   yang id-nya sudah gak ada di opsi sekarang (custody habis/dipindah) tetap
+   ditawarkan UNTUK BARIS ITU SAJA". Tanpa ini <select>/combobox jatuh diam-diam
+   ke opsi pertama saat render, dan submit ulang menimpa field jadi barang lain.
+   Global (bukan import module) karena kedua komponen mendefinisikan fungsi
+   Alpine-nya lewat <script> inline yang di-push lewat @push('scripts'), bukan
+   modul ES — pola yang sama dengan materialRows()/comboBox() di komponen itu
+   sendiri.
+
+   WAJIB didefinisikan SEBELUM `Alpine.start()` (bug 2026-11-14): start()
+   langsung me-render seluruh halaman secara sinkron. Dulu fungsi ini ada di
+   bawah start(), jadi baris tersimpan (prefill data/old(), punya option_id)
+   memanggilnya sebelum ada ⇒ "withLegacyOption is not defined" ⇒ label
+   Barang Dipasang kosong & dropdown tak berisi setelah halaman di-refresh.
+   Baris baru lolos karena tanpa option_id fungsi ini tak dipanggil — itu
+   sebabnya bug cuma muncul setelah simpan + refresh.
+   Penjaga: BarangDipasangHilangSetelahRefreshTest. */
+window.withLegacyOption = function (options, matcher, buildFallback) {
+    if (options.some(matcher)) {
+        return options;
+    }
+
+    return [...options, buildFallback()];
+};
+
 Alpine.plugin(collapse);
 Alpine.plugin(focus);
 
@@ -127,19 +185,3 @@ document.addEventListener('wheel', () => {
     }
 }, { passive: true });
 
-/* Dipakai material-rows.blade.php (itemOptionsFor) & installation-item-rows.blade.php
-   (itemOptionsWithLegacy) — dua komponen beda yang sama-sama butuh "baris lama
-   yang id-nya sudah gak ada di opsi sekarang (custody habis/dipindah) tetap
-   ditawarkan UNTUK BARIS ITU SAJA". Tanpa ini <select>/combobox jatuh diam-diam
-   ke opsi pertama saat render, dan submit ulang menimpa field jadi barang lain.
-   Global (bukan import module) karena kedua komponen mendefinisikan fungsi
-   Alpine-nya lewat <script> inline yang di-push lewat @push('scripts'), bukan
-   modul ES — pola yang sama dengan materialRows()/comboBox() di komponen itu
-   sendiri. */
-window.withLegacyOption = function (options, matcher, buildFallback) {
-    if (options.some(matcher)) {
-        return options;
-    }
-
-    return [...options, buildFallback()];
-};

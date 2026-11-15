@@ -119,6 +119,13 @@ function countdownTimer(deadlineIso, totalSeconds) {
             this._timer = setInterval(() => this.tick(), 1000);
         },
 
+        // Alpine memanggil destroy() saat elemen dicopot — termasuk body
+        // ditukar hx-boost. Tanpa ini interval tiap kartu SLA tetap jalan
+        // setelah pindah menu (review ADHOC-297 #4).
+        destroy() {
+            clearInterval(this._timer);
+        },
+
         tick() {
             // Gunakan Date.now() vs deadline — akurat meski tab di-background
             const nowMs       = Date.now();

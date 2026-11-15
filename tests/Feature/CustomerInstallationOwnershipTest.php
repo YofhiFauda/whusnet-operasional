@@ -23,6 +23,7 @@ use App\Models\Invoice;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\PackageCategory;
+use App\Models\Payment;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
@@ -277,6 +278,14 @@ class CustomerInstallationOwnershipTest extends TestCase
         $device = $customer->customerDevice()->first();
         $this->assertEquals(DeviceAcquisitionSource::SEWA, $device->acquisition_source);
 
+        $this->withoutVite();
+        $this->actingAs($this->loginAsAdmin())
+            ->get(route('customers.verification.admin', $customer))
+            ->assertOk()
+            ->assertSeeInOrder(['Jenis Kontrak', 'Sewa', 'Modem', 'Sewa Gudang'])
+            ->assertDontSee('name="modem_sale_amount"', false)
+            ->assertDontSee('id="kwitansi_modem"', false);
+
         // Invoice AWAL tidak ada baris Jual Modem (amount 0 di-skip builder).
         $this->finalVerifyAsAdmin($customer);
         $invoice = Invoice::where('customer_id', $customer->id)->firstOrFail();
@@ -371,6 +380,20 @@ class CustomerInstallationOwnershipTest extends TestCase
         $device = $customer->customerDevice()->first();
         $this->assertEquals(DeviceAcquisitionSource::BELI_GUDANG, $device->acquisition_source);
 
+        // Laporan user 2026-11-14: halaman Verifikasi Admin dulu tidak
+        // menyebut kontrak Beli/Sewa maupun harga modem — admin gak tahu
+        // modemnya dijual sebelum menyetujui. Harga wajib tampil di Ringkasan
+        // Layanan & kwitansi pratinjau (JS ikut menjumlahkannya).
+        $this->withoutVite();
+        $this->actingAs($this->loginAsAdmin())
+            ->get(route('customers.verification.admin', $customer))
+            ->assertOk()
+            ->assertSeeInOrder(['Jenis Kontrak', 'Beli Putus', 'Modem', 'Beli dari Gudang', 'Rp 150.000'])
+            ->assertSee('SN-OWN-BELI-GUDANG-001')
+            ->assertSee('name="modem_sale_amount"', false)
+            ->assertSee('value="150.000"', false)
+            ->assertSee('id="kwitansi_modem"', false);
+
         // finalVerify() (CS) menerbitkan Invoice AWAL — modem_sale_price
         // dibaca dari draft pointer CustomerInstallation, bukan dari request
         // finalVerify (form itu tidak pernah mengirim field ini).
@@ -386,6 +409,30 @@ class CustomerInstallationOwnershipTest extends TestCase
         // §5 — penaut pasti ke inventory_serial_sales, dipakai laporan
         // rekonsiliasi "SN terjual belum ditagih".
         $this->assertEquals($sale->id, $jualModemItem->inventory_serial_sale_id);
+
+        // Laporan user 2026-11-14: Detail Tagihan & Detail Pembayaran dulu
+        // cuma menampilkan total — baris Pembelian Modem cuma ada di versi
+        // cetak. Urutan memastikan barisnya ada di tab Rincian LAYAR.
+        $admin = $this->loginAsAdmin();
+        $this->withoutVite();
+        $this->actingAs($admin)->get(route('invoices.show', $invoice))
+            ->assertOk()
+            ->assertSeeInOrder(['Rincian Komponen Invoice', 'SN-OWN-BELI-GUDANG-001', 'Subtotal', 'TOTAL TAGIHAN']);
+
+        $payment = Payment::create([
+            'payment_number' => 'PAY-'.$invoice->invoice_number,
+            'invoice_id' => $invoice->id,
+            'customer_id' => $customer->id,
+            'pop_id' => $invoice->pop_id,
+            'payment_date' => now()->toDateString(),
+            'payment_method' => 'cash',
+            'amount' => 50000,
+            'received_by' => $admin->id,
+            'payment_status' => 'valid',
+        ]);
+        $this->actingAs($admin)->get(route('payments.show', $payment))
+            ->assertOk()
+            ->assertSeeInOrder(['Rincian Tagihan', 'SN-OWN-BELI-GUDANG-001', 'Rp 150.000']);
     }
 
     /**
@@ -469,6 +516,18 @@ class CustomerInstallationOwnershipTest extends TestCase
         // Rancangan 2026-10-31 §3 — keterangan ikut nyampe lewat snapshot
         // pending_initial_invoice sampai jalur BD, bukan cuma nominal.
         $this->assertStringContainsString('SN-OWN-BISNIS-001', $jualModemItem->description);
+
+        // Laporan user 2026-11-14: Detail Pelanggan menampilkan bahasa teknis
+        // tagihan — kolom "Kolom di Sistem" (prorate_amount, …) di Rincian
+        // Tagihan Awal dan snapshot pending_initial_invoice sebagai JSON
+        // mentah di Riwayat Perubahan.
+        $this->withoutVite();
+        $customerPage = $this->actingAs($admin)->get(route('customers.show', $customer))->assertOk();
+        $customerPage->assertSeeInOrder(['RINCIAN TAGIHAN AWAL', 'Pembelian modem', 'SN-OWN-BISNIS-001', 'TOTAL PEMBAYARAN REGISTRASI AWAL'])
+            ->assertDontSee('Kolom di Sistem')
+            ->assertSee('Rincian Tagihan Awal (Menunggu Verifikasi BD)')
+            ->assertDontSee('&quot;billing&quot;', false)
+            ->assertDontSee('"billing"', false);
 
         // Modem beneran kejual di sisi Gudang juga — regresi sisi Task 4
         // tidak berubah hanya karena kategori paketnya Bisnis.
@@ -568,6 +627,62 @@ class CustomerInstallationOwnershipTest extends TestCase
         $installation = $customer->installations()->latest()->first();
         $this->assertNull($installation->modem_acquisition_choice);
         $this->assertNull($installation->selected_inventory_serial_id);
+    }
+
+    /**
+     * Permintaan user 2026-11-14: harga "Pembelian modem" di Verifikasi
+     * Admin berupa input yang bisa dikoreksi admin. Nilai koreksi yang
+     * ditagih, dan ledger penjualan SN + draft instalasi ikut disamakan
+     * supaya laporan gudang tidak menyimpan harga lama.
+     */
+    #[Test]
+    public function admin_bisa_mengoreksi_harga_modem_beli_dari_gudang_saat_verifikasi(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInstallingCustomer('beli');
+        $serial = $this->issueSerialToTechnician($pusat, $cabang, $technician, 'SN-OWN-KOREKSI-001');
+
+        $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePemasanganPayload($technician, $cabang) + [
+            'selected_inventory_serial_id' => $serial->id,
+            'modem_acquisition_choice' => 'beli_gudang',
+            'modem_sale_price' => 150000,
+        ])->assertSessionHasNoErrors();
+        $this->actingAs($technician)->post(route('customers.installation.speedtest', $customer->id), $this->baseSpeedtestPayload())
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->loginAsAdmin())->post(route('customers.verification.final', $customer->id), [
+            'issue_date' => now()->format('Y-m-d'),
+            'modem_sale_amount' => '175.000',
+        ])->assertSessionHasNoErrors();
+
+        $invoice = Invoice::where('customer_id', $customer->id)->firstOrFail();
+        $jualModemItem = $invoice->items()->whereHas('subcategory', fn ($q) => $q->where('code', 'jual_modem'))->firstOrFail();
+        $this->assertEquals(175000.00, (float) $jualModemItem->amount);
+        $this->assertEquals(175000.00, (float) InventorySerialSale::where('inventory_serial_id', $serial->id)->sole()->price);
+        $this->assertEquals(175000.00, (float) $customer->installations()->latest()->first()->modem_sale_price);
+    }
+
+    #[Test]
+    public function harga_modem_dari_form_verifikasi_diabaikan_untuk_pelanggan_sewa(): void
+    {
+        Storage::fake('public');
+        [$customer, $technician, , $pusat, $cabang] = $this->setupInstallingCustomer('sewa');
+        $serial = $this->issueSerialToTechnician($pusat, $cabang, $technician, 'SN-OWN-SEWA-RAKIT-001');
+
+        $this->actingAs($technician)->post(route('customers.installation.pemasangan', $customer->id), $this->basePemasanganPayload($technician, $cabang) + [
+            'selected_inventory_serial_id' => $serial->id,
+        ])->assertSessionHasNoErrors();
+        $this->actingAs($technician)->post(route('customers.installation.speedtest', $customer->id), $this->baseSpeedtestPayload())
+            ->assertSessionHasNoErrors();
+
+        $this->actingAs($this->loginAsAdmin())->post(route('customers.verification.final', $customer->id), [
+            'issue_date' => now()->format('Y-m-d'),
+            'modem_sale_amount' => '500.000',
+        ])->assertSessionHasNoErrors();
+
+        $invoice = Invoice::where('customer_id', $customer->id)->firstOrFail();
+        $this->assertFalse($invoice->items()->whereHas('subcategory', fn ($q) => $q->where('code', 'jual_modem'))->exists());
+        $this->assertSame(0, InventorySerialSale::count());
     }
 
     private function finalVerifyAsAdmin(Customer $customer): void

@@ -15,9 +15,11 @@ use App\Models\CustomerInstallation;
 use App\Models\CustomerSurvey;
 use App\Models\FopTask;
 use App\Models\Task;
+use App\Models\TaskMemberRelease;
 use App\Models\TaskTeam;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Notifications\AppPushNotification;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -189,14 +191,29 @@ class TaskService
 
     /**
      * Update jadwal dan/atau tim task (guard: task.edit + task.schedule).
+     *
+     * $notify=false dipakai caller yang meng-update BANYAK task sekaligus
+     * dalam satu aksi (mis. FopTaskController::assignToTeam() ngebersihin
+     * teknisi dari task lain yang bentrok jadwal) — kalau tetap true,
+     * teknisi yang kena notifyTeam()/notifyDroppedMembers() bakal dapet
+     * satu notif+toast TERPISAH per task yang diubah, numpuk jadi banjir
+     * notifikasi buat SATU aksi admin. Caller begini wajib kirim notif
+     * gabungannya sendiri setelah loop-nya selesai.
+     *
+     * Broadcast realtime `TaskScheduled` TETAP dikirim walau $notify=false
+     * (review ADHOC-297 #6) — itu bukan notifikasi, tapi sinyal ke Tasks Saya
+     * untuk mencopot/menyegarkan kartu (tanpa toast). Dulu ikut tertahan ⇒
+     * kartu task yang sudah dilepas tetap tampil di HP teknisi sampai reload,
+     * dan diketuk berujung 403.
      */
-    public function update(Task $task, array $data, User $actor): Task
+    public function update(Task $task, array $data, User $actor, bool $notify = true): Task
     {
         $rescheduled = false;
         $teamChanged = false;
         $droppedIds = [];
+        $addedIds = [];
 
-        $task = DB::transaction(function () use ($task, $data, $actor, &$rescheduled, &$teamChanged, &$droppedIds) {
+        $task = DB::transaction(function () use ($task, $data, $actor, &$rescheduled, &$teamChanged, &$droppedIds, &$addedIds) {
             $rescheduled = isset($data['scheduled_at'])
                 && $task->scheduled_at?->ne(Carbon::parse($data['scheduled_at']));
 
@@ -211,7 +228,8 @@ class TaskService
             if (isset($data['team_member_ids'])) {
                 $newMemberIds = $data['team_member_ids'];
                 $droppedIds = array_values(array_diff($oldMemberIds, $newMemberIds));
-                $teamChanged = count($droppedIds) > 0 || count(array_diff($newMemberIds, $oldMemberIds)) > 0;
+                $addedIds = array_values(array_diff($newMemberIds, $oldMemberIds));
+                $teamChanged = count($droppedIds) > 0 || count($addedIds) > 0;
 
                 $task->teamMembers()->delete();
                 foreach ($newMemberIds as $index => $userId) {
@@ -239,13 +257,20 @@ class TaskService
         // Kalau masih di dalam closure, listener frontend bisa fetch partial
         // sebelum row ke-commit dan kartu gak pernah muncul tanpa reload.
         if ($rescheduled) {
-            $this->notifyTeam($task, "Jadwal task diubah ke {$task->scheduled_at->format('d M Y H:i')}", 'rescheduled');
+            $this->notifyTeam($task, "Jadwal task diubah ke {$task->scheduled_at->format('d M Y H:i')}", 'rescheduled', $notify);
         } elseif ($teamChanged) {
-            $this->notifyTeam($task, 'Tim task Anda diperbarui.', 'team_changed');
+            $this->notifyTeam($task, 'Tim task Anda diperbarui.', 'team_changed', $notify);
         }
 
         if (! empty($droppedIds)) {
-            $this->notifyDroppedMembers($task, $droppedIds);
+            $this->notifyDroppedMembers($task, $droppedIds, $notify);
+        }
+
+        // Teknisi yang BARU masuk tim task yang sudah ada — buat dia ini
+        // penugasan baru, jadi ikut dapat push "Jadwal Baru" seperti task
+        // yang baru dibuat (review ADHOC-297 #10).
+        if ($notify && ! empty($addedIds)) {
+            DB::afterCommit(fn () => $this->pushNewAssignment($task, $addedIds));
         }
 
         return $task;
@@ -407,7 +432,7 @@ class TaskService
             $fop->notify(new AppNotification(
                 title: 'Laporan Task Selesai: '.$task->task_number,
                 message: "Teknisi {$actor->name} telah menyelesaikan task dan mengunggah laporan. Butuh review Anda.",
-                actionUrl: route('tasks.show', $task->id),
+                actionUrl: route('tasks.show', $task->id, false),
                 type: NotificationType::INFO
             ));
         }
@@ -578,7 +603,7 @@ class TaskService
         // Notif dikirim SEBELUM tim dilepas — delete pivot bikin query tim
         // sesudahnya kosong.
         $members = $notifyTeam ? $task->teamMembers()->with('user')->get() : collect();
-        $url = route('tasks.show', $task->id);
+        $url = route('tasks.show', $task->id, false);
 
         foreach ($members as $member) {
             if ($member->user) {
@@ -599,6 +624,24 @@ class TaskService
                 'pending_reason' => $reason,
                 'updated_by' => $actorId,
             ]);
+
+            // Jejak tim yang dilepas DICATAT sebelum pivot dihapus (ADHOC-298).
+            // Tanpa ini task yang di-pending lenyap dari sisi teknisi — tidak
+            // di Tasks Saya, tidak di Riwayat — seolah kunjungannya tak pernah
+            // ada. Ditulis di sini (bukan di controller) supaya ketiga jalur
+            // Pending (teknisi, FOP, review FOP) tercatat sama.
+            $releasedAt = now();
+            foreach ($task->teamMembers()->get() as $member) {
+                TaskMemberRelease::create([
+                    'task_id' => $task->id,
+                    'user_id' => $member->user_id,
+                    'role_in_task' => $member->role_in_task,
+                    'reason' => $reason,
+                    'source' => $auditAction,
+                    'released_by' => $actorId,
+                    'released_at' => $releasedAt,
+                ]);
+            }
 
             $task->teamMembers()->delete();
 
@@ -716,7 +759,7 @@ class TaskService
 
         // Notify new tech
         if ($newUser) {
-            $url = route('tasks.show', $task->id);
+            $url = route('tasks.show', $task->id, false);
             $msg = "Anda telah ditugaskan menggantikan {$oldUser?->name} untuk task ini.";
             if ($scheduleChanged) {
                 $msg .= ' Jadwal diubah ke '.Carbon::parse($targetScheduledAt)->format('d M Y H:i');
@@ -727,11 +770,14 @@ class TaskService
                 actionUrl: $url,
                 type: NotificationType::INFO
             ));
+
+            // Teknisi pengganti = penugasan baru buat dia (review ADHOC-297 #10).
+            $this->pushNewAssignment($task, [$newUser->id]);
         }
 
         // Notify old tech
         if ($oldUser) {
-            $url = route('tasks.show', $task->id);
+            $url = route('tasks.show', $task->id, false);
             $oldUser->notify(new AppNotification(
                 title: 'Task Di-unassign: '.$task->task_number,
                 message: 'Tugas ini telah dialihkan ke teknisi lain.',
@@ -743,7 +789,7 @@ class TaskService
         // Notify remaining team members if schedule changed
         if ($scheduleChanged && count($otherUserIds) > 0) {
             $formattedTime = Carbon::parse($targetScheduledAt)->format('d M Y H:i');
-            $url = route('tasks.show', $task->id);
+            $url = route('tasks.show', $task->id, false);
             foreach ($otherUserIds as $otherId) {
                 $otherUser = $usersById->get($otherId);
                 if ($otherUser) {
@@ -811,7 +857,11 @@ class TaskService
 
     // ─── Helper ──────────────────────────────────────────────────
 
-    private function notifyTeam(Task $task, string $message, string $eventType = 'created'): void
+    /**
+     * $withNotification=false ⇒ cuma broadcast realtime (kartu Tasks Saya),
+     * tanpa AppNotification/Telegram/push — dipakai update(notify: false).
+     */
+    private function notifyTeam(Task $task, string $message, string $eventType = 'created', bool $withNotification = true): void
     {
         // afterCommit(), bukan langsung — caller di controller (mis. FopTaskController::
         // store()/update()/assignToTeam()) sering manggil method ini dari DALAM
@@ -820,9 +870,9 @@ class TaskService
         // instan, listener langsung fetch() partial task via request HTTP baru (koneksi
         // DB lain) yang belum bisa lihat row-nya — kartu gak pernah muncul tanpa reload
         // manual. afterCommit() aman dipanggil di luar transaction juga (jalan langsung).
-        DB::afterCommit(function () use ($task, $message, $eventType) {
-            $members = $task->teamMembers()->with('user')->get();
-            $url = route('tasks.show', $task->id);
+        DB::afterCommit(function () use ($task, $message, $eventType, $withNotification) {
+            $members = $withNotification ? $task->teamMembers()->with('user')->get() : collect();
+            $url = route('tasks.show', $task->id, false);
 
             foreach ($members as $member) {
                 if ($member->user) {
@@ -836,11 +886,46 @@ class TaskService
 
                     // Optional: keep Telegram if already setup
                     SendTaskNotificationJob::dispatch($task->id, $member->user_id, $message);
+
+                    // Push device (ADHOC-288 Tahap 6, event disetujui #2
+                    // "New Task Assignment Survey/PSB/Ticket") — cuma task
+                    // BARU dijadwalkan (bukan reschedule/cancel/pending/dll)
+                    // dan cuma 3 tipe yang disetujui; C-REQ/O-REQ/INFR
+                    // REQ/DEAC sengaja TIDAK push.
+                    if ($eventType === 'created') {
+                        $this->pushNewAssignment($task, [$member->user_id]);
+                    }
                 }
             }
 
             broadcast(new TaskScheduled($task, $eventType));
         });
+    }
+
+    /**
+     * Push device "Jadwal Baru" (ADHOC-288 Tahap 6, event disetujui #2 "New
+     * Task Assignment Survey/PSB/Ticket") ke teknisi yang BARU ditugaskan —
+     * task baru, masuk tim task yang sudah ada, atau menggantikan teknisi lain.
+     * Cuma 3 tipe yang disetujui; C-REQ/O-REQ/INFR REQ/DEAC sengaja TIDAK push.
+     * Reschedule/cancel/pending juga tidak lewat sini.
+     *
+     * @param  list<int>  $userIds
+     */
+    private function pushNewAssignment(Task $task, array $userIds): void
+    {
+        if (! in_array($task->task_type, [TaskType::SURVEY, TaskType::PEMASANGAN, TaskType::MAINTENANCE], true)) {
+            return;
+        }
+
+        $url = route('tasks.show', $task->id, false);
+
+        foreach (User::whereIn('id', $userIds)->get() as $user) {
+            $user->notify(new AppPushNotification(
+                'Jadwal Baru: '.$task->task_number,
+                'Anda ditugaskan ke task baru. Ketuk buat lihat lokasi & jadwal.',
+                $url
+            ));
+        }
     }
 
     /**
@@ -851,12 +936,12 @@ class TaskService
      *
      * @param  array<int>  $droppedUserIds
      */
-    private function notifyDroppedMembers(Task $task, array $droppedUserIds): void
+    private function notifyDroppedMembers(Task $task, array $droppedUserIds, bool $withNotification = true): void
     {
         // Sama alasan afterCommit() seperti notifyTeam() di atas.
-        DB::afterCommit(function () use ($task, $droppedUserIds) {
-            $users = User::whereIn('id', $droppedUserIds)->get();
-            $url = route('tasks.show', $task->id);
+        DB::afterCommit(function () use ($task, $droppedUserIds, $withNotification) {
+            $users = $withNotification ? User::whereIn('id', $droppedUserIds)->get() : collect();
+            $url = route('tasks.show', $task->id, false);
 
             foreach ($users as $user) {
                 $user->notify(new AppNotification(

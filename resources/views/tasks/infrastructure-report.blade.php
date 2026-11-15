@@ -317,9 +317,11 @@
                 <div class="mt-4 grid gap-4 sm:grid-cols-2">
                     <label class="block text-sm font-medium text-text-secondary">Foto lokasi / hasil <span class="text-xs font-normal text-text-muted">(opsional)</span>
                         <input type="file" name="opm_photo" accept="image/*" class="mt-1.5 block w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                        <x-upload-limit-hint class="font-normal" />
                     </label>
                     <label class="block text-sm font-medium text-text-secondary">Foto pengukuran <span class="text-xs font-normal text-text-muted">(opsional)</span>
                         <input type="file" name="speedtest_photo" accept="image/*" class="mt-1.5 block w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main">
+                        <x-upload-limit-hint class="font-normal" />
                     </label>
                 </div>
                 @if($workTools->isNotEmpty())

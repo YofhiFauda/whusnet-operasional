@@ -101,7 +101,7 @@
             });
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    window.onPageReady(() => {
         const miniPopSelect = document.getElementById('na-mini-pop-select');
         if (miniPopSelect) {
             miniPopSelect.addEventListener('change', renderDistributionOptions);

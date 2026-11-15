@@ -14,6 +14,7 @@ use App\Models\Ticket;
 use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
+use App\Notifications\AppPushNotification;
 use Database\Seeders\ActionSeeder;
 use Database\Seeders\FeatureSeeder;
 use Database\Seeders\RolePermissionSeeder;
@@ -89,13 +90,13 @@ class TicketNotificationTest extends TestCase
         return $user;
     }
 
-    private function submitTicket(User $actor): Ticket
+    private function submitTicket(User $actor, string $priority = 'High'): Ticket
     {
         $this->actingAs($actor)->post(route('tickets.store'), [
             'type' => TaskType::MAINTENANCE->value,
             'customer_id' => $this->customer->id,
             'detail_keluhan' => 'Internet mati total sejak pagi.',
-            'priority' => 'High',
+            'priority' => $priority,
         ])->assertRedirect();
 
         return Ticket::latest('id')->firstOrFail();
@@ -132,6 +133,58 @@ class TicketNotificationTest extends TestCase
         Notification::assertSentTo(
             $this->fopUser,
             AppNotification::class,
+            fn ($notification) => str_contains($notification->title, $ticket->fresh()->fopTask->task_number)
+        );
+    }
+
+    /**
+     * Push device (ADHOC-288 Tahap 6, event disetujui #1 "Tiket Gangguan
+     * Prioritas High/Critical") — cuma tiket High/Urgent yang push, biar
+     * gak numpuk notif device buat tiket low/medium.
+     */
+    public function test_escalate_to_noc_with_high_priority_also_pushes_noc_users(): void
+    {
+        $ticket = $this->submitTicket($this->helpdeskUser, 'High');
+
+        Notification::fake();
+
+        $this->actingAs($this->helpdeskUser)
+            ->postJson(route('tickets.escalate', $ticket), ['target' => 'noc'])
+            ->assertOk();
+
+        Notification::assertSentTo(
+            $this->nocUser,
+            AppPushNotification::class,
+            fn ($notification) => str_contains($notification->title, $ticket->ticket_number)
+        );
+    }
+
+    public function test_escalate_to_noc_with_low_priority_does_not_push(): void
+    {
+        $ticket = $this->submitTicket($this->helpdeskUser, 'low');
+
+        Notification::fake();
+
+        $this->actingAs($this->helpdeskUser)
+            ->postJson(route('tickets.escalate', $ticket), ['target' => 'noc'])
+            ->assertOk();
+
+        Notification::assertNotSentTo($this->nocUser, AppPushNotification::class);
+    }
+
+    public function test_escalate_to_fop_with_high_priority_also_pushes_fop_users(): void
+    {
+        $ticket = $this->submitTicket($this->helpdeskUser, 'Urgent');
+
+        Notification::fake();
+
+        $this->actingAs($this->helpdeskUser)
+            ->postJson(route('tickets.escalate', $ticket), ['target' => 'fop'])
+            ->assertOk();
+
+        Notification::assertSentTo(
+            $this->fopUser,
+            AppPushNotification::class,
             fn ($notification) => str_contains($notification->title, $ticket->fresh()->fopTask->task_number)
         );
     }

@@ -1,8 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Lebih Bayar - Whusnet Operasional')
+@section('title', 'Lebih Bayar')
 @section('page_title', 'Lebih Bayar')
-@section('breadcrumb_parent', 'Riwayat Transaksi Pembayaran')
 @section('breadcrumb_parent_url', route('payments.index'))
 
 @section('content')

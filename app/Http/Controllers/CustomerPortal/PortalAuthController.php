@@ -162,8 +162,10 @@ class PortalAuthController extends Controller
     /**
      * Resolusi QR
      *
-     * Dipanggil Portal (app terpisah) begitu pelanggan scan QR — cuma
-     * balikin `login_id` + status akun, buat pre-fill halaman klaim/login.
+     * Dipanggil Portal (app terpisah) begitu pelanggan scan QR — balikin
+     * `login_id` + status akun (pre-fill halaman klaim/login) + `billing`:
+     * ringkasan tagihan belum lunas yang TERSAMAR (nama disamarkan, tanpa
+     * alamat/HP/nomor invoice) supaya tamu langsung lihat tagihan.
      * TIDAK PERNAH minta/balikin PIN — itu tetap di `claim()`. 404 (bukan
      * pesan detail) kalau kode gak valid, sama pola anti-enumeration
      * `QrScanController`.
@@ -182,6 +184,9 @@ class PortalAuthController extends Controller
         return response()->json([
             'login_id' => $result['login_id'],
             'account_status' => $result['account_status'],
+            // Ringkasan tagihan tersamar buat tamu (2026-11-14) — whitelist
+            // dijaga di PortalAuthService::publicBillingSummary().
+            'billing' => $result['billing'],
         ]);
     }
 

@@ -6,6 +6,7 @@ use App\Enums\Gender;
 use App\Models\InternetPackage;
 use App\Models\RestrictedPackage;
 use App\Support\RupiahInput;
+use App\Support\UploadLimit;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Rule;
 
@@ -127,8 +128,8 @@ class CustomerRegistrationRequest extends FormRequest
             // Foto Rumah cuma ada di blok Skip Survey (wajib di sana). Di jalur
             // normal field ini dihapus, jadi upload yang nyasar ditolak, bukan
             // diam-diam tersimpan.
-            'foto_rumah' => ['nullable', 'required_if:skip_survey,1', 'prohibited_unless:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
-            'foto_kontrak' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf|max:2048',
+            'foto_rumah' => ['nullable', 'required_if:skip_survey,1', 'prohibited_unless:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg,webp', UploadLimit::rule()],
+            'foto_kontrak' => 'nullable|file|mimes:jpeg,png,jpg,webp,pdf|'.UploadLimit::rule(),
             // FAB (Formulir Akan Berlangganan Bisnis) — wajib kalau kategori
             // paket yang dipilih adalah kategori Bisnis (mis. "Paket Bisnis
             // Broadband/UKM/Dedicated"), BUKAN restricted_packages —
@@ -148,7 +149,7 @@ class CustomerRegistrationRequest extends FormRequest
 
                     return $category && stripos($category, 'bisnis') !== false;
                 }),
-                'file', 'mimes:jpeg,png,jpg,webp,pdf', 'max:4096',
+                'file', 'mimes:jpeg,png,jpg,webp,pdf', UploadLimit::rule(),
             ],
 
             // Skip Survey — Sales input data survey langsung saat registrasi
@@ -158,7 +159,7 @@ class CustomerRegistrationRequest extends FormRequest
             'nearest_odp' => ['nullable', 'required_if:skip_survey,1', 'string', 'max:255'],
             'cable_estimation_meter' => ['nullable', 'required_if:skip_survey,1', 'integer', 'min:0'],
             'difficulty_level' => ['nullable', 'required_if:skip_survey,1', 'in:MUDAH,SEDANG,SULIT'],
-            'survey_photo' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg,webp', 'max:2048'],
+            'survey_photo' => ['nullable', 'required_if:skip_survey,1', 'file', 'image', 'mimes:jpeg,png,jpg,webp', UploadLimit::rule()],
             // Opsional (sama seperti Lapor Survey teknisi) — diisi hanya kalau
             // pelanggan minta dipasang di tanggal tertentu. after_or_equal:today:
             // tanggal lampau gak ada artinya dan bikin task lahir langsung

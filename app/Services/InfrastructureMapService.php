@@ -961,13 +961,14 @@ class InfrastructureMapService
 
         if ($serialIds !== []) {
             $latest = InventoryTransaction::query()
-                ->selectRaw('MAX(id)')
+                ->selectRaw('MAX(id) AS id')
                 ->where('type', InventoryTransactionType::DEPLOY->value)
                 ->whereIn('serial_id', $serialIds)
                 ->groupBy('serial_id');
 
             $serialEvents = InventoryTransaction::query()
-                ->whereIn('id', $latest)
+                ->joinSub($latest, 'latest_deploy', 'latest_deploy.id', '=', 'inventory_transactions.id')
+                ->select('inventory_transactions.*')
                 ->with('fromTechnician', 'fopTask.task')
                 ->get()
                 ->keyBy('serial_id');
@@ -975,7 +976,7 @@ class InfrastructureMapService
 
         if ($nodeIds !== []) {
             $latest = InventoryTransaction::query()
-                ->selectRaw('MAX(id)')
+                ->selectRaw('MAX(id) AS id')
                 ->where(function ($query): void {
                     $query->where('type', InventoryTransactionType::DEPLOY->value)
                         ->orWhere(function ($correction): void {
@@ -988,7 +989,8 @@ class InfrastructureMapService
                 ->groupBy('to_network_node_id', 'item_id', DB::raw("CASE WHEN roll_id IS NULL THEN '' ELSE COALESCE(lot_no, '') END"));
 
             $quantityEvents = InventoryTransaction::query()
-                ->whereIn('id', $latest)
+                ->joinSub($latest, 'latest_deploy', 'latest_deploy.id', '=', 'inventory_transactions.id')
+                ->select('inventory_transactions.*')
                 ->with('fromTechnician', 'createdBy', 'fopTask.task')
                 ->get()
                 ->keyBy(fn (InventoryTransaction $event): string => $this->balanceKey(

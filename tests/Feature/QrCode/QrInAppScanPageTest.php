@@ -55,6 +55,22 @@ class QrInAppScanPageTest extends TestCase
         $response->assertSee('qr-scan-video', false);
     }
 
+    /**
+     * Tombol Stop/Nyalakan kamera manual (diminta eksplisit 2026-11-10) —
+     * halaman gak cuma otomatis-decode, staf harus bisa matikan kamera
+     * sendiri tanpa pindah/muat ulang halaman. Lihat resources/js/qr-scan.js.
+     */
+    #[Test]
+    public function halaman_punya_tombol_toggle_kamera_manual(): void
+    {
+        $staff = $this->staffWithPermission('helpdesk');
+
+        $response = $this->actingAs($staff)->get(route('qr.scan.show'));
+
+        $response->assertOk();
+        $response->assertSee('qr-scan-toggle-btn', false);
+    }
+
     #[Test]
     public function fop_yang_punya_permission_bisa_buka_halaman(): void
     {

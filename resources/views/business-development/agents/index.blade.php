@@ -1,8 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Master Agent - Whusnet Operasional')
+@section('title', 'Master Agent')
 @section('page_title', 'Master Agent')
-@section('breadcrumb_parent', 'Busdev')
 @section('breadcrumb_parent_url', route('business-development.agents.index'))
 
 @section('content')
@@ -784,7 +783,7 @@
                 </div>
 
                 {{-- MODAL FORM BODY (SCROLLABLE) --}}
-                <form :action="editAgent.updateUrl" method="POST" class="flex-1 flex flex-col overflow-hidden">
+                <form :action="editAgent.updateUrl" method="POST" hx-boost="false" class="flex-1 flex flex-col overflow-hidden">
                     @csrf
                     @method('PUT')
                     <input type="hidden" name="_agent_id" :value="editAgent.id">

@@ -3,10 +3,41 @@
 namespace App\Observers;
 
 use App\Models\Payment;
+use App\Notifications\AppPushNotification;
 use InvalidArgumentException;
 
 class PaymentObserver
 {
+    /**
+     * Push device pelanggan (ADHOC-288 Tahap 7, event disetujui "Pembayaran
+     * berhasil"). `old_payment_id` dilewati — replay data legacy bukan
+     * pembayaran BARU yang perlu diberitahukan ke pelanggan.
+     */
+    public function created(Payment $payment): void
+    {
+        if (! empty($payment->old_payment_id)) {
+            return;
+        }
+
+        $customer = $payment->customer;
+
+        if (! $customer) {
+            return;
+        }
+
+        // Mayoritas pelanggan tidak pernah mengaktifkan push — tanpa cek ini
+        // generate ~15 ribu tagihan bulanan = ~15 ribu job antrean kosong
+        // (review ADHOC-297 #7).
+        if (! $customer->pushSubscriptions()->exists()) {
+            return;
+        }
+
+        $customer->notify(new AppPushNotification(
+            'Pembayaran Diterima: Rp'.number_format((float) $payment->amount, 0, ',', '.'),
+            "Pembayaran {$payment->payment_number} berhasil kami terima. Terima kasih!"
+        ));
+    }
+
     /**
      * Reject zero/negative-amount payments regardless of caller (controller,
      * artisan command, import script, tinker). PaymentController::store already
