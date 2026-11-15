@@ -24,8 +24,8 @@
         v: @js($selectedVillages->map(fn ($x) => ['id' => (int) $x->id, 'name' => $x->name, 'district_id' => (int) ($x->district_id ?? 0), 'district' => optional($x->district)->name])->values()),
         formId: @js($formId)
     })"
-    @click.outside="open = false"
     @keydown.escape="open = false"
+    @scroll.window="open = false" @resize.window="open = false"
     class="relative"
 >
     {{-- Hidden inputs yang ikut ke-submit sebagai filter --}}
@@ -33,7 +33,7 @@
     <template x-for="v in selV" :key="'hv' + v.id"><input type="hidden" name="village_id[]" :value="v.id"></template>
 
     {{-- Pill trigger --}}
-    <button type="button" @click="toggle()"
+    <button type="button" @click="open ? (open = false) : openPanel($event)"
         :aria-expanded="open ? 'true' : 'false'"
         aria-label="Filter Wilayah Kecamatan dan Desa"
         class="h-[38px] w-full inline-flex items-center gap-2 px-3 rounded-lg border border-border bg-surface
@@ -51,12 +51,17 @@
         </svg>
     </button>
 
-    {{-- Dropdown panel --}}
+    {{-- Dropdown panel — diteleport ke <body>, alasan sama kayak pop-filter.blade.php:
+         `overflow-hidden` di section induk _list_filters.blade.php + x-collapse
+         memotong dropdown absolute mana pun yang nongol di dalamnya. --}}
+    <template x-teleport="body">
     <div x-show="open" x-cloak
          x-transition:enter="transition ease-out duration-100"
          x-transition:enter-start="opacity-0 -translate-y-1"
          x-transition:enter-end="opacity-100 translate-y-0"
-         class="absolute z-40 mt-1 w-72 rounded-lg border border-border bg-surface shadow-lg overflow-hidden">
+         @click.outside="open = false" @keydown.escape.window="open = false"
+         :style="`position: fixed; top: ${pos.top}px; left: ${pos.left}px; z-index: 9999;`"
+         class="w-72 rounded-lg border border-border bg-surface shadow-lg overflow-hidden">
 
         {{-- Tabs --}}
         <div class="flex border-b border-border text-xs font-medium">
@@ -151,6 +156,7 @@
             <button type="button" @click="apply()" class="text-xs font-semibold text-white bg-primary hover:bg-primary-hover rounded-md px-3 py-1.5 transition-colors">Terapkan</button>
         </div>
     </div>
+    </template>
 </div>
 
 @once
@@ -171,17 +177,23 @@
             selD: Array.isArray(cfg.d) ? cfg.d : [],
             selV: Array.isArray(cfg.v) ? cfg.v : [],
             formId: cfg.formId || 'filterForm',
+            pos: { top: 0, left: 0 },
 
             label() {
                 const n = this.selD.length + this.selV.length;
                 return n ? (n + ' wilayah dipilih') : 'Wilayah';
             },
 
-            // Buka/tutup dropdown; saat dibuka langsung muat list tab aktif
-            // (tak perlu klik input dulu).
-            toggle() {
-                this.open = !this.open;
-                if (this.open) { this.tab === 'kec' ? this.searchD() : this.searchV(); }
+            // Buka dropdown (diteleport ke <body>, lihat komentar di blade) —
+            // posisi dihitung dari bounding rect tombol, baru muat list tab aktif.
+            openPanel(e) {
+                const panelWidth = 288; // w-72
+                const r = e.currentTarget.getBoundingClientRect();
+                let left = r.left;
+                if (left + panelWidth > window.innerWidth - 8) left = Math.max(8, window.innerWidth - panelWidth - 8);
+                this.pos = { top: Math.round(r.bottom + 4), left: Math.round(left) };
+                this.open = true;
+                this.tab === 'kec' ? this.searchD() : this.searchV();
             },
 
             async searchD() {

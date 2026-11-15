@@ -206,7 +206,7 @@
     // Kategori baru dari modal Tambah Kategori langsung disisipkan ke
     // <select> dan otomatis terpilih — admin tidak perlu reload form yang
     // sedang diisi cuma buat lihat kategori barusan tersedia.
-    document.addEventListener('package-category-created', function (e) {
+    window.pageListen(document, 'package-category-created', function (e) {
         const select = document.getElementById('category');
         const option = document.createElement('option');
         option.value = e.detail.name;

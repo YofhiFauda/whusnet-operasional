@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
 use App\Services\FileUploadService;
+use App\Support\UploadLimit;
 use Illuminate\Http\Request;
 
 class CustomerTestReportController extends Controller
@@ -22,7 +23,7 @@ class CustomerTestReportController extends Controller
             'latency_ms' => 'nullable|numeric|min:0',
             'packet_loss_percent' => 'nullable|numeric|min:0|max:100',
             'quality_score' => 'nullable|integer|min:1|max:5',
-            'speedtest_photo' => 'nullable|image|max:2048',
+            'speedtest_photo' => 'nullable|image|'.UploadLimit::rule(),
             'actual_attenuation' => 'nullable|string|max:50',
             'initial_attenuation' => 'nullable|string|max:50',
         ]);

@@ -8,6 +8,7 @@ use App\Models\CustomerCableCrossing;
 use App\Models\CustomerInstallation;
 use App\Models\Task;
 use App\Models\User;
+use App\Support\UploadLimit;
 use Illuminate\Http\Request;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Collection;
@@ -50,7 +51,7 @@ class CableCrossingService
             'cable_crossings.*.nama_jalan' => ['required', 'string', 'max:191'],
             'cable_crossings.*.jenis_jalan' => ['nullable', 'string', 'max:100'],
             'cable_crossings.*.meter_terpakai' => ['nullable', 'numeric', 'min:0.01'],
-            'cable_crossings.*.foto' => ['nullable', 'image', 'max:4096'],
+            'cable_crossings.*.foto' => ['nullable', 'image', UploadLimit::rule()],
             'cable_crossings.*.points' => ['required', 'array', 'min:2'],
             'cable_crossings.*.points.*.label' => ['nullable', 'string', 'max:150'],
             'cable_crossings.*.points.*.latitude' => ['required', 'numeric', 'between:-90,90'],
@@ -77,7 +78,7 @@ class CableCrossingService
             $rules["{$key}.foto"] = [
                 Rule::requiredIf(fn () => $request->input($statusInput) === CableCrossingStatus::DITARIK->value),
                 'image',
-                'max:4096',
+                UploadLimit::rule(),
             ];
             $rules["{$key}.alasan"] = [
                 Rule::requiredIf(fn () => $request->input($statusInput) === CableCrossingStatus::TIDAK_BISA_DITARIK->value),

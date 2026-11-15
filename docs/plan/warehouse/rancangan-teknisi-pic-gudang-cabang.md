@@ -300,7 +300,7 @@ Sumber: `RolePermissionSeeder` (salinan Role Matrix UI, 2026-09-29).
 | Tugas gudang cabang | PIC Gudang | POP Admin | Pusat (admin/owner) |
 |---|---|---|---|
 | Terima kiriman dari Pusat | ✅ | ❌ lihat saja *(lihat §7.2 untuk cabang tanpa PIC)* | — |
-| Keluarkan barang ke teknisi | ✅ kecuali ke diri sendiri | ✅ **hanya ke PIC** *(lihat §7.2)* | — |
+| Keluarkan barang ke teknisi | ✅ termasuk ke diri sendiri *(dipantau Pusat, §7.3 revisi 2026-11-14)* | ✅ **hanya ke PIC** *(lihat §7.2)* | — |
 | Pindah custody teknisi resign/cuti | ✅ kecuali ke diri sendiri | ✅ | — |
 | Ajukan / batalkan permintaan stok | ✅ | ✅ | Setujui / tolak |
 | Lapor rusak/hilang/opname | ✅ | ✅ | **Memantau** di laporan gudang (§10) |
@@ -311,7 +311,7 @@ Sumber: `RolePermissionSeeder` (salinan Role Matrix UI, 2026-09-29).
 Intinya:
 
 - **Barang masuk & keluar sehari-hari** → PIC.
-- **Barang untuk PIC sendiri** → selalu lewat POP Admin (PIC tidak bisa memberi barang ke dirinya sendiri).
+- **Barang untuk PIC sendiri** → PIC boleh mengeluarkannya sendiri dari gudang cabang penunjukannya, atau lewat POP Admin. Self-issue ditandai & dipantau Pusat (revisi 2026-11-14, §7.3).
 - **Kerugian** (rusak/hilang/opname) → boleh dilaporkan PIC maupun POP Admin, semuanya tercatat dan **dipantau Pusat**.
 
 ### 7.2 Cabang yang belum punya PIC (masa transisi)
@@ -328,6 +328,10 @@ Karena itu **permission `pop_admin` TIDAK dicabut** (`warehouse_transfer.receive
 **Definisi "PIC aktif cabang X":** user dengan role `pic_gudang`, `status = active`, dan punya baris di **`warehouse_pop_pics`** untuk POP X (§5.3.2) — **bukan** dari scope-nya. Ini sengaja dipisah dari scope: PIC bisa saja scope-nya `all_pop`, tapi tetap cuma "PIC aktif" untuk cabang yang dia ditunjuk secara eksplisit. Dihitung di **satu tempat** (`Pop::hasActivePicGudang()` / `Pop::gudangPics()`, §8 Kelompok H) — jangan ditulis ulang di tiap controller.
 
 ### 7.3 Aturan "tidak ke diri sendiri"
+
+> **Revisi keputusan user 2026-11-14 (Opsi B):** PIC Gudang juga teknisi yang dapat task FOP, dan menunggu POP Admin membuat barang telat. Sekarang **Issue ke diri sendiri DIIZINKAN untuk `pic_gudang` dari gudang cabang penunjukannya** (`warehouse_pop_pics`). Kontrol pindah dari pencegahan ke **pemantauan**: transaksi self-issue (`created_by` = `to_technician_id`, diturunkan dari kolom yang ada — tanpa kolom baru) tampil di Laporan Gudang tab *Kerugian & Selisih* bagian **"Dikeluarkan untuk Diri Sendiri"**, plus penanda di Bukti Serah Terima. Role lain tetap ditolak, PIC di cabang lain tetap ditolak, dan **Reassign custody ke diri sendiri tetap ditolak untuk semua** (mengambil barang yang dipegang teknisi lain). Test: `PicGudangKeluarkanBarangUntukDiriSendiriTest`.
+>
+> Aturan asli di bawah dipertahankan sebagai riwayat.
 
 Berlaku untuk **semua** user (bukan cuma PIC), karena memang tidak pernah masuk akal:
 
@@ -710,7 +714,7 @@ Setiap langkah bisa di-commit terpisah.
 | 1 | Pakai solusi F (role global `pic_gudang` + `TECHNICIAN_CODES` + scope POP) — bukan role per cabang | 2026-09-29 |
 | 2 | Tiap cabang punya PIC Gudang **dan** POP Admin → pembagian **Opsi B**: PIC pelaksana, POP Admin pemeriksa (§7) | 2026-09-30 |
 | 3 | PIC **boleh** lapor rusak/hilang/opname (`warehouse_adjustment.create`), **dipantau Pusat** | 2026-09-30 |
-| 4 | PIC **tidak boleh** issue/reassign barang ke dirinya sendiri — barang untuk PIC dikeluarkan POP Admin | 2026-09-30 (bagian dari Opsi B) |
+| 4 | ~~PIC **tidak boleh** issue/reassign barang ke dirinya sendiri — barang untuk PIC dikeluarkan POP Admin~~ **Direvisi 2026-11-14:** PIC **boleh** issue ke diri sendiri dari gudang cabang penunjukannya, ditandai & dipantau Pusat; reassign ke diri sendiri tetap dilarang (§7.3) | 2026-09-30, revisi 2026-11-14 |
 | 5 | Penunjukan PIC **dipisah dari scope POP** lewat tabel baru `warehouse_pop_pics` — menjawab kasus teknisi scope global yang PIC cuma di 1 cabang (§5.3) | 2026-09-30 |
 | 6 | Validasi penunjukan PIC berlaku **2 arah**: cabang PIC wajib dalam scope saat ditunjuk, dan scope gak boleh diubah sampai keluar dari cabang yang sudah dia PIC-i (§5.3.3) | 2026-09-30 |
 | 7 | Satu cabang boleh punya **lebih dari satu** PIC, dan satu PIC boleh pegang **lebih dari satu** cabang — makanya dipilih tabel pivot, bukan kolom tunggal di `pops` (§5.3.2) | 2026-09-30 |

@@ -84,10 +84,13 @@
         </svg>
     </div>
 
+    {{-- z-40, bukan z-30: footer navigasi wizard laporan (fixed di mobile)
+         pakai z-30 & muncul belakangan di DOM ⇒ dengan z sama, footer
+         menutupi daftar ini (2026-11-11, laporan PSB). --}}
     <div
         x-show="open"
         x-cloak
-        class="absolute z-30 mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-1"
+        class="absolute z-40 mt-1 w-full max-h-64 overflow-y-auto rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-lg py-1"
     >
         <template x-for="(opt, index) in matches" :key="String(opt.value)">
             <button

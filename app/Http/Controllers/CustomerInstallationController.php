@@ -20,6 +20,7 @@ use App\Models\Customer;
 use App\Models\CustomerTechnicalDetail;
 use App\Models\InternetPackage;
 use App\Models\InventoryRoll;
+use App\Models\CustomerAdditionalDevice;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\ItemCategory;
@@ -43,6 +44,7 @@ use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
 use App\Services\TelegramBotService;
 use App\Support\SafeUrl;
+use App\Support\UploadLimit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -256,24 +258,12 @@ class CustomerInstallationController extends Controller
             ->where('status', SerialStatus::ISSUED->value)
             ->whereHas('item', fn ($q) => $q->where('ownership_mode', OwnershipMode::INSTALLABLE->value))
             // AP/STB (`is_customer_extra_device`) punya langkahnya sendiri
-            // (ADHOC-190, eligibleExtraDeviceSerialsForTeam()) — kalau ikut
+            // (ADHOC-190, AdditionalDeviceCustodyService::eligibleSerialsForExtraDevice()) — kalau ikut
             // ditawarkan di sini, AP bisa terpilih jadi perangkat UTAMA dan
             // ditimpa ke customer_devices/ont_sn lewat installSerial(true).
             ->whereDoesntHave('item.category', fn ($q) => $q->where('is_customer_extra_device', true))
             ->with('item')
             ->get();
-    }
-
-    /**
-     * Padanan `eligibleSerialsForTeam()` khusus perangkat tambahan (AP/STB,
-     * ADHOC-190) — query-nya tinggal di AdditionalDeviceCustodyService supaya
-     * dropdown di report() dan validasi `Rule::in` di
-     * CustomerInstallationAdditionalDeviceController::store() pakai sumber
-     * yang sama persis.
-     */
-    private function eligibleExtraDeviceSerialsForTeam(?Task $task)
-    {
-        return app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task);
     }
 
     /**
@@ -413,7 +403,13 @@ class CustomerInstallationController extends Controller
         // task ini, item-nya boleh dipasang ke pelanggan (bukan company_asset
         // kayak OTDR). Kosong = teknisi belum ambil barang dari Gudang —
         // storePemasangan() menolak submit-nya, lihat eligibleSerialsForTeam().
-        $eligibleSerials = $this->eligibleSerialsForTeam($task);
+        // SN yang sudah disimpan sebagai pilihan Perangkat Tambahan (draft
+        // pointer extra_device_serial_ids) disembunyikan — kalau dipilih jadi
+        // modem utama juga, storeSpeedtest() meng-install SN yang sama dua kali.
+        $extraDeviceSerialIds = $installation?->extra_device_serial_ids ?? [];
+        $eligibleSerials = $this->eligibleSerialsForTeam($task)
+            ->reject(fn ($serial) => in_array($serial->id, $extraDeviceSerialIds, true))
+            ->values();
 
         // Material Terpakai (Perangkat Pasif) — SEKARANG dibatasi custody tim
         // ini juga, sama prinsipnya dengan SN Perangkat Aktif di atas (ADHOC,
@@ -431,7 +427,8 @@ class CustomerInstallationController extends Controller
 
         // Langkah Perangkat Tambahan (ADHOC-190) — partial cuma tampil kalau
         // paket mengatur perangkat tambahan (limit > 0).
-        $eligibleExtraDeviceSerials = $this->eligibleExtraDeviceSerialsForTeam($task);
+        $eligibleExtraDeviceSerials = app(AdditionalDeviceCustodyService::class)
+            ->eligibleSerialsForExtraDevice($task, $installation?->selected_inventory_serial_id);
         $requiredExtraDevices = (int) ($customer->customerService?->internetPackage?->max_additional_devices ?? 0);
 
         // Prefill: baris terpakai yang sudah pernah disimpan (laporan dibuka
@@ -586,15 +583,15 @@ class CustomerInstallationController extends Controller
             'jitter_ms' => 'nullable|numeric',
             'latency_ms' => 'nullable|numeric',
             'packet_loss_percent' => 'nullable|numeric',
-            'speedtest_photo' => 'nullable|image|max:2048',
+            'speedtest_photo' => 'nullable|image|'.UploadLimit::rule(),
             'actual_attenuation' => 'nullable|string|max:50',
             'initial_attenuation' => 'nullable|string|max:50',
 
             // Installation details
             'installation_status' => 'required|string|in:scheduled,in_progress,completed,failed',
-            'installation_photo' => 'nullable|image|max:2048',
-            'contract_photo' => 'nullable|image|max:2048',
-            'signature_photo' => 'nullable|image|max:2048',
+            'installation_photo' => 'nullable|image|'.UploadLimit::rule(),
+            'contract_photo' => 'nullable|image|'.UploadLimit::rule(),
+            'signature_photo' => 'nullable|image|'.UploadLimit::rule(),
             'installation_note' => 'nullable|string',
 
             // Timer fields (dari countdown JS di form)
@@ -960,8 +957,8 @@ class CustomerInstallationController extends Controller
         abort_unless($survey !== null, 422, 'Pelanggan ini belum punya data survey untuk diganti fotonya.');
 
         $validated = $request->validate([
-            'house_photo' => 'nullable|image|max:2048',
-            'survey_photo' => 'nullable|image|max:2048',
+            'house_photo' => 'nullable|image|'.UploadLimit::rule(),
+            'survey_photo' => 'nullable|image|'.UploadLimit::rule(),
         ]);
 
         // Urutan aman: unggah foto baru → simpan DB → baru hapus foto lama. Dulu
@@ -1077,6 +1074,11 @@ class CustomerInstallationController extends Controller
         // yang sama dengan $assignmentTask di atas, bukan query baru.
         $eligibleSerialIds = $this->eligibleSerialsForTeam($assignmentTask)->pluck('id');
 
+        // SN yang sudah jadi pilihan Perangkat Tambahan (draft pointer, belum
+        // terpasang) gak boleh dipakai juga sebagai modem utama — lihat
+        // report() & CustomerInstallationAdditionalDeviceController.
+        $extraDeviceSerialIds = $customer->installations()->latest()->first()?->extra_device_serial_ids ?? [];
+
         // Roll kabel — OPSIONAL (beda dari SN Perangkat Aktif yang wajib):
         // gak semua pemasangan pakai kabel yang ke-track per-roll, jadi
         // submit tanpa pilih roll tetap harus jalan biasa.
@@ -1151,6 +1153,7 @@ class CustomerInstallationController extends Controller
                 'nullable',
                 'integer',
                 Rule::in($eligibleSerialIds),
+                Rule::notIn($extraDeviceSerialIds),
             ],
 
             // OPSIONAL — sama pola draft pointer di atas (dibatasi custody
@@ -1188,9 +1191,9 @@ class CustomerInstallationController extends Controller
             // CustomerVerificationController::finalVerify()).
             'modem_sale_price' => ['nullable', 'numeric', 'min:0.01', 'required_if:modem_acquisition_choice,beli_gudang'],
 
-            'installation_photo' => 'nullable|image|max:2048',
-            'contract_photo' => 'nullable|image|max:2048',
-            'signature_photo' => 'nullable|image|max:2048',
+            'installation_photo' => 'nullable|image|'.UploadLimit::rule(),
+            'contract_photo' => 'nullable|image|'.UploadLimit::rule(),
+            'signature_photo' => 'nullable|image|'.UploadLimit::rule(),
             'installation_note' => 'nullable|string',
 
             'started_at' => 'nullable|date',
@@ -1225,6 +1228,7 @@ class CustomerInstallationController extends Controller
             // yang bisa dipilih, harus ambil barang dari Gudang dulu.
             'selected_inventory_serial_id.required' => 'SN Perangkat Aktif wajib dipilih dari Gudang. Anda tidak memiliki SN di custody — ambil barang (Issue) dari Gudang terlebih dahulu sebelum bisa mengisi Laporan Pemasangan.',
             'selected_inventory_serial_id.in' => 'SN yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar SN yang tersedia.',
+            'selected_inventory_serial_id.not_in' => 'SN ini sudah dipilih sebagai Perangkat Tambahan — ganti dulu pilihan Perangkat Tambahan, atau pilih SN lain untuk perangkat utama.',
             'selected_inventory_roll_id.in' => 'Roll kabel yang dipilih bukan bagian dari custody tim Anda saat ini. Pilih ulang dari daftar roll yang tersedia.',
             'roll_meters_used.required_with' => 'Meter terpakai wajib diisi kalau roll kabel dipilih.',
             'modem_acquisition_choice.required' => 'Pilih cara pemilikan modem (Beli Sendiri/Beli dari Gudang) — pelanggan ini kontraknya Beli.',
@@ -1587,13 +1591,34 @@ class CustomerInstallationController extends Controller
             ]);
         }
 
+        // Pilihan Perangkat Tambahan cuma draft pointer — SN-nya bisa saja
+        // sudah dialihkan Gudang/dipasang di tempat lain sejak disimpan. Cek
+        // ulang di sini supaya teknisi dapat pesan yang menunjuk langkahnya,
+        // bukan "Terjadi kesalahan" dari guard installSerial() di transaksi.
+        $extraDeviceSerialIds = $installation->extra_device_serial_ids ?? [];
+        if ($extraDeviceSerialIds !== []) {
+            $stillEligible = app(AdditionalDeviceCustodyService::class)
+                ->eligibleSerialsForExtraDevice($assignmentTask, $installation->selected_inventory_serial_id)
+                ->pluck('id')
+                ->all();
+            $missing = array_diff($extraDeviceSerialIds, $stillEligible);
+
+            if ($missing !== []) {
+                $missingNumbers = InventorySerial::whereKey($missing)->pluck('serial_number')->implode(', ');
+
+                return redirect()->back()->withInput()->withErrors([
+                    'extra_devices' => "SN perangkat tambahan {$missingNumbers} sudah tidak ada di custody tim — pilih ulang di langkah Perangkat Tambahan (Step 5).",
+                ]);
+            }
+        }
+
         $validated = $request->validate([
             'test_upload' => 'required|numeric',
             'test_download' => 'required|numeric',
             'jitter_ms' => 'nullable|numeric',
             'latency_ms' => 'nullable|numeric',
             'packet_loss_percent' => 'nullable|numeric',
-            'speedtest_photo' => 'nullable|image|max:2048',
+            'speedtest_photo' => 'nullable|image|'.UploadLimit::rule(),
             'actual_attenuation' => 'nullable|string|max:50',
             'completed_at' => 'nullable|date',
         ]);
@@ -1713,6 +1738,37 @@ class CustomerInstallationController extends Controller
                     if ($installation->modem_acquisition_choice === 'beli_gudang') {
                         app(InventoryService::class)->recordSerialSale($serial, $customer, $installFopTask, (float) $installation->modem_sale_price, auth()->user());
                     }
+                }
+
+                // Perangkat Tambahan — draft pointer dari
+                // CustomerInstallationAdditionalDeviceController dieksekusi
+                // jadi INSTALL beneran DI SINI (keputusan user 2026-11-14),
+                // SETELAH modem utama: installSerial() modem utama dipanggil
+                // dengan returnExistingSerial=true, kalau urutannya dibalik
+                // perangkat tambahan yang baru terpasang ikut teretur.
+                // returnExistingSerial WAJIB false di sini — true akan meretur
+                // ONT utama pelanggan (risiko utama ADHOC-190).
+                foreach ($installation->extra_device_serial_ids ?? [] as $extraSerialId) {
+                    $extraSerial = InventorySerial::with('item.category')->findOrFail($extraSerialId);
+
+                    app(InventoryService::class)->installSerial($extraSerial, $customer, $installFopTask, $teamTechnicians, auth()->user(), returnExistingSerial: false, ownership: DeviceOwnership::COMPANY);
+
+                    CustomerAdditionalDevice::create([
+                        'customer_id' => $customer->id,
+                        'inventory_serial_id' => $extraSerial->id,
+                        'device_type' => $extraSerial->item?->category?->name ?? 'Perangkat Tambahan',
+                        'brand' => $extraSerial->item?->brand,
+                        'model' => $extraSerial->item?->model,
+                        'serial_number' => $extraSerial->serial_number,
+                        'status' => 'terpasang',
+                    ]);
+                }
+
+                // Pointer dikosongkan setelah dieksekusi — kalau pemasangan
+                // dibuka lagi (revisi), SN yang sama gak di-install dua kali.
+                if (! empty($installation->extra_device_serial_ids)) {
+                    $installation->extra_device_serial_ids = null;
+                    $installation->save();
                 }
 
                 // Roll kabel — draft pointer dari storePemasangan() dieksekusi

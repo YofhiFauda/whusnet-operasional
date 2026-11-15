@@ -149,6 +149,11 @@ class ActionSeeder extends Seeder
                 'name' => 'Register Infra',
                 'description' => 'Registrasi aset infrastruktur lama yang belum pernah masuk ledger gudang',
             ],
+            [
+                'code' => ActionCode::ISOLIR,
+                'name' => 'Isolir',
+                'description' => 'Mengisolir atau mengaktifkan kembali layanan pelanggan',
+            ],
         ];
 
         foreach ($actions as $action) {

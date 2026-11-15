@@ -558,6 +558,14 @@
                             <span class="text-text-muted">Total Invoice:</span>
                             <span class="font-mono font-medium text-text-main tabular-nums">Rp {{ number_format((float) ($payment->invoice->total_amount ?? 0), 0, ',', '.') }}</span>
                         </div>
+                        {{-- Rincian komponen tagihan yang dibayar (laporan user
+                             2026-11-14: dulu cuma total). --}}
+                        @if($payment->invoice->items->isNotEmpty())
+                        <div class="pt-2 border-t border-border">
+                            <p class="text-[10px] font-semibold text-text-muted uppercase tracking-wider mb-1">Rincian Tagihan</p>
+                            @include('invoices.partials.line-items', ['invoice' => $payment->invoice])
+                        </div>
+                        @endif
                     </div>
                     @else
                     <div class="pt-3.5">
@@ -663,7 +671,7 @@
     }
 
     @if ($errors->has('reject_reason'))
-        document.addEventListener('DOMContentLoaded', openRejectModal);
+        window.onPageReady(openRejectModal);
     @endif
 
     function toggleJsonView(id) {

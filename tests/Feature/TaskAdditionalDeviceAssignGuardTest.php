@@ -68,10 +68,10 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
 
         $this->assertSame('terjadwal', $task->status->value);
         $this->assertTrue($task->teamMembers()->where('user_id', $teknisi->id)->exists());
-        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task));
+        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForExtraDevice($task));
 
         $this->issueExtraDeviceSerial($teknisi, 'ADG-SN-SETELAH-ASSIGN', $pop->id);
-        $this->assertCount(1, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task->fresh()));
+        $this->assertCount(1, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForExtraDevice($task->fresh()));
     }
 
     #[Test]
@@ -338,7 +338,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
         ], $fop);
 
         $this->assertSame('terjadwal', $task->status->value);
-        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task));
+        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForExtraDevice($task));
     }
 
     /**
@@ -366,7 +366,7 @@ class TaskAdditionalDeviceAssignGuardTest extends TestCase
         ], $fop);
 
         $this->assertSame('terjadwal', $task->status->value);
-        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task));
+        $this->assertCount(0, app(AdditionalDeviceCustodyService::class)->eligibleSerialsForExtraDevice($task));
     }
 
     /**

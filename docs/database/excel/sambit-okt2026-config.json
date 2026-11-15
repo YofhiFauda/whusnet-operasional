@@ -20,5 +20,9 @@
         "Net137": "Net138",
         "Net1380": "Net138"
     },
-    "manual_overrides": {}
+    "manual_overrides": {
+        "G00RQ000059": "PK000001",
+        "G00RQ000067": "PK000004",
+        "G1X4BRQ000041": "NetP125"
+    }
 }

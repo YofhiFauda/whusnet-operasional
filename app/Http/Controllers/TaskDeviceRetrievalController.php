@@ -19,6 +19,7 @@ use App\Services\FileUploadService;
 use App\Services\InventoryReassignService;
 use App\Services\LegacyDeviceHintService;
 use App\Services\TaskService;
+use App\Support\UploadLimit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -108,7 +109,7 @@ class TaskDeviceRetrievalController extends Controller
             ],
             'serials.*.serial_number' => ['required', 'string', 'max:100'],
             'serials.*.item_id' => ['nullable', 'integer', 'exists:items,id'],
-            'condition_photo' => ['required_if:outcome,'.DeviceRetrievalOutcome::DIAMBIL->value, 'nullable', 'image', 'max:2048'],
+            'condition_photo' => ['required_if:outcome,'.DeviceRetrievalOutcome::DIAMBIL->value, 'nullable', 'image', UploadLimit::rule()],
             'accessories' => ['nullable', 'array'],
             'accessories.*' => ['string', Rule::in(array_keys(TaskDeviceRetrieval::ACCESSORY_OPTIONS))],
             // Alasan wajib kalau alat TIDAK diambil — satu-satunya jejak kenapa

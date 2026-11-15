@@ -259,7 +259,7 @@ class MadiunRegionSeeder extends Seeder
         }, 100);
 
         $districtsData = [
-            'Mangu Harjo' => [
+            'Manguharjo' => [
                 'Nambangan Kidul' => '63128',
                 'Nambangan Lor' => '63129',
                 'Manguharjo' => '63127',

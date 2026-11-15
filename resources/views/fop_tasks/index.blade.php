@@ -598,7 +598,18 @@
                 </button>
             </div>
 
-            <form :action="formAction" method="POST" enctype="multipart/form-data"
+            {{--
+                hx-boost="false" WAJIB. `<body hx-boost="true">` (layouts/app.blade.php)
+                nge-boost form ini saat htmx pertama proses DOM — waktu itu modal masih
+                tertutup, formAction masih default (route store, "/fop-tasks" tanpa id).
+                htmx nyimpen target itu di cache internalnya dan TIDAK baca ulang attribute
+                `action` pas Alpine update-nya belakangan (openEditModal() ganti ke
+                "/fop-tasks/{id}"). Akibatnya: DOM attribute kelihatan benar, tapi XHR
+                yang beneran jalan tetep ke URL store lama → 405 (bug "assign teknisi
+                simpan tidak terjadi apa-apa", ditemukan 2026-11-09). Form ini sudah
+                dihandle penuh oleh @submit Alpine di bawah, gak butuh boost htmx.
+            --}}
+            <form :action="formAction" method="POST" enctype="multipart/form-data" hx-boost="false"
                   class="flex flex-col flex-1 min-h-0 overflow-hidden"
                   @submit="
                       if (!$el.getAttribute('action')) {
@@ -801,7 +812,7 @@
                             <label class="block text-xs font-semibold text-text-secondary mb-1">Lampiran</label>
                             <input type="file" name="attachments[]" multiple accept="image/*,application/pdf"
                                    class="w-full text-xs text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-surface-muted file:text-text-main hover:file:bg-border file:cursor-pointer">
-                            <p class="text-[10px] text-text-muted mt-1">Maks. 5 file, tiap file maks. 5 MB. Format: JPG, PNG, WEBP, PDF.</p>
+                            <p class="text-[10px] text-text-muted mt-1">Maks. 5 file, tiap file maks. {{ \App\Support\UploadLimit::label() }}. Format: JPG, PNG, WEBP, PDF.</p>
                         </div>
                     </div>
 
@@ -2351,7 +2362,7 @@
                 )];
 
                 popIds.forEach(popId => {
-                    window.Echo.private('fop-tasks.' + popId)
+                    window.pageEcho('fop-tasks.' + popId)
                         .listen('.FopTaskUpdated', (e) => this.refreshFopTaskRow(e.fop_task_id))
                         .listen('TaskStarted', (e) => { if (e.fop_task_id) this.refreshFopTaskRow(e.fop_task_id); })
                         .listen('TaskCompleted', (e) => { if (e.fop_task_id) this.refreshFopTaskRow(e.fop_task_id); });

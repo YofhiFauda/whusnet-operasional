@@ -64,7 +64,7 @@ Ketiganya pakai logic sama: kumpulkan `user_id` anggota tim (+ diri sendiri), ca
 
 ## 5b. Riwayat Task Saya (`/tasks-saya/riwayat`, 2026-08-06)
 
-Arsip task **status `selesai`** milik teknisi login, `TaskController::historyOwn()`. Beda dari `/tasks-saya` (`indexOwn()`): itu papan kerja aktif (task hari ini + `in_progress`/`pending` + `terjadwal` overdue, **buang** task selesai lama dari daftar), ini arsip lintas waktu — tiap kartu klik langsung ke `/tasks/{id}` yang sekarang sudah lengkap sama blok Laporan Pekerjaan (lihat §5). Guard sama dengan dashboard: `task.view.own` + `whereHas('teamMembers', user)`.
+Arsip task **status `selesai`** milik teknisi login, `TaskController::historyOwn()`. **Sejak ADHOC-298 (2026-11-14) juga memuat entri Pending:** tiap kali teknisi dilepas dari task karena Pending (oleh dirinya, FOP, atau review FOP) tercatat di `task_member_releases` (ditulis hanya oleh `TaskService::releaseTeamAndSetPending()`, sebelum `task_teams` dihapus). Riwayat = union Selesai + Pending urut waktu terbaru; satu task bisa muncul dua kali (Pending lalu Selesai) — Riwayat adalah jejak kunjungan, bukan status terkini. Entri Pending tidak menautkan `/tasks/{id}` kecuali teknisi masih berhak (`TaskPolicy::view`). Beda dari `/tasks-saya` (`indexOwn()`): itu papan kerja aktif (task hari ini + `in_progress`/`pending` + `terjadwal` overdue, **buang** task selesai lama dari daftar), ini arsip lintas waktu — tiap kartu klik langsung ke `/tasks/{id}` yang sekarang sudah lengkap sama blok Laporan Pekerjaan (lihat §5). Guard sama dengan dashboard: `task.view.own` + `whereHas('teamMembers', user)`.
 
 ## 6. Efek Complete → Review FOP → Transisi Customer
 

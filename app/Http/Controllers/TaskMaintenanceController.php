@@ -51,6 +51,7 @@ use App\Services\TaskMaterialService;
 use App\Services\TaskService;
 use App\Services\TaskWorkToolService;
 use App\Support\InfrastructureCutover;
+use App\Support\UploadLimit;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -116,8 +117,8 @@ class TaskMaintenanceController extends Controller
     }
 
     /**
-     * AP/STB yang sedang terpasang di pelanggan task ini — kandidat "yang
-     * diganti". Baris teks bebas (legacy, tanpa SN Gudang) ikut: data legacy
+     * Perangkat tambahan yang sedang terpasang di pelanggan task ini (apa pun
+     * kategorinya) — kandidat "yang diganti". Baris teks bebas (legacy, tanpa SN Gudang) ikut: data legacy
      * sering tak cocok dengan perangkat nyata, jadi teknisi harus bisa
      * menggantinya (tanpa retur stok, lihat AdditionalDeviceReplacementService).
      *
@@ -437,7 +438,7 @@ class TaskMaintenanceController extends Controller
 
         $supportsExtraReplacement = $this->supportsExtraReplacement($task);
         $replaceableExtraDevices = $supportsExtraReplacement ? $this->replaceableExtraDevices($task) : collect();
-        $eligibleExtraSerials = $supportsExtraReplacement ? app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task) : collect();
+        $eligibleExtraSerials = $supportsExtraReplacement ? app(AdditionalDeviceCustodyService::class)->eligibleSerialsForExtraDevice($task) : collect();
 
         // Seksi "Pasang/Ganti Infrastruktur" — cuma ditampilkan view untuk
         // O-REQ/INFR REQ, jadi query-nya juga cuma jalan di dua tipe itu
@@ -512,13 +513,13 @@ class TaskMaintenanceController extends Controller
         $eligibleSerialIds = $this->eligibleSerialsForTeam($task)->pluck('id');
         $eligibleRollIds = $this->eligibleRollsForTeam($task)->pluck('id');
 
-        // Ganti Perangkat Tambahan (AP/STB) — cuma MTN & C-REQ. Dua daftar ini
+        // Ganti Perangkat Tambahan — cuma MTN & C-REQ. Dua daftar ini
         // jadi batas `Rule::in` di bawah: yang diganti HARUS AP Gudang yang
         // sedang terpasang di pelanggan task ini, penggantinya HARUS custody
         // tim (query yang sama dengan langkah Perangkat Tambahan Pemasangan).
         $supportsExtraReplacement = $this->supportsExtraReplacement($task);
         $replaceableExtraDeviceIds = $supportsExtraReplacement ? $this->replaceableExtraDevices($task)->pluck('id') : collect();
-        $eligibleExtraSerialIds = $supportsExtraReplacement ? app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($task)->pluck('id') : collect();
+        $eligibleExtraSerialIds = $supportsExtraReplacement ? app(AdditionalDeviceCustodyService::class)->eligibleSerialsForExtraDevice($task)->pluck('id') : collect();
 
         // Kategori C-REQ dibaca SEBELUM validate() supaya rule kondisional
         // (tikor wajib, custom name wajib, dst — docs/plan/task-teknisi/
@@ -551,8 +552,8 @@ class TaskMaintenanceController extends Controller
             'patchcord' => 'nullable|string|max:100',
             'sleeve' => 'nullable|string|max:100',
             'lainnya' => 'nullable|string|max:255',
-            'opm_photo' => 'nullable|image|max:2048',
-            'speedtest_photo' => 'nullable|image|max:2048',
+            'opm_photo' => 'nullable|image|'.UploadLimit::rule(),
+            'speedtest_photo' => 'nullable|image|'.UploadLimit::rule(),
             // Modem/Perangkat Aktif — OPSIONAL (beda dari Laporan Pemasangan
             // yang wajib). Maintenance gak selalu ganti modem; kalau teknisi
             // gak bawa/ganti, dibiarkan kosong dan gak nyentuh SN sama
@@ -688,12 +689,20 @@ class TaskMaintenanceController extends Controller
         if ($supportsExtraReplacement) {
             $rules['extra_replacements'] = ['nullable', 'array', 'max:5'];
             $rules['extra_replacements.*.old_device_id'] = ['required', 'integer', 'distinct', Rule::in($replaceableExtraDeviceIds)];
-            $rules['extra_replacements.*.new_serial_id'] = ['required', 'integer', 'distinct', Rule::in($eligibleExtraSerialIds)];
+            // Daftar pengganti = SEMUA SN custody (2026-11-14), jadi bisa beririsan
+            // dengan dropdown modem utama di form yang sama. SN yang sama dipilih
+            // di dua tempat = modem utama terpasang duluan, lalu penggantian gagal
+            // di tengah transaksi — ditolak di validasi dengan pesan jelas.
+            $rules['extra_replacements.*.new_serial_id'] = [
+                'required', 'integer', 'distinct', Rule::in($eligibleExtraSerialIds),
+                Rule::notIn(array_filter([(int) $request->input('selected_inventory_serial_id')])),
+            ];
             $rules['extra_replacements.*.old_condition'] = ['required', Rule::in([AdditionalDeviceReplacementService::CONDITION_BAIK, AdditionalDeviceReplacementService::CONDITION_RUSAK])];
             $rules['extra_replacements.*.note'] = ['nullable', 'string', 'max:255'];
 
             $messages['extra_replacements.*.old_device_id.in'] = 'Perangkat tambahan yang diganti harus perangkat Gudang yang sedang terpasang di pelanggan ini.';
-            $messages['extra_replacements.*.new_serial_id.in'] = 'SN pengganti bukan bagian dari custody tim Anda saat ini, atau bukan perangkat tambahan (AP/STB).';
+            $messages['extra_replacements.*.new_serial_id.in'] = 'SN pengganti bukan bagian dari custody tim Anda saat ini.';
+            $messages['extra_replacements.*.new_serial_id.not_in'] = 'SN pengganti perangkat tambahan sama dengan SN modem utama yang dipilih — pilih SN lain.';
             $messages['extra_replacements.*.old_condition.required'] = 'Pilih kondisi perangkat lama (baik/rusak).';
         }
 
@@ -1126,7 +1135,7 @@ class TaskMaintenanceController extends Controller
                         }
                     }
 
-                    // Ganti Perangkat Tambahan (AP/STB) — OPSIONAL. Pasang
+                    // Ganti Perangkat Tambahan — OPSIONAL. Pasang
                     // pengganti + cabut yang lama + perbarui Detail Pelanggan
                     // dalam satu service; gagal di mana pun me-rollback seluruh
                     // laporan (transaksi store() ini).

@@ -2,13 +2,16 @@
 
 namespace Tests\Feature\Api\CustomerPortal;
 
+use App\Enums\InvoiceStatus;
 use App\Models\Customer;
 use App\Models\CustomerPortalAccount;
+use App\Models\Invoice;
 use App\Services\CustomerQrTokenService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Hash;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\Feature\Api\CustomerPortal\Concerns\InteractsWithPortalAuth;
+use Tests\Feature\Api\CustomerPortal\Concerns\InteractsWithPortalBilling;
 use Tests\TestCase;
 
 /**
@@ -20,7 +23,7 @@ use Tests\TestCase;
  */
 class PortalQrResolveTest extends TestCase
 {
-    use InteractsWithPortalAuth, RefreshDatabase;
+    use InteractsWithPortalAuth, InteractsWithPortalBilling, RefreshDatabase;
 
     protected function setUp(): void
     {
@@ -54,10 +57,8 @@ class PortalQrResolveTest extends TestCase
         $response = $this->resolveJson("{$token->token}.{$signature}");
 
         $response->assertOk();
-        $response->assertExactJson([
-            'login_id' => $customer->portal_login_id,
-            'account_status' => 'pending_claim',
-        ]);
+        $response->assertJsonPath('login_id', $customer->portal_login_id);
+        $response->assertJsonPath('account_status', 'pending_claim');
     }
 
     #[Test]
@@ -115,7 +116,95 @@ class PortalQrResolveTest extends TestCase
 
         $response->assertOk();
         $this->assertArrayNotHasKey('pin', $response->json());
-        $this->assertSame(['login_id', 'account_status'], array_keys($response->json()));
+        $this->assertSame(['login_id', 'account_status', 'billing'], array_keys($response->json()));
+    }
+
+    /**
+     * Tamu scan QR → langsung lihat tagihan (2026-11-14). Cuma tagihan
+     * belum lunas, nama tersamar, whitelist kolom sempit.
+     */
+    #[Test]
+    public function tamu_dapat_ringkasan_tagihan_belum_lunas_tersamar(): void
+    {
+        $pop = $this->seedPop();
+        $customer = Customer::factory()->create([
+            'pop_id' => $pop->id,
+            'full_name' => 'Masudah Yuni Fitri',
+        ]);
+
+        $this->makeInvoice($customer, '2026-09', InvoiceStatus::LUNAS, '0.00');
+        $this->makeInvoice($customer, '2026-10', InvoiceStatus::SEBAGIAN, '50000.00');
+        $this->makeInvoice($customer, '2026-11', InvoiceStatus::BELUM_DIBAYAR, '150000.00');
+        $this->makeInvoice($customer, '2026-08', InvoiceStatus::BATAL, '150000.00');
+
+        $response = $this->resolveJson($this->validCode($customer));
+
+        $response->assertOk();
+        $response->assertJsonPath('billing.customer_name', 'MASUDAH Y***** F*****');
+        $response->assertJsonPath('billing.display_id', $customer->display_id);
+        $response->assertJsonPath('billing.outstanding_total', '200000.00');
+        $response->assertJsonCount(2, 'billing.invoices');
+        $response->assertJsonPath('billing.invoices.0.billing_period', '2026-10');
+        $response->assertJsonPath('billing.invoices.0.invoice_status.value', 'sebagian');
+        $response->assertJsonPath('billing.invoices.1.billing_period', '2026-11');
+    }
+
+    #[Test]
+    public function ringkasan_tagihan_tamu_tidak_membocorkan_data_pribadi(): void
+    {
+        $pop = $this->seedPop();
+        $customer = Customer::factory()->create(['pop_id' => $pop->id]);
+        $invoice = $this->makeInvoice($customer, '2026-11', InvoiceStatus::BELUM_DIBAYAR, '150000.00');
+
+        $response = $this->resolveJson($this->validCode($customer));
+
+        $response->assertOk();
+        $this->assertSame(
+            ['customer_name', 'display_id', 'outstanding_total', 'invoices'],
+            array_keys($response->json('billing'))
+        );
+        $this->assertSame(
+            ['billing_period', 'due_date', 'remaining_amount', 'invoice_status'],
+            array_keys($response->json('billing.invoices.0'))
+        );
+        $this->assertStringNotContainsString($invoice->invoice_number, $response->getContent());
+        if ($customer->primary_phone) {
+            $this->assertStringNotContainsString($customer->primary_phone, $response->getContent());
+        }
+    }
+
+    #[Test]
+    public function pelanggan_tanpa_tunggakan_dapat_daftar_kosong(): void
+    {
+        $pop = $this->seedPop();
+        $customer = Customer::factory()->create(['pop_id' => $pop->id]);
+        $this->makeInvoice($customer, '2026-11', InvoiceStatus::LUNAS, '0.00');
+
+        $response = $this->resolveJson($this->validCode($customer));
+
+        $response->assertOk();
+        $response->assertJsonPath('billing.outstanding_total', '0.00');
+        $response->assertJsonCount(0, 'billing.invoices');
+    }
+
+    private function validCode(Customer $customer): string
+    {
+        $qrService = app(CustomerQrTokenService::class);
+        $token = $qrService->issue($customer);
+        $signature = $qrService->signature((int) $customer->pop_id, $customer->customer_code, $token->token);
+
+        return "{$token->token}.{$signature}";
+    }
+
+    private function makeInvoice(Customer $customer, string $period, InvoiceStatus $status, string $remaining): Invoice
+    {
+        return $this->seedInvoice($customer, [
+            'due_date' => $period.'-15',
+            'billing_period' => $period,
+            'total_amount' => '150000.00',
+            'remaining_amount' => $remaining,
+            'invoice_status' => $status->value,
+        ]);
     }
 
     #[Test]

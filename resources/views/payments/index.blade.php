@@ -1,6 +1,6 @@
 @extends('layouts.app')
 
-@section('title', 'Riwayat Transaksi Pembayaran - Whusnet Operasional')
+@section('title', 'Riwayat Transaksi Pembayaran')
 @section('page_title', 'Riwayat Transaksi Pembayaran')
 
 @section('content')

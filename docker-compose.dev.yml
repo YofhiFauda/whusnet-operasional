@@ -54,7 +54,16 @@ services:
       - app_network
 
   app:
-    image: app:${APP_VERSION:-latest}
+    # Tag TERPISAH dari docker-compose.yml (prod, Dockerfile.prod) — keduanya
+    # SEBELUMNYA pakai tag sama "app:latest". Siapa yang build TERAKHIR
+    # (dev atau prod) menimpa image punya yang lain; Compose tidak rebuild
+    # otomatis kalau tag sudah ada, jadi `up` dev bisa diam-diam pakai image
+    # PROD basi (baked `zz-production.ini` yang matiin opcache.validate_
+    # timestamps, kode lama dari COPY . /var/www saat build terakhir).
+    # Ketauan 2026-11-07 lewat gejala membingungkan: route baru 404, opcache
+    # gak reload. Bind-mount `./:/var/www` MENUTUPI kode basi itu di runtime,
+    # jadi baru ketara di hal yang BUKAN bagian bind mount (php.ini, opcache).
+    image: app:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -76,6 +85,16 @@ services:
       - ./docker/php/local.ini:/usr/local/etc/php/conf.d/local.ini
       - storage_data:/var/www/storage
       - cache_data:/var/www/bootstrap/cache
+    # Cache Blade terkompilasi doang — murni regenerable, gak ada data asli.
+    # Dipisah dari storage_data (named volume numpang disk WSL2 Docker Desktop
+    # yang kadang flaky abis insiden stale bind-mount) ke tmpfs biar lepas
+    # dari race filemtime(): "stat failed" yang kejadian berulang 2026-11-07
+    # (file kebaca exists() tapi "hilang" sepersekian detik kemudian pas
+    # filemtime() — konsisten dgn lapisan network-FS yang gak atomik, bukan
+    # bug Laravel/Blade). tmpfs = per-container, ilang pas restart — gapapa,
+    # Laravel compile ulang otomatis request pertama.
+    tmpfs:
+      - /var/www/storage/framework/views:mode=1777
     depends_on:
       db:
         condition: service_healthy
@@ -198,7 +217,7 @@ services:
   #  HORIZON — Queue Worker
   # ─────────────────────────────────────────
   horizon:
-    image: app:${APP_VERSION:-latest}
+    image: app:latest # lihat catatan tag di service `app`
     restart: unless-stopped
     working_dir: /var/www
     networks:
@@ -251,7 +270,7 @@ services:
   #  REVERB — WebSocket Server
   # ─────────────────────────────────────────
   reverb:
-    image: app:${APP_VERSION:-latest}
+    image: app:latest # lihat catatan tag di service `app`
     restart: unless-stopped
     working_dir: /var/www
     networks:
@@ -306,7 +325,7 @@ services:
   #  SCHEDULER — Laravel Cron
   # ─────────────────────────────────────────
   scheduler:
-    image: app:${APP_VERSION:-latest}
+    image: app:latest # lihat catatan tag di service `app`
     restart: unless-stopped
     working_dir: /var/www
     networks:

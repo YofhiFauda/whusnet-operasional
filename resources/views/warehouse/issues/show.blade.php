@@ -31,6 +31,11 @@
                     <p class="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
                         Dicatat pada <strong class="text-slate-700 dark:text-slate-200">{{ $first->created_at->translatedFormat('d F Y • H:i') }} WIB</strong> oleh <strong class="text-slate-700 dark:text-slate-200">{{ $first->createdBy?->name ?? 'Sistem' }}</strong>
                     </p>
+                    @if($first->created_by !== null && $first->created_by === $first->to_technician_id)
+                    <p class="mt-1.5 inline-flex items-center px-2 py-0.5 rounded text-[11px] font-semibold bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300">
+                        Dikeluarkan untuk diri sendiri — dipantau Pusat di Laporan Gudang
+                    </p>
+                    @endif
                 </div>
             </div>
 

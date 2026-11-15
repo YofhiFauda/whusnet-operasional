@@ -36,7 +36,7 @@ class NotifyUnsettledTechnicianCommand extends Command
             $technician->notify(new AppNotification(
                 title: 'Belum setor saldo pembayaran',
                 message: 'Saldo pembayaran Rp '.number_format($row['balance'], 0, ',', '.').' belum disetor. Silakan setorkan sebelum melanjutkan pekerjaan besok.',
-                actionUrl: route('technician-payments.index'),
+                actionUrl: route('technician-payments.index', [], false),
                 type: NotificationType::INFO
             ));
 

@@ -16,6 +16,7 @@ use App\Models\NetworkNodePort;
 use App\Models\Pop;
 use App\Models\Task;
 use App\Models\TaskInfrastructureAction;
+use App\Models\TaskMemberRelease;
 use App\Models\TechnicianCustody;
 use App\Models\User;
 use App\Notifications\AppNotification;
@@ -178,23 +179,59 @@ class TaskController extends Controller
     }
 
     /**
-     * Riwayat Task Saya — arsip task yang SUDAH diselesaikan teknisi login.
+     * Riwayat Task Saya — arsip lintas waktu milik teknisi login: task yang
+     * dia SELESAIKAN + tiap kali dia DILEPAS dari task karena Pending.
      * Beda dari indexOwn(): itu papan kerja hari ini (difilter tanggal +
-     * status aktif), ini arsip lintas waktu, cuma status Selesai.
+     * status aktif).
+     *
+     * Entri Pending dari `task_member_releases`, bukan dari status task:
+     * Pending menghapus `task_teams`, jadi task-nya sendiri sudah tak punya
+     * jejak ke teknisi ini — dan sesudah dijadwal ulang/selesai statusnya pun
+     * berubah. Satu task bisa muncul >1 kali (Pending lalu Selesai) karena
+     * Riwayat = jejak kunjungan, bukan cerminan status terkini (ADHOC-298).
      * Guard: task.view.own
      */
     public function historyOwn(Request $request): View
     {
         $this->authorize('viewOwn', Task::class);
 
-        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'customer.customerAddress', 'pop'])
-            ->whereHas('teamMembers', fn ($q) => $q->where('user_id', auth()->id()))
-            ->where('status', TaskStatus::SELESAI->value)
-            ->latest('completed_at')
+        $userId = auth()->id();
+
+        $selesai = DB::table('tasks')
+            ->join('task_teams', 'task_teams.task_id', '=', 'tasks.id')
+            ->where('task_teams.user_id', $userId)
+            ->where('tasks.status', TaskStatus::SELESAI->value)
+            ->selectRaw("tasks.id as task_id, 'selesai' as kind, tasks.completed_at as occurred_at, NULL as release_id");
+
+        $pending = DB::table('task_member_releases')
+            ->where('user_id', $userId)
+            ->selectRaw("task_id, 'pending' as kind, released_at as occurred_at, id as release_id");
+
+        $entries = DB::query()
+            ->fromSub($selesai->unionAll($pending), 'riwayat')
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('release_id')
             ->paginate(15)
             ->withQueryString();
 
-        return view('tasks.own-history', compact('tasks'));
+        $tasks = Task::with(['customer.village', 'customer.district', 'customer.city', 'customer.customerAddress', 'pop'])
+            ->whereIn('id', $entries->pluck('task_id')->unique())
+            ->get()
+            ->keyBy('id');
+
+        $releases = TaskMemberRelease::with('releasedBy')
+            ->whereIn('id', $entries->pluck('release_id')->filter())
+            ->get()
+            ->keyBy('id');
+
+        $entries->through(fn (object $row) => (object) [
+            'kind' => $row->kind,
+            'task' => $tasks->get($row->task_id),
+            'release' => $row->release_id ? $releases->get($row->release_id) : null,
+            'occurred_at' => $row->occurred_at ? Carbon::parse($row->occurred_at) : null,
+        ]);
+
+        return view('tasks.own-history', compact('entries'));
     }
 
     /**
@@ -754,7 +791,7 @@ class TaskController extends Controller
     private function notifyTeamMembers(Task $task, string $title, string $message, NotificationType $type = NotificationType::INFO): void
     {
         $task->loadMissing('teamMembers.user');
-        $url = route('tasks.show', $task->id);
+        $url = route('tasks.show', $task->id, false);
         foreach ($task->teamMembers as $member) {
             if ($member->user) {
                 /** @var User $user */

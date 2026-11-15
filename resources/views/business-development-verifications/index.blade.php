@@ -1,8 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Verifikasi BD - Whusnet Operasional')
+@section('title', 'Verifikasi BD')
 @section('page_title', 'Menunggu Verifikasi BD')
-@section('breadcrumb_parent', 'Busdev')
 @section('breadcrumb_parent_url', route('business-development-verifications.index'))
 
 @section('content')

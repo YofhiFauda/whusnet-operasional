@@ -2,40 +2,30 @@
 
 namespace App\Http\Controllers;
 
-use App\Enums\DeviceOwnership;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
 use App\Models\Customer;
-use App\Models\CustomerAdditionalDevice;
-use App\Models\InventorySerial;
 use App\Models\Task;
-use App\Models\User;
 use App\Services\AdditionalDeviceCustodyService;
-use App\Services\InventoryService;
-use App\Services\TaskMaterialService;
 use App\Support\SafeUrl;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
-use InvalidArgumentException;
 
 /**
  * Langkah "Perangkat Tambahan" Laporan Pemasangan (ADHOC-190 task 4, spec
- * §4.2). Endpoint sendiri, terpisah dari storePemasangan(), karena langkah
- * ini MENULIS ledger stok seketika (installSerial) sementara step 5 cuma
- * menyimpan draft pointer yang bisa disubmit ulang berkali-kali.
+ * §4.2). Endpoint sendiri, terpisah dari storePemasangan().
+ *
+ * Sejak 2026-11-14 (keputusan user) langkah ini cuma menyimpan DRAFT POINTER
+ * (`customer_installations.extra_device_serial_ids`), pola sama Barang
+ * Dipasang Step 5: teknisi bisa simpan ulang & ganti pilihan berkali-kali.
+ * Dulu langsung installSerial() — SN keluar dari custody begitu disimpan, jadi
+ * salah pilih gak bisa dibetulkan lagi. Pemasangan sungguhan dieksekusi di
+ * CustomerInstallationController::storeSpeedtest() (titik selesai tunggal).
  */
 class CustomerInstallationAdditionalDeviceController extends Controller
 {
-    private const OUTCOME_LABELS = [
-        'terpasang' => 'Terpasang',
-        'kembali_gudang' => 'Kembali ke Gudang',
-        'rusak' => 'Rusak',
-        'hilang' => 'Hilang',
-    ];
-
     public function store(Request $request, Customer $customer): RedirectResponse
     {
         // Permission SAMA dengan storePemasangan() — bukan
@@ -62,18 +52,20 @@ class CustomerInstallationAdditionalDeviceController extends Controller
             'Anda bukan anggota tim yang ditugaskan untuk pemasangan pelanggan ini.'
         );
 
-        $eligibleSerials = app(AdditionalDeviceCustodyService::class)->eligibleSerialsForTask($assignmentTask)->keyBy('id');
+        $installation = $customer->installations()->latest()->first();
+        if (! $installation) {
+            throw ValidationException::withMessages([
+                'decisions' => 'Simpan Laporan Pemasangan (Step 5) terlebih dahulu sebelum memilih perangkat tambahan.',
+            ]);
+        }
+
+        $eligibleSerials = app(AdditionalDeviceCustodyService::class)
+            ->eligibleSerialsForExtraDevice($assignmentTask, $installation->selected_inventory_serial_id)
+            ->keyBy('id');
 
         $validated = $request->validate([
             'decisions' => ['nullable', 'array'],
             'decisions.*.inventory_serial_id' => ['required', 'integer', 'distinct', Rule::in($eligibleSerials->keys())],
-            // NULLABLE, bukan required (review fix 2): daftar custody berisi
-            // SEMUA AP/STB yang dibawa tim, bisa termasuk barang untuk
-            // pelanggan LAIN di hari yang sama. Kalau wajib diisi, teknisi
-            // dipaksa mencatat status palsu ("kembali gudang") untuk barang
-            // yang sebenarnya masih mau dipasang di lokasi berikutnya. Baris
-            // kosong = belum ada keputusan → dibuang sebelum hitung agregat.
-            'decisions.*.outcome' => ['nullable', Rule::in(array_keys(self::OUTCOME_LABELS))],
             'kekurangan_perangkat' => ['nullable', 'boolean'],
             'kekurangan_perangkat_alasan' => ['nullable', 'required_if:kekurangan_perangkat,1', 'string', 'max:500'],
         ], [
@@ -81,9 +73,14 @@ class CustomerInstallationAdditionalDeviceController extends Controller
             'kekurangan_perangkat_alasan.required_if' => 'Alasan kekurangan perangkat wajib diisi.',
         ]);
 
-        $decisions = collect($validated['decisions'] ?? [])
-            ->filter(fn (array $decision) => filled($decision['outcome'] ?? null))
-            ->values();
+        // Dropdown Status DIHAPUS (keputusan user 2026-11-14): perangkat yang
+        // dipilih di langkah ini = AKAN dipasang ke pelanggan (dieksekusi di
+        // storeSpeedtest()), tidak ada pilihan lain. Barang yang tidak jadi
+        // dipasang cukup tidak dipilih — tetap di custody teknisi
+        // (retur/rusak/hilang diurus lewat alur Gudang). Dulu
+        // ada opsi Kembali Gudang/Rusak/Hilang yang cuma ditulis ke catatan
+        // instalasi tanpa efek stok, jadi membingungkan.
+        $decisions = collect($validated['decisions'] ?? [])->values();
         $shortage = (bool) ($validated['kekurangan_perangkat'] ?? false);
         $required = (int) ($customer->customerService?->internetPackage?->max_additional_devices ?? 0);
 
@@ -91,108 +88,51 @@ class CustomerInstallationAdditionalDeviceController extends Controller
         // ikut dihitung — SN-nya sudah INSTALLED jadi tidak muncul lagi di
         // daftar custody; tanpa ini submit ulang (mis. revisi) bakal selalu
         // dianggap kurang.
-        // Jenis perangkat (AP/STB/dll) TIDAK dibatasi per kategori — teknisi
-        // bebas pilih barang apa pun dari custody tim yang ditandai
-        // `is_customer_extra_device`, selama total yang dipenuhi pas dengan
+        // Jenis perangkat TIDAK dibatasi per kategori — teknisi bebas pilih
+        // perangkat ber-SN apa pun dari custody tim (sejak 2026-11-14 bukan
+        // cuma yang ditandai `is_customer_extra_device`), selama total yang dipenuhi pas dengan
         // `max_additional_devices` paket. Ketentuan jenis barang bisa beda
         // di kemudian hari; cuma jumlahnya yang tetap (lihat cek $required
         // di bawah).
         $alreadyInstalled = $customer->additionalDevices()->installedFromWarehouse()->count();
 
         // Spec §4.2: keputusan wajib untuk SETIAP perangkat yang diatur paket
-        // (apa pun outcome-nya), bukan cuma minimal satu. Jalur kekurangan +
+        // (SN yang dipilih = dipasang), bukan cuma minimal satu. Jalur kekurangan +
         // alasan = pengecualian untuk kejadian di luar kendali teknisi.
         if ($decisions->count() + $alreadyInstalled < $required && ! $shortage) {
             throw ValidationException::withMessages([
-                'decisions' => "Paket pelanggan ini mengatur {$required} perangkat tambahan — beri keputusan untuk setiap perangkat, atau centang \"Laporkan kekurangan\" dan isi alasannya.",
+                'decisions' => "Paket pelanggan ini mengatur {$required} perangkat tambahan — pilih perangkat yang dipasang, atau centang \"Laporkan kekurangan\" dan isi alasannya.",
             ]);
         }
 
         // Batas paket tetap berlaku (pola sama CustomerAdditionalDeviceController::store());
         // lebih dari limit bikin ganti paket berikutnya keblok
         // (CustomerPackageService::assertAdditionalDevicesWithinLimit()).
-        $toInstall = $decisions->where('outcome', 'terpasang');
+        $toInstall = $decisions;
         if ($toInstall->isNotEmpty() && $customer->additionalDevices()->active()->count() + $toInstall->count() > $required) {
             throw ValidationException::withMessages([
                 'decisions' => "Melebihi batas {$required} perangkat tambahan untuk paket pelanggan ini.",
             ]);
         }
 
-        $installFopTask = app(TaskMaterialService::class)->resolveTaskFor($customer, TaskType::PEMASANGAN);
-        if ($toInstall->isNotEmpty() && ! $installFopTask) {
-            throw ValidationException::withMessages([
-                'decisions' => 'Task FOP Pemasangan pelanggan ini tidak ditemukan — perangkat tidak bisa dicatat terpasang.',
-            ]);
-        }
-
-        $teamTechnicians = User::whereIn('id', $assignmentTask?->teamMembers->pluck('user_id') ?? [])->get();
-
-        try {
-            DB::transaction(function () use ($customer, $decisions, $eligibleSerials, $installFopTask, $teamTechnicians, $shortage, $validated) {
-                $notLines = [];
-
-                foreach ($decisions as $decision) {
-                    /** @var InventorySerial $serial */
-                    $serial = $eligibleSerials[(int) $decision['inventory_serial_id']];
-
-                    if ($decision['outcome'] !== 'terpasang') {
-                        // TIDAK di-install: SN tetap ISSUED di custody teknisi —
-                        // itu sendiri sinyal ke Gudang (retur/rusak/hilang
-                        // diproses lewat alur Gudang existing, spec §5).
-                        // Keputusannya cukup dicatat di catatan instalasi.
-                        $notLines[] = "[Perangkat Tambahan] SN {$serial->serial_number} ({$serial->item?->category?->name}): ".self::OUTCOME_LABELS[$decision['outcome']];
-
-                        continue;
-                    }
-
-                    // returnExistingSerial WAJIB false — true akan meretur ONT
-                    // utama pelanggan (risiko utama ADHOC-190).
-                    app(InventoryService::class)->installSerial(
-                        $serial,
-                        $customer,
-                        $installFopTask,
-                        $teamTechnicians,
-                        auth()->user(),
-                        returnExistingSerial: false,
-                        ownership: DeviceOwnership::COMPANY,
-                    );
-
-                    CustomerAdditionalDevice::create([
-                        'customer_id' => $customer->id,
-                        'inventory_serial_id' => $serial->id,
-                        'device_type' => $serial->item?->category?->name ?? 'Perangkat Tambahan',
-                        'brand' => $serial->item?->brand,
-                        'model' => $serial->item?->model,
-                        'serial_number' => $serial->serial_number,
-                        'status' => 'terpasang',
-                    ]);
-                }
-
-                $installation = $customer->installations()->latest()->first();
-                if ($installation) {
-                    if ($notLines !== []) {
-                        $installation->installation_note = trim(($installation->installation_note ? $installation->installation_note."\n" : '').implode("\n", $notLines));
-                    }
-
-                    $installation->extra_device_shortage = $shortage;
-                    $installation->extra_device_shortage_reason = $shortage ? $validated['kekurangan_perangkat_alasan'] : null;
-                    // Penanda gerbang storeSpeedtest() — cuma diset kalau
-                    // cek kelengkapan di atas sudah lolos.
-                    $installation->extra_devices_reported_at = now();
-                    $installation->save();
-                }
-            });
-        } catch (InvalidArgumentException $e) {
-            // Guard installSerial() (status/custody/cabang dicek ulang di
-            // bawah lock) — tampilkan sebagai error form, bukan 500.
-            throw ValidationException::withMessages(['decisions' => $e->getMessage()]);
-        }
+        // Simpan ulang = GANTI daftar pilihan (bukan menambah) — sama perilaku
+        // selected_inventory_serial_id Step 5. Belum ada ledger stok yang
+        // ditulis, jadi aman diubah berkali-kali sampai Laporan Speedtest.
+        $installation->extra_device_serial_ids = $decisions->isEmpty()
+            ? null
+            : $decisions->map(fn ($decision) => (int) $decision['inventory_serial_id'])->values()->all();
+        $installation->extra_device_shortage = $shortage;
+        $installation->extra_device_shortage_reason = $shortage ? $validated['kekurangan_perangkat_alasan'] : null;
+        // Penanda gerbang storeSpeedtest() — cuma diset kalau cek
+        // kelengkapan di atas sudah lolos.
+        $installation->extra_devices_reported_at = now();
+        $installation->save();
 
         return redirect()
             ->route('customers.installation.report', [
                 'customer' => $customer,
                 'return_to' => SafeUrl::resolveReturnTo($request->input('return_to'), 'verifications.queue'),
             ])
-            ->with('success', 'Laporan perangkat tambahan tersimpan.');
+            ->with('success', 'Pilihan perangkat tambahan tersimpan — masih bisa diganti, baru tercatat terpasang saat Laporan Speedtest.');
     }
 }

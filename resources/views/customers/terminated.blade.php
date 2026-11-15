@@ -7,9 +7,8 @@
     $pageTitle = 'Pelanggan Putus';
 @endphp
 
-@section('title', $pageTitle . ' - Whusnet Operasional')
+@section('title', $pageTitle)
 @section('page_title', $pageTitle)
-@section('breadcrumb_parent', 'Pelanggan')
 @section('breadcrumb_parent_url', '/customers')
 
 @section('content')

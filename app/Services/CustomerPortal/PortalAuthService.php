@@ -2,10 +2,13 @@
 
 namespace App\Services\CustomerPortal;
 
+use App\Enums\InvoiceStatus;
+use App\Helpers\FormatHelper;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\CustomerPortalAccount;
 use App\Models\CustomerPortalToken;
+use App\Models\Invoice;
 use App\Models\User;
 use App\Services\CustomerQrTokenService;
 use App\Support\PortalClientIp;
@@ -229,7 +232,10 @@ class PortalAuthService
      * 4 kegagalan resolve token (§5, sama seperti `QrScanController`) SEMUA
      * dijawab `not_found` identik — jangan bocorkan detail mana yang salah.
      *
-     * @return array{outcome: 'success'|'not_found', login_id?: string, account_status?: string}
+     * Sejak 2026-11-14 ikut membawa `billing` — ringkasan tagihan tersamar
+     * buat tamu (lihat `publicBillingSummary()`).
+     *
+     * @return array{outcome: 'success'|'not_found', login_id?: string, account_status?: string, billing?: array<string, mixed>}
      */
     public function resolveQr(string $code): array
     {
@@ -254,6 +260,54 @@ class PortalAuthService
             // pernah dibuat sama sekali — kasus jarang, biasanya
             // ensureAccountExists() udah jalan bareng penerbitan QR).
             'account_status' => $customer->portalAccount?->status,
+            'billing' => $this->publicBillingSummary($customer),
+        ];
+    }
+
+    /**
+     * Ringkasan tagihan TERSAMAR buat tamu yang scan QR (2026-11-14,
+     * keputusan eksplisit user — membalik sebagian pencabutan gerbang
+     * tagihan 2026-08-27, tapi TANPA PIN dan TANPA data pribadi).
+     *
+     * Stiker QR nempel di ONT → siapa pun yang motret stiker bisa memanggil
+     * ini. Karena itu whitelist-nya sengaja sempit: nama disamarkan
+     * (`FormatHelper::maskName()`), CID, dan per tagihan yang BELUM lunas
+     * cuma periode, jatuh tempo, sisa, status. TIDAK ada alamat, nomor HP,
+     * nomor invoice, maupun riwayat pembayaran — rincian lengkap tetap di
+     * balik login Portal. Jangan tambah kolom di sini tanpa menimbang
+     * "pantes gak ini dilihat tetangga yang motret stiker".
+     *
+     * Tagihan `batal` & `lunas` tidak ikut — yang relevan buat orang di
+     * depan ONT cuma "masih ada yang harus dibayar atau tidak".
+     *
+     * @return array{customer_name: string, display_id: string, outstanding_total: string, invoices: list<array{billing_period: ?string, due_date: ?string, remaining_amount: string, invoice_status: array{value: string, label: string}}>}
+     */
+    private function publicBillingSummary(Customer $customer): array
+    {
+        $invoices = $customer->invoices()
+            ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value])
+            ->orderBy('billing_period')
+            ->orderBy('id')
+            ->limit(12)
+            ->get(['id', 'billing_period', 'due_date', 'remaining_amount', 'invoice_status']);
+
+        $outstanding = $customer->invoices()
+            ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value])
+            ->sum('remaining_amount');
+
+        return [
+            'customer_name' => FormatHelper::maskName($customer->full_name),
+            'display_id' => $customer->display_id,
+            'outstanding_total' => number_format((float) $outstanding, 2, '.', ''),
+            'invoices' => $invoices->map(fn (Invoice $invoice): array => [
+                'billing_period' => $invoice->billing_period,
+                'due_date' => $invoice->due_date?->toDateString(),
+                'remaining_amount' => (string) $invoice->remaining_amount,
+                'invoice_status' => [
+                    'value' => $invoice->invoice_status->value,
+                    'label' => $invoice->invoice_status->label(),
+                ],
+            ])->values()->all(),
         ];
     }
 

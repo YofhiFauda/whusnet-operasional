@@ -1,8 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Ubah Agent - Whusnet Operasional')
+@section('title', 'Ubah Agent')
 @section('page_title', 'Ubah Agent')
-@section('breadcrumb_parent', 'Master Agent')
 @section('breadcrumb_parent_url', route('business-development.agents.index'))
 
 @section('content')

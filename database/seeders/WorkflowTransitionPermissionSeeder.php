@@ -20,6 +20,17 @@ class WorkflowTransitionPermissionSeeder extends Seeder
         DB::table('role_workflow_transition')->truncate();
         Schema::enableForeignKeyConstraints();
 
+        // Pelaksana task lapangan = SEMUA Role::TECHNICIAN_CODES, bukan cuma
+        // 'teknisi'. PIC gudang cabang ('pic_gudang') itu teknisi yang
+        // merangkap (dropdown penugasan FOP sudah pakai TECHNICIAN_CODES),
+        // jadi dia DITUGASKAN task seperti teknisi biasa. Dulu daftar ini
+        // ditulis ['owner','admin','teknisi'] ⇒ TaskPolicy::canTransition()
+        // menolak pic_gudang ⇒ tombol Mulai (C-REQ/O-REQ/INFR) & tombol
+        // Laporan SEMUA tipe task hilang di Tasks Saya / Detail Task
+        // (ADHOC-297 bug #2, laporan user 2026-11-13). Role teknisi baru
+        // cukup ditambah di Role::TECHNICIAN_CODES — jangan tulis ulang di sini.
+        $executorRoles = ['owner', 'admin', ...Role::TECHNICIAN_CODES];
+
         $transitions = [
             [
                 'from_status' => 'pending',
@@ -43,19 +54,19 @@ class WorkflowTransitionPermissionSeeder extends Seeder
                 'from_status' => 'pending',
                 'to_status' => 'pending',
                 'permission_name' => 'task.execute',
-                'roles' => ['owner', 'admin', 'teknisi'],
+                'roles' => $executorRoles,
             ],
             [
                 'from_status' => 'terjadwal',
                 'to_status' => 'in_progress',
                 'permission_name' => 'task.execute',
-                'roles' => ['owner', 'admin', 'teknisi'],
+                'roles' => $executorRoles,
             ],
             [
                 'from_status' => 'in_progress',
                 'to_status' => 'selesai',
                 'permission_name' => 'task.execute',
-                'roles' => ['owner', 'admin', 'teknisi'],
+                'roles' => $executorRoles,
             ],
             [
                 'from_status' => 'selesai',
@@ -73,13 +84,13 @@ class WorkflowTransitionPermissionSeeder extends Seeder
                 'from_status' => 'terjadwal',
                 'to_status' => 'pending',
                 'permission_name' => 'task.execute',
-                'roles' => ['owner', 'admin', 'teknisi'],
+                'roles' => $executorRoles,
             ],
             [
                 'from_status' => 'in_progress',
                 'to_status' => 'pending',
                 'permission_name' => 'task.execute',
-                'roles' => ['owner', 'admin', 'teknisi'],
+                'roles' => $executorRoles,
             ],
             [
                 'from_status' => 'terjadwal',

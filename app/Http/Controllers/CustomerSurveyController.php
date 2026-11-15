@@ -26,6 +26,7 @@ use App\Services\TaskWorkToolService;
 use App\Services\TelegramBotService;
 use App\Support\LikeSearch;
 use App\Support\SafeUrl;
+use App\Support\UploadLimit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -387,8 +388,8 @@ class CustomerSurveyController extends Controller
         // field lain jalan — begitu attempt berikutnya gagal lagi di step
         // lain, foto yang sudah benar di Step 2 gak perlu diulang.
         $request->validate([
-            'house_photo' => 'sometimes|image|max:2048',
-            'survey_photo' => 'sometimes|image|max:2048',
+            'house_photo' => 'sometimes|image|'.UploadLimit::rule(),
+            'survey_photo' => 'sometimes|image|'.UploadLimit::rule(),
         ]);
 
         $stagedPhotosKey = "survey_report_photos.{$customer->id}";

@@ -75,7 +75,14 @@
                          CustomerQrTokenService::revealPin(). --}}
                     <a href="{{ route('customers.qr.print', $customer) }}" target="_blank"
                        class="px-4 py-2 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-sm font-semibold">
-                        Cetak Stiker
+                        QR Kirim ke Pelanggan
+                    </a>
+
+                    {{-- Stiker tempel modem: QR + CID saja, tanpa PIN —
+                         lihat CustomerQrController::printLabel(). --}}
+                    <a href="{{ route('customers.qr.print-label', $customer) }}" target="_blank"
+                       class="px-4 py-2 rounded-lg border border-sky-300 dark:border-sky-800 text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-sky-900/20 text-sm font-semibold">
+                        Cetak QR
                     </a>
 
                     @if (auth()->user()->hasPermission('customers.qr.create'))

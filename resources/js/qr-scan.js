@@ -76,6 +76,8 @@ function initQrScan({ videoEl, canvasEl, statusEl, onError }) {
             cancelAnimationFrame(rafId);
         }
         stream?.getTracks().forEach((track) => track.stop());
+        stream = null;
+        videoEl.srcObject = null; // lepas referensi stream mati — biar video gak nampilin frame beku terakhir.
     }
 
     async function loop(timestamp) {
@@ -141,16 +143,27 @@ function initQrScan({ videoEl, canvasEl, statusEl, onError }) {
         rafId = requestAnimationFrame(loop);
     }
 
-    return { start, stop };
+    return { start, stop, isScanning: () => scanning };
 }
 
 // Self-init — dipasang lewat @vite() di qr/scan.blade.php (satu-satunya
-// halaman yang nge-load bundle ini). Elemen wajib ada di DOM sebelum ini
-// jalan; `defer` bawaan Vite module script udah nunggu DOMContentLoaded,
-// jadi gak perlu bungkus listener DOMContentLoaded lagi di sini.
-const videoEl = document.getElementById('qr-scan-video');
+// halaman yang nge-load bundle ini).
+//
+// Dibungkus `mountQrScanner()` (ADHOC-297 P5): dengan `<body hx-boost="true">`
+// module ini cuma DIEKSEKUSI SEKALI per tab, jadi pemasangan di top-level dulu
+// bikin kunjungan ke-2 ke /qr/scan kamera gak pernah nyala. Sekarang dipanggil
+// saat module dimuat DAN tiap `htmx:afterSettle`; video yang sudah terpasang
+// ditandai `data-qr-mounted`.
+let activeQrScanner = null;
 
-if (videoEl) {
+function mountQrScanner() {
+    const videoEl = document.getElementById('qr-scan-video');
+
+    if (!videoEl || videoEl.dataset.qrMounted) {
+        return;
+    }
+    videoEl.dataset.qrMounted = '1';
+
     const statusEl = document.getElementById('qr-scan-status');
     const scanner = initQrScan({
         videoEl,
@@ -164,12 +177,78 @@ if (videoEl) {
                 : 'Kamera gak bisa diakses. Coba muat ulang halaman.';
         },
     });
+    activeQrScanner = { videoEl, scanner };
 
-    scanner.start().then(() => {
-        statusEl.textContent = 'Mengarahkan kamera…';
+    // Izin kamera bisa baru keluar SETELAH staf pindah halaman — stream yang
+    // terlanjur terbuka untuk halaman yang sudah ditinggal langsung dimatikan.
+    const startGuarded = () => scanner.start().then(() => {
+        if (!videoEl.isConnected) {
+            scanner.stop();
+        }
     });
 
-    // Kamera WAJIB berhenti begitu staf pindah halaman — jangan biarin
-    // nyala di background (baterai + privasi, kamera ngerekam terus).
-    window.addEventListener('pagehide', () => scanner.stop());
+    startGuarded().then(() => {
+        if (scanner.isScanning()) {
+            statusEl.textContent = 'Mengarahkan kamera…';
+        }
+    });
+
+    // Tombol Stop/Nyalakan manual (diminta eksplisit 2026-11-10) — staf bisa
+    // matikan kamera sendiri tanpa harus pindah/muat ulang halaman (privasi
+    // & baterai), lalu nyalakan lagi kalau mau lanjut scan.
+    const toggleBtn = document.getElementById('qr-scan-toggle-btn');
+
+    if (toggleBtn) {
+        toggleBtn.addEventListener('click', async () => {
+            if (scanner.isScanning()) {
+                scanner.stop();
+                statusEl.textContent = 'Kamera dimatikan.';
+                toggleBtn.textContent = 'Nyalakan Kamera';
+
+                return;
+            }
+
+            toggleBtn.disabled = true;
+            statusEl.textContent = 'Meminta izin kamera…';
+            await startGuarded();
+            toggleBtn.disabled = false;
+
+            if (scanner.isScanning()) {
+                statusEl.textContent = 'Mengarahkan kamera…';
+                toggleBtn.textContent = 'Matikan Kamera';
+            }
+        });
+    }
 }
+
+/**
+ * Kamera WAJIB berhenti begitu staf pindah halaman — jangan biarin nyala di
+ * background (baterai + privasi). `pagehide` saja TIDAK cukup: navigasi
+ * hx-boost gak memicunya, dulu kamera tetap merekam sesudah pindah menu.
+ *
+ * @param {boolean} onlyDetached true = cuma kalau videonya sudah lepas dari DOM.
+ */
+function stopQrScanner(onlyDetached) {
+    if (!activeQrScanner || (onlyDetached && activeQrScanner.videoEl.isConnected)) {
+        return;
+    }
+
+    activeQrScanner.scanner.stop();
+
+    if (!activeQrScanner.videoEl.isConnected) {
+        activeQrScanner = null;
+    }
+}
+
+mountQrScanner();
+
+document.addEventListener('htmx:beforeSwap', (event) => {
+    if (event.detail.target === document.body) {
+        stopQrScanner(false);
+    }
+});
+document.addEventListener('htmx:afterSettle', () => {
+    stopQrScanner(true);
+    mountQrScanner();
+});
+window.addEventListener('pagehide', () => stopQrScanner(false));

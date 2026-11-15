@@ -235,7 +235,7 @@ class CashDepositService
             title: "Setoran kas {$written->deposit_number}: ".$written->status->label(),
             message: 'Selisih Rp'.number_format(abs((float) $written->difference), 0, ',', '.')
                 .' ditutup oleh Owner. Alasan: '.$reason,
-            actionUrl: route('cash-deposits.index'),
+            actionUrl: route('cash-deposits.index', [], false),
             type: NotificationType::WARNING
         )));
         if ($written->depositor) {
@@ -381,7 +381,7 @@ class CashDepositService
                 title: 'Setoran kas menunggu pemeriksaan: '.$admin->name,
                 message: "{$deposit->deposit_number} — {$sumberCount} sumber, tercatat Rp"
                     .number_format($total, 0, ',', '.').'. Periksa lalu tutup setorannya.',
-                actionUrl: route('cash-deposits.index'),
+                actionUrl: route('cash-deposits.index', [], false),
                 type: NotificationType::WARNING
             ));
         }
@@ -406,7 +406,7 @@ class CashDepositService
                 ? 'Uang yang diserahkan cocok dengan catatan sistem. Setoran ditutup.'
                 : 'Selisih Rp'.number_format(abs((float) $deposit->difference), 0, ',', '.')
                     .' ('.((float) $deposit->difference < 0 ? 'kurang' : 'lebih').'). Catatan: '.($deposit->note ?? '-'),
-            actionUrl: route('cash-deposits.index'),
+            actionUrl: route('cash-deposits.index', [], false),
             type: $cocok ? NotificationType::SUCCESS : NotificationType::WARNING
         ));
     }

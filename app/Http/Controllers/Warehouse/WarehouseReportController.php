@@ -55,6 +55,7 @@ class WarehouseReportController extends Controller
         $movementRows = $this->buildMovementSummary($popIds, $popFilter, $periodStart, $periodEnd, $stockAsOf);
         $adjustmentRows = $this->buildAdjustmentSummary($popIds, $popFilter, $periodStart, $periodEnd);
         $movementCounts = $this->buildMovementCounts($popIds, $popFilter, $periodStart, $periodEnd);
+        $selfIssueRows = $this->buildSelfIssueRows($popIds, $popFilter, $periodStart, $periodEnd);
 
         // Tab "Barang Terjual" (sub-permission TERPISAH dari warehouse_report.view,
         // lihat routes/web.php) — data cuma dihitung kalau user benar-benar
@@ -101,8 +102,50 @@ class WarehouseReportController extends Controller
             ->all();
 
         return view('warehouse.reports.index', compact(
-            'pops', 'period', 'popFilter', 'movementRows', 'adjustmentRows', 'movementCounts', 'kpi', 'lossChartData', 'soldToCustomerSales'
+            'pops', 'period', 'popFilter', 'movementRows', 'adjustmentRows', 'movementCounts', 'kpi', 'lossChartData', 'soldToCustomerSales', 'selfIssueRows'
         ));
+    }
+
+    /**
+     * Issue yang pengeluarnya = penerimanya (`created_by` = `to_technician_id`)
+     * — PIC Gudang mengambil barang untuk dirinya sendiri (boleh sejak
+     * 2026-11-14, lihat InventoryIssueService::assertIssueAllowed()). Kontrol
+     * atas PIC dipindah dari pencegahan ke pemantauan; daftar ini tempat Pusat
+     * memantaunya. Diturunkan dari kolom yang sudah ada, tanpa flag tersimpan,
+     * jadi tidak mungkin terlewat ditandai.
+     *
+     * @param  Collection<int, int>  $popIds
+     * @return list<array{reference:string, date:Carbon, pic_name:string, pop_label:string, line_count:int, items:string}>
+     */
+    private function buildSelfIssueRows($popIds, ?int $popFilter, Carbon $start, Carbon $end): array
+    {
+        $scopedPops = $popFilter ? collect([$popFilter])->intersect($popIds) : $popIds;
+
+        return InventoryTransaction::query()
+            ->where('type', InventoryTransactionType::ISSUE->value)
+            ->whereColumn('created_by', 'to_technician_id')
+            ->whereIn('from_pop_id', $scopedPops)
+            ->whereBetween('created_at', [$start, $end])
+            ->with(['item:id,name', 'fromPop:id,name', 'createdBy:id,name'])
+            ->orderByDesc('created_at')
+            ->get()
+            ->groupBy('reference_number')
+            ->map(function (Collection $group, string $reference) {
+                $first = $group->first();
+
+                return [
+                    'reference' => $reference,
+                    'date' => $first->created_at,
+                    'pic_name' => $first->createdBy->name ?? '(user dihapus)',
+                    'pop_label' => $first->fromPop->name ?? '—',
+                    'line_count' => $group->count(),
+                    'items' => $group->groupBy('item_id')
+                        ->map(fn (Collection $rows) => ($rows->first()->item->name ?? '(item dihapus)').' ×'.rtrim(rtrim(number_format($rows->sum('qty'), 2, ',', '.'), '0'), ','))
+                        ->implode(', '),
+                ];
+            })
+            ->values()
+            ->all();
     }
 
     /**

@@ -88,4 +88,13 @@ enum ActionCode: string
      * bukan numpang wildcard `network_nodes.create`.
      */
     case REGISTER_INFRA = 'register_infra';
+
+    /**
+     * Isolir/aktivasi-kembali layanan pelanggan (toggle status
+     * active <-> suspended). SENGAJA bukan `UPDATE`: sebelumnya numpang
+     * `customers.update`, jadi role yang cuma butuh edit field pelanggan
+     * biasa otomatis bisa isolir juga. Aksi service-impacting, wajib
+     * permission sendiri — pola sama kayak `customers.deactivate`.
+     */
+    case ISOLIR = 'isolir';
 }

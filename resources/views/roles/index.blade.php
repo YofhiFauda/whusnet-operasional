@@ -501,7 +501,7 @@
             $canManageRoles
         ));
     @endphp
-    document.addEventListener('DOMContentLoaded', () => {
+    window.onPageReady(() => {
         const roles = @json($scopeRoleLabels);
         if (window.Toast) {
             Toast.info(

@@ -240,7 +240,11 @@
             </div>
 
             <!-- RIGHT COLUMN: Wizard Steps Form Panels -->
-            <div class="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xs overflow-hidden flex flex-col justify-between min-h-[520px]">
+            {{-- TANPA overflow-hidden (2026-11-11): daftar <x-combobox> (SN/roll/
+                 barang custody) absolute di dalam panel ini — overflow-hidden
+                 motong daftarnya di tepi bawah panel, teknisi gak bisa pilih
+                 barang. Sudut bawah sudah ditangani footer `sm:rounded-b-lg`. --}}
+            <div class="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg shadow-xs flex flex-col justify-between min-h-[520px]">
 
                 <!-- FORM BODY -->
                 <div class="p-4 sm:p-6 flex-1">
@@ -419,17 +423,19 @@
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Foto Rumah</span>
                                     <input type="file" name="house_photo" accept="image/*"
                                            class="w-full text-xs file:mr-2.5 file:px-2.5 file:py-1.5 file:rounded-md file:border-0 file:bg-slate-100 file:text-slate-700 dark:file:bg-slate-800 dark:file:text-slate-300">
+                                    <x-upload-limit-hint />
                                     @error('house_photo')<p class="text-xs text-rose-600 font-medium mt-1">{{ $message }}</p>@enderror
                                 </label>
                                 <label class="block">
                                     <span class="block text-[10px] font-bold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Foto ODP Terdekat</span>
                                     <input type="file" name="survey_photo" accept="image/*"
                                            class="w-full text-xs file:mr-2.5 file:px-2.5 file:py-1.5 file:rounded-md file:border-0 file:bg-slate-100 file:text-slate-700 dark:file:bg-slate-800 dark:file:text-slate-300">
+                                    <x-upload-limit-hint />
                                     @error('survey_photo')<p class="text-xs text-rose-600 font-medium mt-1">{{ $message }}</p>@enderror
                                 </label>
                             </div>
                             <div class="flex items-center justify-between pt-2 border-t border-slate-200 dark:border-slate-800">
-                                <span class="text-[11px] text-slate-500 dark:text-slate-400">Maks. 2 MB per foto</span>
+                                <span></span>
                                 <button type="submit" class="px-3.5 py-1.5 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-xs font-medium shadow-xs inline-flex items-center gap-1.5">
                                     <x-ui.icon name="save" class="w-3.5 h-3.5" />
                                     <span>Simpan Foto</span>
@@ -903,6 +909,7 @@
                                                     <div class="space-y-1">
                                                         <label class="block mb-1 font-medium uppercase text-[10px] tracking-wide text-slate-600 dark:text-slate-400">Foto Bukti <span x-show="!row.id" class="text-rose-500">*</span></label>
                                                         <input type="file" :name="`cable_crossings[${r}][foto]`" accept="image/*" class="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 dark:file:bg-sky-950/60 dark:file:text-sky-300 cursor-pointer">
+                                                        <x-upload-limit-hint />
                                                         <p x-show="row.id" class="text-[10px] text-slate-500">Foto sebelumnya tersimpan — unggah lagi kalau ingin menggantinya.</p>
                                                     </div>
 
@@ -1119,6 +1126,7 @@
                                                     <span>{{ $existingFotoUrl ? 'Ganti Foto' : $photo['cta'] }}</span>
                                                 </label>
                                                 <span id="file-label-{{ $photo['field'] }}" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">{{ $existingFotoUrl ? 'Pakai foto tersimpan' : 'Belum ada file' }}</span>
+                                                <x-upload-limit-hint class="text-center" />
                                             </div>
                                         </div>
                                     @endforeach
@@ -1266,6 +1274,7 @@
                                             <span>Pilih Foto Speedtest</span>
                                         </label>
                                         <span id="file-label-speedtest_photo" class="block text-[10px] text-slate-400 dark:text-slate-500 text-center mt-1 font-mono truncate">Belum ada file dipilih</span>
+                                        <x-upload-limit-hint class="text-center" />
                                     </div>
 
                                     @error('speedtest_photo')
@@ -1317,31 +1326,46 @@
 @include('partials.wilayah-cascade-script')
 <script>
     /* ── Wizard Form Stepper & Live Timer Logic ── */
-    let currentActiveStep = 1;
-    const totalStepsCount = 6;
+    // `var`, BUKAN `let`/`const` (2026-11-11): hx-boost swap <body> me-re-execute
+    // script ini di dokumen yang sama. Survey report juga deklarasi
+    // `currentActiveStep` — pindah survey → PSB lewat boost = SyntaxError
+    // "already declared", loop insert-script htmx putus, script sesudahnya
+    // (comboBox, baris barang custody) gak jalan ⇒ teknisi gak bisa pilih
+    // SN/roll. Penjaga: TopLevelLetConstBoostRedeclareTest.
+    var currentActiveStep = 1;
+    var totalStepsCount = 6;
 
-    const inputSteps = [5, 6];
-    const readOnlySteps = [1, 2, 3, 4];
+    var inputSteps = [5, 6];
+    var readOnlySteps = [1, 2, 3, 4];
 
-    const pemasanganComplete = @json($pemasanganComplete);
+    var pemasanganComplete = @json($pemasanganComplete);
 
     // ═══════════════════════════════════════════════════════════
     // TIMER LOGIC
     // ═══════════════════════════════════════════════════════════
-    let timerInterval = null;
-    let timerSeconds = 0;
+    // Handle interval disimpan juga di `window` — `var timerInterval = null`
+    // di bawah dieksekusi ulang tiap navigasi boost, jadi handle kunjungan
+    // sebelumnya hilang dan timer lama tetap jalan di belakang (detik dobel,
+    // menulis ke #timer-display halaman baru). Bersihkan dulu sebelum mulai.
+    clearInterval(window.__psbReportTimer);
+    var timerInterval = null;
+    var timerSeconds = 0;
 
     @if($installation && $installation->started_at)
-        const timerStartedAt = new Date("{{ $installation->started_at->toIso8601String() }}");
+        // `var` — lihat catatan di atas. Dua deklarasi ini sempat ketinggalan
+        // waktu perbaikan 2026-11-11 (ter-indent di dalam blok kondisi Blade, lolos penjaga
+        // lama) ⇒ kunjungan KEDUA ke laporan yang pemasangannya sudah mulai
+        // tetap SyntaxError "already declared" (ADHOC-297).
+        var timerStartedAt = new Date("{{ $installation->started_at->toIso8601String() }}");
 
-        const hiddenStartedAtInit = document.getElementById('hidden_started_at');
+        var hiddenStartedAtInit = document.getElementById('hidden_started_at');
         if (hiddenStartedAtInit) {
             hiddenStartedAtInit.value = "{{ $installation->started_at->format('Y-m-d H:i:s') }}";
         }
 
         timerSeconds = Math.max(0, Math.floor((new Date() - timerStartedAt) / 1000));
 
-        timerInterval = setInterval(function() {
+        timerInterval = window.__psbReportTimer = window.pageInterval(function() {
             timerSeconds++;
             const h = String(Math.floor(timerSeconds / 3600)).padStart(2, '0');
             const m = String(Math.floor((timerSeconds % 3600) / 60)).padStart(2, '0');
@@ -1456,7 +1480,7 @@
         document.getElementById('form-speedtest').submit();
     }
 
-    const formFields = {
+    var formFields = {
         'pemasangan': {
             get required() { return getPemasanganRequiredFields(); },
             optional: ['brand', 'model', 'mac_address', 'pppoe_username', 'pppoe_password', 'olt_number', 'olt_slot', 'olt_port', 'vlan', 'router_number', 'initial_attenuation', 'installation_note']
@@ -1467,12 +1491,12 @@
         }
     };
 
-    const stepKeys = {
+    var stepKeys = {
         5: 'pemasangan',
         6: 'uji'
     };
 
-    document.addEventListener("DOMContentLoaded", function() {
+    window.onPageReady(function () {
         const inputs = document.querySelectorAll('#form-pemasangan input, #form-pemasangan select, #form-pemasangan textarea, #form-speedtest input, #form-speedtest select, #form-speedtest textarea');
         inputs.forEach(input => {
             input.addEventListener('input', runLiveProgressUpdates);

@@ -653,7 +653,7 @@
                                         <svg class="w-4 h-4 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
                                         </svg>
-                                        <span class="text-[11px] font-medium text-text-secondary"><span class="font-bold text-sky-600">Pilih file</span> (Maks. 5 file, @5MB)</span>
+                                        <span class="text-[11px] font-medium text-text-secondary"><span class="font-bold text-sky-600">Pilih file</span> (Maks. 5 file, maks. {{ \App\Support\UploadLimit::label() }}/file)</span>
                                     </div>
                                     <input type="file" x-ref="fileInput" @change="attachments = Array.from($event.target.files)" multiple accept="image/*,application/pdf" class="hidden">
                                 </label>
@@ -1576,8 +1576,8 @@
                 this.initEchoListeners();
                 const narrow = window.matchMedia('(max-width: 1023px)');
                 const updateNarrow = () => { this.narrowViewport = narrow.matches; };
-                narrow.addEventListener('change', updateNarrow);
-                window.addEventListener('resize', updateNarrow);
+                window.pageListen(narrow, 'change', updateNarrow);
+                window.pageListen(window, 'resize', updateNarrow);
                 // Dua rAF: satu buat nunggu Alpine selesai render class awal,
                 // satu lagi buat memastikan browser sudah melukisnya sebelum
                 // properti transition dipasang.
@@ -1612,7 +1612,7 @@
                         return;
                     }
                     popIds.forEach(popId => {
-                        window.Echo.private(`tickets.${popId}`)
+                        window.pageEcho(`tickets.${popId}`)
                             .listen('.TicketQueueUpdated', () => this.refreshWorksheet());
                     });
                 };

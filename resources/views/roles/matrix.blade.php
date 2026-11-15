@@ -241,6 +241,7 @@ $permissionDescMap = [
     'customers.update' => 'Edit data pelanggan & assign survey. Menggerbangi SEMUA tab detail sekaligus, bukan per-tab.',
     'customers.delete' => 'Hapus pelanggan dari daftar (soft delete).',
     'customers.deactivate' => 'Putus langganan pelanggan aktif (terminasi). Terpisah dari Edit karena mematikan layanan.',
+    'customers.isolir' => 'Isolir atau aktifkan kembali layanan pelanggan (toggle active/suspended). Terpisah dari Edit, bukan numpang `customers.update`.',
     'customers.import.view' => 'Buka halaman Import Pelanggan, riwayat batch import, dan unduh template.',
     'customers.import.import' => 'Unggah, validasi, dan eksekusi import massal pelanggan dari Excel/CSV.',
     'customers.detail.view' => 'Buka halaman Detail Pelanggan. Terpisah dari akses List — bisa diberikan sendiri-sendiri.',
@@ -948,7 +949,7 @@ foreach ($features as $f) {
 
     // Toast warning untuk role sistem
     @if($role->is_system && !$role->isOwner())
-    document.addEventListener('DOMContentLoaded', () => {
+    window.onPageReady(() => {
         if (window.Toast) {
             Toast.warning(
                 'Role Standar Sistem',
@@ -1162,7 +1163,7 @@ foreach ($features as $f) {
         });
     }
 
-    document.addEventListener('DOMContentLoaded', () => {
+    window.onPageReady(() => {
         resolvePermissionDependencies();
         updatePermCount();
         document.querySelectorAll('.perm-checkbox').forEach(cb => {

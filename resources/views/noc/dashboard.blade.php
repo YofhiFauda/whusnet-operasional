@@ -581,7 +581,7 @@
                     return;
                 }
                 allowedPopIds.forEach(popId => {
-                    window.Echo.private(`tickets.${popId}`).listen('.TicketQueueUpdated', () => {
+                    window.pageEcho(`tickets.${popId}`).listen('.TicketQueueUpdated', () => {
                         refetchAndSwap();
                         refreshLeaderboard();
                     });

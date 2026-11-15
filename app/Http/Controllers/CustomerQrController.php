@@ -105,6 +105,33 @@ class CustomerQrController extends Controller
     }
 
     /**
+     * "Cetak QR" — stiker yang DITEMPEL di modem (revisi user 2026-11-15):
+     * cuma QR + CID. Cetakan `print()` di atas berubah peran jadi "QR Kirim
+     * ke Pelanggan" (dikirim ke pelanggan, memuat Login ID + PIN).
+     *
+     * SENGAJA tanpa PIN/Login ID/nama: stiker modem terpajang permanen di
+     * rumah pelanggan — tamu/tukang mana pun bisa memotretnya. PIN di situ
+     * sama dengan membagikan kunci klaim akun portal ke siapa saja.
+     *
+     * Teks di bawah QR pakai `display_id` (keputusan user): CID asli kalau
+     * sudah aktif, REQ ID/C00RQ… kalau belum — stiker biasanya dicetak saat
+     * pemasangan, sebelum CID terbit.
+     */
+    public function printLabel(Customer $customer): View
+    {
+        $this->authorizePopScope($customer);
+
+        $activeToken = $customer->activeQrToken;
+
+        abort_unless($activeToken, 404, 'Pelanggan ini belum punya token QR aktif — terbitkan dulu.');
+
+        return view('customers.qr.print-label', [
+            'customer' => $customer,
+            'qrDataUri' => $this->qrRenderer->dataUri($this->qrTokens->dispatchUrl($activeToken)),
+        ]);
+    }
+
+    /**
      * Terbitkan QR + PIN — SATU aksi, bukan dua tombol terpisah (§6.5.3:
      * penerbitan PIN "dipicu saat pelanggan masuk WAITING_INSTALLATION,
      * BUKAN aksi admin lepas" — token dan PIN adalah satu paket, sama

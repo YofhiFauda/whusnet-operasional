@@ -332,7 +332,7 @@
 </div>
 
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+window.onPageReady(function () {
     const roleSelect     = document.getElementById('role_id');
     const scopeSelect    = document.getElementById('scope_type');
     const popContainer   = document.getElementById('pop_selection_container');
@@ -495,7 +495,7 @@ window.submitForm = function () {
 };
 
 // Close modal on Escape key press
-document.addEventListener('keydown', function (e) {
+window.pageListen(document, 'keydown', function (e) {
     if (e.key === 'Escape') {
         const modal = document.getElementById('previewAccessModal');
         if (modal && !modal.classList.contains('hidden')) {

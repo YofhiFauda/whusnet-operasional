@@ -844,7 +844,7 @@
 
             init() {
                 // Responsiveness listener jika resize layar
-                window.addEventListener('resize', () => {
+                window.pageListen(window, 'resize', () => {
                     if (!localStorage.getItem('whusnet_ticket_history_view')) {
                         this.viewMode = window.innerWidth >= 768 ? 'table' : 'cards';
                     }
@@ -909,7 +909,7 @@
                         return;
                     }
                     allowedPopIds.forEach(popId => {
-                        window.Echo.private(`tickets.${popId}`)
+                        window.pageEcho(`tickets.${popId}`)
                             .listen('.TicketQueueUpdated', () => this.refetchAndSwap());
                     });
                 };

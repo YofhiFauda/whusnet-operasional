@@ -350,15 +350,168 @@
                         <th class="w-8 px-2.5 py-2.5 text-center">
                             <input type="checkbox" @change="toggleSelectAll($event.target.checked)" :checked="isAllSelected()" class="w-3.5 h-3.5 rounded border-slate-300 dark:border-slate-600 dark:bg-slate-700 text-sky-600 focus:ring-sky-500 cursor-pointer">
                         </th>
-                        <th class="px-3 py-2.5">Kategori</th>
-                        <th class="px-3 py-2.5">Tanggal</th>
-                        <th class="px-3 py-2.5">Tugas</th>
-                        <th class="px-3 py-2.5">Area</th>
-                        <th class="px-3 py-2.5">Issue</th>
+                        <?php $sortDir = request()->query('dir', 'asc'); ?>
+                        <?php if (isset($component)) { $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.sortable-th','data' => ['sortKey' => 'category','label' => 'Kategori','class' => 'px-3 py-2.5','currentSort' => $activeSort,'currentDir' => $sortDir]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('sortable-th'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['sort-key' => 'category','label' => 'Kategori','class' => 'px-3 py-2.5','current-sort' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($activeSort),'current-dir' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($sortDir)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $attributes = $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $component = $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+                        <?php if (isset($component)) { $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.sortable-th','data' => ['sortKey' => 'task_date','label' => 'Tanggal','class' => 'px-3 py-2.5','currentSort' => $activeSort,'currentDir' => $sortDir]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('sortable-th'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['sort-key' => 'task_date','label' => 'Tanggal','class' => 'px-3 py-2.5','current-sort' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($activeSort),'current-dir' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($sortDir)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $attributes = $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $component = $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+                        <?php if (isset($component)) { $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.sortable-th','data' => ['sortKey' => 'tugas','label' => 'Tugas','class' => 'px-3 py-2.5','currentSort' => $activeSort,'currentDir' => $sortDir]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('sortable-th'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['sort-key' => 'tugas','label' => 'Tugas','class' => 'px-3 py-2.5','current-sort' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($activeSort),'current-dir' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($sortDir)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $attributes = $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $component = $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+                        <?php if (isset($component)) { $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.sortable-th','data' => ['sortKey' => 'area','label' => 'Area','class' => 'px-3 py-2.5','currentSort' => $activeSort,'currentDir' => $sortDir]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('sortable-th'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['sort-key' => 'area','label' => 'Area','class' => 'px-3 py-2.5','current-sort' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($activeSort),'current-dir' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($sortDir)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $attributes = $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $component = $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+                        <?php if (isset($component)) { $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.sortable-th','data' => ['sortKey' => 'issue','label' => 'Issue','class' => 'px-3 py-2.5','currentSort' => $activeSort,'currentDir' => $sortDir]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('sortable-th'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['sort-key' => 'issue','label' => 'Issue','class' => 'px-3 py-2.5','current-sort' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($activeSort),'current-dir' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($sortDir)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $attributes = $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $component = $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
                         <th class="px-3 py-2.5">Teknisi</th>
-                        <th class="px-3 py-2.5">Team</th>
-                        <th class="px-3 py-2.5">Status</th>
-                        <th class="px-3 py-2.5">Prioritas</th>
+                        <?php if (isset($component)) { $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.sortable-th','data' => ['sortKey' => 'team','label' => 'Team','class' => 'px-3 py-2.5','currentSort' => $activeSort,'currentDir' => $sortDir]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('sortable-th'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['sort-key' => 'team','label' => 'Team','class' => 'px-3 py-2.5','current-sort' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($activeSort),'current-dir' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($sortDir)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $attributes = $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $component = $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+                        <?php if (isset($component)) { $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.sortable-th','data' => ['sortKey' => 'status','label' => 'Status','class' => 'px-3 py-2.5','currentSort' => $activeSort,'currentDir' => $sortDir]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('sortable-th'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['sort-key' => 'status','label' => 'Status','class' => 'px-3 py-2.5','current-sort' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($activeSort),'current-dir' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($sortDir)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $attributes = $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $component = $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+                        <?php if (isset($component)) { $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.sortable-th','data' => ['sortKey' => 'priority','label' => 'Prioritas','class' => 'px-3 py-2.5','currentSort' => $activeSort,'currentDir' => $sortDir]] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('sortable-th'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['sort-key' => 'priority','label' => 'Prioritas','class' => 'px-3 py-2.5','current-sort' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($activeSort),'current-dir' => \Illuminate\View\Compilers\BladeCompiler::sanitizeComponentAttribute($sortDir)]); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $attributes = $__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__attributesOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07)): ?>
+<?php $component = $__componentOriginal3c1df23c66879bbdd25946c6c08cdc07; ?>
+<?php unset($__componentOriginal3c1df23c66879bbdd25946c6c08cdc07); ?>
+<?php endif; ?>
                         <th class="px-3 py-2.5 text-right">Aksi</th>
                     </tr>
                 </thead>
@@ -1482,8 +1635,11 @@
                     if (data.success) {
                         this.showToast('success', data.message);
                         this.bulkTeamModal.open = false;
+                        // FopTaskUpdated sudah di-dispatch server-side per task (ShouldBroadcastNow),
+                        // jadi cukup tarik ulang baris yang barusan di-assign — gak perlu reload penuh.
+                        const refreshedTaskIds = [...this.selectedTaskIds];
                         this.selectedTaskIds = [];
-                        setTimeout(() => window.location.reload(), 800);
+                        refreshedTaskIds.forEach(id => this.refreshFopTaskRow(id));
                     } else {
                         this.showToast('error', data.message || 'Gagal menugaskan task ke tim.');
                     }

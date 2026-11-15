@@ -283,6 +283,160 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
         $this->assertSame('0.00', $serviceB->refresh()->monthly_price);
     }
 
+    public function test_cid_jadi_kunci_utama_walau_nama_di_excel_beda_dari_db(): void
+    {
+        // Kasus Caruban: CID di excel pasti, tapi nama ditulis kolektor beda
+        // (typo/alias) dari full_name di DB. CID harus tetap match duluan,
+        // bukan ikut ke jalur ambigu/"tidak ditemukan" nama.
+        $pop = Pop::factory()->create(['name' => 'Caruban']);
+        $package = $this->makePackage('NetP110', '110K Up to 5M', 110000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Sulastri', 'cid' => 'I1X13ARQ000001']);
+        $service = $this->makeService($customer, $package, 90357);
+
+        $file = $this->writeExcelFixture([
+            ['CID' => 'I1X13ARQ000001', 'Nama' => 'sulastri (nama beda tulis kolektor)', 'Paket' => 110000, 'paket ' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->expectsOutputToContain('1 diubah')
+            ->assertSuccessful();
+
+        $this->assertSame('110000.00', $service->refresh()->monthly_price);
+    }
+
+    public function test_cid_tidak_ketemu_fallback_ke_nama(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Caruban']);
+        $package = $this->makePackage('NetP110', '110K Up to 5M', 110000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Agus Setiawan', 'cid' => 'I1X13ARQ000002']);
+        $service = $this->makeService($customer, $package, 90357);
+
+        $file = $this->writeExcelFixture([
+            ['CID' => 'CID-SALAH-KETIK', 'Nama' => 'Agus Setiawan', 'Paket' => 110000, 'paket ' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->expectsOutputToContain('1 diubah')
+            ->assertSuccessful();
+
+        $this->assertSame('110000.00', $service->refresh()->monthly_price);
+    }
+
+    public function test_cid_ketemu_tapi_nama_gak_nyambung_ditolak_tidak_menimpa_pelanggan_lain(): void
+    {
+        // Regresi temuan nyata cabang Caruban: CID di Excel kolektor "nyasar"
+        // (off-by-satu/beda segmen distribusi) ke pelanggan LAIN yang sama
+        // sekali gak nyambung namanya ("suyanto peting" di Excel punya CID
+        // yang di DB justru kepunyaan "Sudji Pendot"). Command TIDAK BOLEH
+        // percaya CID buta — kalau nama gak nyambung sama sekali, harus
+        // ditolak (dilewati), bukan nimpa harga/paket pelanggan yang salah.
+        $pop = Pop::factory()->create(['name' => 'Caruban']);
+        $package = $this->makePackage('NetP110', 'NetP110', 115000);
+        $korbanSalahCid = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Sudji Pendot', 'cid' => 'I1X13ARQ000360']);
+        $service = $this->makeService($korbanSalahCid, $package, 77903);
+
+        $file = $this->writeExcelFixture([
+            ['CID' => 'I1X13ARQ000360', 'Nama' => 'suyanto peting', 'Paket' => 115000, 'paket ' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->assertSuccessful();
+
+        // Harga/paket Sudji Pendot (korban CID nyasar) TIDAK boleh berubah
+        // sama sekali — kalau ini gagal, berarti safety check-nya bolong dan
+        // CID yang salah berhasil nimpa data pelanggan yang gak terkait.
+        $this->assertSame('77903.00', $service->refresh()->monthly_price);
+        $this->assertSame($package->id, $service->internet_package_id);
+    }
+
+    public function test_cid_tetap_dipercaya_walau_nama_beda_gaya_tulis_bukan_beda_orang(): void
+    {
+        // Regresi temuan nyata: "warung-hari-martono" (Excel, pakai strip)
+        // vs "Warung Hari Martono" (DB, pakai spasi) itu PELANGGAN YANG
+        // SAMA — beda gaya tulis kolektor doang, bukan CID nyasar. Safety
+        // check CID jangan sampai menolak kasus beda format kayak ini.
+        $pop = Pop::factory()->create(['name' => 'Caruban']);
+        $package = $this->makePackage('NetP110', 'NetP110', 110000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Warung Hari Martono', 'cid' => 'I1X13ARQ000376']);
+        $service = $this->makeService($customer, $package, 90000);
+
+        $file = $this->writeExcelFixture([
+            ['CID' => 'I1X13ARQ000376', 'Nama' => 'warung-hari-martono', 'Paket' => 110000, 'paket ' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->assertSuccessful();
+
+        $this->assertSame('110000.00', $service->refresh()->monthly_price);
+    }
+
+    public function test_name_alias_meloloskan_cid_yang_namanya_typo_parah(): void
+    {
+        // Regresi temuan nyata: "rizka ana" (Excel, typo/singkatan parah)
+        // vs "Rizka Fitri Ana" (DB) — CID-nya BENAR pasangannya, tapi typo
+        // separah ini gak lolos namaCocokLonggar() yang cuma toleransi beda
+        // format/spasi. Reviewer manual yang mastiin lewat name_aliases.
+        $pop = Pop::factory()->create(['name' => 'Caruban']);
+        $package = $this->makePackage('NetP110', 'NetP110', 115000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Rizka Fitri Ana', 'cid' => 'I1X13ARQ000033']);
+        $service = $this->makeService($customer, $package, 90000);
+
+        $file = $this->writeExcelFixture([
+            ['CID' => 'I1X13ARQ000033', 'Nama' => 'rizka ana', 'Paket' => 115000, 'paket ' => 'NetP110'],
+        ]);
+        $config = $this->writeConfigFixture([
+            'name_aliases' => ['rizka ana' => 'Rizka Fitri Ana'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--apply' => true])
+            ->assertSuccessful();
+
+        $this->assertSame('115000.00', $service->refresh()->monthly_price);
+    }
+
+    public function test_header_harga_dan_nama_paket_dipakai_kalau_ada(): void
+    {
+        // Regresi temuan nyata: cabang Sambit ganti header filenya jadi
+        // "Harga"/"Nama Paket" (ikutin template Caruban) — kolom "Paket"
+        // lama malah dipakai buat TEKS speed ("Up to 25 Mbps"), bukan
+        // nominal lagi. Command harus baca "Harga", BUKAN "Paket", kalau
+        // "Harga" ada — jangan diam-diam jatuh balik ke "Paket" yang
+        // isinya udah bukan harga.
+        $pop = Pop::factory()->create(['name' => 'Sambit']);
+        $package = $this->makePackage('NetP110', 'NetP110', 111000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Veri Toko']);
+        $service = $this->makeService($customer, $package, 90000);
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Veri Toko', 'Paket' => 'Up to 25 Mbps', 'Harga' => 111000, 'Nama Paket' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->assertSuccessful();
+
+        $this->assertSame('111000.00', $service->refresh()->monthly_price);
+    }
+
+    public function test_cid_kosong_tetap_pakai_nama_seperti_sebelumnya(): void
+    {
+        // Backward-compat: Excel kolektor lama (Sambit) gak punya kolom CID
+        // sama sekali — fixture ini sengaja gak kirim key 'CID'.
+        $pop = Pop::factory()->create(['name' => 'Sambit']);
+        $package = $this->makePackage('NetP110', '110K Up to 5M', 110000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Imam Choirul Anam']);
+        $service = $this->makeService($customer, $package, 90357);
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Imam Choirul Anam', 'Paket' => 110000, 'paket ' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->expectsOutputToContain('1 diubah')
+            ->assertSuccessful();
+
+        $this->assertSame('110000.00', $service->refresh()->monthly_price);
+    }
+
     public function test_idempotent_jalan_dua_kali(): void
     {
         $pop = Pop::factory()->create(['name' => 'Sambit']);

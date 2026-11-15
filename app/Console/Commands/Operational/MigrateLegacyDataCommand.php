@@ -7,6 +7,8 @@ use App\Enums\Gender;
 use App\Http\Controllers\CustomerController;
 use App\Models\Customer;
 use App\Models\Distribution;
+use App\Models\ImportBatch;
+use App\Models\ImportError;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -25,6 +27,34 @@ class MigrateLegacyDataCommand extends Command
      * jalur fallback UNASSIGNED yang gak lewat createLegacyPopMap().
      */
     private ?Pop $pusatPop = null;
+
+    /**
+     * Akun pengguna legacy yang terbukti dummy/test (bukan pelanggan asli),
+     * ditemukan lewat audit manual 2026-11 (keyed per basename file dump).
+     * Dua jenis: (1) nama Faker lorem ipsum murni — khas data percobaan tiap
+     * status alur (Sambit, satu per status ACTIVE/PUTUS/GAGAL); (2) nama
+     * literal "tes"/"test" yang dipakai staf untuk coba-coba sistem.
+     * Jangan diperluas jadi pola/regex nama — daftar eksplisit supaya tidak
+     * pernah salah buang pelanggan asli yang namanya kebetulan serupa.
+     *
+     * @var array<string, list<string>>
+     */
+    private const DUMMY_LEGACY_ACCOUNTS = [
+        'samb_db_aplikasi_sambit.sql' => [
+            'PE000060', 'PE000061', 'PE000062', 'PE000063', 'PE000064',
+            'PE000065', 'PE000066', 'PE000068', 'PE000012',
+            'US000001', 'US000002', 'US000003', 'US000004', 'US000005', 'US000006',
+        ],
+        'paci_db_aplikasi_pacitan.sql' => [
+            'PE000001', 'PE000051', 'PE000843', 'PE000954',
+        ],
+        'caru_db_caruban.sql' => [
+            'PE000182',
+        ],
+        'jetis_db_aplikasi_jetis.sql' => [
+            'PE000197', 'PE000243', 'PE000552',
+        ],
+    ];
 
     /**
      * The name and signature of the console command.
@@ -128,6 +158,39 @@ class MigrateLegacyDataCommand extends Command
         $buktiLunasRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksilunas');
         $buktiPemasanganRows = $this->parseTableData($sql, 'apikeuangan_buktitransaksipemasangan');
         $riwayatPelangganRows = $this->parseTableData($sql, 'riwayat_pelanggan');
+
+        // Akun dummy/test staf lama (Faker lorem ipsum, atau nama "tes"/"test")
+        // yang kebawa ke dump produksi — bukan pelanggan asli, jangan diimpor.
+        // Daftar eksplisit per file dump (bukan pola nama/regex): audit 2026-11
+        // atas permintaan user, supaya tidak pernah salah buang pelanggan asli
+        // yang namanya kebetulan mengandung kata serupa. Dump baru di luar
+        // daftar ini WAJIB diaudit manual dulu sebelum diasumsikan bersih.
+        $dummyAccountIds = self::DUMMY_LEGACY_ACCOUNTS[basename($fileName)] ?? [];
+        if ($dummyAccountIds !== []) {
+            $dummySet = array_flip($dummyAccountIds);
+            $dummyRequestIds = array_flip(array_column(
+                array_filter($layananRows, fn ($row) => isset($dummySet[$row['IDPENGGUNA'] ?? ''])),
+                'IDPERMINTAAN'
+            ));
+
+            $bukanPengguna = fn ($row) => ! isset($dummySet[$row['IDPENGGUNA'] ?? '']);
+            $bukanPermintaan = fn ($row) => ! isset($dummyRequestIds[$row['IDPERMINTAAN'] ?? '']);
+
+            $penggunaRows = array_values(array_filter($penggunaRows, $bukanPengguna));
+            $layananRows = array_values(array_filter($layananRows, $bukanPermintaan));
+            $laporanRows = array_values(array_filter($laporanRows, $bukanPermintaan));
+            $biayaRows = array_values(array_filter($biayaRows, $bukanPermintaan));
+            $buktiRows = array_values(array_filter($buktiRows, $bukanPermintaan));
+            $surveyRows = array_values(array_filter($surveyRows, $bukanPermintaan));
+            $riwayatBarangRows = array_values(array_filter($riwayatBarangRows, $bukanPermintaan));
+            $buktiLunasRows = array_values(array_filter($buktiLunasRows, $bukanPermintaan));
+            $buktiPemasanganRows = array_values(array_filter($buktiPemasanganRows, $bukanPermintaan));
+            $riwayatPelangganRows = array_values(array_filter($riwayatPelangganRows, $bukanPermintaan));
+
+            $this->warn(count($dummyAccountIds).' akun dummy/test legacy dikeluarkan dari migrasi (bukan pelanggan asli): '.implode(', ', $dummyAccountIds));
+        }
+
+        $penggunaRows = $this->appendPlaceholderCustomersForOrphanRequests($penggunaRows, $layananRows);
 
         $this->info('Parsed counts:');
         $this->line('- cabang: '.count($cabangRows));
@@ -764,7 +827,13 @@ class MigrateLegacyDataCommand extends Command
             // dilengkapi manual belakangan. Harga tetap diambil dari
             // `biaya_tagihan` di bawah, jadi placeholder ini tidak menyeret
             // harga jadi 0 kalau pelanggannya memang pernah ditagih.
+            // Kode yang tidak ada di tabel `paket` (Sambit RQ000026 menyimpan
+            // literal 'undefined') sama nasibnya dengan kosong: ditolak
+            // importer "Paket ... tidak ditemukan" dan layanannya hilang.
             $packageId = trim((string) ($row['IDPAKET'] ?? ''));
+            if ($packageId !== '' && collect($paketRows)->firstWhere('KODEPAKET', $packageId) === null) {
+                $packageId = '';
+            }
             if ($packageId === '') {
                 $placeholder = collect($paketRows)->firstWhere('KODEPAKET', 'PK21000001')
                     ?? collect($paketRows)->first();
@@ -866,7 +935,7 @@ class MigrateLegacyDataCommand extends Command
                 // "terakhir disentuh", BUKAN tanggal karangan/now().
                 'status_changed_at' => ! $isZeroDate($row['TGLSELESAI'] ?? null)
                     ? $row['TGLSELESAI']
-                    : (! empty($row['updated_at']) ? $row['updated_at'] : null),
+                    : (! $isZeroDate($row['updated_at'] ?? null) ? $row['updated_at'] : null),
 
                 // New survey/FOP/Installation fields
                 'profile' => $profile,
@@ -1158,7 +1227,15 @@ class MigrateLegacyDataCommand extends Command
             // dan sebelumnya salah satunya jadi utang hantu Rp 11.000 yang tidak
             // pernah ada di sistem lama. Sisi pembayaran sudah menolak BAYAR<=0;
             // sisi invoice sekarang ikut menolak supaya guard-nya tidak asimetris.
-            if ($installationFee <= 0 && $monthlyFee <= 0) {
+            //
+            // KECUALI baris itu punya bukti BAYAR>0: di semua dump ada baris
+            // pasang=0 & bulanan=0 yang nominalnya cuma di BIAYALAINLAIN
+            // (mis. Siman IN000002 Rp 12.000) dan BENAR dibayar. Dulu baris ini
+            // ikut dibuang → invoice-nya tidak ada → pembayarannya ditolak
+            // importer "Gagal memetakan Invoice ID" (Rp 1,67 jt hilang di 5
+            // cabang, 2026-11-11). Yang dibuang hanya log yang tidak pernah
+            // menarik uang.
+            if ($installationFee <= 0 && $monthlyFee <= 0 && empty($paidByCostPeriod[$costId])) {
                 $skippedActivationLogRows++;
 
                 continue;
@@ -1252,6 +1329,13 @@ class MigrateLegacyDataCommand extends Command
                 if ($paidForPeriod > 0) {
                     $pushInvoice($period, 'bulanan', $paidForPeriod, null, 0);
 
+                    continue;
+                }
+
+                // Baris tanpa biaya pasang/bulanan hanya lolos sampai sini karena
+                // ada periode yang dibayar; periode lain yang tidak dibayar bukan
+                // tunggakan (cuma materai log aktivasi) — jangan jadi utang hantu.
+                if ($installationFee <= 0 && $monthlyFee <= 0) {
                     continue;
                 }
 
@@ -1420,6 +1504,24 @@ class MigrateLegacyDataCommand extends Command
         }
         unset($sheetRow);
 
+        // Tanggal nol MySQL lama ('0000-00-00', '0000-00-00 00:00:00' — default
+        // banyak kolom DATETIME/TIMESTAMP legacy) bukan tanggal: Carbon membacanya
+        // jadi -0001-11-30 dan MySQL strict menolak saat ditulis, lalu SELURUH
+        // batch import di-rollback (Sambit 2026-11-11, `customers.rejected_at`).
+        // SQLite di test menerimanya diam-diam, jadi dibersihkan di sumber untuk
+        // semua kolom semua sheet, bukan ditambal per kolom.
+        foreach ([&$customersSheet, &$servicesSheet, &$technicalSheet, &$invoicesSheet, &$paymentsSheet] as &$sheetRows) {
+            foreach ($sheetRows as &$sheetRow) {
+                foreach ($sheetRow as $field => $value) {
+                    if (is_string($value) && str_starts_with($value, '0000-00-00')) {
+                        $sheetRow[$field] = null;
+                    }
+                }
+            }
+            unset($sheetRow);
+        }
+        unset($sheetRows);
+
         if ($skippedWithoutRequest > 0) {
             $this->warn("Dilewati {$skippedWithoutRequest} akun ber-prefix PE tanpa permintaan layanan (bukan pelanggan).");
         }
@@ -1518,6 +1620,8 @@ class MigrateLegacyDataCommand extends Command
             'file_name' => $fileName,
         ]);
 
+        $lastBatchIdBeforeImport = (int) ImportBatch::max('id');
+
         try {
             $confirmResponse = $controller->confirmImport($requestConfirm);
 
@@ -1525,9 +1629,19 @@ class MigrateLegacyDataCommand extends Command
             if (session()->has('success')) {
                 $this->info('Success: '.session('success'));
             }
+            // confirmImport() menangkap exception di dalam DB::transaction dan
+            // cuma menaruhnya di flash session — artinya SEMUA baris batch ini
+            // di-rollback. Dulu command tetap lanjut "completed" + "tidak ada
+            // baris ditolak" (import_errors ikut ter-rollback), padahal tidak
+            // ada satu pelanggan pun yang tersimpan.
             if (session()->has('errors')) {
                 $this->error('Errors: '.json_encode(session('errors')->getBag('default')->all()));
+                $this->error('IMPORT GAGAL: seluruh batch di-rollback, TIDAK ADA data yang tersimpan. Perbaiki error di atas lalu jalankan ulang.');
+
+                return \Symfony\Component\Console\Command\Command::FAILURE;
             }
+
+            $this->reportRejectedRows($lastBatchIdBeforeImport);
 
             $this->info('Data migration execution completed.');
 
@@ -1536,6 +1650,88 @@ class MigrateLegacyDataCommand extends Command
             $this->error('Migration failed with exception: '.$e->getMessage());
 
             return \Symfony\Component\Console\Command\Command::FAILURE;
+        }
+    }
+
+    /**
+     * Permintaan legacy yang IDPENGGUNA-nya tidak punya baris di `pengguna`
+     * ("RQ yatim", mis. Jetis RQ001634→PE001630 ACTIVE ber-tagihan) dulu
+     * ditolak importer beserta layanan, tagihan, dan pembayarannya. Keputusan
+     * user 2026-11-11: tetap diimpor ke kelompok statusnya masing-masing —
+     * ACTIVE jadi pelanggan aktif (dapat CID), PUTUS/GAGAL tetap tercatat lewat
+     * RQ-nya. Identitasnya memang tidak ada di dump, jadi dibuat baris
+     * pengguna pengganti: nama kosong → jatuh ke ID lama (lihat sheet
+     * customers), sehingga pelanggan masuk sebagai "perlu dilengkapi".
+     *
+     * @param  list<array<string, ?string>>  $penggunaRows
+     * @param  list<array<string, ?string>>  $layananRows
+     * @return list<array<string, ?string>>
+     */
+    private function appendPlaceholderCustomersForOrphanRequests(array $penggunaRows, array $layananRows): array
+    {
+        $known = array_flip(array_filter(array_column($penggunaRows, 'IDPENGGUNA')));
+        $emptyRow = array_fill_keys(array_keys($penggunaRows[0] ?? []), null);
+        $placeholders = [];
+
+        foreach ($layananRows as $row) {
+            $customerId = trim((string) ($row['IDPENGGUNA'] ?? ''));
+            if (! str_starts_with($customerId, 'PE') || isset($known[$customerId])) {
+                continue;
+            }
+
+            $known[$customerId] = true;
+            $penggunaRows[] = array_merge($emptyRow, [
+                'IDPENGGUNA' => $customerId,
+                'IDJABATAN' => '8',
+                'IDCABANG' => '',
+                'NAMADEPAN' => '',
+                'NAMABELAKANG' => '',
+                'inserted_at' => $row['inserted_at'] ?? null,
+            ]);
+            $placeholders[] = ($row['IDPERMINTAAN'] ?? '').'→'.$customerId.' ('.($row['STATUS'] ?? '-').')';
+        }
+
+        if ($placeholders !== []) {
+            $this->warn(count($placeholders).' permintaan legacy tanpa data pengguna diimpor sebagai pelanggan pengganti (nama = ID lama, wajib dilengkapi manual): '.implode(', ', $placeholders));
+        }
+
+        return $penggunaRows;
+    }
+
+    /**
+     * Importer menolak baris per-baris (status_row=error) lalu cuma menulis ke
+     * import_errors — dari terminal tidak kelihatan apa pun, jadi pembayaran
+     * yang gagal dipetakan dulu hilang diam-diam. Semua penolakan batch ini
+     * dicetak di sini supaya tidak ada data legacy yang lenyap tanpa jejak.
+     * "Sudah terdaftar" wajar muncul saat import ULANG cabang yang sama.
+     */
+    private function reportRejectedRows(int $afterBatchId): void
+    {
+        $errors = ImportError::query()->where('import_batch_id', '>', $afterBatchId)->get();
+
+        if ($errors->isEmpty()) {
+            $this->info('Rekonsiliasi: tidak ada baris legacy yang ditolak importer.');
+
+            return;
+        }
+
+        $this->error("Rekonsiliasi: {$errors->count()} baris legacy DITOLAK importer dan TIDAK tersimpan:");
+
+        $grouped = $errors->groupBy(function (ImportError $error) {
+            $reasons = implode('; ', (array) ($error->raw_data['errors'] ?? []));
+
+            return $error->error_message.($reasons !== '' ? ' — '.$reasons : '');
+        });
+
+        foreach ($grouped as $message => $rows) {
+            $labels = $rows->map(function (ImportError $error) {
+                $raw = $error->raw_data ?? [];
+                $id = $raw['old_payment_id'] ?? $raw['old_invoice_id'] ?? $raw['old_report_id'] ?? $raw['old_request_id'] ?? '';
+
+                return trim(($raw['old_customer_id'] ?? '').' '.$id);
+            })->implode(', ');
+
+            $this->line("  - {$message} ({$rows->count()}): {$labels}");
         }
     }
 

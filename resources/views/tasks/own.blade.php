@@ -8,11 +8,7 @@
     {{-- ══ Naked Page Header (Design.md §1.4 Layer 1) ═══════════════════════════════ --}}
     <div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 select-none">
         <div>
-            <div class="flex items-center gap-1.5 text-sky-600 dark:text-sky-400 text-[10px] font-bold uppercase tracking-wider mb-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
-                <span>Status Aktif &middot; GPS Terhubung</span>
-            </div>
-            <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-text-main font-ui">Halo, {{ auth()->user()->name }} 👋</h1>
+            <h1 class="text-xl sm:text-2xl font-bold tracking-tight text-text-main font-ui">Halo, {{ auth()->user()->name }}</h1>
             <p class="text-xs text-text-muted mt-0.5 font-medium font-ui">
                 {{ now()->translatedFormat('l, d F Y') }} &middot; Jadwal Tugas Lapangan
             </p>
@@ -20,7 +16,7 @@
 
         <div class="flex items-center gap-2 self-start sm:self-auto">
             <a href="{{ route('tasks.own.history') }}" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-border bg-surface hover:bg-surface-muted text-xs font-semibold text-text-main hover:text-primary transition-colors font-ui shadow-2xs">
-                <span>Riwayat Selesai</span>
+                <span>Riwayat</span>
                 <svg class="w-3.5 h-3.5 text-text-muted" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7"/>
                 </svg>
@@ -238,7 +234,7 @@ function taskWorksheet() {
             this.updateTasksList();
             
             // Listen to real-time updates event
-            document.addEventListener('task-list-updated', () => {
+            window.pageListen(document, 'task-list-updated', () => {
                 this.updateTasksList();
             });
 
@@ -354,60 +350,75 @@ function taskWorksheet() {
  */
 function technicianNotifier() {
     return {
+        // Kartu yang sedang di-fetch — event ganda untuk task yang sama
+        // (TaskScheduled + TaskStarted beruntun, atau dua tab Reverb) gak boleh
+        // lolos cek getElementById() sebelum await fetch() selesai lalu
+        // menyisipkan kartu yang sama dua kali.
+        pendingCards: new Set(),
+
         init() {
             const userId = {{ auth()->id() }};
-            let attempts = 0;
-            const maxAttempts = 10;
 
-            const attach = () => {
-                if (typeof window.Echo !== 'undefined') {
-                    window.Echo.private(`teknisi.${userId}`)
-                        .listen('TaskScheduled', (event) => {
-                            this.handleTaskScheduled(event);
-                        })
-                        // Task tim (2-3 orang) — kalau anggota LAIN yang mulai/selesaikan
-                        // task yang lagi ditampilkan di kartu, kartu itu harus ikut update
-                        // sendiri tanpa refresh manual. Reuse refreshTaskCard() yang sama
-                        // dipakai TaskScheduled(rescheduled/team_changed) di atas — kalau
-                        // kartunya belum ada di list (task baru buat user ini), otomatis
-                        // fallback nyuntik kartu baru (lihat refreshTaskCard()).
-                        .listen('TaskStarted', (event) => this.refreshTaskCard(event.id))
-                        .listen('TaskCompleted', (event) => this.refreshTaskCard(event.id));
-                    return;
-                }
+            // Listener Echo dipasang SEKALI per dokumen, bukan sekali per
+            // komponen (ADHOC-297 bug #1). `<body hx-boost="true">` mengganti
+            // body tanpa reload: tiap kunjungan ke /tasks-saya membuat komponen
+            // ini lagi, sementara `Echo.private()` mengembalikan channel yang
+            // SAMA — dulu tiap init() menumpuk `.listen()` baru di channel itu.
+            // Buka halaman 3× ⇒ satu jadwal FOP memicu 3 handler ⇒ 3 kartu.
+            // Handler cukup meneruskan ke komponen yang sedang tampil
+            // (window.__technicianNotifier), jadi komponen lama yang sudah
+            // terlepas dari DOM gak ikut bereaksi.
+            window.__technicianNotifier = this;
+            if (window.__technicianEchoBound === userId) {
+                return;
+            }
 
-                attempts++;
-                if (attempts < maxAttempts) {
-                    setTimeout(attach, 300);
-                } else {
-                    console.warn('[technicianNotifier] window.Echo tidak tersedia. Notifikasi real-time tidak aktif.');
-                }
+            // Flag di-set SETELAH listener benar-benar terpasang (review
+            // ADHOC-297 #3). Dulu flag di-set duluan lalu attach() menyerah
+            // setelah 10x300 ms kalau Echo lambat siap — navigasi berikutnya
+            // return lebih awal dan realtime mati sampai reload penuh.
+            // Sekarang: Echo sudah ada → pasang; belum → tunggu `echo:ready`
+            // (didispatch resources/js/echo.js), tanpa batas waktu.
+
+            const current = () => {
+                const notifier = window.__technicianNotifier;
+                return notifier && notifier.$el.isConnected ? notifier : null;
             };
 
-            attach();
+            const attach = () => {
+                if (window.__technicianEchoBound === userId || typeof window.Echo === 'undefined') {
+                    return;
+                }
+                window.__technicianEchoBound = userId;
+                window.Echo.private(`teknisi.${userId}`)
+                    .listen('TaskScheduled', (event) => current()?.handleTaskScheduled(event))
+                    // Task tim (2-3 orang) — kalau anggota LAIN yang mulai/selesaikan
+                    // task yang lagi ditampilkan di kartu, kartu itu harus ikut update
+                    // sendiri tanpa refresh manual. Reuse refreshTaskCard() yang sama
+                    // dipakai TaskScheduled(rescheduled/team_changed) di atas — kalau
+                    // kartunya belum ada di list (task baru buat user ini), otomatis
+                    // fallback nyuntik kartu baru (lihat refreshTaskCard()).
+                    .listen('TaskStarted', (event) => current()?.refreshTaskCard(event.id))
+                    .listen('TaskCompleted', (event) => current()?.refreshTaskCard(event.id));
+            };
+
+            if (typeof window.Echo !== 'undefined') {
+                attach();
+            } else {
+                window.addEventListener('echo:ready', attach, { once: true });
+            }
         },
 
         handleTaskScheduled(event) {
-            let jadwalLabel = '';
-            if (event.scheduled_at) {
-                const dt = new Date(event.scheduled_at);
-                const pad = (n) => String(n).padStart(2, '0');
-                jadwalLabel = `${dt.getFullYear()}-${pad(dt.getMonth()+1)}-${pad(dt.getDate())} ${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
-            }
-
             const isRefresh = event.event_type === 'rescheduled' || event.event_type === 'team_changed';
             const isRemoval = event.event_type === 'removed' || event.event_type === 'cancelled';
 
-            const toastType = isRemoval ? 'warning' : (isRefresh ? 'info' : 'success');
-            const toastTitle = isRemoval
-                ? 'Task Dibatalkan / Dipindahkan'
-                : (isRefresh ? 'Jadwal Task Diperbarui' : 'Task Baru Ditugaskan');
-            const toastDesc = `${event.title}` + (!isRemoval && jadwalLabel ? ` • Jadwal: ${jadwalLabel}` : '');
-
-            if (window.Toast) {
-                window.Toast.show(toastType, toastTitle, toastDesc, 15000);
-            }
-
+            // SENGAJA tanpa toast di sini (ADHOC-297 bug #1). Tiap TaskScheduled
+            // dari server selalu berpasangan dengan AppNotification ke teknisi
+            // yang sama (TaskService::notifyTeam()/notifyDroppedMembers(),
+            // FopTaskController::switchTechnician()), dan lonceng notifikasi
+            // sudah menampilkan toast untuk AppNotification itu. Dulu dua-duanya
+            // muncul ⇒ satu jadwal = dua toast. Di sini cukup urus kartunya.
             if (isRemoval) {
                 this.removeTaskCard(event.id);
             } else if (isRefresh) {
@@ -431,22 +442,27 @@ function technicianNotifier() {
         },
 
         async injectTaskCard(taskId) {
-            if (document.getElementById(`task-card-${taskId}`)) return;
+            if (document.getElementById(`task-card-${taskId}`) || this.pendingCards.has(taskId)) return;
 
-            const freshCard = await this.fetchCard(taskId);
+            this.pendingCards.add(taskId);
+            let freshCard;
+            try {
+                freshCard = await this.fetchCard(taskId);
+            } finally {
+                this.pendingCards.delete(taskId);
+            }
             if (!freshCard) return;
 
-            let container = document.getElementById('today-task-list');
-            if (!container) {
-                container = document.createElement('div');
-                container.id = 'today-task-list';
-                container.className = 'space-y-3';
-                
-                const contentWrapper = document.getElementById('today-task-list').parentElement;
-                if (contentWrapper) {
-                    contentWrapper.insertBefore(container, contentWrapper.firstChild);
-                }
-            }
+            // Cek ulang setelah await — kartu bisa sudah disisipkan jalur lain
+            // (refreshTaskCard) selama fetch berjalan.
+            if (document.getElementById(`task-card-${taskId}`)) return;
+
+            // Dulu: kalau #today-task-list gak ada, kode lama membuat container
+            // baru lalu memanggil getElementById('today-task-list').parentElement
+            // pada elemen yang BELUM ada di DOM ⇒ TypeError. Container selalu
+            // dirender di view ini; kalau tetap hilang, lewati saja.
+            const container = document.getElementById('today-task-list');
+            if (!container) return;
 
             container.insertBefore(freshCard, container.firstChild);
             this.initAlpineOn(freshCard);

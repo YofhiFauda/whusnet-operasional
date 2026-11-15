@@ -134,6 +134,9 @@
                         class="inline-flex items-center justify-center gap-2 px-3.5 py-2 rounded-lg text-xs transition-all cursor-pointer">
                     <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"/></svg>
                     <span class="truncate">Kerugian & Selisih</span>
+                    @if(!empty($selfIssueRows))
+                    <span class="w-2 h-2 rounded-full bg-amber-500" title="Ada barang yang dikeluarkan PIC untuk diri sendiri"></span>
+                    @endif
                     @if($kpi['adjustment_count'] > 0)
                     <span class="inline-flex px-1.5 py-0.2 rounded-full text-[10px] font-mono font-bold bg-rose-100 dark:bg-rose-950/80 text-rose-700 dark:text-rose-300">
                         {{ $kpi['adjustment_count'] }}
@@ -499,6 +502,35 @@
          TAB 2: KERUGIAN & PENYESUAIAN
          ========================================================================= -->
     <div x-show="activeTab === 'adjustment'" x-transition:enter="transition ease-out duration-150" x-transition:enter-start="opacity-0 translate-y-1" x-transition:enter-end="opacity-100 translate-y-0" style="display: none;" class="space-y-4">
+
+        {{-- PIC Gudang mengeluarkan barang untuk dirinya sendiri (boleh sejak
+             2026-11-14, InventoryIssueService::assertIssueAllowed()). Kontrol
+             atas PIC = pemantauan Pusat di sini, bukan larangan. --}}
+        @if(!empty($selfIssueRows))
+        <div class="bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/70 rounded-xl p-4 sm:p-5 shadow-xs">
+            <h3 class="text-xs sm:text-sm font-bold text-amber-900 dark:text-amber-200 uppercase tracking-wider">
+                Dikeluarkan untuk Diri Sendiri ({{ count($selfIssueRows) }})
+            </h3>
+            <p class="text-[11px] text-amber-800/80 dark:text-amber-300/80 mt-0.5 mb-3">
+                PIC Gudang mengambil barang untuk dirinya sendiri tanpa POP Admin. Periksa kewajarannya terhadap task yang dikerjakan.
+            </p>
+            <ul class="divide-y divide-amber-200/70 dark:divide-amber-800/50">
+                @foreach($selfIssueRows as $row)
+                <li class="py-2.5 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-1 text-xs">
+                    <div class="min-w-0">
+                        <a href="{{ route('warehouse.issues.show', $row['reference']) }}" class="font-mono font-semibold text-sky-700 dark:text-sky-400 hover:underline">{{ $row['reference'] }}</a>
+                        <span class="text-slate-500 dark:text-slate-400">· {{ $row['date']->translatedFormat('d M Y H:i') }}</span>
+                        <p class="text-slate-700 dark:text-slate-300 break-words">{{ $row['items'] }}</p>
+                    </div>
+                    <div class="shrink-0 text-slate-600 dark:text-slate-300 sm:text-right">
+                        <span class="font-semibold">{{ $row['pic_name'] }}</span>
+                        <span class="block text-[11px] text-slate-500 dark:text-slate-400">{{ $row['pop_label'] }}</span>
+                    </div>
+                </li>
+                @endforeach
+            </ul>
+        </div>
+        @endif
         
         <!-- Chart Kerugian -->
         @if(!empty($lossChartData))

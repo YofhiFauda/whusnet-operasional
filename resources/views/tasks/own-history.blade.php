@@ -17,20 +17,26 @@
             </a>
             <div>
                 <h1 class="page-header-title text-base sm:text-lg font-bold text-text-main font-ui">Riwayat Task Saya</h1>
-                <p class="page-header-subtitle text-[11px] text-text-muted font-ui">Daftar task yang telah Anda selesaikan</p>
+                <p class="page-header-subtitle text-[11px] text-text-muted font-ui">Task yang Anda selesaikan &amp; yang di-pending</p>
             </div>
         </div>
         <div class="text-right">
-            <span class="font-mono text-base sm:text-lg font-bold text-text-main leading-none">{{ $tasks->total() }}</span>
-            <span class="text-[9px] text-text-muted font-ui block uppercase tracking-wider font-semibold">Total Selesai</span>
+            <span class="font-mono text-base sm:text-lg font-bold text-text-main leading-none">{{ $entries->total() }}</span>
+            <span class="text-[9px] text-text-muted font-ui block uppercase tracking-wider font-semibold">Total Riwayat</span>
         </div>
     </div>
 
     {{-- ══ List Riwayat ═════════════════════════════════════════════ --}}
-    @if($tasks->count() > 0)
+    {{-- Satu entri = satu kunjungan: Selesai, atau Pending (tim dilepas,
+         task balik ke antrean FOP). Task yang sama bisa muncul dua kali —
+         lihat TaskController::historyOwn() (ADHOC-298). --}}
+    @if($entries->count() > 0)
     <div class="space-y-3.5">
-        @foreach($tasks as $task)
+        @foreach($entries as $entry)
+        @continue(! $entry->task)
         @php
+            $task = $entry->task;
+            $isPending = $entry->kind === 'pending';
             $lat = $task->customer?->customerAddress?->latitude ?? $task->pop?->latitude;
             $lng = $task->customer?->customerAddress?->longitude ?? $task->pop?->longitude;
             $phone = $task->customer?->primary_phone;
@@ -38,8 +44,8 @@
         @endphp
         <div class="relative bg-surface border border-border rounded-2xl overflow-hidden pl-5 hover:border-slate-300 dark:hover:border-slate-700 hover:shadow-sm transition-all duration-200 group">
             
-            {{-- Left accent strip: emerald-500 because it's completed --}}
-            <div class="absolute left-0 top-0 bottom-0 w-1.5 bg-emerald-500"></div>
+            {{-- Strip kiri: emerald = selesai, amber = di-pending --}}
+            <div class="absolute left-0 top-0 bottom-0 w-1.5 {{ $isPending ? 'bg-amber-500' : 'bg-emerald-500' }}"></div>
 
             <div class="p-4 sm:p-5 flex flex-col justify-between h-full">
                 <div>
@@ -49,9 +55,15 @@
                             <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md border {{ $task->task_type->cardClasses() }}">
                                 {{ $task->task_type->label() }}
                             </span>
+                            @if($isPending)
+                            <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/30 dark:text-amber-400 dark:border-amber-900/50 font-ui">
+                                Pending
+                            </span>
+                            @else
                             <span class="text-[10px] font-semibold px-2 py-0.5 rounded-md border bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-400 dark:border-emerald-900/50 font-ui">
                                 Selesai
                             </span>
+                            @endif
                         </div>
                         <span class="font-mono text-[10px] font-semibold text-text-muted shrink-0">{{ $task->task_number }}</span>
                     </div>
@@ -77,13 +89,33 @@
                     </p>
                     @endif
 
-                    {{-- Completion Time --}}
+                    @if($isPending && $entry->release)
+                    {{-- Alasan pending --}}
+                    <div class="mt-3 rounded-xl border border-amber-200 dark:border-amber-900/50 bg-amber-50/60 dark:bg-amber-950/20 px-3 py-2">
+                        <p class="text-[10px] font-semibold uppercase tracking-wider text-amber-700 dark:text-amber-400 font-ui">
+                            Alasan pending
+                            @if($entry->release->released_by && $entry->release->released_by !== auth()->id())
+                                <span class="normal-case tracking-normal font-medium text-amber-700/80 dark:text-amber-400/80">&middot; oleh {{ $entry->release->releasedBy?->name ?? 'FOP' }}</span>
+                            @endif
+                        </p>
+                        <p class="text-xs text-text-main mt-0.5 font-ui break-words">{{ $entry->release->reason }}</p>
+                    </div>
+                    @endif
+
+                    {{-- Waktu selesai / waktu di-pending --}}
                     <div class="flex items-center gap-1.5 mt-3 text-xs text-text-secondary font-medium font-ui">
+                        @if($isPending)
+                        <svg class="h-4 w-4 shrink-0 text-text-muted/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M10 9v6m4-6v6m7-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <span>Di-pending</span>
+                        @else
                         <svg class="h-4 w-4 shrink-0 text-text-muted/70" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
+                        @endif
                         <span class="font-mono font-semibold">
-                            {{ $task->completed_at?->translatedFormat('d M Y, H:i') ?? '-' }}
+                            {{ $entry->occurred_at?->translatedFormat('d M Y, H:i') ?? '-' }}
                         </span>
                     </div>
                 </div>
@@ -106,6 +138,22 @@
                         @endif
                     </div>
 
+                    {{-- Entri pending: teknisi sudah bukan anggota tim ⇒ detail
+                         task 403 (TaskPolicy::view). Tautan cuma muncul kalau
+                         masih berhak, mis. sudah dijadwal ulang ke dia lagi. --}}
+                    @if($isPending)
+                        @can('view', $task)
+                        <a href="{{ route('tasks.show', $task) }}"
+                           class="inline-flex items-center justify-center gap-1.5 text-xs font-bold py-2.5 px-4 border border-border rounded-xl bg-surface hover:bg-surface-muted text-primary hover:text-primary-hover transition-all duration-150 shadow-sm cursor-pointer font-ui">
+                            <span>Lihat Task</span>
+                            <svg class="h-3.5 w-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
+                            </svg>
+                        </a>
+                        @else
+                        <span class="text-[11px] text-text-muted font-ui text-right">Kembali ke antrean FOP</span>
+                        @endcan
+                    @else
                     <a href="{{ route('tasks.show', $task) }}"
                        class="inline-flex items-center justify-center gap-1.5 text-xs font-bold py-2.5 px-4 border border-border rounded-xl bg-surface hover:bg-surface-muted text-primary hover:text-primary-hover transition-all duration-150 shadow-sm cursor-pointer font-ui">
                         <span>Lihat Laporan</span>
@@ -113,6 +161,7 @@
                             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5l7 7-7 7" />
                         </svg>
                     </a>
+                    @endif
                 </div>
             </div>
 
@@ -121,14 +170,14 @@
     </div>
 
     <div class="pt-2 select-none">
-        {{ $tasks->links() }}
+        {{ $entries->links() }}
     </div>
     @else
     <div class="bg-surface border border-border rounded-2xl py-16 px-4 text-center select-none shadow-xs">
         <svg class="h-10 w-10 text-text-muted opacity-40 mx-auto mb-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5">
             <path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2" />
         </svg>
-        <p class="text-sm text-text-muted font-bold font-ui">Belum ada task yang diselesaikan</p>
+        <p class="text-sm text-text-muted font-bold font-ui">Belum ada riwayat task</p>
     </div>
     @endif
 

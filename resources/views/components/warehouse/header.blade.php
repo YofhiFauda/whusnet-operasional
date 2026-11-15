@@ -17,6 +17,11 @@
     $canViewTraceability = $user->hasPermission('warehouse_traceability.view');
     $canViewReport = $user->hasPermission('warehouse_report.view');
     $canViewSoldToCustomer = $user->hasPermission('warehouse_report.sold_to_customer.view');
+    // Rekap Pemakaian Material (/warehouse/usage) gerbangnya OR warehouse.view|warehouse.usage.view
+    // (lihat routes/web.php) biar fop bisa dikasih akses sempit tanpa warehouse.view penuh.
+    // Menu ini WAJIB ikut cek permission sempit ini juga, bukan cuma $canViewWarehouse,
+    // kalau enggak fop gak pernah liat tombol masuk ke halaman yang rute-nya sendiri kebuka.
+    $canViewUsage = $user->hasPermission('warehouse.usage.view');
     $canViewStockRequest = $user->hasPermission('warehouse_stock_request.view');
     $canViewPengajuanBarang = $user->hasPermission('warehouse_pengajuan_barang.view');
     $canViewInfraStock = $user->hasPermission('warehouse.infra_stock.view');
@@ -83,7 +88,7 @@
 
     $reportsUrl = $canViewWarehouse
         ? route('warehouse.history.index')
-        : ($canViewReport ? route('warehouse.reports.index') : ($canViewSoldToCustomer ? route('warehouse.reports.sold-to-customer') : '#'));
+        : ($canViewUsage ? route('warehouse.usage.index') : ($canViewReport ? route('warehouse.reports.index') : ($canViewSoldToCustomer ? route('warehouse.reports.sold-to-customer') : '#')));
 
     $tabClass = fn (string $key) => (($key === 'returns' && $isReturnsActive) || ($key === 'transfers' && $isTransfersActive) || ($key === 'custody' && $isFieldActive) || ($key === 'reports' && $isReportsActive) || $active === $key)
         ? 'bg-sky-600 text-white shadow-xs dark:bg-sky-500'
@@ -608,7 +613,7 @@
             @endif
 
             {{-- 7. Laporan & Mutasi (Vertical Hover Dropdown) --}}
-            @if($canViewWarehouse || $canViewReport || $canViewSoldToCustomer)
+            @if($canViewWarehouse || $canViewReport || $canViewSoldToCustomer || $canViewUsage)
             <div class="relative"
                  @mouseenter="openMenu = 'reports'"
                  @mouseleave="if (openMenu === 'reports') openMenu = null"
@@ -655,6 +660,8 @@
                                 </div>
                             </div>
                         </a>
+                        @endif
+                        @if($canViewWarehouse || $canViewUsage)
                         <a href="{{ route('warehouse.usage.index') }}" class="{{ $vItemClass($active === 'usage') }}">
                             <div class="flex items-center gap-2.5 min-w-0">
                                 <div class="{{ $vIconWrapClass($active === 'usage', 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400') }}">
@@ -1193,6 +1200,8 @@
                             </div>
                         </div>
                     </a>
+                    @endif
+                    @if($canViewWarehouse || $canViewUsage)
                     <a href="{{ route('warehouse.usage.index') }}" class="{{ $vItemClass($active === 'usage') }}">
                         <div class="flex items-center gap-2.5 min-w-0">
                             <div class="{{ $vIconWrapClass($active === 'usage', 'bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400') }}">

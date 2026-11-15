@@ -293,7 +293,7 @@ class GenerateMonthlyInvoicesCommand extends Command
         }
 
         $title = "Generate Tagihan Bulanan {$billingPeriod}";
-        $actionUrl = route('invoices.index');
+        $actionUrl = route('invoices.index', [], false);
         $type = $failed > 0 ? NotificationType::WARNING : NotificationType::SUCCESS;
 
         $financeUsers = app(EffectiveAccessService::class)->usersWithPermission('invoices.approve')->get();

@@ -250,9 +250,20 @@ class InfrastructureMapTest extends TestCase
 
         $owner = User::factory()->create(['role_id' => Role::where('code', 'owner')->firstOrFail()->id]);
         $owner->roleScopes()->create(['role_id' => $owner->role_id, 'scope_type' => ScopeType::ALL_POP]);
-        $asset = collect(app(InfrastructureMapService::class)->build($owner, null, 'name')['assetsByNode'][$node->id])
-            ->firstWhere('name', 'Closure Peta');
+        DB::enableQueryLog();
+        try {
+            $asset = collect(app(InfrastructureMapService::class)->build($owner, null, 'name')['assetsByNode'][$node->id])
+                ->firstWhere('name', 'Closure Peta');
+            $queries = DB::getQueryLog();
+        } finally {
+            DB::disableQueryLog();
+            DB::flushQueryLog();
+        }
+
         $this->assertSame('TASK-PETA-001', $asset['task']);
+        $this->assertCount(2, collect($queries)->filter(fn (array $query) => str_contains($query['query'], 'latest_deploy')
+            && str_contains($query['query'], 'MAX(')
+            && str_contains($query['query'], 'inventory_transactions')));
 
         $this->loginAsAdmin();
         $response = $this->get(route('network.map.index'));

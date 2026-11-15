@@ -192,7 +192,7 @@ class BusinessDevelopmentVerificationController extends Controller
                 $creator->notify(new AppNotification(
                     title: 'Pelanggan Aktif: '.$customer->full_name,
                     message: "Pelanggan {$customer->full_name} resmi aktif — tagihan awal ({$initialInvoice->invoice_number}, termasuk Biaya Instalasi) sudah terbit.",
-                    actionUrl: route('customers.show', $customer->id),
+                    actionUrl: route('customers.show', $customer->id, false),
                     type: NotificationType::SUCCESS
                 ));
             }

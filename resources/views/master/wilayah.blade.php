@@ -91,7 +91,7 @@
 
 @section('scripts')
 <script>
-    document.addEventListener("DOMContentLoaded", function() {
+    window.onPageReady(function() {
         const searchInput = document.getElementById('region-search');
         const treeContent = document.getElementById('region-tree-content');
         const treeLoading = document.getElementById('region-tree-loading');

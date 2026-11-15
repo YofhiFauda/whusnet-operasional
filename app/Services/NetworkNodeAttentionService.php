@@ -81,7 +81,7 @@ class NetworkNodeAttentionService
             $recipient->notify(new AppNotification(
                 title: 'Perangkat baru terpasang: '.$node->code,
                 message: "{$actor->name} melaporkan pemasangan di {$node->breadcrumbLabel()} (task {$task->task_number}).",
-                actionUrl: route('network.nodes.show', $node),
+                actionUrl: route('network.nodes.show', $node, false),
                 type: NotificationType::INFO,
             ));
         }

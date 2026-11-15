@@ -17,15 +17,62 @@
         fallback buat browser yang belum dukung directive ini, mis. iOS
         Safari versi lama).
     --}}
-    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content">
+    {{--
+        viewport-fit=cover — tanpa ini browser Android/iOS gak ngirim nilai
+        env(safe-area-inset-*) yang benar buat PWA standalone (manifest.json
+        display: standalone, lihat public/manifest.json). PWA ke-install di
+        HP render EDGE-TO-EDGE (gak ada address bar yang otomatis nyisain
+        ruang kayak tab browser biasa), jadi status bar (atas) & gesture
+        nav bar (bawah) nutupin header/konten kalau shell gak dikasih
+        padding env() sendiri — persis bug "konten kepotong" yang gak
+        kelihatan di devtools responsive mode (desktop Chrome gak pernah
+        render edge-to-edge, env() selalu 0 di situ).
+    --}}
+    <meta name="viewport" content="width=device-width, initial-scale=1, interactive-widget=resizes-content, viewport-fit=cover">
     <meta name="description" content="@yield('meta_description', 'Sistem Billing dan Operasional ISP Whusnet')">
     <meta name="csrf-token" content="{{ csrf_token() }}">
+    {{-- Dibaca resources/js/webpush.js untuk menjawab cek push service worker. --}}
+    <meta name="user-id" content="{{ auth()->id() }}">
+    @auth
+    {{-- URL webpush untuk resources/js/webpush.js — dari route(), bukan dirakit klien. --}}
+    @php
+        $webPushRoutes = [
+            'vapidKey' => route('webpush.vapid-key'),
+            'subscribe' => route('webpush.subscribe'),
+            'unsubscribe' => route('webpush.unsubscribe'),
+            'subscriptions' => route('webpush.subscriptions'),
+            'test' => route('webpush.test'),
+        ];
+    @endphp
+    <script>
+        window.WebPushRoutes = @json($webPushRoutes);
+    </script>
+    @endauth
 
     <title>@yield('title', 'Ruang Kerja Whusnet')</title>
 
     <link rel="icon" type="image/svg+xml" href="{{ asset('favicon.svg') }}">
     <link rel="alternate icon" type="image/png" href="{{ asset('favicon.png') }}">
     <link rel="shortcut icon" href="{{ asset('favicon.ico') }}">
+    <link rel="manifest" href="{{ asset('manifest.json') }}?v=2">
+    <meta name="theme-color" content="#0f172a">
+
+    {{--
+        iOS gak pakai manifest.json buat splash screen PWA (standalone) —
+        splash auto-generate-nya cuma jalan kalau ketiga meta ini ada:
+        apple-mobile-web-app-capable (standalone mode) + apple-touch-icon
+        (sumber ikon splash) + apple-mobile-web-app-status-bar-style.
+        Tanpa apple-touch-icon, iOS splash screen kosong/putih polos.
+
+        mobile-web-app-capable = padanan standar. Chrome nge-warn "deprecated"
+        kalau cuma ada versi apple-; versi apple- TETAP dipertahankan karena
+        iOS/Safari lama masih butuh itu buat mode standalone.
+    --}}
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Ruang Kerja">
+    <link rel="apple-touch-icon" href="{{ asset('images/apple-touch-icon.png') }}?v=2">
 
     <style>
         html, body {
@@ -46,6 +93,89 @@
                 window.scrollTo(0, 0);
             }
         });
+        /*
+         * Pengganti `document.addEventListener('DOMContentLoaded', fn)` untuk
+         * script di dalam <body>. hx-boost menukar <body> TANPA page load,
+         * jadi DOMContentLoaded cuma nyala sekali seumur dokumen — halaman
+         * yang dibuka lewat klik link gak pernah menerimanya dan
+         * inisialisasinya diam-diam gak jalan (wizard laporan PSB, tombol
+         * Aktivasi, dst. — ADHOC-297).
+         *
+         * Sesudah dokumen siap, fn ditunda lewat queueMicrotask, bukan
+         * dipanggil langsung: htmx mengeksekusi <script> satu per satu
+         * SELAGI menyisipkan isi body baru, dan microtask baru jalan setelah
+         * seluruh swap selesai (+ setelah Alpine meng-init node baru lewat
+         * MutationObserver-nya) — sama seperti jaminan DOMContentLoaded.
+         *
+         * Didefinisikan di <head> karena <head> tidak ikut ditukar boost:
+         * cukup sekali, gak perlu dijaga dari eksekusi ulang.
+         */
+        window.onPageReady = function (fn) {
+            if (document.readyState === 'loading') {
+                document.addEventListener('DOMContentLoaded', fn, { once: true });
+            } else {
+                queueMicrotask(fn);
+            }
+        };
+
+        /*
+         * Pengganti `document/window.addEventListener(type, fn)` untuk script
+         * halaman. Target global (document, window, matchMedia) TIDAK ikut
+         * ditukar hx-boost, jadi listener yang dipasang script halaman tiap
+         * kunjungan menumpuk: Escape menutup modal 3x, `payment-recorded`
+         * memproses update 3x, dragover FOP auto-scroll makin cepat, dan
+         * closure-nya menahan DOM halaman lama di memori (ADHOC-297 P8).
+         *
+         * Listener diikat ke `#main-content` saat dipasang. Begitu body ditukar
+         * elemen itu lepas dari dokumen ⇒ handler berhenti merespons seketika
+         * dan dicopot di `htmx:afterSettle` berikutnya.
+         */
+        (function () {
+            const bindings = [];
+
+            window.pageListen = function (target, type, handler, options) {
+                const anchor = document.getElementById('main-content') || document.body;
+                const wrapped = function (event) {
+                    if (anchor.isConnected) {
+                        return handler.call(this, event);
+                    }
+                };
+                target.addEventListener(type, wrapped, options);
+                bindings.push({ anchor, target, type, wrapped, options });
+            };
+
+            window.pageListen.activeCount = () => bindings.length;
+
+            /*
+             * Pengganti `setInterval` untuk script halaman: interval berhenti
+             * sendiri pada tick pertama setelah halamannya ditinggal. Dulu
+             * countdown verifikasi & timer laporan PSB cuma dibersihkan kalau
+             * halaman yang SAMA dibuka lagi — pindah ke menu lain membiarkannya
+             * jalan terus di latar belakang (review ADHOC-297 #4).
+             */
+            window.pageInterval = function (fn, ms) {
+                const anchor = document.getElementById('main-content') || document.body;
+                const id = setInterval(function () {
+                    if (!anchor.isConnected) {
+                        clearInterval(id);
+                        return;
+                    }
+                    fn();
+                }, ms);
+                return id;
+            };
+
+            document.addEventListener('htmx:afterSettle', function () {
+                for (let i = bindings.length - 1; i >= 0; i--) {
+                    const b = bindings[i];
+                    if (!b.anchor.isConnected) {
+                        b.target.removeEventListener(b.type, b.wrapped, b.options);
+                        bindings.splice(i, 1);
+                    }
+                }
+            });
+        })();
+
         (function () {
             const saved = localStorage.getItem('whusnet-theme');
             const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
@@ -62,6 +192,7 @@
     <!-- Styles / Scripts -->
     @include('partials.web-fonts')
     @vite(['resources/css/app.css', 'resources/js/app.js'])
+
 </head>
 {{--
     hx-boost="true" TANPA hx-target/hx-select — boost nge-swap innerHTML
@@ -100,6 +231,13 @@
     verifications/queue.blade.php/dst untuk pola lengkapnya.
 --}}
 <body hx-boost="true" hx-history="false" class="h-full overflow-hidden text-slate-800 dark:text-slate-100 antialiased font-sans selection:bg-sky-500 selection:text-white">
+{{-- CSS khusus halaman (@push('styles') / @section('styles')). Dulu layout
+     tidak merender keduanya, jadi style network/nodes & roles/matrix diam-diam
+     dibuang (ADHOC-297 P8). Sengaja di <body>, BUKAN <head>: hx-boost cuma
+     menukar <body> — style di <head> gak pernah ikut kalau halamannya dibuka
+     lewat klik menu, dan style halaman lama gak pernah dicopot. --}}
+@stack('styles')
+@yield('styles')
 
 <a href="#main-content" class="sr-only focus:not-sr-only focus:fixed focus:top-3 focus:left-3 focus:z-50 focus:px-4 focus:py-2 focus:bg-sky-600 focus:text-white focus:rounded-lg focus:shadow-lg focus:font-semibold focus:text-xs">
     Lewati ke konten utama
@@ -114,15 +252,26 @@
     scroll body) jadi ikut kescroll dari luar. Kontainernya sendiri gak
     salah (overflow-hidden + flex tetap bener), yang salah unit tinggi
     acuannya. dvh reaktif ke toolbar browser, jadi shell selalu pas.
+
+    pt-[env(safe-area-inset-top)]/pb-[env(safe-area-inset-bottom)] — dorong
+    SELURUH shell (header + <main>) masuk dari status bar/gesture nav bar HP
+    pas PWA standalone render edge-to-edge (lihat komentar viewport-fit di
+    <head>). `env()` balik 0 di browser yang gak punya unsafe area (desktop,
+    devtools responsive, HP tanpa notch/gesture bar) — aman dipasang permanen.
 --}}
-<div class="flex h-dvh overflow-hidden bg-slate-50 dark:bg-slate-900">
+<div class="flex h-dvh overflow-hidden bg-slate-50 dark:bg-slate-900 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
 
     {{-- ═══════════════════════════════════════════════════════
          SIDEBAR — Light mode (putih), sesuai Design.md §3.2
+         pt-/pb-safe sendiri: <aside> ini `fixed` (mobile drawer), jadi
+         gak kena padding parent di atas — perlu inset env() sendiri
+         supaya logo header & bagian bawah sidebar gak ketutup status
+         bar/gesture nav bar pas drawer dibuka di PWA standalone.
     ═══════════════════════════════════════════════════════ --}}
     <aside id="sidebar"
            class="sidebar-light fixed inset-y-0 left-0 z-40 w-64 flex flex-col justify-between
-                  transition-transform duration-300 md:static md:translate-x-0 -translate-x-full">
+                  pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]
+                  transition-transform duration-300 md:static md:translate-x-0 md:pt-0 md:pb-0 -translate-x-full">
 
         {{-- Logo Header --}}
         <div class="h-16 flex items-center justify-between px-4 border-b border-slate-100 dark:border-slate-800/60 shrink-0 brand-container">
@@ -183,9 +332,9 @@
                                 <span class="sidebar-text">Pelanggan</span>
                             </div>
                             <div class="flex items-center gap-1.5 shrink-0">
-                                @if($badgePelangganTotal > 0)
-                                    <span class="sidebar-parent-badge px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-800 dark:bg-amber-700 text-white leading-none shadow-xs">{{ $badgePelangganTotal }}</span>
-                                @endif
+                                {{-- Selalu dirender (disembunyikan saat 0) supaya badge realtime
+                                     Verifikasi Registrasi bisa memunculkannya tanpa reload. --}}
+                                <span id="badge-pelanggan-total" class="sidebar-parent-badge px-1.5 py-0.5 rounded-full text-[9px] font-bold bg-amber-800 dark:bg-amber-700 text-white leading-none shadow-xs {{ $badgePelangganTotal > 0 ? '' : 'hidden' }}">{{ $badgePelangganTotal }}</span>
                                 <svg id="chevron-pelanggan"
                                      class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 {{ $isPelangganActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}"
                                      fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2" aria-hidden="true">
@@ -209,9 +358,10 @@
                                 <a href="{{ route('customer-registration-verifications.index') }}"
                                    class="flex items-center justify-between sidebar-subitem {{ Request::is('customer-registration-verifications*') ? 'sidebar-subitem-active' : '' }}">
                                     <span>Verifikasi Registrasi</span>
-                                    @if(isset($badge_registration_verification_count) && $badge_registration_verification_count > 0)
-                                        <span class="bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full">{{ $badge_registration_verification_count }}</span>
-                                    @endif
+                                    <span id="badge-registration-verification"
+                                          data-count-url="{{ route('customer-registration-verifications.badge-count') }}"
+                                          data-pop-ids='@json($badge_registration_verification_pop_ids ?? [])'
+                                          class="bg-amber-100 dark:bg-amber-950/60 text-amber-900 dark:text-amber-200 border border-amber-300 dark:border-amber-700 text-[9px] font-bold px-1.5 py-0.5 rounded-full {{ ($badge_registration_verification_count ?? 0) > 0 ? '' : 'hidden' }}">{{ $badge_registration_verification_count ?? 0 }}</span>
                                 </a>
                                 @endif
                                 @if(auth()->user()->hasPermission('creq_billing_verification.view'))
@@ -629,7 +779,7 @@
             @endif
 
             {{-- ── Group: LAPORAN ── --}}
-            @if(auth()->user()->hasPermission('reports.view') || auth()->user()->hasPermission('audit_logs.view'))
+            @if(auth()->user()->hasPermission('reports.view') || auth()->user()->hasPermission('audit_logs.view') || auth()->user()->hasPermission('webpush_dashboard.view'))
             <div>
                 <div class="sidebar-group-header px-2.5 mb-1.5">
                     <p class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest sidebar-text">Laporan</p>
@@ -707,6 +857,18 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>
                             </svg>
                             <span class="sidebar-text">Audit Log</span>
+                        </div>
+                    </a>
+                    @endif
+
+                    @if(auth()->user()->hasPermission('webpush_dashboard.view'))
+                    <a href="{{ route('webpush.dashboard') }}" title="Dashboard Delivery Push Notification"
+                       class="sidebar-nav-item {{ Request::is('webpush/dashboard*') ? 'sidebar-nav-item-active' : '' }}">
+                        <div class="flex items-center gap-3 sidebar-item-content">
+                            <svg class="h-5 w-5 shrink-0 {{ Request::is('webpush/dashboard*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" />
+                            </svg>
+                            <span class="sidebar-text">Delivery Push Notification</span>
                         </div>
                     </a>
                     @endif
@@ -826,7 +988,7 @@
             @endif
 
             {{-- ── Group: GUDANG & INVENTORY (ADHOC-54) ── --}}
-            @if(auth()->user()->hasPermission('warehouse.view') || auth()->user()->hasPermission('warehouse_transfer.view') || auth()->user()->hasPermission('warehouse_issue.view') || auth()->user()->hasPermission('warehouse_custody.view') || auth()->user()->hasPermission('warehouse_traceability.view') || auth()->user()->hasPermission('warehouse_adjustment.create') || auth()->user()->hasPermission('warehouse_reassign.create') || auth()->user()->hasPermission('warehouse_report.view') || auth()->user()->hasPermission('warehouse_stock_request.view'))
+            @if(auth()->user()->hasPermission('warehouse.view') || auth()->user()->hasPermission('warehouse_transfer.view') || auth()->user()->hasPermission('warehouse_issue.view') || auth()->user()->hasPermission('warehouse_custody.view') || auth()->user()->hasPermission('warehouse_traceability.view') || auth()->user()->hasPermission('warehouse_adjustment.create') || auth()->user()->hasPermission('warehouse_reassign.create') || auth()->user()->hasPermission('warehouse_report.view') || auth()->user()->hasPermission('warehouse_stock_request.view') || auth()->user()->hasPermission('users.update'))
             @php
                 $isWarehouseActive = Request::is('warehouse*');
             @endphp
@@ -899,6 +1061,13 @@
                                     @if(($badge_pengajuan_barang_count ?? 0) > 0)<span data-badge="pengajuan-barang" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">{{ $badge_pengajuan_barang_count }}</span>@endif
                                 </a>
                                 @endif
+                                {{-- Gerbang `users.update` = sama dengan route-nya (lihat docblock
+                                     WarehousePicGudangController). Tanpa link ini halaman cuma bisa
+                                     dibuka lewat ketik URL — PIC yang belum ditunjuk ditolak saat
+                                     Serah ke Teknisi dan admin gak tahu harus ke mana (2026-11-11). --}}
+                                @if(auth()->user()->hasPermission('users.update'))
+                                <a href="{{ route('warehouse.pic-gudang.index') }}" class="flex items-center justify-between sidebar-subitem {{ Request::is('warehouse/pic-gudang*') ? 'sidebar-subitem-active' : '' }}"><span>Kelola PIC Gudang</span></a>
+                                @endif
                             </div>
                         </div>
                     </div>
@@ -923,7 +1092,7 @@
                         <p class="text-[10px] text-slate-500 dark:text-slate-400 truncate">{{ Auth::user()->email ?? 'admin@whusnet.net' }}</p>
                     </div>
                 </div>
-                <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">@csrf</form>
+                <form id="logout-form" action="{{ route('logout') }}" method="POST" class="hidden">@csrf<input type="hidden" name="push_endpoint" value=""></form>
                 <button onclick="event.preventDefault(); window.Confirm('Konfirmasi Keluar', 'Yakin ingin keluar dari sistem?', 'warning', () => document.getElementById('logout-form').submit());"
                         class="p-1.5 text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 rounded-lg hover:bg-rose-50 dark:hover:bg-rose-950/40 transition-colors sidebar-footer-info cursor-pointer"
                         title="Keluar">
@@ -1085,6 +1254,10 @@
                             <svg class="h-4 w-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 21v-2a4 4 0 0 0-4-4H9a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
                             Profil Saya
                         </a>
+                        <a href="{{ route('profile.show') }}#webpush-settings" class="w-full px-3 py-2 flex items-center gap-2.5 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-700/60 transition-colors">
+                            <svg class="h-4 w-4 text-slate-400 dark:text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" /></svg>
+                            Notifikasi Perangkat
+                        </a>
                         @can('qr_scan.view')
                             {{-- Scan QR Internal (2026-08-27) — WAJIB lewat sini (halaman
                                  di dalam app, staf udah pasti login), BUKAN app kamera/
@@ -1139,6 +1312,9 @@
              (topologi di-pan di dalam, drawer detail buka-tutup sendiri) —
              satu-satunya rute yang melepas padding+scroll <main> default. --}}
         <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto scroll-smooth focus:outline-none {{ Request::routeIs('network.map.*') ? '' : 'p-4 sm:p-6 lg:p-5 xl:p-8' }}">
+            @unless(Request::routeIs('network.map.*'))
+                <x-webpush-banner />
+            @endunless
             @yield('content')
         </main>
     </div>
@@ -1333,7 +1509,10 @@
         if (e.key === 'Escape') e.target.blur();
     }
 
-    document.addEventListener('keydown', e => {
+    // pageListen, bukan document.addEventListener: script ini dieksekusi ulang
+    // tiap navigasi boost. Dulu listener menumpuk ⇒ setelah 2 kali pindah menu
+    // Ctrl+D men-toggle tema 2x (alias tidak berubah sama sekali).
+    window.pageListen(document, 'keydown', e => {
         const typing = /^(INPUT|TEXTAREA|SELECT)$/.test(document.activeElement.tagName)
                     || document.activeElement.isContentEditable;
         const helpOpen = !document.getElementById('shortcutsModal')?.classList.contains('hidden');
@@ -1421,7 +1600,9 @@
         });
     };
 
-    document.addEventListener('submit', function(e) {
+    // pageListen: script ini dieksekusi ulang tiap navigasi boost — tanpa itu
+    // satu listener konfirmasi bertambah per pindah halaman (ADHOC-297 P8).
+    window.pageListen(document, 'submit', function(e) {
         const form = e.target;
         if (form.method && form.method.toLowerCase() === 'get') return;
         if (form.classList.contains('no-confirm') ||
@@ -1664,6 +1845,16 @@
      * — nominal uang tidak boleh bergantung pada JS yang jalan.
      */
     (function () {
+        // Script ini ada di <body> ⇒ dieksekusi ULANG tiap navigasi hx-boost
+        // (ADHOC-297 P3). Listener `input`/`submit` di document cukup sekali per
+        // tab — dulu tiap navigasi menambah sepasang lagi. Kunjungan berikutnya
+        // cuma perlu memformat nilai awal kolom [data-rupiah] halaman baru.
+        if (window.__rupiahBound) {
+            window.onPageReady(() => window.formatInputRupiah());
+            return;
+        }
+        window.__rupiahBound = true;
+
         const digitSebelumKursor = (teks, posisi) => (teks.slice(0, posisi).match(/\d/g) || []).length;
 
         const format = (mentah) => {
@@ -1752,7 +1943,9 @@
             if (input.value !== '') input.value = window.Rupiah.formatDariServer(input.value);
         });
 
-        document.addEventListener('DOMContentLoaded', formatAwal);
+        // onPageReady, bukan DOMContentLoaded — event itu tak pernah nyala lagi
+        // setelah navigasi boost, jadi nilai old()/bawaan server tampil polos.
+        window.onPageReady(formatAwal);
         // Tersedia untuk markup yang disisipkan SESUDAH halaman termuat.
         // Pemanggil AJAX yang ada sekarang (modal Bayar Cepat, tabel batch,
         // modal Hub pelanggan) memformat fieldnya masing-masing saat mengisi.
@@ -1808,8 +2001,17 @@
 
 <script>
     (function () {
-        const banner = document.getElementById('realtime-offline-banner');
-        if (!banner) return;
+        // Script ini dieksekusi ulang tiap navigasi hx-boost, sedangkan koneksi
+        // pusher hidup sepanjang tab. Dulu tiap kunjungan menambah satu
+        // `bind('state_change')` (menumpuk + menahan elemen banner halaman lama),
+        // dan banner baru selalu tersembunyi walau koneksi masih putus.
+        // Sekarang: bind sekali per tab, elemen banner dicari ulang tiap kali,
+        // dan kunjungan berikutnya cuma menyamakan tampilan banner baru.
+        const banner = () => document.getElementById('realtime-offline-banner');
+        if (window.__realtimeBanner) {
+            window.__realtimeBanner.sync();
+            return;
+        }
 
         // Jangan langsung berteriak saat halaman baru dibuka: koneksi WebSocket
         // wajar melewati `connecting` sebentar. Banner cuma muncul kalau putusnya
@@ -1818,12 +2020,21 @@
         // justru saat benar-benar penting.
         const TUNDA_MS = 8000;
         let timer = null;
+        let terlihat = false;
 
-        const tampilkan = () => banner.classList.remove('hidden');
+        const tampilkan = () => {
+            terlihat = true;
+            banner()?.classList.remove('hidden');
+        };
         const sembunyikan = () => {
             clearTimeout(timer);
             timer = null;
-            banner.classList.add('hidden');
+            terlihat = false;
+            banner()?.classList.add('hidden');
+        };
+
+        window.__realtimeBanner = {
+            sync: () => banner()?.classList.toggle('hidden', !terlihat),
         };
 
         const tandaiPutus = () => {
@@ -1855,6 +2066,90 @@
             pasang();
         } else {
             window.addEventListener('echo:ready', pasang, { once: true });
+        }
+    })();
+</script>
+
+<script>
+    /*
+     * Badge "Verifikasi Registrasi" realtime. Dulu angkanya cuma dihitung View
+     * Composer saat render, jadi registrasi baru baru kelihatan setelah user
+     * pindah halaman. Sekarang tiap RegistrationVerificationQueueChanged di POP
+     * yang kelihatan user ⇒ ambil ulang angkanya dari server (lolos permission
+     * + POP scope) lalu tulis ke badge menu & badge induk "Pelanggan".
+     *
+     * Subscribe SEKALI per tab (pola sama lonceng notifikasi): script ini
+     * dieksekusi ulang tiap navigasi hx-boost, sedangkan channel Echo hidup
+     * sepanjang tab. Elemen badge dicari ulang tiap event karena <body>
+     * terganti tiap navigasi.
+     */
+    (function () {
+        const badge = () => document.getElementById('badge-registration-verification');
+        const el = badge();
+        if (!el || window.__registrationBadgeBound) {
+            return;
+        }
+
+        const popIds = JSON.parse(el.dataset.popIds || '[]');
+        if (popIds.length === 0) {
+            return;
+        }
+
+        const setCount = (target, count) => {
+            target.textContent = count;
+            target.classList.toggle('hidden', count <= 0);
+        };
+
+        let timer = null;
+        const refresh = () => {
+            // Debounce: beberapa event berdekatan (approve beruntun, pindah POP
+            // = 2 event) cukup satu fetch.
+            clearTimeout(timer);
+            timer = setTimeout(async () => {
+                const current = badge();
+                if (!current) {
+                    return;
+                }
+                try {
+                    const response = await fetch(current.dataset.countUrl, {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    if (!response.ok) {
+                        return;
+                    }
+                    const { count } = await response.json();
+
+                    // Badge induk = jumlah beberapa antrean; yang berubah di
+                    // sini cuma bagian registrasi, jadi geser pakai selisih.
+                    const previous = parseInt(current.textContent, 10) || 0;
+                    const parent = document.getElementById('badge-pelanggan-total');
+                    if (parent) {
+                        setCount(parent, Math.max(0, (parseInt(parent.textContent, 10) || 0) + count - previous));
+                    }
+                    setCount(current, count);
+                } catch (e) {
+                    // Gagal jaringan ⇒ biarkan angka lama; navigasi berikutnya
+                    // merender angka terbaru dari server.
+                }
+            }, 300);
+        };
+
+        const attach = () => {
+            if (window.__registrationBadgeBound || typeof window.Echo === 'undefined') {
+                return;
+            }
+            window.__registrationBadgeBound = true;
+            popIds.forEach((popId) => {
+                window.Echo.private('registration-verifications.' + popId)
+                    .listen('.RegistrationVerificationQueueChanged', refresh);
+            });
+        };
+
+        if (typeof window.Echo !== 'undefined') {
+            attach();
+        } else {
+            window.addEventListener('echo:ready', attach, { once: true });
         }
     })();
 </script>

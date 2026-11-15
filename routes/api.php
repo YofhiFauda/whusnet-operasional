@@ -8,6 +8,7 @@ use App\Http\Controllers\CustomerPortal\PortalBalanceController;
 use App\Http\Controllers\CustomerPortal\PortalInvoiceController;
 use App\Http\Controllers\CustomerPortal\PortalMeController;
 use App\Http\Controllers\CustomerPortal\PortalPaymentController;
+use App\Http\Controllers\CustomerPortal\PortalPushSubscriptionController;
 use App\Http\Controllers\CustomerPortal\PortalStaffKolektorController;
 use App\Http\Controllers\CustomerPortal\PortalStaffTeknisiController;
 use App\Http\Controllers\CustomerPortal\PortalStaffTicketController;
@@ -147,6 +148,27 @@ Route::prefix('customer-portal')->group(function () {
 
             Route::get('/me/tickets/{ticket_number}', [PortalTicketController::class, 'show'])
                 ->name('api.customer-portal.me.tickets.show');
+
+            // Web Push Fase 3 (ADHOC-288 Tahap 7) — subscribe/unsubscribe
+            // perangkat pelanggan buat notif Tagihan/Pembayaran. Rate limiter
+            // cukup customer-portal-api di grup atas, sama kelas risiko dengan
+            // endpoint /me/* lain (bukan kredensial).
+            Route::get('/push/vapid-key', [PortalPushSubscriptionController::class, 'vapidPublicKey'])
+                ->name('api.customer-portal.push.vapid-key');
+
+            Route::post('/push/subscribe', [PortalPushSubscriptionController::class, 'subscribe'])
+                ->name('api.customer-portal.push.subscribe');
+
+            Route::post('/push/unsubscribe', [PortalPushSubscriptionController::class, 'unsubscribe'])
+                ->name('api.customer-portal.push.unsubscribe');
+
+            Route::get('/push/subscriptions', [PortalPushSubscriptionController::class, 'subscriptions'])
+                ->name('api.customer-portal.push.subscriptions');
+
+            // Tahap 8 — tombol "Kirim notifikasi uji" di Portal Next.js,
+            // paralel sama PushSubscriptionController::sendTest() staf.
+            Route::post('/push/test', [PortalPushSubscriptionController::class, 'sendTest'])
+                ->name('api.customer-portal.push.test');
         });
 
         // Staf/kolektor (2026-08-29, docs/plan/qr-code/

@@ -21,6 +21,7 @@ use App\Services\FopTaskProvisioningService;
 use App\Services\NumberSequenceService;
 use App\Support\LikeSearch;
 use App\Support\ReasonValidationRule;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -47,6 +48,18 @@ use Illuminate\View\View;
  */
 class CustomerRegistrationVerificationController extends Controller
 {
+    /**
+     * Jumlah antrean untuk badge sidebar realtime. Query-nya SAMA dengan
+     * View Composer sidebar (Customer::awaitingRegistrationVerificationCount)
+     * supaya angka hasil refresh realtime gak beda dengan angka render awal.
+     */
+    public function badgeCount(Request $request): JsonResponse
+    {
+        return response()->json([
+            'count' => Customer::awaitingRegistrationVerificationCount($request->user()),
+        ]);
+    }
+
     public function index(Request $request): View
     {
         $access = app(EffectiveAccessService::class);
@@ -253,7 +266,7 @@ class CustomerRegistrationVerificationController extends Controller
             $creator->notify(new AppNotification(
                 title: $title,
                 message: $message,
-                actionUrl: route('customers.show', $customer->id),
+                actionUrl: route('customers.show', $customer->id, false),
                 type: NotificationType::INFO
             ));
         }

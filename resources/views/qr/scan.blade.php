@@ -13,7 +13,8 @@
 <div class="max-w-md mx-auto">
     <p class="text-sm text-text-secondary mb-4">
         Arahkan kamera ke QR pelanggan. Halaman otomatis pindah begitu QR
-        valid kebaca — gak perlu tombol apa pun.
+        valid kebaca. Pakai tombol di bawah buat matikan/nyalakan kamera
+        manual.
     </p>
 
     <div class="relative bg-black rounded-xl overflow-hidden aspect-square">
@@ -28,6 +29,11 @@
     <p id="qr-scan-status" class="mt-4 text-center text-sm text-text-muted min-h-[1.5em]">
         Meminta izin kamera…
     </p>
+
+    <button type="button" id="qr-scan-toggle-btn"
+            class="mt-3 w-full px-4 py-2.5 rounded-lg text-sm font-semibold bg-slate-800 dark:bg-slate-700 text-white hover:bg-slate-700 dark:hover:bg-slate-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed">
+        Matikan Kamera
+    </button>
 </div>
 
 @vite(['resources/js/qr-scan.js'])

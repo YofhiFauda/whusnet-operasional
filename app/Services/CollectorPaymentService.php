@@ -523,8 +523,8 @@ class CollectorPaymentService
                 'Pembayaran '.$sourceLabel.': '.$collector->name,
                 $rowsInPop->count().' pembayaran (total Rp'.number_format($total, 0, ',', '.').") dicatat {$sourceLabel} {$collector->name}.",
                 $isTechnician
-                    ? route('collector-worksheet.technicians.show', $collector->id)
-                    : route('collector-worksheet.show', $collector->id)
+                    ? route('collector-worksheet.technicians.show', $collector->id, false)
+                    : route('collector-worksheet.show', $collector->id, false)
             );
 
             // Notifikasi saja tidak cukup: ia mendarat di lonceng, sementara

@@ -217,17 +217,25 @@ class FopTaskController extends Controller
         // dan cuma membebani JSON yang di-render ke halaman.
         // Lapor Nanti gak boleh jadi tujuan switch teknisi — terkunci ke tim
         // teknisinya sendiri (switchTechnician() juga nolak).
-        $switchTargetTasks = FopTask::applyUserScope()
+        $targetTaskRows = FopTask::applyUserScope()
             ->whereNotIn('status', [TaskStatus::SELESAI, TaskStatus::DIBATALKAN, TaskStatus::LAPOR_NANTI])
             ->whereNotNull('task_date')
-            ->with('technicians:id,name')
-            ->get(['id', 'task_number', 'tugas', 'task_date'])
-            ->map(fn (FopTask $t) => [
-                'id' => $t->id,
+            ->toBase()
+            ->get(['id', 'task_number', 'tugas', 'task_date']);
+
+        $targetTechnicianIds = DB::table('fop_task_user')
+            ->whereIn('fop_task_id', $targetTaskRows->pluck('id')->all())
+            ->get(['fop_task_id', 'user_id'])
+            ->groupBy('fop_task_id')
+            ->map(fn ($rows) => $rows->pluck('user_id')->map(fn ($id) => (int) $id)->all());
+
+        $switchTargetTasks = $targetTaskRows
+            ->map(fn ($t) => [
+                'id' => (int) $t->id,
                 'task_number' => $t->task_number,
                 'tugas' => $t->tugas,
-                'task_date' => $t->task_date?->toDateString(),
-                'technician_ids' => $t->technicians->pluck('id')->all(),
+                'task_date' => Carbon::parse($t->task_date)->toDateString(),
+                'technician_ids' => $targetTechnicianIds->get($t->id, []),
             ])
             ->values();
 
@@ -928,7 +936,13 @@ class FopTaskController extends Controller
             $fopTask->manual_override_at = now();
             $fopTask->save();
 
-            // Bersihkan teknisi dari task lain di tanggal yang sama yang berada di team yang berbeda
+            // Bersihkan teknisi dari task lain di tanggal yang sama yang berada di team yang berbeda.
+            // $notify: false di update() per task + satu notif GABUNGAN per teknisi di
+            // bawah — tanpa ini, teknisi yang bentrok di N task lain kena N toast/notif
+            // "Task Dilepas" terpisah buat SATU aksi assign admin (ketauan 2026-11-09,
+            // flood toast di HP teknisi pas assign ke team).
+            $droppedTaskNumbersByTech = [];
+
             foreach ($fopTask->technicians as $tech) {
                 // task_date bertipe datetime (bukan date) — rentang eksplisit
                 // supaya index task_date bisa dipakai; whereDate() membungkusnya
@@ -948,11 +962,35 @@ class FopTaskController extends Controller
                         $remainingTechs = $otherTask->technicians()->pluck('users.id')->all();
                         app(TaskService::class)->update($otherTask->task, [
                             'team_member_ids' => $remainingTechs,
-                        ], auth()->user());
+                        ], auth()->user(), notify: false);
                     }
+
+                    $droppedTaskNumbersByTech[$tech->id][] = $otherTask->task_number;
 
                     FopTaskUpdated::dispatch($otherTask->fresh());
                 }
+            }
+
+            if (! empty($droppedTaskNumbersByTech)) {
+                $technicians = User::whereIn('id', array_keys($droppedTaskNumbersByTech))->get()->keyBy('id');
+
+                DB::afterCommit(function () use ($droppedTaskNumbersByTech, $technicians) {
+                    foreach ($droppedTaskNumbersByTech as $techId => $taskNumbers) {
+                        $tech = $technicians->get($techId);
+                        if (! $tech) {
+                            continue;
+                        }
+
+                        $tech->notify(new AppNotification(
+                            title: 'Task Dilepas (bentrok jadwal)',
+                            message: count($taskNumbers) === 1
+                                ? 'Anda tidak lagi ditugaskan pada task '.$taskNumbers[0].'.'
+                                : 'Anda tidak lagi ditugaskan pada '.count($taskNumbers).' task: '.implode(', ', $taskNumbers).'.',
+                            actionUrl: route('tasks.own', [], false),
+                            type: NotificationType::INFO
+                        ));
+                    }
+                });
             }
 
             if (class_exists(AuditLog::class)) {
@@ -980,6 +1018,38 @@ class FopTaskController extends Controller
     }
 
     /**
+     * Daftar Team FOP di tanggal tertentu, buat modal "Pilih Team" di
+     * openTeamSelectionModal() (teamSelectionModal.teams). fop_task_teams gak
+     * punya pop_id (sudah dihapus permanen, lihat migration
+     * drop_pop_id_from_fop_task_teams_table) — otorisasi cukup di level task
+     * lewat authorizeFopTaskScope(), sama kayak listing Team di history().
+     */
+    public function availableTeams(Request $request, FopTask $fopTask)
+    {
+        $this->authorizeAccess();
+        $this->authorizeFopTaskScope($fopTask);
+
+        $validated = $request->validate([
+            'date' => ['required', 'date'],
+        ]);
+
+        $teams = FopTaskTeam::with('members:id,name')
+            ->whereDate('work_date', $validated['date'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (FopTaskTeam $team) => [
+                'id' => $team->id,
+                'name' => $team->name,
+                'members' => $team->members->map(fn ($m) => [
+                    'id' => $m->id,
+                    'name' => $m->name,
+                ])->values(),
+            ]);
+
+        return response()->json(['teams' => $teams]);
+    }
+
+    /**
      * Bulk assign multiple FOP tasks to a team.
      */
     public function bulkAssignTeam(Request $request)
@@ -994,6 +1064,8 @@ class FopTaskController extends Controller
 
         $team = FopTaskTeam::with('members')->findOrFail($validated['team_id']);
         $teamWorkDate = $team->work_date->toDateString();
+        $workDateStart = $team->work_date->copy()->startOfDay();
+        $workDateEnd = $team->work_date->copy()->endOfDay();
 
         $tasks = FopTask::with(['technicians', 'task'])
             ->whereIn('id', $validated['task_ids'])
@@ -1006,8 +1078,12 @@ class FopTaskController extends Controller
 
         $assignedCount = 0;
         $errors = [];
+        // Gabungan per teknisi lintas SEMUA task yang diproses satu panggilan
+        // bulk ini — sama seperti assignToTeam(), satu notif gabungan per
+        // teknisi, bukan N notif terpisah tiap task yang narik teknisi sama.
+        $droppedTaskNumbersByTech = [];
 
-        DB::transaction(function () use ($tasks, $team, $teamWorkDate, &$assignedCount, &$errors) {
+        DB::transaction(function () use ($tasks, $team, $teamWorkDate, $workDateStart, $workDateEnd, &$assignedCount, &$errors, &$droppedTaskNumbersByTech) {
             foreach ($tasks as $task) {
                 // FopTask DAN Task eksekusinya (yang otoritatif) — sama
                 // persis dengan abortIfReportDeferred(); kalau cuma cek
@@ -1059,6 +1135,43 @@ class FopTaskController extends Controller
                     ], auth()->user());
                 }
 
+                // Bersihkan teknisi dari task LAIN di tanggal yang sama yang
+                // berada di team berbeda — PERSIS logic assignToTeam(). Tanpa
+                // ini, bulk assign bisa narik teknisi yang sudah terpasang di
+                // task lain hari itu (team beda) TANPA pernah melepasnya di
+                // sana ⇒ teknisi kebentrok (double-booked di dua task/team
+                // sekaligus). notify: false per task, satu notif gabungan per
+                // teknisi di bawah — alasan sama dengan assignToTeam() (flood
+                // toast kalau tiap task kena notif sendiri-sendiri).
+                // Iterasi $teamMemberIds, BUKAN $task->technicians — relasi itu
+                // udah di-eager-load SEBELUM sync() di atas, jadi masih balikin
+                // isi LAMA; task yang tadinya belum punya teknisi sama sekali
+                // bikin koleksi basi itu kosong, cleanup di bawah gak pernah
+                // ke-trigger (ketauan dari test regresi).
+                foreach ($teamMemberIds as $techId) {
+                    $otherTasks = FopTask::where('id', '!=', $task->id)
+                        ->whereBetween('task_date', [$workDateStart, $workDateEnd])
+                        ->whereHas('technicians', fn ($q) => $q->where('users.id', $techId))
+                        ->whereNotNull('team_id')
+                        ->where('team_id', '!=', $team->id)
+                        ->get();
+
+                    foreach ($otherTasks as $otherTask) {
+                        $otherTask->technicians()->detach($techId);
+
+                        if ($otherTask->task_id && $otherTask->task) {
+                            $remainingTechs = $otherTask->technicians()->pluck('users.id')->all();
+                            app(TaskService::class)->update($otherTask->task, [
+                                'team_member_ids' => $remainingTechs,
+                            ], auth()->user(), notify: false);
+                        }
+
+                        $droppedTaskNumbersByTech[$techId][] = $otherTask->task_number;
+
+                        event(new FopTaskUpdated($otherTask->fresh()));
+                    }
+                }
+
                 if (class_exists(AuditLog::class)) {
                     AuditLog::log($task, 'bulk_assign_team', $oldValues, $task->fresh()->toArray());
                 }
@@ -1067,6 +1180,34 @@ class FopTaskController extends Controller
                 $assignedCount++;
             }
         });
+
+        if (! empty($droppedTaskNumbersByTech)) {
+            $technicians = User::whereIn('id', array_keys($droppedTaskNumbersByTech))->get()->keyBy('id');
+
+            DB::afterCommit(function () use ($droppedTaskNumbersByTech, $technicians) {
+                foreach ($droppedTaskNumbersByTech as $techId => $taskNumbers) {
+                    $tech = $technicians->get($techId);
+                    if (! $tech) {
+                        continue;
+                    }
+
+                    $taskNumbers = array_unique($taskNumbers);
+
+                    $tech->notify(new AppNotification(
+                        title: 'Task Dilepas (bentrok jadwal)',
+                        message: count($taskNumbers) === 1
+                            ? 'Anda tidak lagi ditugaskan pada task '.$taskNumbers[0].'.'
+                            : 'Anda tidak lagi ditugaskan pada '.count($taskNumbers).' task: '.implode(', ', $taskNumbers).'.',
+                        actionUrl: route('tasks.own', [], false),
+                        type: NotificationType::INFO
+                    ));
+                }
+            });
+        }
+
+        if ($assignedCount > 0) {
+            app(FopTaskTeamService::class)->rebuildTeamsForDate($team->work_date->copy());
+        }
 
         if ($request->wantsJson()) {
             return response()->json([
@@ -1292,7 +1433,7 @@ class FopTaskController extends Controller
         $user->notify(new AppNotification(
             title: 'Switch Teknisi',
             message: $message,
-            actionUrl: route('fop-tasks.index'),
+            actionUrl: route('fop-tasks.index', [], false),
             type: NotificationType::INFO
         ));
     }
@@ -1690,6 +1831,7 @@ class FopTaskController extends Controller
             ->get();
 
         $now = Carbon::now();
+        $priorityUpdates = [];
 
         foreach ($activeTasks as $task) {
             $customer = $task->customer;
@@ -1707,7 +1849,7 @@ class FopTaskController extends Controller
             // badge prioritas dan countdown timer gak pernah pakai syarat beda.
             if ($task->isScheduledForFutureClientDate()) {
                 if ($task->priority !== FopTaskPriority::LOW) {
-                    $task->update(['priority' => FopTaskPriority::LOW]);
+                    $priorityUpdates[FopTaskPriority::LOW->value][] = $task->id;
                 }
 
                 continue;
@@ -1759,8 +1901,16 @@ class FopTaskController extends Controller
                 }
 
                 if ($task->priority !== $newPriority) {
-                    $task->update(['priority' => $newPriority]);
+                    $priorityUpdates[$newPriority->value][] = $task->id;
                 }
+            }
+        }
+
+        // Priority berubah saja: observer FopTask hanya bereaksi pada status.
+        // Batch menjaga updated_at Eloquent tanpa UPDATE per task saat backlog.
+        foreach ($priorityUpdates as $priority => $taskIds) {
+            foreach (array_chunk($taskIds, 500) as $chunk) {
+                FopTask::query()->whereKey($chunk)->update(['priority' => $priority]);
             }
         }
     }

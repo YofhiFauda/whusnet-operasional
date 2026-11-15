@@ -21,6 +21,7 @@ use App\Models\TicketBatchMember;
 use App\Models\TicketIssueCategory;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Notifications\AppPushNotification;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -450,7 +451,10 @@ class TicketService
         $this->notifyRoleUsersInPop('noc', $ticket->pop_id,
             'Tiket Masuk NOC: '.$ticket->ticket_number,
             "Tiket {$ticket->ticket_number} ({$ticket->customer_name}) dikirim {$actor->name} ke NOC.".($reason ? " Catatan: {$reason}" : ''),
-            route('tickets.show', $ticket->id)
+            route('tickets.show', $ticket->id, false),
+            push: in_array($ticket->priority, [FopTaskPriority::HIGH, FopTaskPriority::URGENT], true),
+            pushTitle: 'Tiket Urgent: '.$ticket->ticket_number,
+            pushMessage: "{$ticket->customer_name} butuh penanganan segera. Dikirim {$actor->name}.".($reason ? " Catatan: {$reason}" : '')
         );
 
         return $ticket;
@@ -513,7 +517,10 @@ class TicketService
         $this->notifyRoleUsersInPop('fop', $fopTask->pop_id,
             'FopTask Baru dari Tiket: '.$fopTask->task_number,
             "Tiket {$ticket->ticket_number} dikirim {$actor->name} ke FOP, jadi {$fopTask->task_number}. Perlu ditugaskan teknisi.",
-            route('fop-tasks.index')
+            route('fop-tasks.index', [], false),
+            push: in_array($ticket->priority, [FopTaskPriority::HIGH, FopTaskPriority::URGENT], true),
+            pushTitle: 'Perlu Teknisi: '.$fopTask->task_number,
+            pushMessage: "Eskalasi dari tiket {$ticket->ticket_number}. Segera tugaskan teknisi."
         );
 
         return $fopTask;
@@ -892,7 +899,7 @@ class TicketService
         $creator->notify(new AppNotification(
             title: $title,
             message: $message,
-            actionUrl: route('tickets.show', $ticket->id),
+            actionUrl: route('tickets.show', $ticket->id, false),
             type: $type
         ));
     }
@@ -919,7 +926,20 @@ class TicketService
             ->get();
     }
 
-    private function notifyRoleUsersInPop(string $roleCode, int $popId, string $title, string $message, string $actionUrl): void
+    /**
+     * $push cuma dinyalakan pemanggil buat tiket prioritas HIGH/URGENT
+     * (ADHOC-288 Tahap 6, event disetujui #1 "Tiket Gangguan Prioritas
+     * High/Critical") — tiket LOW/MEDIUM tetap in-app saja, gak push.
+     *
+     * $pushTitle/$pushMessage OPSIONAL dan terpisah dari $title/$message —
+     * push device cuma keliatan title+1 baris di lockscreen (beda dari
+     * dropdown in-app yang punya actionUrl buat konteks), jadi butuh copy
+     * lebih "to the point, langsung ngerti, langsung tahu harus ngapain"
+     * tanpa klaim urgensi ke tiket LOW/MEDIUM yang justru gak pernah lewat
+     * jalur ini (2026-11-09, copywriting review). Default ke $title/$message
+     * kalau caller gak kirim — jangan sampai push kosong.
+     */
+    private function notifyRoleUsersInPop(string $roleCode, int $popId, string $title, string $message, string $actionUrl, bool $push = false, ?string $pushTitle = null, ?string $pushMessage = null): void
     {
         foreach ($this->usersWithRoleInPop($roleCode, $popId) as $user) {
             $user->notify(new AppNotification(
@@ -928,6 +948,10 @@ class TicketService
                 actionUrl: $actionUrl,
                 type: NotificationType::INFO
             ));
+
+            if ($push) {
+                $user->notify(new AppPushNotification($pushTitle ?? $title, $pushMessage ?? $message, $actionUrl));
+            }
         }
     }
 }

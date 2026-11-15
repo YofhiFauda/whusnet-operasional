@@ -241,6 +241,7 @@
                     </label>
                     <input type="file" name="condition_photo" accept="image/*"
                            class="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 dark:file:bg-sky-950/60 dark:file:text-sky-300 font-ui transition-colors cursor-pointer">
+                    <x-upload-limit-hint />
                     @if($existing?->condition_photo)
                     <p class="text-[11px] text-slate-400 dark:text-slate-500 font-ui">Foto sebelumnya tersimpan — unggah lagi jika ingin menggantinya.</p>
                     @endif
@@ -304,6 +305,7 @@
                         <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui">Foto Penarikan <span class="text-red-500">*</span></label>
                         <input type="file" name="cable_crossings[{{ $crossing->id }}][foto]" accept="image/*"
                                class="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 dark:file:bg-sky-950/60 dark:file:text-sky-300 font-ui transition-colors cursor-pointer">
+                        <x-upload-limit-hint />
                     </div>
 
                     <div x-show="result === 'tidak_bisa_ditarik'" x-cloak class="space-y-1.5">

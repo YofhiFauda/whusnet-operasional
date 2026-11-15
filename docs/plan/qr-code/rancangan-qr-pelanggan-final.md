@@ -572,6 +572,16 @@ Permission baru lewat `features` × `actions` (`PermissionGeneratorService`):
 > bawah DIPERTAHANKAN sebagai jejak keputusan (kenapa dulu dibangun begini),
 > BUKAN kontrak yang masih berlaku — jangan diimplementasikan ulang.
 
+> **REVISI 2026-11-14 (keputusan eksplisit user):** tamu yang scan QR
+> kembali LANGSUNG melihat tagihan — tapi BUKAN dengan menghidupkan
+> `QrBillingController`. Halaman Portal `/klaim` menampilkan ringkasan
+> tagihan belum lunas TANPA PIN, whitelist sempit: nama tersamar
+> (`FormatHelper::maskName()`), CID, lalu per tagihan periode / jatuh tempo /
+> sisa / status. Tanpa alamat, HP, nomor invoice, riwayat bayar. Data dari
+> field `billing` di `GET /api/customer-portal/qr/resolve`
+> (`PortalAuthService::publicBillingSummary()`). Rincian & pembayaran tetap
+> di balik login Portal.
+
 Satu-satunya halaman **tanpa auth**. Posisi ONT (dalam/luar rumah) mempengaruhi takaran mitigasi — konfirmasi ke FOP sebelum implementasi. Rancangan ini mengasumsikan ONT bisa diakses orang yang tidak tinggal di rumah (tamu, teknisi, atau memang di luar).
 
 **Two-step disclosure:**

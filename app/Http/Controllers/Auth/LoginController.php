@@ -57,6 +57,16 @@ class LoginController extends Controller
      */
     public function logout(Request $request)
     {
+        // Lepas subscription push browser ini dari akun yang keluar (review
+        // ADHOC-297 #9). PushManager per device, bukan per akun: tanpa ini
+        // push milik user sebelumnya tetap tampil di perangkat bersama.
+        // Endpoint dikirim resources/js/webpush.js lewat field tersembunyi
+        // #logout-form; hanya subscription MILIK user ini yang bisa terhapus.
+        $endpoint = $request->input('push_endpoint');
+        if ($request->user() && is_string($endpoint) && $endpoint !== '' && strlen($endpoint) <= 1024) {
+            $request->user()->deletePushSubscription($endpoint);
+        }
+
         Auth::logout();
 
         $request->session()->invalidate();

@@ -1,8 +1,7 @@
 @extends('layouts.app')
 
-@section('title', 'Import Pelanggan - Whusnet Operasional')
+@section('title', 'Import Pelanggan')
 @section('page_title', 'Import Pelanggan')
-@section('breadcrumb_parent', 'Pelanggan')
 @section('breadcrumb_parent_url', '/customers')
 
 @section('content')

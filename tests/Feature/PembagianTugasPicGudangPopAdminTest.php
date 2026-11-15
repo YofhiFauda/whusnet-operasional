@@ -96,7 +96,7 @@ class PembagianTugasPicGudangPopAdminTest extends TestCase
     // ---------------------------------------------------------------
 
     #[Test]
-    public function issuing_stock_to_self_is_always_rejected(): void
+    public function issuing_stock_to_self_is_rejected_for_non_pic_roles(): void
     {
         $cabang = $this->createCabang('PTG-01', 'Cabang PTG 1');
         $popAdmin = $this->makeScopedUser('pop_admin', 'selected_pop', $cabang);

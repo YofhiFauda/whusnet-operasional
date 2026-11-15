@@ -11,6 +11,7 @@ use App\Models\CollectorDeposit;
 use App\Models\Payment;
 use App\Models\User;
 use App\Notifications\AppNotification;
+use App\Notifications\AppPushNotification;
 use App\Support\Money;
 use Illuminate\Support\Facades\DB;
 use RuntimeException;
@@ -301,7 +302,7 @@ class CollectorDepositService
         $this->safelyNotify(fn () => $written->collector?->notify(new AppNotification(
             title: "Setoran {$written->deposit_number}: ".$written->status->label(),
             message: 'Kekurangan Rp'.number_format($outstanding, 0, ',', '.').' dihapus buku oleh kantor. Alasan: '.$reason,
-            actionUrl: route('collector-worklist.index'),
+            actionUrl: route('collector-worklist.index', [], false),
             type: NotificationType::WARNING
         )));
 
@@ -472,7 +473,7 @@ class CollectorDepositService
             $user->notify(new AppNotification(
                 title: 'Setoran menunggu verifikasi: '.$collector->name,
                 message: "{$deposit->deposit_number} — {$paymentCount} pembayaran, tercatat Rp".number_format($total, 0, ',', '.').'. Hitung uang fisiknya lalu verifikasi.',
-                actionUrl: route('collector-worksheet.show', ['collector' => $collector->id, 'tab' => 'setoran']),
+                actionUrl: route('collector-worksheet.show', ['collector' => $collector->id, 'tab' => 'setoran'], false),
                 type: NotificationType::WARNING
             ));
         }
@@ -507,13 +508,30 @@ class CollectorDepositService
         // di-hardcode. Sejak lebih setor punya status sendiri, judul tetap
         // harus ikut statusnya — kalau tidak, kolektor yang menyerahkan uang
         // LEBIH menerima kabar berjudul "SELISIH" dan mengira dirinya kurang.
+        $title = "Setoran {$deposit->deposit_number}: ".$deposit->status->label();
+        $message = $isClean
+            ? 'Uang fisik cocok dengan catatan sistem. Setoran ditutup.'
+            : 'Selisih Rp'.number_format(abs($difference), 0, ',', '.').' ('.($difference < 0 ? 'kurang setor' : 'lebih setor').'). Catatan admin: '.($deposit->note ?? '-');
+
         $collector->notify(new AppNotification(
-            title: "Setoran {$deposit->deposit_number}: ".$deposit->status->label(),
-            message: $isClean
-                ? 'Uang fisik cocok dengan catatan sistem. Setoran ditutup.'
-                : 'Selisih Rp'.number_format(abs($difference), 0, ',', '.').' ('.($difference < 0 ? 'kurang setor' : 'lebih setor').'). Catatan admin: '.($deposit->note ?? '-'),
-            actionUrl: route('collector-worklist.index'),
+            title: $title,
+            message: $message,
+            actionUrl: route('collector-worklist.index', [], false),
             type: $isClean ? NotificationType::SUCCESS : NotificationType::WARNING
+        ));
+
+        // Push device (ADHOC-288 Tahap 6, event disetujui #3 "Setoran
+        // Collector Approved/Rejected" — "approved" = clean, "rejected" =
+        // selisih, sistem ini gak literal pakai dua kata itu). Copy
+        // TERPISAH dari $title/$message in-app di atas — lockscreen cuma
+        // nunjukin title+1 baris, jadi butuh langsung "beres" vs "perlu
+        // dicek" tanpa nunggu buka dropdown (2026-11-09, copywriting review).
+        $collector->notify(new AppPushNotification(
+            $isClean ? 'Setoran Beres: '.$deposit->deposit_number : 'Setoran Perlu Dicek: '.$deposit->deposit_number,
+            $isClean
+                ? 'Uang fisik sesuai catatan. Setoran ditutup, mantap.'
+                : 'Ada selisih Rp'.number_format(abs($difference), 0, ',', '.').' ('.($difference < 0 ? 'kurang setor' : 'lebih setor').'). Cek catatan admin.',
+            route('collector-worklist.index', [], false)
         ));
     }
 }

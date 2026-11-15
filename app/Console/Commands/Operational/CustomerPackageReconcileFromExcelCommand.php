@@ -108,6 +108,12 @@ class CustomerPackageReconcileFromExcelCommand extends Command
      * "Ambil Alat" otomatis muncul di List Putus Langganan tanpa command
      * ini perlu menyentuhnya sama sekali.
      *
+     * **Kolom `CID` (opsional, 2026-11-10, kasus Caruban):** kalau Excel
+     * punya kolom `CID`, itu jadi kunci pencarian pelanggan UTAMA per baris
+     * (satu CID = satu pelanggan pasti). Nama cuma fallback kalau kolom CID
+     * kosong di baris itu ATAU CID-nya gak ketemu di Pop ini — supaya Excel
+     * kolektor lama tanpa kolom CID (Sambit) tetap jalan apa adanya.
+     *
      * Alasan putus (`termination_reason_id`) SENGAJA bukan opsi — command
      * `firstOrCreate()` satu baris master alasan tetap bernama konstan
      * (lihat `TERMINATION_REASON_NAME`) kalau belum ada, lalu selalu pakai
@@ -184,37 +190,101 @@ class CustomerPackageReconcileFromExcelCommand extends Command
 
         foreach (SimpleExcelReader::create($fullPath)->getRows() as $row) {
             $namaExcel = trim((string) ($row['Nama'] ?? ''));
-            $nominal = (int) ($row['Paket'] ?? 0);
-            $kodeRaw = trim((string) ($row['paket '] ?? ''));
+            // `Harga`/`Nama Paket` adalah nama kolom yang BENERAN jelas
+            // (dipakai Caruban & template baru) — diutamakan kalau ADA.
+            // `Paket`/`paket ` (huruf kecil+spasi, nyaris gak kebeda dari
+            // `Paket` biasa) nama kolom LAMA peninggalan file Sambit asli,
+            // tetap didukung buat file lama yang belum dirapiin. Kalau
+            // kolom `Harga` ada tapi isinya bukan harga (misal cabang
+            // nulis ulang header `Paket` jadi teks speed seperti "Up to 25
+            // Mbps"), `Harga` TETAP menang — jangan pernah diam-diam jatuh
+            // balik ke `Paket` cuma karena `Harga` kosong/0, itu nyembunyiin
+            // kesalahan isi data, bukan masalah nama kolom.
+            $nominal = array_key_exists('Harga', $row)
+                ? (int) $row['Harga']
+                : (int) ($row['Paket'] ?? 0);
+            $kodeRaw = trim((string) (array_key_exists('Nama Paket', $row) ? $row['Nama Paket'] : ($row['paket '] ?? '')));
+            $cidExcel = trim((string) ($row['CID'] ?? ''));
 
             if ($namaExcel === '' || $nominal <= 0) {
                 continue;
             }
 
+            // Kolom CID opsional — kalau diisi, jadi kunci pencarian UTAMA
+            // (satu CID = satu pelanggan pasti, gak ambigu kayak nama). Nama
+            // cuma dipakai fallback kalau kolom CID kosong atau CID-nya gak
+            // ketemu di Pop ini (Excel kolektor lama kadang gak punya kolom
+            // CID sama sekali — lihat fixture test Sambit yang cuma kirim
+            // Nama/Paket/paket, harus tetap jalan seperti sebelumnya).
+            // Lookup + presentCustomerIds TETAP dijalankan sebelum cek
+            // skip_names (sama seperti nama) — kalau tidak, pelanggan yang
+            // di-skip config ikut diputus otomatis oleh --terminate-missing
+            // padahal barisnya jelas-jelas ADA di Excel.
+            $customer = $cidExcel !== ''
+                ? Customer::query()->where('pop_id', $pop->id)->where('cid', $cidExcel)->first()
+                : null;
+
+            // Alias nama dicek DULUAN (bukan cuma di fallback nama) —
+            // temuan nyata: CID bisa match pelanggan yang BENERAN tepat,
+            // tapi namanya ketulis beda jauh dari kolektor (typo parah,
+            // "rizka ana" vs DB "Rizka Fitri Ana") sampai gak lolos
+            // `namaCocokLonggar()` yang cuma toleransi beda format/spasi,
+            // bukan typo/singkatan. Reviewer manual yang mastiin itu orang
+            // yang sama lewat alias di config, bukan ditebak otomatis.
             $resolvedName = $nameAliases[$namaExcel] ?? $namaExcel;
 
-            $candidates = Customer::query()
-                ->where('pop_id', $pop->id)
-                ->whereRaw('LOWER(TRIM(full_name)) = ?', [mb_strtolower(trim($resolvedName))])
-                ->get();
-
-            foreach ($candidates as $candidate) {
-                $presentCustomerIds[$candidate->id] = true;
-            }
-
-            if (in_array($namaExcel, $skipNames, true)) {
-                $skipped[] = [$namaExcel, 'ditandai skip di config — datanya belum bisa dipercaya, perlu ditelusuri manual dulu'];
-
-                continue;
-            }
-
-            if ($candidates->count() !== 1) {
-                $skipped[] = [$namaExcel, $candidates->count() === 0 ? 'nama ini tidak ditemukan di sistem' : "ada {$candidates->count()} pelanggan dengan nama sama di sistem — perlu dicek manual, nama saja tidak cukup unik"];
+            // Temuan nyata cabang Caruban: CID di Excel kolektor bisa off-by-
+            // satu/beda segmen distribusi dari CID asli di DB (migrasi lama
+            // regenerate CID pakai distribusi SAAT INI, bukan distribusi lama
+            // yang ketulis di Excel) — CID yang "ketemu" bisa KEBETULAN jatuh
+            // ke pelanggan LAIN yang gak ada hubungannya ("suyanto peting" di
+            // Excel punya CID yang justru dipunyai "Sudji Pendot" di DB).
+            // Kalau nama Excel (atau alias-nya) vs nama DB gak nyambung SAMA
+            // SEKALI, CID ini TIDAK bisa dipercaya — jangan sampai harga/
+            // paket pelanggan lain ketimpa cuma gara-gara nomor CID nyasar.
+            // Dianggap "CID tidak ketemu" (fallback ke nama di bawah), BUKAN
+            // langsung diterima.
+            if ($customer && ! $this->namaCocokLonggar($resolvedName, $customer->full_name)) {
+                $skipped[] = [$namaExcel, "CID '{$cidExcel}' di Excel ternyata milik pelanggan lain di sistem ('{$customer->full_name}') — nama tidak nyambung sama sekali, dicurigai CID salah/nyasar, perlu dicek manual"];
 
                 continue;
             }
 
-            $customer = $candidates->first();
+            if ($customer) {
+                $presentCustomerIds[$customer->id] = true;
+
+                if (in_array($namaExcel, $skipNames, true)) {
+                    $skipped[] = [$namaExcel, 'ditandai skip di config — datanya belum bisa dipercaya, perlu ditelusuri manual dulu'];
+
+                    continue;
+                }
+            } else {
+                $candidates = Customer::query()
+                    ->where('pop_id', $pop->id)
+                    ->whereRaw('LOWER(TRIM(full_name)) = ?', [mb_strtolower(trim($resolvedName))])
+                    ->get();
+
+                foreach ($candidates as $candidate) {
+                    $presentCustomerIds[$candidate->id] = true;
+                }
+
+                if (in_array($namaExcel, $skipNames, true)) {
+                    $skipped[] = [$namaExcel, 'ditandai skip di config — datanya belum bisa dipercaya, perlu ditelusuri manual dulu'];
+
+                    continue;
+                }
+
+                if ($candidates->count() !== 1) {
+                    $reason = $candidates->count() === 0
+                        ? ($cidExcel !== '' ? "CID '{$cidExcel}' tidak ditemukan, dan nama ini juga tidak ditemukan di sistem" : 'nama ini tidak ditemukan di sistem')
+                        : "ada {$candidates->count()} pelanggan dengan nama sama di sistem — perlu dicek manual, nama saja tidak cukup unik";
+                    $skipped[] = [$namaExcel, $reason];
+
+                    continue;
+                }
+
+                $customer = $candidates->first();
+            }
             $service = $customer->customerService;
 
             if (! $service) {
@@ -350,7 +420,18 @@ class CustomerPackageReconcileFromExcelCommand extends Command
 
         $terminated = [];
         if ($terminateMissing) {
+            // Eager-load customerService (dipakai CustomerTerminationService::
+            // terminate()), portalAccount (dipakai CustomerObserver::updated()
+            // begitu status jadi TERMINATED, buat disable akun portal), dan
+            // customerService.customer (CustomerService::boot() 'saved' hook
+            // manggil $service->customer->recalculateCompleteness() begitu
+            // service_status diupdate ke 'berhenti'). `Model::
+            // preventLazyLoading()` aktif di luar production (lihat
+            // AppServiceProvider), jadi tanpa ini meledak "Attempted to lazy
+            // load" begitu dipanggil dari console command (gak ada request
+            // HTTP yang biasa nge-trigger eager load di controller).
             $candidates = Customer::query()
+                ->with(['customerService.customer', 'portalAccount'])
                 ->where('pop_id', $pop->id)
                 ->whereNotIn('id', array_keys($presentCustomerIds))
                 ->whereIn('status', [WorkflowTransition::ACTIVE->value, WorkflowTransition::SUSPENDED->value])
@@ -496,6 +577,35 @@ class CustomerPackageReconcileFromExcelCommand extends Command
                     'amount' => (float) $service->monthly_price,
                 ]]);
             });
+    }
+
+    /**
+     * Pengecekan longgar SENGAJA (bukan exact match) — nama kolektor di
+     * Excel sering ada embel-embel ("adelia dwi rahmawati taufik" vs DB
+     * "Adelia Dwi Rahmawati"), substring 1 arah cukup. Ini BUKAN pengganti
+     * matching nama yang ketat di fallback (tidak dipakai buat nyari
+     * pelanggan) — cuma SANITY CHECK terakhir sebelum percaya hasil lookup
+     * CID, biar CID yang nyasar ke pelanggan gak nyambung ketahuan duluan.
+     */
+    private function namaCocokLonggar(string $namaExcel, string $namaDb): bool
+    {
+        // Normalisasi pemisah (spasi dobel, strip "-"/"_") SEBELUM substring
+        // check — temuan nyata: "warung-hari-martono" (Excel) vs "Warung Hari
+        // Martono" (DB) itu ORANG/USAHA YANG SAMA, cuma beda gaya penulisan
+        // kolektor, bukan nama yang gak nyambung. Spasi di DALAM kata TIDAK
+        // dihapus (cuma dirapatkan) — "Kasti Ningsih" vs "Kastiningsih"
+        // SENGAJA tetap gak dianggap cocok, karena gabung/pisah kata beresiko
+        // nabrak orang lain yang beneran berbeda.
+        $normalize = fn (string $s): string => trim(preg_replace('/[^a-z0-9]+/', ' ', mb_strtolower($s)));
+
+        $a = $normalize($namaExcel);
+        $b = $normalize($namaDb);
+
+        if ($a === '' || $b === '') {
+            return false;
+        }
+
+        return str_contains($a, $b) || str_contains($b, $a);
     }
 
     private function resolvePop(): ?Pop

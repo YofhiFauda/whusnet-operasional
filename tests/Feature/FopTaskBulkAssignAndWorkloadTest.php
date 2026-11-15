@@ -262,4 +262,79 @@ class FopTaskBulkAssignAndWorkloadTest extends TestCase
             $execTask->teamMembers->pluck('user_id')->all()
         );
     }
+
+    /**
+     * Regresi — bulk assign SEBELUMNYA gak punya logic pelepasan teknisi dari
+     * task lain di tanggal yang sama yang berada di team berbeda (beda dengan
+     * assignToTeam() yang punya logic ini, ketauan 2026-11-09). Akibatnya
+     * teknisi bisa kebentrok: tetap nempel di task lama (team lama) SEKALIGUS
+     * ditambahkan ke task baru (team baru) lewat bulk assign.
+     */
+    public function test_bulk_assign_team_releases_technician_from_conflicting_task_same_day(): void
+    {
+        $today = Carbon::today();
+
+        $oldTeam = FopTaskTeam::create([
+            'name' => 'Tim Lama',
+            'work_date' => $today->toDateString(),
+            'pop_id' => $this->pop->id,
+        ]);
+        $oldTeam->members()->sync([$this->technician1->id]);
+
+        $oldTask = FopTask::create([
+            'task_number' => 'TFOP-2026-3001',
+            'task_date' => $today->copy()->setTime(8, 0),
+            'category' => 'MTN',
+            'status' => 'terjadwal',
+            'priority' => 'Medium',
+            'tugas' => 'Task Lama',
+            'pop_id' => $this->pop->id,
+            'village_id' => $this->village->id,
+            'team_id' => $oldTeam->id,
+            'manual_override_at' => now(),
+        ]);
+        $oldTask->technicians()->sync([$this->technician1->id]);
+
+        $newTeam = FopTaskTeam::create([
+            'name' => 'Tim Baru',
+            'work_date' => $today->toDateString(),
+            'pop_id' => $this->pop->id,
+        ]);
+        $newTeam->members()->sync([$this->technician1->id, $this->technician2->id]);
+
+        $newTask = FopTask::create([
+            'task_number' => 'TFOP-2026-3002',
+            'task_date' => $today->copy()->setTime(13, 0),
+            'category' => 'C-REQ',
+            'status' => 'draft',
+            'priority' => 'High',
+            'tugas' => 'Task Baru',
+            'pop_id' => $this->pop->id,
+            'village_id' => $this->village->id,
+        ]);
+
+        $response = $this->actingAs($this->fopUser)->post(route('fop-tasks.bulk-assign-team'), [
+            'task_ids' => [$newTask->id],
+            'team_id' => $newTeam->id,
+        ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success');
+
+        $oldTask->refresh();
+        $newTask->refresh();
+
+        // Teknisi 1 HARUS dilepas dari task lama — gak boleh kebentrok di
+        // task lama & baru sekaligus di hari yang sama.
+        $this->assertEqualsCanonicalizing([], $oldTask->technicians->pluck('id')->all());
+        $this->assertEqualsCanonicalizing(
+            [$this->technician1->id, $this->technician2->id],
+            $newTask->technicians->pluck('id')->all()
+        );
+
+        $this->assertDatabaseHas('notifications', [
+            'notifiable_id' => $this->technician1->id,
+            'notifiable_type' => User::class,
+        ]);
+    }
 }

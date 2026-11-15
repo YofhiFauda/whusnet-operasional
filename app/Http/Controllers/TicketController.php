@@ -13,6 +13,7 @@ use App\Models\TicketAttachment;
 use App\Models\TicketIssueCategory;
 use App\Services\TicketService;
 use App\Support\IndonesianDate;
+use App\Support\UploadLimit;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -463,7 +464,7 @@ class TicketController extends Controller
             'catatan_teknis' => ['nullable', 'string', 'max:2000'],
             'priority' => ['required', 'string', Rule::enum(FopTaskPriority::class)],
             'attachments' => ['nullable', 'array', 'max:5'],
-            'attachments.*' => ['file', 'max:5120', 'mimes:jpg,jpeg,png,webp,pdf'],
+            'attachments.*' => ['file', UploadLimit::rule(), 'mimes:jpg,jpeg,png,webp,pdf'],
             // Cuma dipakai jalur FOP submit langsung dari halaman Task FOP —
             // dicek permission-nya di bawah, BUKAN cuma divalidasi di sini.
             'task_date' => ['nullable', 'date'],
@@ -473,7 +474,7 @@ class TicketController extends Controller
         ], [
             'type.in' => 'Tipe ticket hanya boleh MTN atau C-REQ.',
             'attachments.max' => 'Maksimal 5 lampiran per ticket.',
-            'attachments.*.max' => 'Ukuran tiap lampiran maksimal 5 MB.',
+            'attachments.*.max' => 'Ukuran tiap lampiran maksimal '.UploadLimit::label().'.',
             'attachments.*.mimes' => 'Lampiran harus berupa gambar (jpg/png/webp) atau PDF.',
         ]);
 

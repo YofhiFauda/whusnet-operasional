@@ -71,7 +71,7 @@ class CustomerTerminationController extends Controller
             $creator->notify(new AppNotification(
                 title: 'Pelanggan Diterminasi: '.$customer->full_name,
                 message: "Layanan pelanggan {$customer->full_name} dihentikan oleh ".auth()->user()->name.". {$penaltyMessage}",
-                actionUrl: route('customers.show', $customer->id),
+                actionUrl: route('customers.show', $customer->id, false),
                 type: NotificationType::ERROR
             ));
         }

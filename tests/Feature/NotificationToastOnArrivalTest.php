@@ -27,6 +27,9 @@ class NotificationToastOnArrivalTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('window.Toast', false);
-        $response->assertSee('(window.Toast[type] || window.Toast.info)(notification.title, notification.message)', false);
+        // Dipanggil SEBAGAI method — bentuk lama `(Toast[type] || Toast.info)(...)`
+        // melepas fungsi dari objeknya ("this.show is not a function", 2026-11-11).
+        $response->assertSee('window.Toast[type](notification.title, notification.message)', false);
+        $response->assertDontSee('(window.Toast[type] || window.Toast.info)(', false);
     }
 }

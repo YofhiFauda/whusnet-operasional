@@ -187,7 +187,7 @@
 
             {{-- Form B: SLOT --}}
             @can('network_nodes.update')
-            <form x-show="createType === 'slot'" method="POST" :action="createSlotAction" class="space-y-4 pt-1">
+            <form x-show="createType === 'slot'" method="POST" :action="createSlotAction" hx-boost="false" class="space-y-4 pt-1">
                 @csrf
                 <input type="hidden" name="device_type" value="slot">
                 <div>
@@ -219,7 +219,7 @@
             </form>
 
             {{-- Form C: PON --}}
-            <form x-show="createType === 'pon'" method="POST" :action="createPonAction" class="space-y-4 pt-1">
+            <form x-show="createType === 'pon'" method="POST" :action="createPonAction" hx-boost="false" class="space-y-4 pt-1">
                 @csrf
                 <input type="hidden" name="device_type" value="pon">
                 {{-- Slot dimuat per OLT lewat `children_url` item perangkat; target

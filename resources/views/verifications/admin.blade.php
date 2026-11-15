@@ -904,7 +904,14 @@
 
             @php
                 $service = $customer->customerService;
-                $isWaitingBdStage = $customer->status === \App\Enums\WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value;
+                // Harga modem "Beli dari Gudang" — angka & keterangan SAMA dengan
+                // yang ditagih finalVerify() (CustomerInstallation::modemSaleAmountForInvoice()).
+                $verifModemInstallation = $customer->latestInstallation;
+                $verifModemSaleAmount = $verifModemInstallation?->modemSaleAmountForInvoice() ?? 0.0;
+                $verifModemSaleDescription = $verifModemSaleAmount > 0
+                    ? ($verifModemInstallation->selectedInventorySerial?->modemSaleDescription() ?? 'Pembelian modem (Beli dari Gudang)')
+                    : null;
+                $isWaitingBdStage =$customer->status === \App\Enums\WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value;
             @endphp
 
             @if($isWaitingBdStage)
@@ -1126,6 +1133,24 @@
                             <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">PPN</span>
                             <span class="block text-sm font-mono text-text-main">{{ number_format($service->ppn ?? 0, 0, ',', '.') }}%</span>
                         </div>
+                        {{-- Jenis kontrak + cara pemilikan modem (laporan user
+                             2026-11-14): admin perlu tahu modem pelanggan ini dibeli
+                             atau disewa SEBELUM menyetujui — harga "Beli dari Gudang"
+                             ikut Invoice Awal (CustomerInstallation::modemSaleAmountForInvoice()). --}}
+                        <div>
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Jenis Kontrak</span>
+                            <span class="block text-sm font-bold text-text-main">{{ match ($service->contract_type) { 'beli' => 'Beli Putus', 'sewa' => 'Sewa', default => '-' } }}</span>
+                        </div>
+                        <div class="col-span-2 md:col-span-3">
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Modem</span>
+                            <span class="block text-sm font-bold text-text-main">
+                                {{ $verifModemInstallation?->modemAcquisitionLabel() ?? ($service->contract_type === 'sewa' ? 'Sewa Gudang' : '-') }}
+                                @if($verifModemSaleAmount > 0)
+                                    — <span class="font-mono text-primary">Rp {{ number_format($verifModemSaleAmount, 0, ',', '.') }}</span>
+                                    <span class="block text-[11px] font-normal text-text-muted">{{ $verifModemSaleDescription }} · ikut ditagihkan di Tagihan Pertama.</span>
+                                @endif
+                            </span>
+                        </div>
                     </div>
                 </div>
             </div>
@@ -1255,6 +1280,26 @@
                                 <p class="text-[10px] text-text-muted mt-1">Otomatis dari prorata (<span id="prorate_auto_hint">—</span>). Bisa diedit manual bila perlu.</p>
                             </div>
 
+                            {{-- Harga modem "Beli dari Gudang" — bisa dikoreksi admin
+                                 (permintaan user 2026-11-14). Default harga isian teknisi
+                                 di Laporan Pemasangan; finalVerify() memakai nilai ini
+                                 untuk Tagihan Pertama + menyamakan ledger penjualan SN. --}}
+                            @if($verifModemSaleAmount > 0)
+                            <div class="mt-4">
+                                <label for="fv_modem_sale_amount" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">HARGA MODEM (BELI DARI GUDANG)</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm text-text-muted pointer-events-none">Rp</span>
+                                    <input type="text" inputmode="decimal" data-rupiah name="modem_sale_amount" id="fv_modem_sale_amount"
+                                        class="w-full text-sm pl-9 pr-3 py-2.5 border border-border rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 bg-surface text-text-main font-mono"
+                                        value="{{ old('modem_sale_amount', \App\Helpers\FormatHelper::rupiahInput($verifModemSaleAmount)) }}" onkeyup="calculateFees()" onchange="calculateFees()">
+                                </div>
+                                <p class="text-[10px] text-text-muted mt-1">{{ $verifModemSaleDescription }}. Diisi teknisi saat pemasangan — ubah bila harga disepakati berbeda.</p>
+                                @error('modem_sale_amount')
+                                    <p class="text-xs text-red-500 mt-1">{{ $message }}</p>
+                                @enderror
+                            </div>
+                            @endif
+
                             {{-- KWITANSI. Bahasa manusia, bukan kalkulator: "ditagih 30 hari
                                  (2–31 Agu 2026)" menjelaskan prorata pakai rentang tanggal, bukan
                                  cuma "30 dari 31 hari" yang ambigu (kenapa bukan 31?). Baris
@@ -1285,6 +1330,12 @@
                                         <dt class="text-text-secondary">Tiang tambahan</dt>
                                         <dd id="kwitansi_tiang" class="font-mono text-text-main shrink-0">Rp 0</dd>
                                     </div>
+                                    @if($verifModemSaleAmount > 0)
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-text-secondary">{{ $verifModemSaleDescription }}</dt>
+                                        <dd id="kwitansi_modem" class="font-mono text-text-main shrink-0">Rp 0</dd>
+                                    </div>
+                                    @endif
 
                                     {{-- Diskon & PPN cuma muncul kalau memang ada. Untuk semua paket
                                          saat ini PPN sudah termasuk harga (rate 0), jadi barisnya
@@ -1440,7 +1491,7 @@
     }
 
     // Escape key for modals
-    document.addEventListener('keydown', function(e) {
+    window.pageListen(document, 'keydown', function(e) {
         if (e.key === 'Escape') {
             closePhotoLightbox();
             if (typeof closeRevisiModal === 'function') closeRevisiModal();
@@ -1626,7 +1677,11 @@
         // Subtotal = prorata + biaya sekali bayar (termasuk materai); PPN dihitung
         // dari subtotal setelah diskon (persen, sama seperti render di
         // invoices/show.blade.php).
-        const subtotal = prorateAmount + instFee + cableFee + poleFee + otherFee;
+        // Harga modem "Beli dari Gudang" (input admin, cuma ada kalau modem
+        // dijual) ikut subtotal SEBELUM diskon/PPN, persis
+        // InitialInvoiceService::calculate().
+        const modemSale = angkaRupiah('fv_modem_sale_amount');
+        const subtotal = prorateAmount + instFee + cableFee + poleFee + otherFee + modemSale;
         const afterDiscount = Math.max(0, subtotal - discount);
         const ppnAmount = Math.round(afterDiscount * (ppnRate / 100) * 100) / 100;
         const total = afterDiscount + ppnAmount;
@@ -1636,6 +1691,10 @@
         document.getElementById('kwitansi_materai').textContent = rupiah(otherFee);
         document.getElementById('kwitansi_kabel').textContent = rupiah(cableFee);
         document.getElementById('kwitansi_tiang').textContent = rupiah(poleFee);
+        const modemEl = document.getElementById('kwitansi_modem');
+        if (modemEl) {
+            modemEl.textContent = rupiah(modemSale);
+        }
         document.getElementById('kwitansi_total').textContent = rupiah(total);
 
         // Baris diskon & PPN hanya dirender kalau nilainya > 0 (lihat Blade).
@@ -1653,7 +1712,7 @@
     }
 
     // ── CONFIRM ACTIVATION ─────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', function () {
+    window.onPageReady(function () {
         // Initial calculation
         calculateFees();
 

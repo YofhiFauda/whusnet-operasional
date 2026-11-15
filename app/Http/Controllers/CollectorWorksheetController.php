@@ -32,6 +32,7 @@ use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Http\Response;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 use Illuminate\View\View;
 
 /**
@@ -117,20 +118,19 @@ class CollectorWorksheetController extends Controller
             ->orderBy('name')
             ->get();
 
-        // Total tunggakan per kolektor, dijumlah di SQL tanpa JOIN: scope POP
-        // (HasPopScope::scopeApplyUserScope) menulis `pop_id` tanpa qualifier tabel,
-        // jadi JOIN ke `customers` jadi ambigu — kolektor diambil lewat subquery.
-        $unpaidTotals = Invoice::query()
+        // Scope POP diterapkan pada invoice sebelum bergabung dengan customers.
+        $scopedOpenInvoices = Invoice::query()
             ->applyUserScope()
             ->whereIn('invoice_status', [InvoiceStatus::BELUM_DIBAYAR->value, InvoiceStatus::SEBAGIAN->value])
-            ->whereIn('customer_id', Customer::query()->select('id')->whereNotNull('collector_id'))
-            // Kolektor diambil lewat subquery berkorelasi (bukan JOIN) supaya
-            // `pop_id` tak berqualifier dari scope POP tetap tak ambigu. Dijumlah
-            // di SQL — dulu seluruh tagihan tertunggak + pelanggannya dihidrasi
-            // (puluhan ribu model) hanya untuk dijumlah per kolektor di PHP.
-            ->selectRaw('(select collector_id from customers where customers.id = invoices.customer_id) as collector_id, SUM(remaining_amount) as total')
-            ->groupBy('collector_id')
             ->toBase()
+            ->select(['customer_id', 'remaining_amount']);
+
+        $unpaidTotals = DB::query()
+            ->fromSub($scopedOpenInvoices, 'scoped_invoices')
+            ->join('customers', 'customers.id', '=', 'scoped_invoices.customer_id')
+            ->whereNotNull('customers.collector_id')
+            ->selectRaw('customers.collector_id, SUM(scoped_invoices.remaining_amount) as total')
+            ->groupBy('customers.collector_id')
             ->pluck('total', 'collector_id');
         foreach ($collectors as $collector) {
             $collector->unpaid_total = (float) ($unpaidTotals[$collector->id] ?? 0);
@@ -754,7 +754,7 @@ class CollectorWorksheetController extends Controller
             $collector->notify(new AppNotification(
                 title: $diassign ? 'Rute bertambah' : 'Rute berkurang',
                 message: $pesan,
-                actionUrl: route('collector-worklist.index'),
+                actionUrl: route('collector-worklist.index', [], false),
                 type: $diassign ? NotificationType::INFO : NotificationType::WARNING
             ));
         } catch (\Throwable $e) {

@@ -49,6 +49,7 @@ use App\Models\Task;
 use App\Models\User;
 use App\Models\Village;
 use App\Notifications\AppNotification;
+use App\Notifications\AppPushNotification;
 use App\Services\BillingPeriodWaiverService;
 use App\Services\CableCrossingService;
 use App\Services\CustomerBalanceService;
@@ -298,7 +299,7 @@ class CustomerController extends Controller
      */
     public function toggleSuspend(Request $request, Customer $customer): JsonResponse|RedirectResponse
     {
-        abort_unless(auth()->user()->hasPermission('customers.update'), 403);
+        abort_unless(auth()->user()->hasPermission('customers.isolir'), 403);
         $this->authorizeCustomerPopScope($customer);
 
         if (! in_array($customer->status, ['active', 'suspended'], true)) {
@@ -730,11 +731,25 @@ class CustomerController extends Controller
             ->get();
 
         foreach ($users as $user) {
+            $title = 'Pendaftaran Baru: '.$customer->full_name;
+            $message = "Pelanggan {$customer->full_name} (REG {$customer->customer_code}) baru mendaftar, perlu diperiksa.";
+
             $user->notify(new AppNotification(
-                title: 'Pendaftaran Baru: '.$customer->full_name,
-                message: "Pelanggan {$customer->full_name} (REG {$customer->customer_code}) baru mendaftar, perlu diperiksa.",
-                actionUrl: route('customers.show', $customer->id),
+                title: $title,
+                message: $message,
+                actionUrl: route('customers.show', $customer->id, false),
                 type: NotificationType::INFO
+            ));
+
+            // Push device (ADHOC-288 Tahap 6, event disetujui #4). Copy
+            // TERPISAH dari $title/$message in-app di atas — lockscreen cuma
+            // nunjukin title+1 baris, jadi langsung bilang "perlu diperiksa"
+            // + nomor REG tanpa nunggu buka dropdown (2026-11-09, copywriting
+            // review).
+            $user->notify(new AppPushNotification(
+                'Perlu Diperiksa: '.$customer->full_name,
+                "Pendaftaran baru REG {$customer->customer_code}. Verifikasi sebelum lanjut proses.",
+                route('customers.show', $customer->id, false)
             ));
         }
     }
@@ -3259,7 +3274,8 @@ class CustomerController extends Controller
                     // jadi kolom itu kosong buat pelanggan migrasi. Bikin AuditLog
                     // sintetis pakai ALASAN/tanggal legacy biar dua halaman itu bisa
                     // nampilin data yang sama seperti di sistem lama.
-                    $legacyChangedAt = ! empty($row['status_changed_at'])
+                    // '0000-00-00 …' legacy → Carbon -0001-11-30 → MySQL strict menolak & seluruh batch rollback.
+                    $legacyChangedAt = ! empty($row['status_changed_at']) && ! str_starts_with((string) $row['status_changed_at'], '0000-00-00')
                         ? Carbon::parse($row['status_changed_at'])
                         : $customer->created_at;
                     $legacyReason = trim((string) ($row['reason'] ?? '')) ?: 'Data migrasi dari sistem lama (alasan tidak tercatat).';
@@ -3644,7 +3660,7 @@ class CustomerController extends Controller
             auth()->user()?->notify(new AppNotification(
                 title: 'Import Pelanggan Gagal: '.$batch->batch_number,
                 message: "Import gagal — {$e->getMessage()}",
-                actionUrl: route('customers.import.batch-detail', $batch->id),
+                actionUrl: route('customers.import.batch-detail', $batch->id, false),
                 type: NotificationType::ERROR
             ));
 
@@ -3654,7 +3670,7 @@ class CustomerController extends Controller
         auth()->user()?->notify(new AppNotification(
             title: 'Import Pelanggan Selesai: '.$batch->batch_number,
             message: "Berhasil meng-import {$insertedCount} baris data dari sheet migrasi.",
-            actionUrl: route('customers.import.batch-detail', $batch->id),
+            actionUrl: route('customers.import.batch-detail', $batch->id, false),
             type: NotificationType::SUCCESS
         ));
 
@@ -3958,6 +3974,10 @@ class CustomerController extends Controller
             // pelanggan migrasi nyasar ke antrian Survey padahal harusnya di
             // antrian Verif & Pemasangan.
             'disurvei' => 'waiting_installation',
+            // 'DIPROSES' = teknisi pemasangan sudah ditugaskan (DIPROSES terisi),
+            // belum Terpasang. Dulu tidak dipetakan → "Status layanan tidak
+            // didukung" → layanan ditolak importer (Jetis RQ001910, 2026-11-11).
+            'diproses' => 'installation_in_progress',
             'survey' => 'waiting_survey',
             'menunggu_survey' => 'waiting_survey',
             // 'PENGAJUAN' = request udah diajukan di sistem lama (masuk tabel

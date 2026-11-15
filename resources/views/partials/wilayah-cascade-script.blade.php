@@ -13,7 +13,8 @@
     /api/cities/{city}/districts, /api/districts/{district}/villages.
 
     Di-include sekali per halaman di section scripts. Prefill dijalankan sendiri
-    saat DOMContentLoaded, jadi halaman tidak perlu memanggil apa pun.
+    lewat window.onPageReady (juga saat halaman dibuka via navigasi hx-boost,
+    yang tidak memicu DOMContentLoaded), jadi halaman tidak perlu memanggil apa pun.
 --}}
 <script>
     async function wilayahLoadDistricts(cityId, selectedDistrictId = null, selectedVillageId = null) {
@@ -61,7 +62,7 @@
         }
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    window.onPageReady(function () {
         const citySelect = document.getElementById('identity-city_id');
         if (citySelect && citySelect.value) {
             wilayahLoadDistricts(

@@ -184,3 +184,19 @@ user(): BelongsTo(User::class)
 ## Audit
 
 `Task` — trait `RecordsAuditLogs`, module `Task Management`, event `created`/`updated`/`deleted` otomatis. Ditambah manual `AuditLog::log()` di `TaskService` untuk aksi domain-specific: `started`, `pending`, `report_deferred`, `completed`, `cancelled`, `reassigned`, dan di `TaskController` untuk `pending`/`reschedule`/`approved`/`rejected`. Sejak 2026-08-13 service **tidak lagi** menulis `created`/`updated` manual — itu duplikat persis tulisan trait. Timeline di Detail Task disaring `App\Support\TaskAuditTimeline` (penyajian saja; tabel `audit_logs` tetap utuh). `task_teams`, `task_maintenances` **tidak** py audit trait sendiri — perubahan di tabel ini cuma keliatan lewat perubahan `tasks` punya (kalau di-log manual) atau tidak sama sekali.
+
+## `task_member_releases` (ADHOC-298, 2026-11-14)
+
+Jejak anggota tim yang dilepas saat task di-Pending — sumber entri Pending di Riwayat Task Saya.
+
+| Kolom | Tipe | Catatan |
+|---|---|---|
+| `task_id` | FK `tasks` | cascade on delete |
+| `user_id` | FK `users` | restrict; teknisi yang dilepas |
+| `role_in_task` | varchar(30) null | salinan dari `task_teams` |
+| `reason` | varchar(255) | alasan pending |
+| `source` | varchar(30) | `reschedule` (teknisi) / `pending` (FOP) — sama dengan aksi audit |
+| `released_by` | FK `users` null | pelaku; null on delete |
+| `released_at` | timestamp | |
+
+Index `(user_id, released_at)`. Tanpa unique — satu task bisa di-pending berkali-kali. Tabel terpisah karena `task_teams` unique `(task_id, user_id)` dan barisnya wajib dihapus saat Pending.

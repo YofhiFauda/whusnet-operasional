@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\Gender;
+use App\Enums\WorkflowTransition;
 use App\Models\Concerns\RecordsAuditLogs;
 use App\Services\CustomerValidationService;
 use App\Traits\HasPopScope;
@@ -12,6 +13,8 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
+use Illuminate\Notifications\Notifiable;
+use NotificationChannels\WebPush\HasPushSubscriptions;
 
 #[Fillable([
     'person_id',
@@ -68,9 +71,21 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 ])]
 class Customer extends Model
 {
-    use HasFactory, HasPopScope, RecordsAuditLogs;
+    use HasFactory, HasPopScope, HasPushSubscriptions, Notifiable, RecordsAuditLogs;
 
     protected string $auditModule = 'Data Pelanggan';
+
+    /**
+     * Jumlah antrean Verifikasi Registrasi yang kelihatan user — satu sumber
+     * untuk badge sidebar (render awal di View Composer) dan refresh realtime
+     * (CustomerRegistrationVerificationController::badgeCount).
+     */
+    public static function awaitingRegistrationVerificationCount(User $user): int
+    {
+        return static::applyUserScope($user)
+            ->where('status', WorkflowTransition::REGISTERED->value)
+            ->count();
+    }
 
     protected array $auditHidden = [
         'foto_rumah',

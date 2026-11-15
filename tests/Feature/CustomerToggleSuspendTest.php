@@ -32,7 +32,7 @@ class CustomerToggleSuspendTest extends TestCase
 
     protected InternetPackage $package;
 
-    protected User $adminUser;
+    protected User $helpdeskUser;
 
     protected function setUp(): void
     {
@@ -58,15 +58,18 @@ class CustomerToggleSuspendTest extends TestCase
 
         $this->package = InternetPackage::first();
 
-        $adminRole = Role::where('name', 'Admin')->firstOrFail();
-        $this->adminUser = User::factory()->create([
-            'role_id' => $adminRole->id,
+        // Helpdesk SENGAJA, bukan Admin — role Admin tidak memegang
+        // `customers.isolir` (lihat RolePermissionSeeder), jadi tidak cocok
+        // dipakai memverifikasi akses isolir.
+        $helpdeskRole = Role::where('name', 'Helpdesk')->firstOrFail();
+        $this->helpdeskUser = User::factory()->create([
+            'role_id' => $helpdeskRole->id,
             'status' => 'active',
         ]);
 
         UserRoleScope::create([
-            'user_id' => $this->adminUser->id,
-            'role_id' => $this->adminUser->role_id,
+            'user_id' => $this->helpdeskUser->id,
+            'role_id' => $this->helpdeskUser->role_id,
             'scope_type' => 'all_pop',
         ]);
     }
@@ -120,7 +123,7 @@ class CustomerToggleSuspendTest extends TestCase
     {
         $customer = $this->createCustomer('active', 'aktif');
 
-        $response = $this->actingAs($this->adminUser)
+        $response = $this->actingAs($this->helpdeskUser)
             ->postJson(route('customers.toggle-suspend', $customer->id), [
                 'note' => 'Menunggak 2 bulan',
             ]);
@@ -141,7 +144,7 @@ class CustomerToggleSuspendTest extends TestCase
             'customer_id' => $customer->id,
             'from_status' => 'active',
             'to_status' => 'suspended',
-            'changed_by' => $this->adminUser->id,
+            'changed_by' => $this->helpdeskUser->id,
             'note' => 'Menunggak 2 bulan',
         ]);
 
@@ -157,7 +160,7 @@ class CustomerToggleSuspendTest extends TestCase
     {
         $customer = $this->createCustomer('suspended', 'isolir');
 
-        $response = $this->actingAs($this->adminUser)
+        $response = $this->actingAs($this->helpdeskUser)
             ->postJson(route('customers.toggle-suspend', $customer->id), [
                 'note' => 'Sudah melakukan pembayaran',
             ]);
@@ -178,7 +181,7 @@ class CustomerToggleSuspendTest extends TestCase
             'customer_id' => $customer->id,
             'from_status' => 'suspended',
             'to_status' => 'active',
-            'changed_by' => $this->adminUser->id,
+            'changed_by' => $this->helpdeskUser->id,
             'note' => 'Sudah melakukan pembayaran',
         ]);
 
@@ -194,7 +197,7 @@ class CustomerToggleSuspendTest extends TestCase
     {
         $customer = $this->createCustomer('waiting_survey', 'pending');
 
-        $response = $this->actingAs($this->adminUser)
+        $response = $this->actingAs($this->helpdeskUser)
             ->postJson(route('customers.toggle-suspend', $customer->id));
 
         $response->assertStatus(422)
@@ -217,7 +220,7 @@ class CustomerToggleSuspendTest extends TestCase
         ]);
 
         $restrictedAdmin = User::factory()->create([
-            'role_id' => $this->adminUser->role_id,
+            'role_id' => $this->helpdeskUser->role_id,
             'status' => 'active',
         ]);
 
@@ -234,5 +237,33 @@ class CustomerToggleSuspendTest extends TestCase
             ->postJson(route('customers.toggle-suspend', $customer->id));
 
         $response->assertStatus(403);
+    }
+
+    public function test_sales_cannot_isolir_or_edit_customer(): void
+    {
+        // Sales SENGAJA tanpa `customers.isolir` maupun `customers.update`
+        // (RolePermissionSeeder, 2026-11-10) — isolir & edit data pelanggan
+        // bukan kewenangan Sales.
+        $salesRole = Role::where('name', 'Sales')->firstOrFail();
+        $salesUser = User::factory()->create([
+            'role_id' => $salesRole->id,
+            'status' => 'active',
+        ]);
+
+        UserRoleScope::create([
+            'user_id' => $salesUser->id,
+            'role_id' => $salesUser->role_id,
+            'scope_type' => 'all_pop',
+        ]);
+
+        $customer = $this->createCustomer('active', 'aktif');
+
+        $this->actingAs($salesUser)
+            ->postJson(route('customers.toggle-suspend', $customer->id))
+            ->assertStatus(403);
+
+        $this->actingAs($salesUser)
+            ->get(route('customers.edit', $customer->id))
+            ->assertStatus(403);
     }
 }

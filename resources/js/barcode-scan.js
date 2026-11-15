@@ -683,78 +683,135 @@ function initBarcodeScan({ videoEl, frameEl, statusEl, maskRefs, target, onError
 }
 
 // Self-init tiap blok scanner di halaman — lihat poin 3 di docblock atas.
-document.querySelectorAll('[data-barcode-scanner]').forEach((wrapper) => {
-    const target = wrapper.dataset.barcodeScanner;
-    const frameEl = wrapper.querySelector('[data-barcode-frame]');
-    const videoEl = wrapper.querySelector('[data-barcode-video]');
-    const statusEl = wrapper.querySelector('[data-barcode-status]');
-    const toggleBtn = wrapper.querySelector('[data-barcode-toggle]');
-    const toggleLabel = wrapper.querySelector('[data-barcode-toggle-label]');
-    const viewfinder = wrapper.querySelector('[data-barcode-viewfinder]');
-    const switchBtn = wrapper.querySelector('[data-barcode-switch]');
-    const maskRefs = {
-        frame: frameEl,
-        maskTop: wrapper.querySelector('[data-mask-top]'),
-        maskBottom: wrapper.querySelector('[data-mask-bottom]'),
-        maskLeft: wrapper.querySelector('[data-mask-left]'),
-        maskRight: wrapper.querySelector('[data-mask-right]'),
-        windowEl: wrapper.querySelector('[data-barcode-window]'),
-    };
+//
+// Dibungkus `mountBarcodeScanners()` (ADHOC-297 P5): `<body hx-boost="true">`
+// mengganti halaman tanpa reload, sedangkan module ini cuma DIEKSEKUSI SEKALI
+// per tab (script module ber-URL sama gak jalan lagi walau tag-nya disisipkan
+// ulang). Dulu pemasangan ada di top-level ⇒ kunjungan ke-2 ke halaman scan
+// (Scan Barang, Receive, Transfer, Issue) tombol "Mulai Scan" mati. Sekarang
+// dipanggil saat module dimuat DAN tiap `htmx:afterSettle`; blok yang sudah
+// terpasang ditandai `data-barcode-mounted` supaya gak dobel.
+const mountedScanners = [];
 
-    const hasAllMaskRefs = Object.values(maskRefs).every(Boolean);
-
-    if (!frameEl || !videoEl || !statusEl || !toggleBtn || !toggleLabel || !viewfinder || !hasAllMaskRefs) {
-        return;
-    }
-
-    const scanner = initBarcodeScan({
-        videoEl,
-        frameEl,
-        statusEl,
-        maskRefs,
-        target,
-        onError(err) {
-            statusEl.textContent = err?.name === 'NotAllowedError'
-                ? 'Izin kamera ditolak — aktifkan lewat pengaturan browser, lalu coba lagi.'
-                : (statusEl.textContent || 'Kamera gak bisa diakses.');
-        },
-        onCameraCountChange(count) {
-            // Tombol "Ganti Lensa" cuma relevan kalau HP-nya emang punya
-            // lebih dari satu kamera belakang buat dipilih.
-            if (switchBtn) {
-                switchBtn.hidden = count < 2;
-            }
-        },
-    });
-
-    let active = false;
-
-    toggleBtn.addEventListener('click', () => {
-        active = !active;
-        viewfinder.hidden = !active;
-        toggleLabel.textContent = active ? 'Berhenti Scan' : 'Mulai Scan';
-        toggleBtn.className = active ? toggleBtn.dataset.classActive : toggleBtn.dataset.classInactive;
-
-        if (active) {
-            // `hidden` baru kelepas frame ini — tunggu satu repaint biar
-            // `frameEl.clientWidth/Height` kebaca bener sebelum layout mask
-            // dihitung (di dalam `scanner.start()` → `refreshLayout()`).
-            requestAnimationFrame(() => scanner.start());
-        } else {
-            scanner.stop();
-            if (switchBtn) {
-                switchBtn.hidden = true;
-            }
+function mountBarcodeScanners(root = document) {
+    root.querySelectorAll('[data-barcode-scanner]').forEach((wrapper) => {
+        if (wrapper.dataset.barcodeMounted) {
+            return;
         }
+        wrapper.dataset.barcodeMounted = '1';
+
+        const target = wrapper.dataset.barcodeScanner;
+        const frameEl = wrapper.querySelector('[data-barcode-frame]');
+        const videoEl = wrapper.querySelector('[data-barcode-video]');
+        const statusEl = wrapper.querySelector('[data-barcode-status]');
+        const toggleBtn = wrapper.querySelector('[data-barcode-toggle]');
+        const toggleLabel = wrapper.querySelector('[data-barcode-toggle-label]');
+        const viewfinder = wrapper.querySelector('[data-barcode-viewfinder]');
+        const switchBtn = wrapper.querySelector('[data-barcode-switch]');
+        const maskRefs = {
+            frame: frameEl,
+            maskTop: wrapper.querySelector('[data-mask-top]'),
+            maskBottom: wrapper.querySelector('[data-mask-bottom]'),
+            maskLeft: wrapper.querySelector('[data-mask-left]'),
+            maskRight: wrapper.querySelector('[data-mask-right]'),
+            windowEl: wrapper.querySelector('[data-barcode-window]'),
+        };
+
+        const hasAllMaskRefs = Object.values(maskRefs).every(Boolean);
+
+        if (!frameEl || !videoEl || !statusEl || !toggleBtn || !toggleLabel || !viewfinder || !hasAllMaskRefs) {
+            return;
+        }
+
+        const scanner = initBarcodeScan({
+            videoEl,
+            frameEl,
+            statusEl,
+            maskRefs,
+            target,
+            onError(err) {
+                statusEl.textContent = err?.name === 'NotAllowedError'
+                    ? 'Izin kamera ditolak — aktifkan lewat pengaturan browser, lalu coba lagi.'
+                    : (statusEl.textContent || 'Kamera gak bisa diakses.');
+            },
+            onCameraCountChange(count) {
+                // Tombol "Ganti Lensa" cuma relevan kalau HP-nya emang punya
+                // lebih dari satu kamera belakang buat dipilih.
+                if (switchBtn) {
+                    switchBtn.hidden = count < 2;
+                }
+            },
+        });
+
+        let active = false;
+
+        toggleBtn.addEventListener('click', () => {
+            active = !active;
+            viewfinder.hidden = !active;
+            toggleLabel.textContent = active ? 'Berhenti Scan' : 'Mulai Scan';
+            toggleBtn.className = active ? toggleBtn.dataset.classActive : toggleBtn.dataset.classInactive;
+
+            if (active) {
+                // `hidden` baru kelepas frame ini — tunggu satu repaint biar
+                // `frameEl.clientWidth/Height` kebaca bener sebelum layout mask
+                // dihitung (di dalam `scanner.start()` → `refreshLayout()`).
+                // Izin kamera bisa baru keluar SETELAH staf pindah halaman — kalau
+                // blok ini sudah lepas dari DOM, stream yang terlanjur terbuka
+                // langsung dimatikan, jangan dibiarkan merekam di background.
+                requestAnimationFrame(() => scanner.start().then(() => {
+                    if (!wrapper.isConnected) {
+                        scanner.stop();
+                    }
+                }));
+            } else {
+                scanner.stop();
+                if (switchBtn) {
+                    switchBtn.hidden = true;
+                }
+            }
+        });
+
+        switchBtn?.addEventListener('click', () => scanner.switchCamera());
+
+        mountedScanners.push({ wrapper, scanner });
     });
+}
 
-    switchBtn?.addEventListener('click', () => scanner.switchCamera());
+/**
+ * Kamera WAJIB berhenti begitu staf pindah halaman — jangan biarin nyala di
+ * background (baterai + privasi, kamera ngerekam terus). `pagehide` saja
+ * TIDAK cukup: navigasi hx-boost gak memicunya (dulu kamera tetap nyala
+ * sesudah pindah menu). `stop()` pada scanner yang gak pernah `start()`
+ * cuma no-op (stream null), jadi aman menghentikan semuanya.
+ *
+ * @param {boolean} onlyDetached true = cuma blok yang sudah lepas dari DOM.
+ */
+function stopScanners(onlyDetached) {
+    for (let i = mountedScanners.length - 1; i >= 0; i--) {
+        const { wrapper, scanner } = mountedScanners[i];
 
-    // Kamera WAJIB berhenti begitu staf pindah halaman — jangan biarin nyala
-    // di background (baterai + privasi, kamera ngerekam terus). Beda dari
-    // qr-scan.js yang cuma satu instance, di sini bisa ada 2 blok sekaligus
-    // (tab Single & Batch) — masing-masing daftar listener `pagehide`-nya
-    // sendiri, aman karena `stop()` pada scanner yang gak pernah `start()`
-    // cuma no-op (stream null).
-    window.addEventListener('pagehide', () => scanner.stop());
+        if (onlyDetached && wrapper.isConnected) {
+            continue;
+        }
+
+        scanner.stop();
+
+        if (!wrapper.isConnected) {
+            mountedScanners.splice(i, 1);
+        }
+    }
+}
+
+mountBarcodeScanners();
+
+// Swap <body> (navigasi boost) ⇒ semua blok scanner halaman ini akan hilang.
+document.addEventListener('htmx:beforeSwap', (event) => {
+    if (event.detail.target === document.body) {
+        stopScanners(false);
+    }
 });
+document.addEventListener('htmx:afterSettle', () => {
+    stopScanners(true);
+    mountBarcodeScanners();
+});
+window.addEventListener('pagehide', () => stopScanners(false));

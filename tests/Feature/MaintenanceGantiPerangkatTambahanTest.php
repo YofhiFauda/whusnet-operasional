@@ -161,6 +161,31 @@ class MaintenanceGantiPerangkatTambahanTest extends TestCase
             ->assertViewHas('eligibleExtraSerials', fn ($rows) => $rows->pluck('id')->all() === [$this->newAp->id]);
     }
 
+    /**
+     * ADHOC-297 lanjutan: SN pengganti dipilih lewat Kategori → Nama Barang
+     * (combobox bisa diketik), bukan <select> panjang. Nama field ke server
+     * tetap extra_replacements[i][new_serial_id].
+     */
+    #[Test]
+    public function sn_pengganti_dipilih_lewat_kategori_lalu_nama_barang(): void
+    {
+        $this->withoutVite();
+
+        $response = $this->actingAs($this->technician)
+            ->get(route('tasks.maintenance.report', $this->task))
+            ->assertOk();
+
+        // @js() meng-escape kutip jadi 0022 — dibuka supaya JSON opsi bisa dibaca.
+        $html = str_replace('\u0022', '"', html_entity_decode($response->getContent(), ENT_QUOTES));
+
+        $this->assertStringContainsString('categoryOptionsFor(index)', $html);
+        $this->assertStringContainsString('serialOptionsFor(index)', $html);
+        $this->assertStringContainsString('"category_name":"Access Point"', $html);
+        $this->assertStringContainsString('AP-BARU-001', $html);
+        $this->assertStringContainsString('`extra_replacements[${index}][new_serial_id]`', $html);
+        $this->assertStringNotContainsString('x-model="row.new"', $html);
+    }
+
     #[Test]
     public function ganti_ap_rusak_memasang_pengganti_mencabut_lama_dan_memperbarui_detail_pelanggan(): void
     {
@@ -297,5 +322,64 @@ class MaintenanceGantiPerangkatTambahanTest extends TestCase
         $this->assertSame('terpasang', $this->oldRow->refresh()->status);
         $this->assertSame(SerialStatus::INSTALLED, $this->oldAp->refresh()->status);
         $this->assertSame(SerialStatus::ISSUED, $this->newAp->refresh()->status);
+    }
+
+    /**
+     * Permintaan user 2026-11-14: Ganti Perangkat Tambahan di Maintenance
+     * disamakan dengan PSB — SN pengganti = semua perangkat ber-SN di custody
+     * tim, bukan cuma kategori AP/STB.
+     */
+    #[Test]
+    public function perangkat_tambahan_non_ap_bisa_diganti_dengan_sejenis_dari_custody(): void
+    {
+        $routerCategory = ItemCategory::create(['code' => 'router_gap', 'name' => 'Router', 'default_unit' => 'pcs', 'is_customer_extra_device' => false]);
+        $routerItem = Item::create(['code' => 'RTR-GAP', 'name' => 'Router', 'unit' => 'pcs', 'item_category_id' => $routerCategory->id, 'tracking_type' => 'serialized', 'ownership_mode' => 'installable']);
+        $oldRouter = InventorySerial::create([
+            'item_id' => $routerItem->id, 'serial_number' => 'RTR-LAMA-001', 'status' => SerialStatus::INSTALLED->value,
+            'customer_id' => $this->customer->id, 'issued_from_pop_id' => $this->pop->id,
+        ]);
+        $newRouter = InventorySerial::create([
+            'item_id' => $routerItem->id, 'serial_number' => 'RTR-BARU-001', 'status' => SerialStatus::ISSUED->value,
+            'current_technician_id' => $this->technician->id, 'issued_from_pop_id' => $this->pop->id,
+        ]);
+        $routerRow = CustomerAdditionalDevice::create([
+            'customer_id' => $this->customer->id, 'inventory_serial_id' => $oldRouter->id,
+            'device_type' => 'Router', 'serial_number' => 'RTR-LAMA-001', 'status' => 'terpasang',
+        ]);
+
+        $this->withoutVite();
+        $this->actingAs($this->technician)
+            ->get(route('tasks.maintenance.report', $this->task))
+            ->assertOk()
+            ->assertViewHas('eligibleExtraSerials', fn ($rows) => $rows->pluck('id')->contains($newRouter->id));
+
+        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $this->task), $this->payload([
+            'extra_replacements' => [['old_device_id' => $routerRow->id, 'new_serial_id' => $newRouter->id, 'old_condition' => 'rusak']],
+        ]))->assertSessionHasNoErrors();
+
+        $this->assertSame(SerialStatus::INSTALLED, $newRouter->refresh()->status);
+        $this->assertSame('ditarik', $routerRow->refresh()->status);
+    }
+
+    /**
+     * Daftar pengganti sekarang beririsan dengan dropdown modem utama di form
+     * yang sama — SN yang sama tidak boleh dipakai dua kali.
+     */
+    #[Test]
+    public function sn_pengganti_tidak_boleh_sama_dengan_modem_utama_yang_dipilih(): void
+    {
+        $ontItem = Item::where('code', 'ONT-GAP')->firstOrFail();
+        $spareOnt = InventorySerial::create([
+            'item_id' => $ontItem->id, 'serial_number' => 'ONT-GAP-SPARE', 'status' => SerialStatus::ISSUED->value,
+            'current_technician_id' => $this->technician->id, 'issued_from_pop_id' => $this->pop->id,
+        ]);
+
+        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $this->task), $this->payload([
+            'selected_inventory_serial_id' => $spareOnt->id,
+            'extra_replacements' => [['old_device_id' => $this->oldRow->id, 'new_serial_id' => $spareOnt->id, 'old_condition' => 'baik']],
+        ]))->assertSessionHasErrors('extra_replacements.0.new_serial_id');
+
+        $this->assertSame(SerialStatus::ISSUED, $spareOnt->refresh()->status);
+        $this->assertSame('terpasang', $this->oldRow->refresh()->status);
     }
 }
