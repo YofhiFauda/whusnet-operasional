@@ -75,4 +75,19 @@ class HorizonAccessOwnerOnlyTest extends TestCase
         $this->actingAs($this->userWithRole('admin'))->get('/horizon')->assertForbidden();
         $this->actingAs($this->userWithRole('owner'))->get('/horizon')->assertOk();
     }
+
+    #[Test]
+    public function tamu_diarahkan_ke_login(): void
+    {
+        $this->get('/horizon')->assertRedirect(route('login'));
+    }
+
+    #[Test]
+    public function env_local_tidak_membuka_horizon_untuk_non_owner(): void
+    {
+        $this->app['env'] = 'local';
+
+        $this->actingAs($this->userWithRole('admin'))->get('/horizon')->assertForbidden();
+        $this->actingAs($this->userWithRole('owner'))->get('/horizon')->assertOk();
+    }
 }

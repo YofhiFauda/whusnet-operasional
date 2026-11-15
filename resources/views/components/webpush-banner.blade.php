@@ -39,6 +39,14 @@
                 title: 'Aktifkan Notifikasi Perangkat',
                 icon: 'info',
                 message: 'Biar gak ketinggalan tiket prioritas, penjadwalan task, dan info penting lainnya — aktifkan notifikasi perangkat untuk situs ini?',
+                // Tombol X di header Dialog manggil Dialog.close() langsung,
+                // gak lewat onClick "Nanti Saja" — tanpa ini nutup lewat X gak
+                // ninggalin tanda dan popup nongol lagi di tiap halaman. X =
+                // "Nanti Saja" (keputusan user 2026-11-15); aktifkan ulang
+                // tetap bisa dari Profil.
+                onClose: function () {
+                    localStorage.setItem(dismissKey, '1');
+                },
                 buttons: [
                     {
                         text: 'Nanti Saja',
@@ -61,9 +69,13 @@
                                     }
                                 })
                                 .catch(function (err) {
+                                    // Gagal pun ditandai "sudah ditawari": tanpa ini popup
+                                    // muncul lagi di TIAP halaman dan user ketemu error yang
+                                    // sama berulang-ulang. Coba ulang tetap bisa dari Profil.
+                                    localStorage.setItem(dismissKey, '1');
                                     window.Dialog.close();
                                     if (window.Toast) {
-                                        window.Toast.error('Notifikasi Perangkat', err.message || 'Gagal mengaktifkan notifikasi.');
+                                        window.Toast.error('Notifikasi Perangkat', (err.message || 'Gagal mengaktifkan notifikasi.') + ' Anda bisa mencoba lagi dari halaman Profil.');
                                     }
                                 });
                         },

@@ -247,7 +247,7 @@ class FeatureSeeder extends Seeder
                 // Role Matrix.
                 'parent_code' => 'customers',
                 'code' => 'customers.registration',
-                'name' => 'Registrasi — Skip Survey',
+                'name' => 'Registrasi — Skip Survey & Bypass',
                 'type' => FeatureType::SUB_FEATURE,
                 'sort_order' => 5,
             ],

@@ -83,7 +83,10 @@ return [
     |
     */
 
-    'middleware' => ['web'],
+    // `auth` supaya tamu diarahkan ke halaman login, bukan langsung 403 tanpa
+    // petunjuk (samakan dengan /log-viewer). Gate owner-only ada di
+    // HorizonServiceProvider.
+    'middleware' => ['web', 'auth'],
 
     /*
     |--------------------------------------------------------------------------

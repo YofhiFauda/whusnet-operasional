@@ -34,6 +34,7 @@
     <meta name="theme-color" content="#0f172a">
 
     
+    <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <meta name="apple-mobile-web-app-title" content="Ruang Kerja">
@@ -1220,8 +1221,9 @@
 
         
         
-        <main id="main-content" tabindex="-1" class="flex-1 overflow-y-auto scroll-smooth focus:outline-none <?php echo e(Request::routeIs('network.map.*') ? '' : 'p-4 sm:p-6 lg:p-5 xl:p-8'); ?>">
-            <?php if (! (Request::routeIs('network.map.*'))): ?>
+        <main id="main-content" tabindex="-1" <?php if(Request::routeIs('network.map.*')): ?> data-pull-to-refresh="off" <?php endif; ?> class="flex-1 overflow-y-auto scroll-smooth focus:outline-none <?php echo e(Request::routeIs('network.map.*') ? '' : 'p-4 sm:p-6 lg:p-5 xl:p-8'); ?>">
+            
+            <?php if(! Request::routeIs('network.map.*') && filled(config('webpush.vapid.public_key'))): ?>
                 <?php if (isset($component)) { $__componentOriginal24abd27bb07f05f18200a12d59db9eb0 = $component; } ?>
 <?php if (isset($attributes)) { $__attributesOriginal24abd27bb07f05f18200a12d59db9eb0 = $attributes; } ?>
 <?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.webpush-banner','data' => []] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>

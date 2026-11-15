@@ -16,6 +16,7 @@
         "laravel/horizon": "^5.47",
         "laravel/reverb": "^1.10",
         "laravel/tinker": "^3.0",
+        "opcodesio/log-viewer": "^3.24",
         "picqer/php-barcode-generator": "^3.3",
         "spatie/simple-excel": "^3.9"
     },

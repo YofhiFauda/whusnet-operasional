@@ -36,4 +36,17 @@ class HorizonServiceProvider extends HorizonApplicationServiceProvider
     {
         Gate::define('viewHorizon', fn (?User $user = null): bool => $user?->hasRole('owner') ?? false);
     }
+
+    /**
+     * Bawaan Horizon membuka dashboard untuk SIAPA PUN selama env `local`
+     * (`|| app()->environment('local')`). Ditimpa supaya gate owner-only
+     * berlaku di semua env, sama dengan /log-viewer — kalau env server salah
+     * set ke `local`, dashboard tidak ikut terbuka untuk publik.
+     */
+    protected function authorization(): void
+    {
+        $this->gate();
+
+        Horizon::auth(fn ($request): bool => Gate::check('viewHorizon', [$request->user()]));
+    }
 }
