@@ -9,13 +9,26 @@
     $layout = $layout ?? 'row';
     $isCard = $layout === 'card';
 
-    $canValidate = auth()->user()->hasPermission('customers.detail.installation.validate') || auth()->user()->hasFullAccess();
+    $actor = auth()->user();
+    $canValidate = $actor->hasPermission('customers.detail.installation.validate') || $actor->hasFullAccess();
+
+    // Tiap kandidat tujuan dicek terhadap permission ROUTE TUJUANNYA sendiri
+    // (lihat grup middleware di routes/web.php), bukan cuma status pelanggan.
+    // Dulu fallback-nya buta ke customers.show / customers.fieldwork — role
+    // yang gak punya keduanya (mis. sales tanpa customers.detail.view) dapat
+    // ikon mata yang begitu diklik langsung 403. Gak ada tujuan yang boleh
+    // dibuka → $detailUrl null → tombol Detail TIDAK dirender sama sekali.
+    $canSurveyReport = $actor->hasPermission('customers.detail.survey.view') || $actor->hasPermission('customers.detail.survey.update');
+    $canInstallationReport = $actor->hasPermission('customers.detail.installation.view') || $actor->hasPermission('customers.detail.installation.update');
+    $canFieldwork = $actor->hasPermission('customers.detail.devices.view') || $actor->hasPermission('customers.detail.installation.view');
+
     $detailUrl = match (true) {
         $canValidate => route('customers.verification.admin', $customer),
-        in_array($customer->status, ['installation_in_progress', 'revision_installation', 'installed', 'verification_admin']) => route('customers.installation.report', ['customer' => $customer, 'return_to' => route('verifications.queue')]),
-        in_array($customer->status, ['waiting_acc', 'surveyed', 'waiting_installation']) => route('customers.survey.report', ['customer' => $customer, 'return_to' => route('verifications.queue')]),
-        auth()->user()->hasPermission('customers.detail.view') => route('customers.show', $customer),
-        default => route('customers.fieldwork', $customer),
+        $canInstallationReport && in_array($customer->status, ['installation_in_progress', 'revision_installation', 'installed', 'verification_admin']) => route('customers.installation.report', ['customer' => $customer, 'return_to' => route('verifications.queue')]),
+        $canSurveyReport && in_array($customer->status, ['waiting_acc', 'surveyed', 'waiting_installation']) => route('customers.survey.report', ['customer' => $customer, 'return_to' => route('verifications.queue')]),
+        $actor->hasPermission('customers.detail.view') => route('customers.show', $customer),
+        $canFieldwork => route('customers.fieldwork', $customer),
+        default => null,
     };
 
     $btn = 'inline-flex items-center justify-center gap-1.5 rounded-lg text-[11px] font-bold uppercase tracking-wider text-white shadow-sm transition-colors cursor-pointer '
@@ -46,7 +59,7 @@
                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 Detail &amp; Review
             </a>
-        @else
+        @elseif ($detailUrl)
             <a href="{{ $detailUrl }}" class="{{ $isCard ? $btn.' bg-primary hover:bg-primary/90' : $iconBtn.' hover:text-primary' }}" title="Detail" aria-label="Lihat detail pelanggan">
                 <svg class="{{ $isCard ? 'w-4 h-4 shrink-0' : $iconSize }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 @if ($isCard) Detail @endif
@@ -58,16 +71,18 @@
                 <svg class="w-3.5 h-3.5 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
                 Verifikasi Admin
             </a>
-        @else
+        @elseif ($detailUrl)
             <a href="{{ $detailUrl }}" class="{{ $isCard ? $btn.' bg-primary hover:bg-primary/90' : $iconBtn.' hover:text-primary' }}" title="Detail" aria-label="Lihat detail pelanggan">
                 <svg class="{{ $isCard ? 'w-4 h-4 shrink-0' : $iconSize }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
                 @if ($isCard) Detail @endif
             </a>
         @endif
     @else
-        <a href="{{ $detailUrl }}" class="{{ $iconBtn }} hover:text-primary hover:border-primary" title="Detail" aria-label="Lihat detail pelanggan">
-            <svg class="{{ $iconSize }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
-        </a>
+        @if ($detailUrl)
+            <a href="{{ $detailUrl }}" class="{{ $iconBtn }} hover:text-primary hover:border-primary" title="Detail" aria-label="Lihat detail pelanggan">
+                <svg class="{{ $iconSize }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+            </a>
+        @endif
         @can('customers.detail.installation.validate')
             {{-- Target POST dirender SERVER-SIDE (route()), bukan dirakit di JS dari
                  id pelanggan. Dulu queue.blade.php menyusun `/verifications/${id}/reject`

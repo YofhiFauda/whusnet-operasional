@@ -964,7 +964,14 @@ unset($__errorArgs, $__bag); ?>
 
             <?php
                 $service = $customer->customerService;
-                $isWaitingBdStage = $customer->status === \App\Enums\WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value;
+                // Harga modem "Beli dari Gudang" — angka & keterangan SAMA dengan
+                // yang ditagih finalVerify() (CustomerInstallation::modemSaleAmountForInvoice()).
+                $verifModemInstallation = $customer->latestInstallation;
+                $verifModemSaleAmount = $verifModemInstallation?->modemSaleAmountForInvoice() ?? 0.0;
+                $verifModemSaleDescription = $verifModemSaleAmount > 0
+                    ? ($verifModemInstallation->selectedInventorySerial?->modemSaleDescription() ?? 'Pembelian modem (Beli dari Gudang)')
+                    : null;
+                $isWaitingBdStage =$customer->status === \App\Enums\WorkflowTransition::WAITING_BUSINESS_DEVELOPMENT_VERIFICATION->value;
             ?>
 
             <?php if($isWaitingBdStage): ?>
@@ -1068,6 +1075,13 @@ unset($__errorArgs, $__bag); ?>
                                 <span class="block text-sm font-mono font-bold text-primary">Rp <?php echo e(number_format((float) $pendingInitialInvoice['billing']['total_amount'], 0, ',', '.')); ?></span>
                             </div>
                         </div>
+                        
+                        <?php $modemSaleAmount = (float) ($pendingInitialInvoice['billing']['modem_sale_amount'] ?? 0); ?>
+                        <?php if($modemSaleAmount > 0): ?>
+                        <div class="mt-4 rounded-lg border border-sky-200 bg-sky-50 p-3 text-xs text-sky-800 dark:border-sky-900 dark:bg-slate-800 dark:text-sky-300">
+                            Modem terjual: <?php echo e($pendingInitialInvoice['billing']['modem_sale_description'] ?? 'Beli dari Gudang'); ?> — <strong>Rp <?php echo e(number_format($modemSaleAmount, 0, ',', '.')); ?></strong> akan ikut masuk Invoice Awal bersama Biaya Instalasi di bawah.
+                        </div>
+                        <?php endif; ?>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -1159,6 +1173,22 @@ unset($__errorArgs, $__bag); ?>
                         <div>
                             <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">PPN</span>
                             <span class="block text-sm font-mono text-text-main"><?php echo e(number_format($service->ppn ?? 0, 0, ',', '.')); ?>%</span>
+                        </div>
+                        
+                        <div>
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Jenis Kontrak</span>
+                            <span class="block text-sm font-bold text-text-main"><?php echo e(match ($service->contract_type) { 'beli' => 'Beli Putus', 'sewa' => 'Sewa', default => '-' }); ?></span>
+                        </div>
+                        <div class="col-span-2 md:col-span-3">
+                            <span class="block text-[10px] font-bold uppercase tracking-wider text-text-muted mb-1">Modem</span>
+                            <span class="block text-sm font-bold text-text-main">
+                                <?php echo e($verifModemInstallation?->modemAcquisitionLabel() ?? ($service->contract_type === 'sewa' ? 'Sewa Gudang' : '-')); ?>
+
+                                <?php if($verifModemSaleAmount > 0): ?>
+                                    — <span class="font-mono text-primary">Rp <?php echo e(number_format($verifModemSaleAmount, 0, ',', '.')); ?></span>
+                                    <span class="block text-[11px] font-normal text-text-muted"><?php echo e($verifModemSaleDescription); ?> · ikut ditagihkan di Tagihan Pertama.</span>
+                                <?php endif; ?>
+                            </span>
                         </div>
                     </div>
                 </div>
@@ -1262,6 +1292,30 @@ unset($__errorArgs, $__bag); ?>
                             </div>
 
                             
+                            <?php if($verifModemSaleAmount > 0): ?>
+                            <div class="mt-4">
+                                <label for="fv_modem_sale_amount" class="block text-xs font-semibold text-text-secondary uppercase tracking-wider mb-2">HARGA MODEM (BELI DARI GUDANG)</label>
+                                <div class="relative">
+                                    <span class="absolute inset-y-0 left-0 pl-3 flex items-center text-sm text-text-muted pointer-events-none">Rp</span>
+                                    <input type="text" inputmode="decimal" data-rupiah name="modem_sale_amount" id="fv_modem_sale_amount"
+                                        class="w-full text-sm pl-9 pr-3 py-2.5 border border-border rounded-lg focus:outline-none focus:border-primary focus:ring-2 focus:ring-primary/25 bg-surface text-text-main font-mono"
+                                        value="<?php echo e(old('modem_sale_amount', \App\Helpers\FormatHelper::rupiahInput($verifModemSaleAmount))); ?>" onkeyup="calculateFees()" onchange="calculateFees()">
+                                </div>
+                                <p class="text-[10px] text-text-muted mt-1"><?php echo e($verifModemSaleDescription); ?>. Diisi teknisi saat pemasangan — ubah bila harga disepakati berbeda.</p>
+                                <?php $__errorArgs = ['modem_sale_amount'];
+$__bag = $errors->getBag($__errorArgs[1] ?? 'default');
+if ($__bag->has($__errorArgs[0])) :
+if (isset($message)) { $__messageOriginal = $message; }
+$message = $__bag->first($__errorArgs[0]); ?>
+                                    <p class="text-xs text-red-500 mt-1"><?php echo e($message); ?></p>
+                                <?php unset($message);
+if (isset($__messageOriginal)) { $message = $__messageOriginal; }
+endif;
+unset($__errorArgs, $__bag); ?>
+                            </div>
+                            <?php endif; ?>
+
+                            
                             <div class="mt-6 rounded-xl border border-border bg-surface-muted dark:bg-transparent p-5">
                                 <p id="kwitansi_header" class="text-xs font-semibold text-text-muted mb-4">—</p>
 
@@ -1286,6 +1340,12 @@ unset($__errorArgs, $__bag); ?>
                                         <dt class="text-text-secondary">Tiang tambahan</dt>
                                         <dd id="kwitansi_tiang" class="font-mono text-text-main shrink-0">Rp 0</dd>
                                     </div>
+                                    <?php if($verifModemSaleAmount > 0): ?>
+                                    <div class="flex justify-between gap-4">
+                                        <dt class="text-text-secondary"><?php echo e($verifModemSaleDescription); ?></dt>
+                                        <dd id="kwitansi_modem" class="font-mono text-text-main shrink-0">Rp 0</dd>
+                                    </div>
+                                    <?php endif; ?>
 
                                     
                                     <?php if((float) ($service->discount ?? 0) > 0): ?>
@@ -1437,7 +1497,7 @@ unset($__errorArgs, $__bag); ?>
     }
 
     // Escape key for modals
-    document.addEventListener('keydown', function(e) {
+    window.pageListen(document, 'keydown', function(e) {
         if (e.key === 'Escape') {
             closePhotoLightbox();
             if (typeof closeRevisiModal === 'function') closeRevisiModal();
@@ -1623,7 +1683,11 @@ unset($__errorArgs, $__bag); ?>
         // Subtotal = prorata + biaya sekali bayar (termasuk materai); PPN dihitung
         // dari subtotal setelah diskon (persen, sama seperti render di
         // invoices/show.blade.php).
-        const subtotal = prorateAmount + instFee + cableFee + poleFee + otherFee;
+        // Harga modem "Beli dari Gudang" (input admin, cuma ada kalau modem
+        // dijual) ikut subtotal SEBELUM diskon/PPN, persis
+        // InitialInvoiceService::calculate().
+        const modemSale = angkaRupiah('fv_modem_sale_amount');
+        const subtotal = prorateAmount + instFee + cableFee + poleFee + otherFee + modemSale;
         const afterDiscount = Math.max(0, subtotal - discount);
         const ppnAmount = Math.round(afterDiscount * (ppnRate / 100) * 100) / 100;
         const total = afterDiscount + ppnAmount;
@@ -1633,6 +1697,10 @@ unset($__errorArgs, $__bag); ?>
         document.getElementById('kwitansi_materai').textContent = rupiah(otherFee);
         document.getElementById('kwitansi_kabel').textContent = rupiah(cableFee);
         document.getElementById('kwitansi_tiang').textContent = rupiah(poleFee);
+        const modemEl = document.getElementById('kwitansi_modem');
+        if (modemEl) {
+            modemEl.textContent = rupiah(modemSale);
+        }
         document.getElementById('kwitansi_total').textContent = rupiah(total);
 
         // Baris diskon & PPN hanya dirender kalau nilainya > 0 (lihat Blade).
@@ -1650,7 +1718,7 @@ unset($__errorArgs, $__bag); ?>
     }
 
     // ── CONFIRM ACTIVATION ─────────────────────────────────────────────
-    document.addEventListener('DOMContentLoaded', function () {
+    window.onPageReady(function () {
         // Initial calculation
         calculateFees();
 

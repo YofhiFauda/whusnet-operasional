@@ -227,7 +227,14 @@
     // tab Pemasangan yang cuma 1 pelanggan per halaman). openQrPeek()
     // dipanggil dari tombol tiap baris (queue-actions.blade.php) dengan
     // URL yang SUDAH dirender server-side (route()) — bukan dirakit di sini.
-    document.addEventListener('alpine:init', () => {
+    // Registrasi dibungkus fungsi yang CEK dulu `window.Alpine`: hx-boost
+    // nge-swap SELURUH <body> tiap nav, jadi script ini ikut ter-insert
+    // ulang di halaman kedua-dst — pada titik itu Alpine SUDAH start,
+    // daftar langsung. Di load pertama (bukan boost), body biasanya
+    // kebaca SEBELUM module Alpine dari @vite jalan ⇒ window.Alpine belum
+    // ada ⇒ tunggu 'alpine:init' (nyala sekali, pas sebelum Alpine.start()).
+    (function () {
+        const register = () => {
         Alpine.store('qrPeek', {
             loading: false,
             issuing: false,
@@ -275,7 +282,14 @@
                 }
             },
         });
-    });
+        };
+
+        if (window.Alpine) {
+            register();
+        } else {
+            document.addEventListener('alpine:init', register, { once: true });
+        }
+    })();
 
     /**
      * @param {string} statusUrl route('customers.qr.status', $customer)
@@ -330,7 +344,7 @@
         }, 300);
     }
 
-    document.addEventListener('keydown', function (e) {
+    window.pageListen(document, 'keydown', function (e) {
         if (e.key !== 'Escape') {
             return;
         }
@@ -351,7 +365,7 @@
     // DOMContentLoaded: baris/kartu yang diganti oleh refreshVerificationRow()
     // adalah node BARU, jadi NodeList lama tidak lagi menunjuk ke apa pun yang
     // tampil dan countdown-nya berhenti di "Menghitung...".
-    document.addEventListener('DOMContentLoaded', function() {
+    window.onPageReady(function() {
         function updateCountdowns() {
             const now = new Date();
 
@@ -380,7 +394,11 @@
         }
 
         updateCountdowns();
-        setInterval(updateCountdowns, 1000);
+        // Timer disimpan di window & dibersihkan dulu: callback ini jalan tiap
+        // kunjungan (onPageReady, navigasi boost tanpa reload) — tanpa
+        // clearInterval, tiap kunjungan menambah satu interval yang tak pernah mati.
+        clearInterval(window.__verificationCountdownTimer);
+        window.__verificationCountdownTimer = window.pageInterval(updateCountdowns, 1000);
     });
 
     // Realtime tanpa reload: begitu App\Events\CustomerVerificationStatusChanged
@@ -468,7 +486,10 @@
         }).finally(selesai);
     }
 
-    document.addEventListener('DOMContentLoaded', function () {
+    // onPageReady, bukan DOMContentLoaded: event itu cuma nyala sekali per
+    // tab — buka halaman ini lewat navigasi boost ⇒ listener tak pernah
+    // terpasang dan update realtime mati diam-diam (ADHOC-297 P4).
+    window.onPageReady(function () {
         if (typeof window.Echo === 'undefined' || !window.Echo) {
             return;
         }
@@ -480,7 +501,7 @@
         )];
 
         popIds.forEach(function (popId) {
-            window.Echo.private('customers.' + popId)
+            window.pageEcho('customers.' + popId)
                 .listen('.CustomerVerificationStatusChanged', function (e) {
                     refreshVerificationRow(e.customer_id);
                 });

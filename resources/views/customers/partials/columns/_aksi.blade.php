@@ -34,7 +34,7 @@
                                     data-router-brand="{{ $customer->customerDevice?->model ?? '-' }}"
                                     data-contract="{{ match($customer->customerService->contract_type ?? null) { 'sewa' => 'Sewa', 'beli' => 'Beli', default => '-' } }}"
                                     data-distribution="{{ $customer->customerDevice?->odp ?: ($customer->distribution->name ?? ($customer->odp_code ?? '-')) }}"
-                                    data-detail-url="{{ route('customers.show', $customer->id) }}"
+                                    data-detail-url="{{ $canViewCustomerDetail ? route('customers.show', $customer->id) : '' }}"
                                     data-payment-info-url="{{ route('customers.payment-info', $customer->id) }}"
                                     data-network-update-url="{{ route('customers.network-assignment.update', $customer->id) }}"
                                     data-network-data-url="{{ route('customers.network-assignment.data', $customer->id) }}"

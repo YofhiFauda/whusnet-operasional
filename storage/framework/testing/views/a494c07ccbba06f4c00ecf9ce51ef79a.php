@@ -1,4 +1,4 @@
-<?php $__env->startSection('title', 'Perangkat & Pemasangan - Whusnet Operasional'); ?>
+<?php $__env->startSection('title', 'Perangkat & Pemasangan'); ?>
 <?php $__env->startSection('page_title', 'Perangkat & Pemasangan'); ?>
 
 <?php $__env->startSection('content'); ?>
