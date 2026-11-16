@@ -183,8 +183,18 @@ services:
       retries: 3
       start_period: 15s
     networks:
-      - app_network
-      - coolify
+      app_network: {}
+      coolify:
+        # Alias DNS STABIL buat Portal Pelanggan (project Coolify terpisah,
+        # satu server) — Portal set LARAVEL_API_URL=http://whusnet-api/api/customer-portal.
+        # Kenapa bukan nama container: Coolify kasih suffix UUID + timestamp
+        # deploy (`nginx-<uuid>-20261116T023648`), berubah tiap redeploy.
+        # Kenapa bukan alias bawaan `nginx`: network `coolify` dipakai
+        # bareng SEMUA project di server — alias generik bisa bentrok,
+        # Docker DNS lalu round-robin & request Portal (plus header
+        # X-Portal-Client rahasia) nyasar ke container lain.
+        aliases:
+          - whusnet-api
 
   horizon:
     # Tanpa `build:` sendiri — pakai image yang sama persis dengan `app`
