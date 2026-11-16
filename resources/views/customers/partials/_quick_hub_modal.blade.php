@@ -445,11 +445,16 @@
         <!-- Modal Footer: Single Unified Action Bar (6 Actions) -->
         <div class="px-2 sm:px-4 py-2.5 border-t border-slate-100 dark:border-slate-800 bg-slate-50/90 dark:bg-slate-900/90 backdrop-blur shrink-0">
             <div class="grid grid-cols-6 gap-1 sm:gap-2">
+                {{-- Detail Pelanggan digerbangi customers.detail.view (terpisah dari
+                     customers.view List). Role List-only (mis. sales) tanpa gerbang
+                     ini dapat tombol yang begitu diklik langsung 403. --}}
+                @if(auth()->user()->hasPermission('customers.detail.view'))
                 <button type="button" onclick="triggerDetail()" title="Detail Full Pelanggan"
                         class="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-sky-600 dark:text-sky-400 hover:bg-sky-50 dark:hover:bg-slate-800 transition-colors btn-interactive touch-target">
                     <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"/></svg>
                     <span class="text-[9px] sm:text-[10px] font-semibold leading-none">Detail</span>
                 </button>
+                @endif
 
                 @if(auth()->user()->hasPermission('customers.update'))
                 <button type="button" onclick="triggerEdit()" title="Edit Data Pelanggan"

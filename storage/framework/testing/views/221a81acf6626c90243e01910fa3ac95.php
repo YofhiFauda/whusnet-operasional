@@ -99,15 +99,78 @@
             'referral_customer_code' => 'Kode Referral Pelanggan',
             'note' => 'Catatan Tambahan',
             'notes' => 'Catatan Tambahan',
+            'pending_initial_invoice' => 'Rincian Tagihan Awal (Menunggu Verifikasi BD)',
+            'data_completeness_status' => 'Kelengkapan Data',
+            'activation_time' => 'Jam Aktivasi',
+            'activated_by_name' => 'Diaktifkan Oleh',
+            'activated_by_user_id' => 'Diaktifkan Oleh (ID Pengguna)',
+            'contract_type' => 'Jenis Kontrak',
+            'prorate_amount' => 'Biaya Prorata',
+            'extra_installation_fee' => 'Biaya Pemasangan',
+            'extra_cable_fee' => 'Biaya Kabel Tambahan',
+            'extra_pole_fee' => 'Biaya Tiang Tambahan',
         ];
+
+        $rupiahText = fn ($amount) => 'Rp '.number_format((float) $amount, 0, ',', '.');
+
+        // Snapshot `customers.pending_initial_invoice` (hasil
+        // InitialInvoiceService::calculate(), dititipkan sampai BD menyetujui)
+        // dulu dirender json_encode mentah — {"billing":{"prorate_amount":…}}.
+        // Disusun jadi kalimat rincian biaya yang bisa dibaca CS/admin.
+        $formatPendingInvoice = function (array $value) use ($rupiahText) {
+            $billing = $value['billing'] ?? [];
+            if ($billing === []) {
+                return '- (Kosong)';
+            }
+
+            $parts = [];
+            if ((float) ($billing['prorate_amount'] ?? 0) > 0) {
+                $days = isset($billing['prorate_days'], $billing['days_in_month'])
+                    ? " ({$billing['prorate_days']} dari {$billing['days_in_month']} hari)"
+                    : '';
+                $parts[] = 'Langganan prorata'.$days.' '.$rupiahText($billing['prorate_amount']);
+            }
+            foreach ([
+                'extra_installation_fee' => 'Biaya pemasangan',
+                'extra_cable_fee' => 'Kabel tambahan',
+                'extra_pole_fee' => 'Tiang tambahan',
+                'other_fee' => 'Materai / biaya lain',
+            ] as $billingKey => $billingLabel) {
+                if ((float) ($billing[$billingKey] ?? 0) > 0) {
+                    $parts[] = $billingLabel.' '.$rupiahText($billing[$billingKey]);
+                }
+            }
+            if ((float) ($billing['modem_sale_amount'] ?? 0) > 0) {
+                $parts[] = ($billing['modem_sale_description'] ?? 'Pembelian modem').' '.$rupiahText($billing['modem_sale_amount']);
+            }
+            if ((float) ($billing['discount'] ?? 0) > 0) {
+                $parts[] = 'Diskon −'.$rupiahText($billing['discount']);
+            }
+            if ((float) ($billing['ppn_amount'] ?? 0) > 0) {
+                $parts[] = 'PPN '.$rupiahText($billing['ppn_amount']);
+            }
+
+            $total = 'Total '.$rupiahText($billing['total_amount'] ?? 0);
+            $issueDate = ! empty($value['issue_date'])
+                ? ' · Tanggal aktivasi '.\App\Support\IndonesianDate::date(\Carbon\Carbon::parse($value['issue_date']))
+                : '';
+
+            return implode(' · ', $parts).($parts ? ' · ' : '').$total.$issueDate;
+        };
 
         // Ignored system fields
         $ignoredFields = ['id', 'customer_id', 'created_at', 'updated_at', 'updated_by', 'remember_token', 'password'];
 
-        $formatValue = function($key, $value) use ($packageMap, $popMap, $cityMap, $districtMap, $villageMap) {
+        $formatValue = function($key, $value) use ($packageMap, $popMap, $cityMap, $districtMap, $villageMap, $formatPendingInvoice) {
             if (is_null($value) || $value === '') return '- (Kosong)';
             if (is_bool($value)) return $value ? 'Ya' : 'Tidak';
-            if (is_array($value)) return json_encode($value);
+            if ($key === 'pending_initial_invoice' && is_array($value)) return $formatPendingInvoice($value);
+            // Array lain: pasangan "Label: nilai", bukan JSON mentah.
+            if (is_array($value)) {
+                return collect($value)
+                    ->map(fn ($item, $itemKey) => ucwords(str_replace('_', ' ', (string) $itemKey)).': '.(is_scalar($item) ? $item : json_encode($item, JSON_UNESCAPED_UNICODE)))
+                    ->implode(' · ');
+            }
 
             if ($key === 'internet_package_id') return $packageMap[$value] ?? "ID #$value";
             if ($key === 'pop_id') return $popMap[$value] ?? "ID #$value";
@@ -115,7 +178,11 @@
             if ($key === 'district_id') return $districtMap[$value] ?? "ID #$value";
             if ($key === 'village_id') return $villageMap[$value] ?? "ID #$value";
 
-            if (in_array($key, ['monthly_price', 'discount', 'discount_amount', 'other_fee', 'total_monthly_bill'])) {
+            if ($key === 'contract_type') {
+                return match ($value) { 'beli' => 'Beli Putus', 'sewa' => 'Sewa', default => (string) $value };
+            }
+
+            if (in_array($key, ['monthly_price', 'discount', 'discount_amount', 'other_fee', 'total_monthly_bill', 'prorate_amount', 'extra_installation_fee', 'extra_cable_fee', 'extra_pole_fee'])) {
                 if (is_numeric($value)) {
                     return 'Rp ' . number_format((float)$value, 0, ',', '.');
                 }

@@ -654,7 +654,26 @@
                     <label for="installation_photo" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Foto Pemasangan</label>
                     <input type="file" name="installation_photo" id="installation_photo" accept="image/*"
                            class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200">
-                    <p class="text-[9px] text-slate-400 mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
+                    <?php if (isset($component)) { $__componentOriginala82975a30b9db16b9f8ce6ba13694d76 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.upload-limit-hint','data' => ['format' => 'Format JPG/PNG']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('upload-limit-hint'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['format' => 'Format JPG/PNG']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $attributes = $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $component = $__componentOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
                 </div>
             </div>
             <div class="px-5 py-3.5 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2 text-xs">
@@ -751,7 +770,26 @@
                     <label for="speedtest_photo" class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Foto Hasil Speedtest</label>
                     <input type="file" name="speedtest_photo" id="speedtest_photo" accept="image/*"
                            class="w-full px-3 py-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 rounded-lg text-xs text-slate-800 dark:text-slate-200">
-                    <p class="text-[9px] text-slate-400 mt-1 italic">Format JPG/PNG, maksimal 2MB.</p>
+                    <?php if (isset($component)) { $__componentOriginala82975a30b9db16b9f8ce6ba13694d76 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.upload-limit-hint','data' => ['format' => 'Format JPG/PNG']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('upload-limit-hint'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['format' => 'Format JPG/PNG']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $attributes = $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $component = $__componentOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
                 </div>
             </div>
             <div class="px-5 py-3.5 bg-slate-50 dark:bg-slate-900/50 border-t border-slate-200 dark:border-slate-700 flex justify-end gap-2 text-xs">

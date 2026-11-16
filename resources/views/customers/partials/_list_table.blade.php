@@ -6,6 +6,12 @@
      Butuh @include('customers.partials._quick_hub_modal') +
      @include('customers.partials._list_scripts') di halaman pemakainya —
      openActionsModal()/openNetworkAssignmentModal() dipanggil dari sini. --}}
+@php
+    // Dihitung sekali, bukan per baris. URL Detail dikosongkan untuk role
+    // List-only (tanpa customers.detail.view) — triggerDetail() di Quick Hub
+    // early-return kalau kosong, dan tombolnya sendiri sudah disembunyikan.
+    $canViewCustomerDetail = auth()->user()->hasPermission('customers.detail.view');
+@endphp
         <!-- DESKTOP TABLE VIEW (hidden di mobile & tablet portrait) -->
         <div class="hidden lg:block overflow-x-auto">
             <table class="w-full min-w-full xl:min-w-[960px] border-collapse text-left" id="customerTable"
@@ -195,7 +201,7 @@
                                 data-router-brand="{{ $customer->customerDevice?->model ?? '-' }}"
                                 data-contract="{{ match($customer->customerService->contract_type ?? null) { 'sewa' => 'Sewa', 'beli' => 'Beli', default => '-' } }}"
                                 data-distribution="{{ $customer->customerDevice?->odp ?: ($customer->distribution->name ?? ($customer->odp_code ?? '-')) }}"
-                                    data-detail-url="{{ route('customers.show', $customer->id) }}"
+                                    data-detail-url="{{ $canViewCustomerDetail ? route('customers.show', $customer->id) : '' }}"
                                     data-payment-info-url="{{ route('customers.payment-info', $customer->id) }}"
                                     data-network-update-url="{{ route('customers.network-assignment.update', $customer->id) }}"
                                     data-network-data-url="{{ route('customers.network-assignment.data', $customer->id) }}"

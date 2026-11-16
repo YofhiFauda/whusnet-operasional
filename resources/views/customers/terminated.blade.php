@@ -12,6 +12,12 @@
 @section('breadcrumb_parent_url', '/customers')
 
 @section('content')
+@php
+    // Detail Pelanggan digerbangi customers.detail.view, terpisah dari
+    // permission halaman ini. Role yang cuma boleh lihat daftar (mis. sales)
+    // tanpa gerbang ini dapat tombol Detail yang begitu diklik langsung 403.
+    $canViewCustomerDetail = auth()->user()->hasPermission('customers.detail.view');
+@endphp
 @include('customers.partials._list_styles')
 @include('customers.partials._list_header')
 @include('customers.partials._list_stats')
@@ -112,10 +118,12 @@
                     </td>
                     <td class="px-5 py-3.5 text-right whitespace-nowrap">
                         <div class="inline-flex items-center gap-2">
+                            @if($canViewCustomerDetail)
                             <a href="{{ route('customers.show', $customer->id) }}"
                                class="px-2.5 py-1 text-xs font-medium text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/30 transition-colors">
                                 Detail
                             </a>
+                            @endif
                             {{-- Tombol hanya untuk status "Belum Diambil": sudah diambil atau task-nya sedang berjalan → disembunyikan (server juga menolak duplikat). --}}
                             @if(!$isDeviceRetrieved && !$isDeviceInProgress && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                             <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
@@ -207,10 +215,12 @@
                 </dl>
 
                 <div class="border-t border-slate-100 dark:border-slate-800/80 pt-3 flex flex-wrap gap-2 justify-end">
+                    @if($canViewCustomerDetail)
                     <a href="{{ route('customers.show', $customer->id) }}"
                        class="flex-1 sm:flex-none h-10 px-3.5 text-xs font-bold uppercase tracking-wider text-sky-600 dark:text-sky-400 border border-sky-200 dark:border-sky-800 rounded-lg hover:bg-sky-50 dark:hover:bg-sky-950/30 transition-colors flex items-center justify-center cursor-pointer">
                         Detail
                     </a>
+                    @endif
                     @if(!$isDeviceRetrieved && !$isDeviceInProgress && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                     <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
                           class="flex-1 sm:flex-none flex"

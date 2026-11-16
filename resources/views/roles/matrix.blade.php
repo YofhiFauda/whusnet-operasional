@@ -72,6 +72,9 @@ $functionalCategories = [
             'warehouse_custody', 'warehouse_traceability',
             'warehouse_adjustment', 'warehouse_reassign',
             'warehouse_report', 'warehouse_stock_request',
+            // Root sendiri (WarehouseFeatureSeeder), dulu lupa didaftarkan di
+            // sini → kebuang ke "Modul Tambahan Lainnya" tanpa deskripsi.
+            'warehouse_pengajuan_barang',
         ],
     ],
     'group_busdev' => [
@@ -132,6 +135,7 @@ $featureMeta = [
     'warehouse_reassign' => ['name' => 'Reassign Custody Teknisi', 'desc' => 'Pindahkan barang di tangan teknisi (custody/serial) ke teknisi lain — untuk kasus resign/cuti.'],
     'warehouse_report' => ['name' => 'Laporan Gudang (Agregat Periodik)', 'desc' => 'Laporan agregat pergerakan & kerugian barang per gudang/cabang dalam suatu periode.'],
     'warehouse_stock_request' => ['name' => 'Permintaan Stok Cabang', 'desc' => 'Ajukan permintaan stok dari Cabang ke Pusat saat stok cabang menipis, beserta persetujuannya.'],
+    'warehouse_pengajuan_barang' => ['name' => 'Surat Pengajuan Barang', 'desc' => 'Ajukan pengadaan barang yang BELUM ADA di katalog/gudang, beserta persetujuannya. Beda dari Permintaan Stok Cabang (barang sudah ada di katalog).'],
     'customer_acquisitions' => ['name' => 'Pelanggan Aktif < 30 Hari (Busdev)', 'desc' => 'Monitoring pelanggan baru diverifikasi admin, dikelompokkan per bulan — dipakai Busdev untuk rekap komisi Sales.'],
     'agents' => ['name' => 'Master Agent', 'desc' => 'Kelola data mitra Agent (bukan akun login) yang dipakai saat mendaftarkan pelanggan atas nama Agent.'],
     'package_restrictions' => ['name' => 'Restriksi Paket per Role', 'desc' => 'Atur daftar paket internet yang boleh dipilih role bertanda "Batasi pilihan paket internet" (mis. Sales, Teknisi).'],
@@ -164,6 +168,15 @@ $actionMetaMap = [
     'deposit' => ['label' => 'Setor Penagihan', 'desc' => 'Menyetorkan uang hasil penagihan ke kasir.', 'type' => 'write', 'badge' => 'bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-400 border-indigo-200 dark:border-indigo-800'],
     'visit' => ['label' => 'Catat Kunjungan', 'desc' => 'Mencatat laporan hasil kunjungan lapangan.', 'type' => 'write', 'badge' => 'bg-sky-50 text-sky-700 dark:bg-sky-950/60 dark:text-sky-400 border-sky-200 dark:border-sky-800'],
     'receive' => ['label' => 'Konfirmasi Terima', 'desc' => 'Dapat mengonfirmasi penerimaan fisik barang kiriman.', 'type' => 'write', 'badge' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
+    // Empat action di bawah dulu tak terdaftar di sini — permission-nya juga
+    // ber-`name` null di DB, jadi label jatuh ke kode mentah
+    // (`manuals.publish`, `customers.isolir`, …). Tiap ActionCode baru yang
+    // dipakai di config/rbac.php WAJIB dapat entri di sini — dijaga
+    // RoleMatrixLabelTidakTampilKodeMentahTest.
+    'publish' => ['label' => 'Terbitkan', 'desc' => 'Dapat menerbitkan atau menarik terbitan konten.', 'type' => 'write', 'badge' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
+    'change' => ['label' => 'Ganti', 'desc' => 'Dapat mengganti pilihan data yang sedang berjalan.', 'type' => 'write', 'badge' => 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-800'],
+    'isolir' => ['label' => 'Isolir / Buka Isolir', 'desc' => 'Dapat mengisolir layanan atau mengaktifkannya kembali.', 'type' => 'warning', 'badge' => 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-800'],
+    'register_infra' => ['label' => 'Registrasi Aset Lama', 'desc' => 'Dapat mendaftarkan aset/material yang sudah terpasang di lapangan.', 'type' => 'write', 'badge' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
 ];
 
 // 3b. Deskripsi PER KODE PERMISSION — sumbernya fungsi NYATA di modul
@@ -241,7 +254,10 @@ $permissionDescMap = [
     'customers.update' => 'Edit data pelanggan & assign survey. Menggerbangi SEMUA tab detail sekaligus, bukan per-tab.',
     'customers.delete' => 'Hapus pelanggan dari daftar (soft delete).',
     'customers.deactivate' => 'Putus langganan pelanggan aktif (terminasi). Terpisah dari Edit karena mematikan layanan.',
-    'customers.isolir' => 'Isolir atau aktifkan kembali layanan pelanggan (toggle active/suspended). Terpisah dari Edit, bukan numpang `customers.update`.',
+    'customers.detail.packages.change' => 'Ganti paket internet pelanggan yang sudah berjalan (Ganti Paket di Detail Pelanggan & Quick Hub), termasuk pratinjau rincian prorate paket lama & baru sebelum disimpan.',
+    'network_nodes.register_infra' => 'Registrasi Aset Lama: catat aset/material yang sudah terpasang di node jaringan tapi belum pernah tercatat di Gudang.',
+    'manuals.publish' => 'Terbitkan revisi terbaru artikel Pusat Panduan atau tarik terbitannya (unpublish).',
+    'customers.isolir' =>'Isolir atau aktifkan kembali layanan pelanggan (toggle active/suspended). Terpisah dari Edit, bukan numpang `customers.update`.',
     'customers.import.view' => 'Buka halaman Import Pelanggan, riwayat batch import, dan unduh template.',
     'customers.import.import' => 'Unggah, validasi, dan eksekusi import massal pelanggan dari Excel/CSV.',
     'customers.detail.view' => 'Buka halaman Detail Pelanggan. Terpisah dari akses List — bisa diberikan sendiri-sendiri.',
@@ -347,6 +363,10 @@ $permissionDescMap = [
     'warehouse_stock_request.approve' => 'Setujui permintaan stok dan catat pengiriman (deliver/fulfill) dari Pusat.',
     'warehouse_stock_request.reject' => 'Tolak permintaan stok yang diajukan cabang.',
     'warehouse_stock_request.cancel' => 'Batalkan permintaan stok yang diajukan sendiri.',
+    'warehouse_pengajuan_barang.view' => 'Buka daftar & detail Surat Pengajuan Barang, termasuk cetak suratnya.',
+    'warehouse_pengajuan_barang.create' => 'Buat Surat Pengajuan Barang baru untuk barang yang belum ada di katalog/gudang.',
+    'warehouse_pengajuan_barang.approve' => 'Setujui pengajuan barang. Selain permission ini, user juga wajib ditunjuk sebagai Approver Pengajuan Barang di Kelola User.',
+    'warehouse_pengajuan_barang.reject' => 'Tolak pengajuan barang (wajib alasan). Penolakan FINAL — tidak ada revisi di dokumen yang sama. Butuh penunjukan Approver di Kelola User juga.',
 
     // ── Laporan ──────────────────────────────────────────────────
     'reports.view' => 'Buka SEMUA halaman laporan (pelanggan, tagihan, pembayaran, import) sekaligus tombol ekspornya.',

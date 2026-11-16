@@ -121,10 +121,13 @@
             <?php endif; ?>
         <?php endif; ?>
 
-        <a href="<?php echo e(route('customers.edit', $customer->id)); ?>" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs">
-            <i class="fa-solid fa-pen-to-square"></i>
-            <span>Edit Profil</span>
-        </a>
+        
+        <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.update')): ?>
+            <a href="<?php echo e(route('customers.edit', $customer->id)); ?>" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span>Edit Profil</span>
+            </a>
+        <?php endif; ?>
 
         <?php if (app(\Illuminate\Contracts\Auth\Access\Gate::class)->check('customers.qr.view')): ?>
             <a href="<?php echo e(route('customers.qr.show', $customer->id)); ?>" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-2xs">
@@ -1162,13 +1165,21 @@ unset($__errorArgs, $__bag); ?>
                 ?>
                 <?php if($initialInvoice): ?>
                     <?php
-                        $initialRows = [
-                            ['label' => 'Tagihan Prorate Bulan Pertama', 'column' => 'prorate_amount — proporsional dari tanggal aktivasi sampai akhir periode', 'value' => (float) $initialInvoice->prorate_amount],
-                            ['label' => 'Jasa Instalasi & Pemasangan', 'column' => 'extra_installation_fee — default Master Paket + tambahan setting perangkat', 'value' => (float) $initialInvoice->extra_installation_fee],
-                            ['label' => 'Biaya Kabel Tambahan', 'column' => 'extra_cable_fee — kabel FO di luar jarak standar', 'value' => (float) $initialInvoice->extra_cable_fee],
-                            ['label' => 'Tambahan Tiang', 'column' => 'extra_pole_fee — tiang galvanis penambat udara', 'value' => (float) $initialInvoice->extra_pole_fee],
-                            ['label' => 'Biaya Lain-lain', 'column' => 'other_fee', 'value' => (float) $initialInvoice->other_fee],
-                        ];
+                        $initialRows = $initialInvoice->items->isNotEmpty()
+                            ? $initialInvoice->items->map(fn ($item) => [
+                                'label' => $item->subcategory_name_snapshot,
+                                'note' => $item->description ?: $item->category_name_snapshot,
+                                'value' => (float) $item->amount,
+                            ])->all()
+                            : [
+                                ['label' => 'Tagihan Prorata Bulan Pertama', 'note' => 'Proporsional dari tanggal aktivasi sampai akhir periode', 'value' => (float) $initialInvoice->prorate_amount],
+                                ['label' => 'Jasa Instalasi & Pemasangan', 'note' => 'Biaya pemasangan sesuai paket', 'value' => (float) $initialInvoice->extra_installation_fee],
+                                ['label' => 'Biaya Kabel Tambahan', 'note' => 'Kabel di luar jarak standar', 'value' => (float) $initialInvoice->extra_cable_fee],
+                                ['label' => 'Tambahan Tiang', 'note' => 'Tiang penambat tambahan', 'value' => (float) $initialInvoice->extra_pole_fee],
+                                ['label' => 'Biaya Lain-lain', 'note' => 'Materai / biaya lain', 'value' => (float) $initialInvoice->other_fee],
+                            ];
+                        $initialAfterDiscount = max(0, (float) $initialInvoice->subtotal - (float) $initialInvoice->discount);
+                        $initialPpnAmount = round($initialAfterDiscount * ((float) $initialInvoice->ppn / 100), 2);
                     ?>
                     <div class="pt-4 border-t border-slate-200 dark:border-slate-700">
                         <div class="flex flex-wrap gap-2 items-center justify-between mb-3">
@@ -1185,7 +1196,7 @@ unset($__errorArgs, $__bag); ?>
                                 <thead>
                                     <tr class="bg-slate-50/60 dark:bg-slate-900/60 border-b border-slate-200 dark:border-slate-700 text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase">
                                         <th class="px-4 py-2">Komponen Biaya Awal</th>
-                                        <th class="px-4 py-2">Kolom di Sistem</th>
+                                        <th class="px-4 py-2">Keterangan</th>
                                         <th class="px-4 py-2 text-right">Nominal Biaya</th>
                                     </tr>
                                 </thead>
@@ -1194,32 +1205,32 @@ unset($__errorArgs, $__bag); ?>
                                         <?php if($row['value'] > 0): ?>
                                             <tr>
                                                 <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100"><?php echo e($row['label']); ?></td>
-                                                <td class="px-4 py-2 font-sans text-slate-500"><?php echo e($row['column']); ?></td>
-                                                <td class="px-4 py-2 text-right font-bold text-slate-900 dark:text-slate-100 searchable-text">Rp <?php echo e(number_format($row['value'], 2, ',', '.')); ?></td>
+                                                <td class="px-4 py-2 font-sans text-slate-500"><?php echo e($row['note']); ?></td>
+                                                <td class="px-4 py-2 text-right font-bold text-slate-900 dark:text-slate-100 searchable-text">Rp <?php echo e(number_format($row['value'], 0, ',', '.')); ?></td>
                                             </tr>
                                         <?php endif; ?>
                                     <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); ?>
                                     <tr class="bg-slate-50/40 dark:bg-slate-900/30">
-                                        <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100">Subtotal</td>
-                                        <td class="px-4 py-2 font-sans text-slate-500">subtotal</td>
-                                        <td class="px-4 py-2 text-right font-bold text-slate-900 dark:text-slate-100 searchable-text">Rp <?php echo e(number_format((float) $initialInvoice->subtotal, 2, ',', '.')); ?></td>
+                                        <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100" colspan="2">Subtotal</td>
+                                        <td class="px-4 py-2 text-right font-bold text-slate-900 dark:text-slate-100 searchable-text">Rp <?php echo e(number_format((float) $initialInvoice->subtotal, 0, ',', '.')); ?></td>
                                     </tr>
+                                    <?php if((float) $initialInvoice->discount > 0): ?>
                                     <tr class="text-emerald-600 dark:text-emerald-400">
-                                        <td class="px-4 py-2 font-sans font-semibold">Potongan Diskon</td>
-                                        <td class="px-4 py-2 font-sans text-slate-500">discount</td>
-                                        <td class="px-4 py-2 text-right font-bold searchable-text">- Rp <?php echo e(number_format((float) $initialInvoice->discount, 2, ',', '.')); ?></td>
+                                        <td class="px-4 py-2 font-sans font-semibold" colspan="2">Potongan Diskon</td>
+                                        <td class="px-4 py-2 text-right font-bold searchable-text">- Rp <?php echo e(number_format((float) $initialInvoice->discount, 0, ',', '.')); ?></td>
                                     </tr>
+                                    <?php endif; ?>
                                     <tr>
-                                        <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100">PPN</td>
-                                        <td class="px-4 py-2 font-sans text-slate-500">ppn</td>
+                                        
+                                        <td class="px-4 py-2 font-sans font-semibold text-slate-900 dark:text-slate-100" colspan="2">PPN<?php echo e((float) $initialInvoice->ppn > 0 ? ' '.rtrim(rtrim(number_format((float) $initialInvoice->ppn, 2, ',', '.'), '0'), ',').'%' : ''); ?></td>
                                         <td class="px-4 py-2 text-right <?php echo e((float) $initialInvoice->ppn > 0 ? 'font-bold text-slate-900 dark:text-slate-100' : 'font-sans text-slate-500 dark:text-slate-400'); ?> searchable-text">
-                                            <?php echo e((float) $initialInvoice->ppn > 0 ? 'Rp '.number_format((float) $initialInvoice->ppn, 2, ',', '.') : 'Tidak dikenakan'); ?>
+                                            <?php echo e((float) $initialInvoice->ppn > 0 ? 'Rp '.number_format($initialPpnAmount, 0, ',', '.') : 'Tidak dikenakan'); ?>
 
                                         </td>
                                     </tr>
                                     <tr class="bg-slate-100/60 dark:bg-slate-700/60 font-bold">
-                                        <td class="px-4 py-2 font-sans text-slate-900 dark:text-slate-100" colspan="2">TOTAL PEMBAYARAN REGISTRASI AWAL (total_amount)</td>
-                                        <td class="px-4 py-2 text-right text-sky-600 dark:text-sky-400 text-sm searchable-text">Rp <?php echo e(number_format((float) $initialInvoice->total_amount, 2, ',', '.')); ?></td>
+                                        <td class="px-4 py-2 font-sans text-slate-900 dark:text-slate-100" colspan="2">TOTAL PEMBAYARAN REGISTRASI AWAL</td>
+                                        <td class="px-4 py-2 text-right text-sky-600 dark:text-sky-400 text-sm searchable-text">Rp <?php echo e(number_format((float) $initialInvoice->total_amount, 0, ',', '.')); ?></td>
                                     </tr>
                                 </tbody>
                             </table>
@@ -1555,7 +1566,8 @@ unset($__errorArgs, $__bag); ?>
                         <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">LAMPIRAN DOKUMEN PENDUKUNG</h2>
                         <p class="text-[11px] text-slate-500 mt-0.5">Dokumen disimpan aman & private sesuai hak akses permission sistem.</p>
                     </div>
-                    <?php if(auth()->user()->hasPermission('upload_customer_documents')): ?>
+                    
+                    <?php if(auth()->user()->hasPermission('customers.detail.documents.upload')): ?>
                     <button type="button" onclick="openModal('document-upload-modal')" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-sm inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors">
                         <i class="fa-solid fa-cloud-arrow-up text-xs"></i> Upload Dokumen Baru
                     </button>
@@ -1566,16 +1578,25 @@ unset($__errorArgs, $__bag); ?>
                     <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
                         <?php $__currentLoopData = $customer->documents->sortByDesc('created_at'); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $document): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); ?>
                             <div class="border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden flex flex-col justify-between hover:border-sky-500 transition-colors shadow-sm bg-white dark:bg-slate-800">
-                                <div class="p-4 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-center h-36 border-b border-slate-200 dark:border-slate-700">
+                                
+                                <button type="button"
+                                        onclick="openDocumentPreview(this)"
+                                        data-url="<?php echo e(route('customers.documents.show', $document->id)); ?>"
+                                        data-image="<?php echo e($document->isImage() ? '1' : '0'); ?>"
+                                        data-title="<?php echo e($document->typeLabel()); ?>"
+                                        class="relative p-4 bg-slate-50/50 dark:bg-slate-900/50 flex items-center justify-center h-36 border-b border-slate-200 dark:border-slate-700 cursor-zoom-in w-full"
+                                        title="Pratinjau <?php echo e($document->typeLabel()); ?>">
                                     <?php if($document->isImage()): ?>
                                         <img src="<?php echo e(route('customers.documents.show', $document->id)); ?>" alt="<?php echo e($document->typeLabel()); ?>" class="max-h-28 max-w-full rounded object-contain shadow-sm">
                                     <?php else: ?>
-                                        <div class="h-24 w-24 bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-lg flex flex-col items-center justify-center text-rose-600 shadow-sm">
-                                            <i class="fa-solid fa-file-pdf text-3xl mb-1"></i>
-                                            <span class="text-[10px] font-bold">PDF FILE</span>
-                                        </div>
+                                        <object data="<?php echo e(route('customers.documents.show', $document->id)); ?>#toolbar=0&navpanes=0&view=FitH" type="application/pdf" class="w-full h-28 rounded bg-white pointer-events-none" tabindex="-1" aria-hidden="true">
+                                            <div class="h-24 w-24 mx-auto bg-rose-50 dark:bg-rose-950/40 border border-rose-200 dark:border-rose-800 rounded-lg flex flex-col items-center justify-center text-rose-600 shadow-sm">
+                                                <i class="fa-solid fa-file-pdf text-3xl mb-1"></i>
+                                                <span class="text-[10px] font-bold">PDF FILE</span>
+                                            </div>
+                                        </object>
                                     <?php endif; ?>
-                                </div>
+                                </button>
                                 <div class="p-3 flex items-center justify-between gap-3 text-xs">
                                     <div class="min-w-0">
                                         <span class="block text-xs font-semibold text-slate-900 dark:text-slate-100 truncate searchable-text"><?php echo e($document->typeLabel()); ?></span>
@@ -1681,7 +1702,23 @@ unset($__errorArgs, $__bag); ?>
 <!-- MODALS SECTION -->
 
 <!-- MODAL: Document Upload Modal -->
-<?php if(auth()->user()->hasPermission('upload_customer_documents')): ?>
+
+<div id="document-preview-modal" class="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6 hidden" onclick="if (event.target === this) closeDocumentPreview()">
+    <div class="bg-white dark:bg-slate-900 rounded-xl shadow-xl w-full max-w-4xl h-[85vh] flex flex-col overflow-hidden">
+        <div class="px-4 py-3 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between gap-3">
+            <h3 id="document-preview-title" class="text-sm font-bold text-slate-900 dark:text-slate-100 truncate">Pratinjau Dokumen</h3>
+            <div class="flex items-center gap-2 shrink-0">
+                <a id="document-preview-open" href="#" target="_blank" rel="noopener" class="px-3 py-1.5 text-xs font-semibold text-sky-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg">Buka di tab baru ↗</a>
+                <button type="button" onclick="closeDocumentPreview()" aria-label="Tutup" class="p-1.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 cursor-pointer">
+                    <i class="fa-solid fa-xmark"></i>
+                </button>
+            </div>
+        </div>
+        <div id="document-preview-body" class="flex-1 min-h-0 bg-slate-100 dark:bg-slate-950 flex items-center justify-center"></div>
+    </div>
+</div>
+
+<?php if(auth()->user()->hasPermission('customers.detail.documents.upload')): ?>
 <div id="document-upload-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">
@@ -1704,6 +1741,26 @@ unset($__errorArgs, $__bag); ?>
                 <div>
                     <label for="document_file" class="block text-xs font-semibold text-slate-700 dark:text-slate-300 mb-1">File Gambar / PDF</label>
                     <input type="file" name="document_file" id="document_file" accept="image/*,application/pdf" class="w-full text-xs px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200" required>
+                    <?php if (isset($component)) { $__componentOriginala82975a30b9db16b9f8ce6ba13694d76 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.upload-limit-hint','data' => ['format' => 'Gambar / PDF']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('upload-limit-hint'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['format' => 'Gambar / PDF']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $attributes = $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $component = $__componentOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
                 </div>
                 <div class="flex justify-end gap-2 pt-3 border-t border-slate-200 dark:border-slate-700">
                     <button type="button" onclick="closeModal('document-upload-modal')" class="px-4 py-2 border border-slate-200 dark:border-slate-700 rounded-lg text-slate-700 dark:text-slate-300 cursor-pointer">Batal</button>
@@ -1817,19 +1874,22 @@ unset($__errorArgs, $__bag); ?>
         }
 
         // Aksi sendiri lewat modal Bayar Cepat.
-        document.addEventListener('payment-recorded', function (e) {
+        window.pageListen(document, 'payment-recorded', function (e) {
             if (applyCustomerInvoiceUpdate(e.detail)) {
                 e.preventDefault();
             }
         });
 
         // Aksi user lain di POP yang sama, lewat Reverb.
-        document.addEventListener('DOMContentLoaded', function () {
+        // onPageReady, bukan DOMContentLoaded: event itu cuma nyala sekali per
+        // tab — buka halaman ini lewat navigasi boost ⇒ listener tak pernah
+        // terpasang dan update realtime mati diam-diam (ADHOC-297 P4).
+        window.onPageReady(function () {
             if (typeof window.Echo === 'undefined' || !window.Echo) {
                 return;
             }
 
-            window.Echo.private('invoices.<?php echo e($customer->pop_id); ?>')
+            window.pageEcho('invoices.<?php echo e($customer->pop_id); ?>')
                 .listen('.InvoiceStatusUpdated', applyCustomerInvoiceUpdate);
         });
     </script>
@@ -2114,6 +2174,43 @@ unset($__errorArgs, $__bag); ?>
     }
 
     function openModal(id) { document.getElementById(id)?.classList.remove('hidden'); }
+
+    // Pratinjau dokumen pelanggan. URL datang dari data-url yang dirender
+    // server (route customers.documents.show — cek permission + POP scope),
+    // klien tidak merakit path sendiri. Elemen dibangun lewat DOM, bukan
+    // innerHTML, supaya judul dokumen tidak pernah ditafsirkan sebagai HTML.
+    function openDocumentPreview(trigger) {
+        const url = trigger.dataset.url;
+        const body = document.getElementById('document-preview-body');
+        body.replaceChildren();
+
+        if (trigger.dataset.image === '1') {
+            const img = document.createElement('img');
+            img.src = url;
+            img.alt = trigger.dataset.title;
+            img.className = 'max-h-full max-w-full object-contain';
+            body.appendChild(img);
+        } else {
+            const viewer = document.createElement('object');
+            viewer.data = url;
+            viewer.type = 'application/pdf';
+            viewer.className = 'w-full h-full';
+            const fallback = document.createElement('p');
+            fallback.className = 'p-6 text-xs text-slate-500 text-center';
+            fallback.textContent = 'Browser ini tidak bisa menampilkan PDF langsung — gunakan "Buka di tab baru".';
+            viewer.appendChild(fallback);
+            body.appendChild(viewer);
+        }
+
+        document.getElementById('document-preview-title').textContent = trigger.dataset.title;
+        document.getElementById('document-preview-open').href = url;
+        openModal('document-preview-modal');
+    }
+
+    function closeDocumentPreview() {
+        document.getElementById('document-preview-body').replaceChildren();
+        document.getElementById('document-preview-modal')?.classList.add('hidden');
+    }
     function closeModal(id) { document.getElementById(id)?.classList.add('hidden'); }
 
     // Modal milik partial tab Pemasangan & Perangkat. Sebelumnya fungsi ini HANYA

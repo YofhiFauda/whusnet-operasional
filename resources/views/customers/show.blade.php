@@ -122,10 +122,15 @@
             @endif
         @endcan
 
-        <a href="{{ route('customers.edit', $customer->id) }}" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs">
-            <i class="fa-solid fa-pen-to-square"></i>
-            <span>Edit Profil</span>
-        </a>
+        {{-- Halaman Edit digerbangi customers.update (routes/web.php), terpisah
+             dari customers.detail.view yang membuka halaman ini. Role yang cuma
+             boleh melihat Detail dulu tetap dapat tombol ini → klik = 403. --}}
+        @can('customers.update')
+            <a href="{{ route('customers.edit', $customer->id) }}" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-xs">
+                <i class="fa-solid fa-pen-to-square"></i>
+                <span>Edit Profil</span>
+            </a>
+        @endcan
 
         @can('customers.qr.view')
             <a href="{{ route('customers.qr.show', $customer->id) }}" class="inline-flex items-center gap-1.5 px-3 sm:px-3.5 py-2 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 hover:bg-slate-50 dark:hover:bg-slate-700/50 text-slate-700 dark:text-slate-300 rounded-lg transition-all active:scale-[0.98] text-xs font-semibold shadow-2xs">
@@ -1529,7 +1534,10 @@
                         <h2 class="text-xs font-bold text-slate-900 dark:text-slate-100 uppercase tracking-wider">LAMPIRAN DOKUMEN PENDUKUNG</h2>
                         <p class="text-[11px] text-slate-500 mt-0.5">Dokumen disimpan aman & private sesuai hak akses permission sistem.</p>
                     </div>
-                    @if(auth()->user()->hasPermission('upload_customer_documents'))
+                    {{-- Gerbang = permission route customers.documents.store (Role Matrix).
+                         Dulu numpang `upload_customer_documents` (PermissionSeeder lama, di luar
+                         matrix) — role yang diberi Upload Dokumen di matrix malah gak lihat tombolnya. --}}
+                    @if(auth()->user()->hasPermission('customers.detail.documents.upload'))
                     <button type="button" onclick="openModal('document-upload-modal')" class="px-3.5 py-2 bg-sky-600 hover:bg-sky-700 text-white rounded-lg text-xs font-semibold shadow-sm inline-flex items-center gap-1.5 shrink-0 cursor-pointer transition-colors">
                         <i class="fa-solid fa-cloud-arrow-up text-xs"></i> Upload Dokumen Baru
                     </button>
@@ -1686,7 +1694,7 @@
     </div>
 </div>
 
-@if(auth()->user()->hasPermission('upload_customer_documents'))
+@if(auth()->user()->hasPermission('customers.detail.documents.upload'))
 <div id="document-upload-modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 hidden">
     <div class="bg-white dark:bg-slate-800 rounded-lg shadow-xl border border-slate-200 dark:border-slate-700 w-full max-w-md overflow-hidden">
         <div class="px-5 py-4 border-b border-slate-200 dark:border-slate-700 flex items-center justify-between">

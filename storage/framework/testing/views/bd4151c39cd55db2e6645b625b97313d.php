@@ -90,7 +90,7 @@ unset($__defined_vars, $__key, $__value); ?>
     <?php endif; ?>
 </div>
 
-<?php if (! $__env->hasRenderedOnce('7edb8ca4-378e-4022-aa89-d03c839cd220')): $__env->markAsRenderedOnce('7edb8ca4-378e-4022-aa89-d03c839cd220'); ?>
+<?php if (! $__env->hasRenderedOnce('266f81a9-d74f-4429-95c9-39351d49813b')): $__env->markAsRenderedOnce('266f81a9-d74f-4429-95c9-39351d49813b'); ?>
 <?php $__env->startPush('scripts'); ?>
 <script>
 function countdownTimer(deadlineIso, totalSeconds) {
@@ -105,6 +105,13 @@ function countdownTimer(deadlineIso, totalSeconds) {
         start() {
             this.tick();
             this._timer = setInterval(() => this.tick(), 1000);
+        },
+
+        // Alpine memanggil destroy() saat elemen dicopot — termasuk body
+        // ditukar hx-boost. Tanpa ini interval tiap kartu SLA tetap jalan
+        // setelah pindah menu (review ADHOC-297 #4).
+        destroy() {
+            clearInterval(this._timer);
         },
 
         tick() {
@@ -152,7 +159,7 @@ function countdownTimer(deadlineIso, totalSeconds) {
 <?php endif; ?>
 
 
-<?php if (! $__env->hasRenderedOnce('87c25268-7b1c-4b1a-9623-bb43c33c75aa')): $__env->markAsRenderedOnce('87c25268-7b1c-4b1a-9623-bb43c33c75aa'); ?>
+<?php if (! $__env->hasRenderedOnce('a119d728-3ace-4c73-bff0-70f35d715e6b')): $__env->markAsRenderedOnce('a119d728-3ace-4c73-bff0-70f35d715e6b'); ?>
 <style>
 .countdown-green {
     background: var(--color-success-bg);
