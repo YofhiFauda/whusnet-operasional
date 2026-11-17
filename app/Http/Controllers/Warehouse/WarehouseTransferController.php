@@ -381,7 +381,7 @@ class WarehouseTransferController extends Controller
     public function invoice(InventoryTransfer $transfer, EffectiveAccessService $access, Request $request): HttpResponse
     {
         abort_if($transfer->branchSale()->exists(), 403);
-        $transfer->load(['fromPop', 'toPop', 'createdBy']);
+        $transfer->load(['fromPop', 'toPop.gudangPics', 'createdBy']);
         $this->assertViewableByEitherSide($transfer, $access);
 
         $lines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['item'])->get();
@@ -457,7 +457,7 @@ class WarehouseTransferController extends Controller
         if ($transfer->branchSale()->exists()) {
             abort_unless($request->user()->hasPermission('warehouse_branch_sale.view'), 403);
         }
-        $transfer->load(['fromPop', 'toPop', 'createdBy']);
+        $transfer->load(['fromPop.gudangPics', 'toPop.gudangPics', 'createdBy']);
         $this->assertViewableByEitherSide($transfer, $access);
 
         $lines = $transfer->transactions()->whereNotNull('from_pop_id')

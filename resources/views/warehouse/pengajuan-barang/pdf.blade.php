@@ -26,6 +26,12 @@
     <meta charset="utf-8">
     <title>Surat Pengajuan Barang — {{ $pengajuan->nomor_request }}</title>
 
+    @php
+        // Ukuran logo kop diatur di config/warehouse.php (kop_logo.height), bukan di sini.
+        $kopLogoHeight = (int) config('warehouse.kop_logo.height', 84);
+        $kopLogoSize = @getimagesize(public_path('images/kop-surat-logo.png'));
+        $kopLogoCellWidth = (int) ceil($kopLogoHeight * ($kopLogoSize ? $kopLogoSize[0] / $kopLogoSize[1] : 2.5)) + 12;
+    @endphp
     <style>
         * {
             box-sizing: border-box;
@@ -55,14 +61,14 @@
         }
 
         .kop-logo-td {
-            width: 220px;
+            width: {{ $kopLogoCellWidth }}px;
             vertical-align: middle;
             padding: 0;
             text-align: left;
         }
 
         .kop-logo {
-            height: 84px;
+            height: {{ $kopLogoHeight }}px;
             width: auto;
             display: block;
         }
