@@ -443,9 +443,9 @@ class TaskInfrastructureDeployReportTest extends TestCase
     }
 
     #[Test]
-    public function oreq_pasang_barang_qty_menambah_infrastructure_balance(): void
+    public function infr_req_pasang_barang_qty_menambah_infrastructure_balance(): void
     {
-        $task = $this->makeTask(TaskType::OREQ);
+        $task = $this->makeTask(TaskType::INFR);
         $closure = $this->makeItem('INF-CLOSURE', 'quantity');
         TechnicianCustody::create([
             'technician_id' => $this->technician->id,
@@ -472,9 +472,9 @@ class TaskInfrastructureDeployReportTest extends TestCase
     }
 
     #[Test]
-    public function oreq_potong_roll_infrastruktur_hanya_mengurangi_sisa_roll_tanpa_saldo_terpasang(): void
+    public function infr_req_potong_roll_infrastruktur_hanya_mengurangi_sisa_roll_tanpa_saldo_terpasang(): void
     {
-        $task = $this->makeTask(TaskType::OREQ);
+        $task = $this->makeTask(TaskType::INFR);
         $kabel = $this->makeItem('INF-FEEDER', 'roll', 'meter');
         $roll = InventoryRoll::create([
             'item_id' => $kabel->id,
@@ -951,12 +951,101 @@ class TaskInfrastructureDeployReportTest extends TestCase
             ->assertDontSee('Kategori C-REQ')
             ->assertDontSee('Pekerjaan pada pelanggan');
 
-        $customerTask = $this->makeTask(TaskType::OREQ);
+        $customerTask = $this->makeTask(TaskType::INFR);
         $this->actingAs($this->technician)->get(route('tasks.maintenance.report', $customerTask))
             ->assertOk()
             ->assertSee('Pekerjaan pada pelanggan')
             ->assertSee('modem_ownership_choice', false)
             ->assertSee('selected_inventory_roll_id', false);
+    }
+
+    /**
+     * O-REQ = pekerjaan internal kantor (keputusan user 2026-11-17): form
+     * cuma Ringkasan pekerjaan + Bukti & alat kerja — walau task-nya punya
+     * pelanggan, seksi tindakan jaringan & pekerjaan pelanggan tidak tampil.
+     */
+    #[Test]
+    public function laporan_oreq_hanya_berisi_ringkasan_serta_bukti_dan_alat_kerja(): void
+    {
+        $this->withoutVite();
+        $task = $this->makeTask(TaskType::OREQ);
+
+        $this->actingAs($this->technician)->get(route('tasks.maintenance.report', $task))
+            ->assertOk()
+            ->assertViewIs('tasks.infrastructure-report')
+            ->assertSee('Pekerjaan internal · O-REQ')
+            ->assertSee('01 · Ringkasan pekerjaan')
+            // `&` ditulis mentah di Blade (bukan `&amp;`), jadi cocokkan tanpa escape.
+            ->assertSee('02 · Bukti & alat kerja', false)
+            ->assertSee('03 · Tinjau laporan')
+            ->assertDontSee('Apa yang dikerjakan?')
+            ->assertDontSee('Tindakan di jaringan')
+            ->assertDontSee('Pekerjaan pada pelanggan')
+            ->assertDontSee('name="infra_material_action"', false)
+            ->assertDontSee('name="modem_ownership_choice"', false)
+            ->assertDontSee('name="selected_inventory_roll_id"', false);
+    }
+
+    #[Test]
+    public function laporan_oreq_ringkasan_saja_menyelesaikan_task(): void
+    {
+        $task = $this->makeTask(TaskType::OREQ, withCustomer: false);
+
+        $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $task), [
+            'kendala_teknis' => 'Rapikan rak server kantor.',
+        ])->assertSessionHasNoErrors()->assertSessionMissing('error');
+
+        $this->assertSame(TaskStatus::SELESAI, $task->refresh()->status);
+        $this->assertSame(0, InventoryTransaction::count());
+    }
+
+    /**
+     * Field yang formnya sudah disembunyikan tetap bisa ter-POST (tab lama,
+     * request manual). Harus ditolak dengan pesan, bukan dibuang diam-diam —
+     * kalau dibuang, teknisi mengira barang tercatat padahal custody utuh.
+     */
+    #[Test]
+    public function laporan_oreq_menolak_tindakan_jaringan_dan_pekerjaan_pelanggan(): void
+    {
+        $task = $this->makeTask(TaskType::OREQ);
+        $closure = $this->makeItem('INF-CLOSURE-OREQ', 'quantity');
+        $custody = TechnicianCustody::create([
+            'technician_id' => $this->technician->id,
+            'issued_from_pop_id' => $this->pop->id,
+            'item_id' => $closure->id,
+            'qty_remaining' => 10,
+            'status' => 'issued',
+            'issued_at' => now(),
+        ]);
+
+        $payloads = [
+            'infra_quantity_item_id' => [
+                'infra_target_network_node_id' => $this->node->id,
+                'infra_quantity_item_id' => $closure->id,
+                'infra_quantity_qty' => 3,
+            ],
+            'materials' => [
+                'materials' => [['item_id' => $closure->id, 'qty' => 1]],
+            ],
+            'modem_ownership_choice' => [
+                'modem_ownership_choice' => 'beli_sendiri',
+                'manual_device_brand' => 'TP-Link',
+                'manual_device_model' => 'X',
+                'manual_device_serial_number' => 'SN-OREQ',
+            ],
+        ];
+
+        foreach ($payloads as $errorKey => $payload) {
+            $this->actingAs($this->technician)->post(route('tasks.maintenance.store', $task), [
+                'kendala_teknis' => 'Coba catat barang di O-REQ.',
+                ...$payload,
+            ])->assertSessionHasErrors($errorKey);
+        }
+
+        $this->assertSame(TaskStatus::IN_PROGRESS, $task->refresh()->status);
+        $this->assertEquals(10, $custody->refresh()->qty_remaining);
+        $this->assertSame(0, InventoryTransaction::count());
+        $this->assertSame(0, InfrastructureBalance::count());
     }
 
     #[Test]
@@ -1009,7 +1098,7 @@ class TaskInfrastructureDeployReportTest extends TestCase
     {
         $this->withoutVite();
 
-        $task = $this->makeTask(TaskType::OREQ);
+        $task = $this->makeTask(TaskType::INFR);
 
         $infraClosure = $this->makeItem('INF-CLOSURE-P', 'quantity');
         $infraClosure->update(['equipment_class_override' => 'pasif']);

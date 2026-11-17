@@ -59,7 +59,7 @@
     <header class="mb-6">
         <p class="mb-1 text-xs font-semibold uppercase tracking-wider text-text-muted">{{ $isOfficeRequest ? 'Pekerjaan internal · O-REQ' : 'Pekerjaan jaringan · INFR-REQ' }}</p>
         <h1 class="page-header-title">Laporan pekerjaan</h1>
-        <p class="page-header-subtitle mt-1">Catat apa yang dilakukan di lapangan. Isian berikutnya mengikuti tindakan yang Anda pilih.</p>
+        <p class="page-header-subtitle mt-1">{{ $isOfficeRequest ? 'Catat ringkasan pekerjaan internal beserta bukti dan alat kerja yang dipakai.' : 'Catat apa yang dilakukan di lapangan. Isian berikutnya mengikuti tindakan yang Anda pilih.' }}</p>
     </header>
 
     @if($errors->any() || session('error'))
@@ -87,12 +87,17 @@
             </section>
             <section class="border-b border-border px-4 py-5 sm:px-6">
                 <label for="kendala_teknis" class="block text-xs font-semibold uppercase tracking-wider text-text-muted">01 · Ringkasan pekerjaan <span class="text-error">*</span></label>
-                <p class="mb-3 mt-1 text-sm text-text-secondary">Apa yang ditemukan, apa yang dikerjakan, dan bagaimana hasilnya? Ini yang pertama dibaca FOP.</p>
+                <p class="mb-3 mt-1 text-sm text-text-secondary">Apa yang ditemukan, apa yang dikerjakan, dan bagaimana hasilnya?.</p>
                 <textarea id="kendala_teknis" name="kendala_teknis" rows="4" required x-model="summary"
                           class="w-full rounded-lg border border-border bg-surface px-3 py-2.5 text-sm text-text-main focus:border-primary focus:outline-none focus:ring-2 focus:ring-primary/20"
                           placeholder="Contoh: Ditemukan port ODC longgar. Koneksi diperbaiki dan sinyal kembali normal.">{{ old('kendala_teknis') }}</textarea>
             </section>
 
+            {{-- O-REQ = pekerjaan internal kantor (2026-11-17): tanpa tindakan
+                 jaringan & tanpa pekerjaan pelanggan. Field-nya juga ditolak
+                 server (TaskMaintenanceController::store()), jadi menampilkan
+                 ulang seksi ini saja tidak cukup untuk menghidupkannya. --}}
+            @unless($isOfficeRequest)
             <section class="border-b border-border px-4 py-5 sm:px-6">
                 <p class="text-xs font-semibold uppercase tracking-wider text-text-muted">02 · Apa yang dikerjakan?</p>
                 <p class="mt-1 text-sm text-text-secondary">Pilih jalur yang sesuai. Stok hanya berubah bila Anda mencatat pemakaian atau pelepasan barang.</p>
@@ -310,9 +315,10 @@
             </section>
 
             @include('tasks.partials.customer-report-extra')
+            @endunless
 
             <section class="border-b border-border px-4 py-5 sm:px-6">
-                <p class="text-xs font-semibold uppercase tracking-wider text-text-muted">03 · Bukti & alat kerja</p>
+                <p class="text-xs font-semibold uppercase tracking-wider text-text-muted">{{ $isOfficeRequest ? '02' : '03' }} · Bukti & alat kerja</p>
                 <p class="mt-1 text-sm text-text-secondary">Tambahkan foto dan alat yang digunakan bila ada. Data ini membantu FOP meninjau hasil kerja.</p>
                 <div class="mt-4 grid gap-4 sm:grid-cols-2">
                     <label class="block text-sm font-medium text-text-secondary">Foto lokasi / hasil <span class="text-xs font-normal text-text-muted">(opsional)</span>
@@ -334,7 +340,7 @@
                 @endif
             </section>
             <section x-show="reviewing" x-ref="review" x-cloak class="border-b border-border px-4 py-5 sm:px-6">
-                <p class="text-xs font-semibold uppercase tracking-wider text-text-muted">04 · Tinjau laporan</p>
+                <p class="text-xs font-semibold uppercase tracking-wider text-text-muted">{{ $isOfficeRequest ? '03' : '04' }} · Tinjau laporan</p>
                 <h2 class="mt-1 text-lg font-semibold text-text-main">Pastikan catatan sesuai pekerjaan fisik</h2>
                 <p class="mt-3 text-sm text-text-main" x-text="summary"></p>
                 <div x-show="mode === 'actions'" class="mt-4 divide-y divide-border border-t border-border">
@@ -354,8 +360,12 @@
                     <span x-show="correction.action === 'correct'">· <span x-text="nodeName(correction.node)"></span></span>
                 </p>
                 <p x-show="mode === 'correction'" class="mt-1 text-xs text-text-muted" x-text="correction.reason"></p>
-                <p x-show="mode === 'none'" class="mt-3 text-sm text-text-secondary">Tanpa perubahan aset jaringan, node, slot, atau port. Material pelanggan tetap dicatat bila diisi.</p>
-                <p class="mt-4 text-xs text-text-muted">Setelah dikirim, laporan ini menyelesaikan task dan menjadi catatan Inventaris serta Gudang sesuai tindakan di atas.</p>
+                @if($isOfficeRequest)
+                    <p class="mt-4 text-xs text-text-muted">Setelah dikirim, laporan ini menyelesaikan task. Stok gudang tidak berubah, kecuali alat kerja yang dicatat.</p>
+                @else
+                    <p x-show="mode === 'none'" class="mt-3 text-sm text-text-secondary">Tanpa perubahan aset jaringan, node, slot, atau port. Material pelanggan tetap dicatat bila diisi.</p>
+                    <p class="mt-4 text-xs text-text-muted">Setelah dikirim, laporan ini menyelesaikan task dan menjadi catatan Inventaris serta Gudang sesuai tindakan di atas.</p>
+                @endif
             </section>
 
             <div role="alert" x-show="formError" x-ref="formError" x-cloak class="border-b border-error px-4 py-3 text-sm font-medium text-error" x-text="formError"></div>

@@ -710,8 +710,9 @@ class TaskMaintenanceController extends Controller
         // SENGAJA cuma didaftarkan untuk dua tipe itu: field `infra_*` yang
         // ikut ter-POST di task MTN/C-REQ gak lolos ke `$validated`, jadi
         // blok eksekusi di bawah (yang cuma membaca `$validated`) gak pernah
-        // jalan buat tipe lain.
-        if (in_array($task->task_type, [TaskType::OREQ, TaskType::INFR], true)) {
+        // jalan buat tipe lain. O-REQ sudah TIDAK ikut sejak 2026-11-17 —
+        // lihat blok O-REQ tepat setelah blok ini.
+        if ($task->task_type === TaskType::INFR) {
             $rules['infra_actions'] = ['nullable', 'array', 'max:30'];
             $rules['infra_actions.*.action_key'] = ['required', 'uuid'];
             $rules['infra_actions.*.action_type'] = ['required', Rule::in(['inspect', 'install', 'retrieve', 'replace', 'port_connect', 'port_release'])];
@@ -865,6 +866,35 @@ class TaskMaintenanceController extends Controller
             $messages['infra_quantity_qty.required_with'] = 'Qty terpakai wajib diisi kalau barang qty dipilih.';
             $messages['infra_selected_roll_id.in'] = 'Roll yang dipilih bukan bagian dari custody aset infrastruktur tim Anda.';
             $messages['infra_roll_meters_used.required_with'] = 'Meter terpakai wajib diisi kalau roll dipilih.';
+        }
+
+        // O-REQ = pekerjaan internal kantor (keputusan user 2026-11-17):
+        // laporannya CUMA Ringkasan pekerjaan + Bukti & alat kerja. Form-nya
+        // sudah tidak merender seksi tindakan jaringan maupun pekerjaan
+        // pelanggan, tapi field-nya SENGAJA ditolak keras (`prohibited`),
+        // bukan sekadar tidak didaftarkan: kalau cuma tidak didaftarkan,
+        // isian yang ter-POST (form lama di tab yang belum di-refresh,
+        // request manual) dibuang diam-diam — teknisi mengira SN/roll/material
+        // sudah tercatat padahal custody-nya tidak berubah. Ditolak = pesan
+        // jelas, laporan tidak setengah tersimpan.
+        if ($task->task_type === TaskType::OREQ) {
+            $oreqProhibitedFields = [
+                // Tindakan jaringan (baris aksi + form lama + koreksi material)
+                'infra_actions', 'infra_target_network_node_id', 'infra_selected_serial_id',
+                'infra_retrieve_old_serial_id', 'infra_quantity_item_id', 'infra_quantity_qty',
+                'infra_selected_roll_id', 'infra_roll_meters_used', 'infra_material_action',
+                'infra_material_action_key', 'infra_material_source_transaction_id',
+                'infra_material_qty', 'infra_material_reason', 'infra_material_correct_roll_id',
+                // Pekerjaan pada pelanggan (material, modem, roll)
+                'materials', 'selected_inventory_serial_id', 'selected_inventory_roll_id',
+                'roll_meters_used', 'manual_device_brand', 'manual_device_model',
+                'manual_device_serial_number', 'modem_sale_price',
+            ];
+            foreach ($oreqProhibitedFields as $field) {
+                $rules[$field] = ['prohibited'];
+                $messages["{$field}.prohibited"] = 'Laporan O-REQ hanya berisi ringkasan pekerjaan serta bukti & alat kerja — tindakan jaringan dan pekerjaan pelanggan tidak bisa dicatat di sini.';
+            }
+            $rules['modem_ownership_choice'] = ['nullable', Rule::in(['tidak_ganti'])];
         }
 
         $validated = $request->validate($rules, $messages);
