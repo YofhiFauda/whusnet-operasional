@@ -17,6 +17,7 @@ use App\Models\InventoryTransaction;
 use App\Models\Item;
 use App\Models\ItemCategory;
 use App\Models\NetworkNode;
+use App\Models\NetworkNodePort;
 use App\Models\NetworkNodeType;
 use App\Models\Pop;
 use App\Models\Role;
@@ -548,6 +549,56 @@ class TaskInfrastructureHierarchicalLocationTest extends TestCase
         ]);
 
         $this->assertRejected($response, $task);
+    }
+
+    /**
+     * Regresi ADHOC-302: di mode hierarki `network_node_id` baris selalu
+     * kosong, jadi dulu "Node tujuan" di form kosong permanen dan sambung
+     * port dari laporan tidak pernah sampai ke server. Test JS menjaga sisi
+     * form; test ini menjaga jalur server end-to-end — node asal diambil dari
+     * lokasi terdalam (`loc_odp`), bukan dari `network_node_id`.
+     */
+    #[Test]
+    public function sambung_port_mode_hierarki_tersimpan_dari_lokasi_terdalam(): void
+    {
+        $task = $this->task(['scope_mini_pop_id' => $this->miniA1->id]);
+        $child = NetworkNode::factory()->child($this->odpA)->create(['code' => 'ODP-A-ANAK', 'name' => 'ODP-A-ANAK']);
+        $sourcePort = NetworkNodePort::create(['network_node_id' => $this->odpA->id, 'number' => 1, 'is_used' => false]);
+        $targetPort = NetworkNodePort::create(['network_node_id' => $child->id, 'number' => 1, 'is_used' => false]);
+        $location = [
+            ...$this->miniPath(), 'loc_device' => $this->oltA->id, 'loc_slot' => $this->slotA1->id,
+            'loc_port' => $this->ponA11->id, 'loc_odp' => $this->odpA->id,
+        ];
+
+        $this->submit($task, [$this->row('port_connect', $location, [
+            'port_id' => $sourcePort->id, 'target_node_id' => $child->id, 'target_port_id' => $targetPort->id,
+        ])])->assertSessionHasNoErrors()->assertSessionMissing('error');
+
+        $this->assertDatabaseHas('network_port_assignments', [
+            'network_node_port_id' => $sourcePort->id, 'target_node_id' => $child->id,
+            'target_port_id' => $targetPort->id, 'active_key' => 1,
+        ]);
+        $this->assertTrue($sourcePort->refresh()->is_used);
+        $this->assertTrue($targetPort->refresh()->is_used);
+    }
+
+    #[Test]
+    public function sambung_port_mode_hierarki_menolak_port_milik_node_lain(): void
+    {
+        $task = $this->task(['scope_mini_pop_id' => $this->miniA1->id]);
+        $child = NetworkNode::factory()->child($this->odpA)->create(['code' => 'ODP-A-ANAK', 'name' => 'ODP-A-ANAK']);
+        $portDiOlt = NetworkNodePort::create(['network_node_id' => $this->oltA->id, 'number' => 1, 'is_used' => false]);
+        $targetPort = NetworkNodePort::create(['network_node_id' => $child->id, 'number' => 1, 'is_used' => false]);
+        $location = [
+            ...$this->miniPath(), 'loc_device' => $this->oltA->id, 'loc_slot' => $this->slotA1->id,
+            'loc_port' => $this->ponA11->id, 'loc_odp' => $this->odpA->id,
+        ];
+
+        $this->assertRejected($this->submit($task, [$this->row('port_connect', $location, [
+            'port_id' => $portDiOlt->id, 'target_node_id' => $child->id, 'target_port_id' => $targetPort->id,
+        ])]), $task);
+        $this->assertDatabaseCount('network_port_assignments', 0);
+        $this->assertFalse($portDiOlt->refresh()->is_used);
     }
 
     #[Test]

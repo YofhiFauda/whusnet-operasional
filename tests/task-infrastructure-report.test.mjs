@@ -174,3 +174,28 @@ test('koreksi material memerlukan asal dan alasan tanpa baris pemasangan', () =>
     report.correction.reason = 'Jumlah awal salah.';
     assert.equal(report.validate(), '');
 });
+
+test('sambung port mode hierarki menawarkan node anak dari lokasi terdalam', () => {
+    // Regresi: targetNodes() dulu memfilter `row.network_node_id` yang di
+    // mode hierarki selalu kosong → daftar "Node tujuan" kosong permanen.
+    const report = infrastructureReport(hierarchyConfig);
+    report.summary = 'Sambung ODC ke ODP.';
+    report.addAction('port_connect');
+    const row = report.rows[0];
+    assert.equal(row.location_mode, 'hierarchy');
+    assert.equal(row.network_node_id, '');
+    assert.deepEqual(report.targetNodes(row), [], 'Belum pilih node → belum ada tujuan.');
+
+    row.loc.device = '1';
+    row.levels.device.options = [{ id: 1, label: 'ODC Utama', type: 'odc' }];
+    report.levelChanged(row, 'device');
+    assert.equal(report.portNodeId(row), '1');
+    assert.deepEqual(report.targetNodes(row).map((node) => node.id), [2]);
+    assert.deepEqual(report.portsAt(row.target_node_id = '2', 'port_connect').map((port) => port.id), [42]);
+});
+
+test('sambung port mode lama tetap memakai node pilihan', () => {
+    const report = infrastructureReport(config);
+    const row = { location_mode: 'legacy', network_node_id: '1' };
+    assert.deepEqual(report.targetNodes(row).map((node) => node.id), [2]);
+});

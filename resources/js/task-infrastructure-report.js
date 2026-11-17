@@ -330,8 +330,14 @@ export function infrastructureReport(config) {
                 && (type === 'port_connect' ? !port.used : type === 'port_release' ? port.used : true));
         },
 
+        // Node tujuan = anak dari node ASAL yang sama dengan port asal
+        // (`portNodeId`), bukan `row.network_node_id` mentah: di mode hierarki
+        // kolom itu selalu kosong, sehingga dulu daftar tujuan kosong permanen
+        // dan sambung port dari laporan tidak bisa dipakai sama sekali.
         targetNodes(row) {
-            return this.nodes.filter((node) => String(node.parent_id) === String(row.network_node_id));
+            const sourceNodeId = this.portNodeId(row);
+            if (!sourceNodeId) return [];
+            return this.nodes.filter((node) => String(node.parent_id) === String(sourceNodeId));
         },
 
         optionName(options, id) {
