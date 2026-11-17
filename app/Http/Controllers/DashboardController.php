@@ -45,6 +45,15 @@ class DashboardController extends Controller
             if (auth()->user()->hasPermission('task.view.own')) {
                 return redirect()->route('tasks.own');
             }
+            // Admin Gudang Pusat (`admin_gudang`) sengaja tanpa dashboard.view/
+            // customers.view — kerjanya cuma di modul gudang. Tanpa fallback
+            // ini login sukses tapi langsung abort 403 di bawah (gejala sama
+            // seperti kolektor dulu). Ditaruh SETELAH task.view.own: teknisi
+            // yang merangkap PIC gudang tetap mendarat di Task-nya, karena
+            // pekerjaan hariannya di lapangan, bukan di gudang.
+            if (auth()->user()->hasPermission('warehouse.view')) {
+                return redirect()->route('warehouse.index');
+            }
             if (auth()->user()->hasPermission('customers.view')) {
                 return redirect()->route('customers.index');
             }
