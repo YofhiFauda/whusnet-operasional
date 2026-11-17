@@ -523,14 +523,16 @@ class TaskInfrastructureHierarchicalLocationTest extends TestCase
     }
 
     #[Test]
-    public function oreq_inspeksi_tanpa_lokasi_tetap_sah(): void
+    public function oreq_tidak_lagi_menerima_baris_aksi_walau_inspeksi_tanpa_lokasi(): void
     {
+        // Dulu O-REQ boleh inspeksi tanpa lokasi lewat baris aksi. Sejak
+        // 2026-11-17 laporan O-REQ cuma Ringkasan + Bukti & alat kerja.
         $task = $this->task([], TaskType::OREQ);
 
-        $this->submit($task, [$this->row('inspect', [], ['result_note' => 'Cek dokumen kantor'])])
-            ->assertSessionHasNoErrors()->assertSessionMissing('error');
+        $response = $this->submit($task, [$this->row('inspect', [], ['result_note' => 'Cek dokumen kantor'])]);
 
-        $this->assertNull(TaskInfrastructureAction::sole()->work_location_snapshot);
+        $response->assertSessionHasErrors('infra_actions');
+        $this->assertRejected($response, $task);
     }
 
     #[Test]
