@@ -15,6 +15,7 @@ use App\Services\InfrastructureLocationResolver;
 use App\Support\IndonesianDate;
 use App\Support\InfrastructureLocation;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
 use Illuminate\View\View;
@@ -250,30 +251,83 @@ class WarehouseInfraStockController extends Controller
 
     /**
      * Kabel/roll TIDAK punya saldo terpasang per-node seperti barang qty
-     * (`InfrastructureBalance` tidak diisi buat roll) — tapi tiap event
-     * DEPLOY-nya TETAP mencatat titik pasang persis di ledger (kolom `to_*`
-     * yang sama dipakai SN/qty, lihat `InventoryService::transactionLocationColumns()`).
-     * Jadi akumulasi di-GROUP BY item+SEMUA kolom lokasi (bukan cuma
-     * `to_pop_id`) — kombinasi lokasi yang beda jadi baris terpisah, supaya
-     * "kabel ini terpasang di mana" presisi sampai node/slot/port (permintaan
-     * user 2026-11-05), bukan cuma level Cabang. Tetap agregat PER KOMBINASI
-     * lokasi (banyak roll fisik ke titik yang sama digabung jadi 1 baris) —
-     * grouping di SQL, bukan `->get()` seluruh ledger lalu `groupBy()` PHP.
+     * (`InfrastructureBalance` tidak diisi buat roll, §16.4 #2) — jadi "meter
+     * terpasang SEKARANG" diturunkan dari ledger sebagai saldo BERSIH per
+     * item+lokasi, presisi sampai node/slot/port (permintaan user 2026-11-05):
+     *
+     *   + DEPLOY roll                                  (lokasi `to_*`)
+     *   + ADJUSTMENT `infra_record_correction` qty > 0 (lokasi `to_*`)  — tujuan koreksi
+     *   + ADJUSTMENT `infra_record_correction` qty < 0 (lokasi `from_*`) — qty sudah negatif
+     *   − RETRIEVE_INFRA roll                          (lokasi `from_*`) — cabut fisik
+     *
+     * Dulu cuma SUM DEPLOY → kabel yang sudah dicabut/dikoreksi tetap
+     * terhitung, angka jadi "meter yang PERNAH dipasang". Jangan balik ke
+     * DEPLOY-only. ADJUSTMENT lain (inspeksi hasil cabut `infra_recovery_*`,
+     * opname gudang) SENGAJA tidak ikut — itu mutasi custody/gudang, bukan
+     * posisi di jaringan.
+     *
+     * Kolom POP dinormalisasi: DEPLOY di POP Cabang mengisi
+     * `to_infrastructure_pop_id`, sedangkan koreksi/cabut cuma mengisi
+     * `{arah}_pop_id` (`InfrastructureMaterialService::positionOnly()`). Kalau
+     * semua kolom posisi lebih dalam kosong, kunci POP = COALESCE keduanya,
+     * supaya pasang & cabut di POP yang sama jatuh ke baris yang sama.
+     *
+     * Kolom hasil di-alias `to_*` supaya `resolveRollLocation()` tetap
+     * dipakai apa adanya. Agregasi + HAVING di SQL, paginate di DB.
      *
      * @param  list<int>  $allowedPopIds
      */
     private function paginateRoll(bool $allowAll, array $allowedPopIds): LengthAwarePaginator
     {
-        return InventoryTransaction::query()
-            ->select(['item_id', 'to_pop_id', 'to_mini_pop_id', 'to_infrastructure_pop_id', 'to_network_node_id', 'to_infrastructure_slot_id', 'to_infrastructure_port_id'])
-            ->selectRaw('SUM(qty) as total_qty')
+        $movements = $this->rollMovementQuery('to', 'qty')
             ->where('type', InventoryTransactionType::DEPLOY->value)
-            ->whereNotNull('roll_id')
+            ->unionAll($this->rollMovementQuery('to', 'qty')
+                ->where('type', InventoryTransactionType::ADJUSTMENT->value)
+                ->where('reason', 'infra_record_correction')
+                ->where('qty', '>', 0))
+            ->unionAll($this->rollMovementQuery('from', 'qty')
+                ->where('type', InventoryTransactionType::ADJUSTMENT->value)
+                ->where('reason', 'infra_record_correction')
+                ->where('qty', '<', 0))
+            ->unionAll($this->rollMovementQuery('from', '-qty')
+                ->where('type', InventoryTransactionType::RETRIEVE_INFRA->value));
+
+        $keys = ['item_id', 'to_pop_id', 'to_mini_pop_id', 'to_infrastructure_pop_id', 'to_network_node_id', 'to_infrastructure_slot_id', 'to_infrastructure_port_id'];
+
+        // Toleransi setengah senti — qty desimal(…,2) yang dijumlah bisa
+        // menyisakan residu float tipis; baris "0.00 m" bukan kabel terpasang.
+        return InventoryTransaction::query()
+            ->fromSub($movements, 'inventory_transactions')
+            ->select($keys)
+            ->selectRaw('SUM(signed_qty) as total_qty')
             ->when(! $allowAll, fn ($query) => $query->whereIn('to_pop_id', $allowedPopIds))
-            ->groupBy('item_id', 'to_pop_id', 'to_mini_pop_id', 'to_infrastructure_pop_id', 'to_network_node_id', 'to_infrastructure_slot_id', 'to_infrastructure_port_id')
+            ->groupBy($keys)
+            ->havingRaw('SUM(signed_qty) > 0.005')
             ->orderBy('item_id')
             ->paginate(self::PER_PAGE)
             ->withQueryString();
+    }
+
+    /**
+     * Satu cabang UNION `paginateRoll()`: baris roll dengan lokasi dari arah
+     * `$direction` dinormalisasi ke nama kolom `to_*`.
+     */
+    private function rollMovementQuery(string $direction, string $signedQtyExpression): Builder
+    {
+        $deeperEmpty = collect(['mini_pop_id', 'network_node_id', 'infrastructure_slot_id', 'infrastructure_port_id'])
+            ->map(fn (string $column) => "{$direction}_{$column} IS NULL")
+            ->implode(' AND ');
+
+        return InventoryTransaction::query()
+            ->whereNotNull('roll_id')
+            ->select('item_id')
+            ->selectRaw("{$direction}_pop_id as to_pop_id")
+            ->selectRaw("{$direction}_mini_pop_id as to_mini_pop_id")
+            ->selectRaw("CASE WHEN {$deeperEmpty} THEN COALESCE({$direction}_infrastructure_pop_id, {$direction}_pop_id) END as to_infrastructure_pop_id")
+            ->selectRaw("{$direction}_network_node_id as to_network_node_id")
+            ->selectRaw("{$direction}_infrastructure_slot_id as to_infrastructure_slot_id")
+            ->selectRaw("{$direction}_infrastructure_port_id as to_infrastructure_port_id")
+            ->selectRaw("{$signedQtyExpression} as signed_qty");
     }
 
     private function mapRollRows(LengthAwarePaginator $paginator, InfrastructureLocationResolver $locationResolver): Collection
@@ -298,7 +352,7 @@ class WarehouseInfraStockController extends Controller
                 'total_qty' => (float) $row->total_qty,
                 'breadcrumb' => $location?->breadcrumb() ?? '-',
                 'deployed_at' => $latestDeploy?->created_at !== null ? IndonesianDate::date($latestDeploy->created_at) : '-',
-                'technician_name' => $latestDeploy?->fromTechnician?->name ?? '-',
+                'technician_name' => $latestDeploy?->fromTechnician?->name ?? $latestDeploy?->createdBy?->name ?? '-',
                 // Agregat per item+lokasi (bukan 1 roll fisik) — gak ada SN/roll
                 // tunggal buat ditrace, jadi klik baris nunjuk Riwayat Mutasi
                 // (ledger lengkap item itu, dibatasi ke Cabang baris ini),
@@ -327,11 +381,16 @@ class WarehouseInfraStockController extends Controller
     }
 
     /**
-     * Satu query per baris (dibatasi ≤25/halaman) — cocokkan SEMUA kolom
-     * lokasi, bukan cuma `to_pop_id`, biar gak numpuk dengan kombinasi
-     * lokasi lain yang item-nya sama. `where('col', null)` di Eloquent jadi
-     * `col = NULL` yang TIDAK PERNAH match di SQL — kolom yang nilainya null
-     * di baris agregat ini wajib lewat `whereNull()`, bukan `where()`.
+     * Penempatan kabel TERAKHIR ke item+lokasi baris ini: DEPLOY atau tujuan
+     * koreksi (ADJUSTMENT `infra_record_correction` qty > 0) — kabel yang
+     * dipindah lewat koreksi gak punya DEPLOY di lokasi barunya, tanpa
+     * cabang kedua ini tanggalnya jadi "-". Satu query per baris (≤25/halaman).
+     *
+     * `where('col', null)` di Eloquent jadi `col = NULL` yang TIDAK PERNAH
+     * match di SQL — kolom null wajib lewat `whereNull()`. Kolom
+     * `to_infrastructure_pop_id` gak dicocokkan langsung karena di baris
+     * agregat sudah dinormalisasi (lihat `paginateRoll()`): lokasi POP cukup
+     * ditandai `to_pop_id` + semua kolom posisi lebih dalam kosong.
      */
     private function latestRollDeployAtLocation(InventoryTransaction $row): ?InventoryTransaction
     {
@@ -340,18 +399,22 @@ class WarehouseInfraStockController extends Controller
         };
 
         $query = InventoryTransaction::query()
-            ->where('type', InventoryTransactionType::DEPLOY->value)
             ->whereNotNull('roll_id')
-            ->where('item_id', $row->item_id);
+            ->where('item_id', $row->item_id)
+            ->where(function ($q) {
+                $q->where('type', InventoryTransactionType::DEPLOY->value)
+                    ->orWhere(fn ($adj) => $adj->where('type', InventoryTransactionType::ADJUSTMENT->value)
+                        ->where('reason', 'infra_record_correction')
+                        ->where('qty', '>', 0));
+            });
 
         $match($query, 'to_pop_id', $row->to_pop_id);
         $match($query, 'to_mini_pop_id', $row->to_mini_pop_id);
-        $match($query, 'to_infrastructure_pop_id', $row->to_infrastructure_pop_id);
         $match($query, 'to_network_node_id', $row->to_network_node_id);
         $match($query, 'to_infrastructure_slot_id', $row->to_infrastructure_slot_id);
         $match($query, 'to_infrastructure_port_id', $row->to_infrastructure_port_id);
 
-        return $query->with('fromTechnician')->latest('id')->first();
+        return $query->with(['fromTechnician', 'createdBy'])->latest('id')->first();
     }
 
     private function resolveCached(InfrastructureLocationResolver $locationResolver, string $kind, int $id): ?InfrastructureLocation
