@@ -12,6 +12,7 @@ use App\Models\DeviceRetrievalLog;
 use App\Models\InventorySerial;
 use App\Models\Item;
 use App\Models\User;
+use App\Services\ActionQueueBadgeService;
 use App\Services\EffectiveAccessService;
 use App\Services\InventoryReassignService;
 use App\Services\LegacyDeviceHintService;
@@ -36,15 +37,15 @@ class WarehouseReturnReceiveController extends Controller
 {
     use AuthorizesWarehousePop;
 
-    public function index(Request $request, EffectiveAccessService $access): View
+    public function index(Request $request, EffectiveAccessService $access, ActionQueueBadgeService $queues): View
     {
         $user = auth()->user();
         $search = LikeSearch::sanitize((string) $request->input('q', ''));
         $technicianId = $request->input('technician');
 
-        $serials = InventorySerial::query()
-            ->where('status', SerialStatus::RETURNED->value)
-            ->when(! $access->hasAllPopAccess($user), fn ($q) => $q->whereIn('issued_from_pop_id', $access->getAllowedPopIds($user)))
+        // Basis query = badge "Terima Retur" (status + scope POP), supaya angka
+        // badge selalu sama dengan isi daftar tanpa filter.
+        $serials = $queues->pendingReturnReceipts($user)
             ->when($technicianId, fn ($q) => $q->where('current_technician_id', $technicianId))
             ->when($search !== '', function ($query) use ($search) {
                 $query->where(function ($sub) use ($search) {

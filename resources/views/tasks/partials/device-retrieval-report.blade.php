@@ -24,7 +24,7 @@
     };
     $conditionPhotoUrl = $retrieval ? foto_publik($retrieval->condition_photo) : null;
     $accessoryLabels = collect($retrieval?->accessories ?? [])
-        ->map(fn ($key) => \App\Models\TaskDeviceRetrieval::ACCESSORY_OPTIONS[$key] ?? $key)
+        ->map(fn ($key) => \App\Models\TaskDeviceRetrieval::ACCESSORY_LABELS[$key] ?? $key)
         ->values();
 @endphp
 

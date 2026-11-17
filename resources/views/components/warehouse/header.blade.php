@@ -82,6 +82,9 @@
         ? route('warehouse.returns.index')
         : ($canViewWarehouse ? route('warehouse.damaged.index') : '#');
 
+    // Total antrian retur di tab induk "Barang Retur" (Terima Retur + Terima di Pusat).
+    $returnsPendingTotal = ($badge_return_receive_count ?? 0) + ($badge_return_pusat_count ?? 0);
+
     $fieldUrl = $canViewCustody
         ? route('warehouse.custody.index')
         : ($canViewWarehouse ? route('warehouse.scan.index') : ($canViewTraceability ? route('warehouse.traceability.index') : '#'));
@@ -412,6 +415,9 @@
                         @if($returnsActiveLabel)
                             <span class="px-1.5 py-0.5 rounded bg-white/20 text-[10px] font-bold tracking-tight">{{ $returnsActiveLabel }}</span>
                         @endif
+                        @if($canReassign && $returnsPendingTotal > 0)
+                            <span data-badge="returns-total" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold {{ $isReturnsActive ? 'bg-white/20 text-white border-white/30' : 'text-amber-600 dark:text-amber-400' }}">{{ $returnsPendingTotal }}</span>
+                        @endif
                     </a>
                     <button type="button"
                             @click.prevent="openMenu = (openMenu === 'returns' ? null : 'returns')"
@@ -443,6 +449,9 @@
                                     <p class="text-[11px] font-normal text-slate-500 dark:text-slate-400 truncate">Konfirmasi modem transit dari teknisi</p>
                                 </div>
                             </div>
+                            @if(($badge_return_receive_count ?? 0) > 0)
+                                <span data-badge="return-receive" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 shrink-0">{{ $badge_return_receive_count }}</span>
+                            @endif
                         </a>
                         <a href="{{ route('warehouse.returns.from-customer.create') }}" class="{{ $vItemClass(in_array($active, ['returns-from-customer', 'from-customer'], true)) }}">
                             <div class="flex items-center gap-2.5 min-w-0">
@@ -476,6 +485,9 @@
                                     <p class="text-[11px] font-normal text-slate-500 dark:text-slate-400 truncate">Verifikasi final retur di Gudang Pusat</p>
                                 </div>
                             </div>
+                            @if(($badge_return_pusat_count ?? 0) > 0)
+                                <span data-badge="return-pusat" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 shrink-0">{{ $badge_return_pusat_count }}</span>
+                            @endif
                         </a>
                         @endif
                         @if($canViewWarehouse)
@@ -908,6 +920,9 @@
                     @if($returnsActiveLabel)
                         <span class="px-1.5 py-0.2 rounded bg-white/20 text-[10px] font-bold">{{ $returnsActiveLabel }}</span>
                     @endif
+                    @if($canReassign && $returnsPendingTotal > 0)
+                        <span data-badge="returns-total" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.2 text-[9px] font-bold {{ $isReturnsActive ? 'bg-white/20 text-white border-white/30' : 'text-amber-600 dark:text-amber-400' }}">{{ $returnsPendingTotal }}</span>
+                    @endif
                     <svg class="w-3 h-3 opacity-80 transition-transform duration-150" :class="mobGroup === 'returns' ? 'rotate-180' : ''" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
                 </button>
                 @endif
@@ -1070,6 +1085,9 @@
                                 <p class="text-[11px] font-normal text-slate-500 dark:text-slate-400 truncate">Konfirmasi modem transit dari teknisi</p>
                             </div>
                         </div>
+                        @if(($badge_return_receive_count ?? 0) > 0)
+                            <span data-badge="return-receive" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 shrink-0">{{ $badge_return_receive_count }}</span>
+                        @endif
                     </a>
                     <a href="{{ route('warehouse.returns.from-customer.create') }}" class="{{ $vItemClass(in_array($active, ['returns-from-customer', 'from-customer'], true)) }}">
                         <div class="flex items-center gap-2.5 min-w-0">
@@ -1103,6 +1121,9 @@
                                 <p class="text-[11px] font-normal text-slate-500 dark:text-slate-400 truncate">Verifikasi final retur di Gudang Pusat</p>
                             </div>
                         </div>
+                        @if(($badge_return_pusat_count ?? 0) > 0)
+                            <span data-badge="return-pusat" class="rounded-full border border-amber-500/20 bg-amber-500/15 px-1.5 py-0.5 text-[10px] font-bold text-amber-600 dark:text-amber-400 shrink-0">{{ $badge_return_pusat_count }}</span>
+                        @endif
                     </a>
                     @endif
                     @if($canViewWarehouse)

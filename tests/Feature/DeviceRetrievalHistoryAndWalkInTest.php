@@ -592,7 +592,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             'outcome' => DeviceRetrievalOutcome::DIAMBIL->value,
             'serials' => [['serial_number' => 'HS-SN-300', 'item_id' => '']],
             'condition_photo' => UploadedFile::fake()->image('kondisi.jpg'),
-            'accessories' => ['adaptor', 'patchcord'],
+            'accessories' => ['adaptor'],
             'notes' => 'Casing modem lecet',
         ])->assertSessionHasNoErrors();
 
@@ -604,7 +604,6 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             ->assertSee('HS-SN-300')
             ->assertSee('Modem Riwayat Test')
             ->assertSee('Adaptor / power')
-            ->assertSee('Patchcord')
             ->assertSee('Casing modem lecet')
             ->assertSee('Foto Kondisi Alat')
             ->assertSee('Transit — masih dipegang teknisi')
@@ -748,7 +747,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             'outcome' => DeviceRetrievalOutcome::DIAMBIL->value,
             'serials' => [['serial_number' => 'HS-SN-400', 'item_id' => '']],
             'condition_photo' => UploadedFile::fake()->image('kondisi.jpg'),
-            'accessories' => ['adaptor', 'kabel_lan'],
+            'accessories' => ['adaptor'],
             'notes' => 'Kabel LAN ikut dibawa',
         ])->assertSessionHasNoErrors();
 
@@ -765,7 +764,6 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             ->assertSee('Modem Riwayat Test')
             ->assertSee('Transit — di teknisi')
             ->assertSee('Adaptor / power')
-            ->assertSee('Kabel LAN')
             ->assertSee('Kabel LAN ikut dibawa')
             // Foto kondisi terlampir: thumbnail + tautan ke file di disk public.
             ->assertSee('Foto Kondisi Alat')
@@ -899,5 +897,59 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             ->assertOk()
             ->assertSee('ZTEGFORM01')
             ->assertSee('ZTE F609');
+    }
+
+    #[Test]
+    public function kelengkapan_yang_ikut_dibawa_hanya_menawarkan_adaptor(): void
+    {
+        $this->actingAs($this->teknisi)
+            ->get(route('tasks.device-retrieval.report', $this->task))
+            ->assertOk()
+            ->assertSee('Kelengkapan yang Ikut Dibawa')
+            ->assertSee('value="adaptor"', false)
+            ->assertDontSee('value="patchcord"', false)
+            ->assertDontSee('value="kabel_lan"', false)
+            ->assertDontSee('value="remote"', false);
+    }
+
+    #[Test]
+    public function kelengkapan_selain_adaptor_ditolak_validasi(): void
+    {
+        $this->makeInstalledSerial('HS-SN-ACC-1');
+
+        $this->actingAs($this->teknisi)->post(route('tasks.device-retrieval.store', $this->task), [
+            'outcome' => DeviceRetrievalOutcome::DIAMBIL->value,
+            'serials' => [['serial_number' => 'HS-SN-ACC-1', 'item_id' => '']],
+            'condition_photo' => UploadedFile::fake()->image('kondisi.jpg'),
+            'accessories' => ['adaptor', 'patchcord'],
+        ])->assertSessionHasErrors('accessories.1');
+
+        $this->assertNull($this->task->refresh()->deviceRetrieval);
+    }
+
+    #[Test]
+    public function laporan_lama_dengan_kelengkapan_yang_sudah_dicabut_tetap_tampil_berlabel(): void
+    {
+        $this->makeInstalledSerial('HS-SN-ACC-2');
+
+        $this->actingAs($this->teknisi)->post(route('tasks.device-retrieval.store', $this->task), [
+            'outcome' => DeviceRetrievalOutcome::DIAMBIL->value,
+            'serials' => [['serial_number' => 'HS-SN-ACC-2', 'item_id' => '']],
+            'condition_photo' => UploadedFile::fake()->image('kondisi.jpg'),
+            'accessories' => ['adaptor'],
+        ])->assertSessionHasNoErrors();
+
+        // Simulasikan data sebelum opsi dicabut: JSON masih memuat kunci lama.
+        $this->task->refresh()->deviceRetrieval->update([
+            'accessories' => ['adaptor', 'patchcord', 'kabel_lan', 'remote'],
+        ]);
+
+        $this->actingAs($this->owner)
+            ->get(route('tasks.show', $this->task))
+            ->assertOk()
+            ->assertSee('Adaptor / power')
+            ->assertSee('Patchcord')
+            ->assertSee('Kabel LAN')
+            ->assertSee('Remote / STB');
     }
 }

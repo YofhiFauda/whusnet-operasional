@@ -22,12 +22,26 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 class TaskDeviceRetrieval extends Model
 {
     /**
-     * Pilihan kelengkapan standar di form — kunci disimpan di `accessories`.
+     * Pilihan kelengkapan di form + whitelist validasi — kunci disimpan di `accessories`.
+     *
+     * Cuma adaptor: patchcord, kabel LAN, remote/STB dicabut dari form (2026-11-17)
+     * karena bukan kelengkapan yang dilacak saat penarikan. Jangan tambah lagi di
+     * sini kalau cuma butuh label tampilan — pakai ACCESSORY_LABELS.
      *
      * @var array<string, string>
      */
     public const ACCESSORY_OPTIONS = [
         'adaptor' => 'Adaptor / power',
+    ];
+
+    /**
+     * Label tampilan untuk SEMUA kunci yang pernah tersimpan, termasuk yang sudah
+     * dicabut dari form. Laporan lama masih menyimpan `patchcord`/`kabel_lan`/`remote`
+     * di JSON `accessories` — tanpa label ini mereka tampil sebagai kunci mentah.
+     *
+     * @var array<string, string>
+     */
+    public const ACCESSORY_LABELS = self::ACCESSORY_OPTIONS + [
         'patchcord' => 'Patchcord',
         'kabel_lan' => 'Kabel LAN',
         'remote' => 'Remote / STB',
