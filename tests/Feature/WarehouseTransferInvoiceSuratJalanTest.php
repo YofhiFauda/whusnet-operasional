@@ -397,4 +397,89 @@ class WarehouseTransferInvoiceSuratJalanTest extends TestCase
             ->assertOk()
             ->assertHeader('Content-Type', 'application/pdf');
     }
+
+    #[Test]
+    public function penerima_surat_jalan_dan_invoice_memakai_pic_gudang_yang_ditunjuk(): void
+    {
+        // Regresi 2026-11-17: cabang sudah punya PIC Gudang (warehouse_pop_pics)
+        // tapi Surat Jalan cuma baca `pops.pic_name` master POP — kolom
+        // Penerima kosong "-" walau PIC sudah ditunjuk.
+        $this->cabang->update(['pic_name' => null]);
+        $picRole = Role::where('code', 'pic_gudang')->firstOrFail();
+        $pic = User::factory()->create(['role_id' => $picRole->id, 'status' => 'active', 'name' => 'Rina PIC Cabang']);
+        $this->cabang->gudangPics()->attach($pic->id);
+
+        $transfer = $this->transfer->fresh(['fromPop.gudangPics', 'toPop.gudangPics', 'createdBy']);
+        $lines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['item', 'serial', 'roll'])->get();
+
+        $suratJalan = view('warehouse.transfers.surat-jalan', [
+            'transfer' => $transfer,
+            'lines' => $lines,
+            'suratJalanNumber' => 'SJ/WHUS/2026/11/001',
+            'fromPopAddress' => '-',
+            'toPopAddress' => '-',
+        ])->render();
+
+        $this->assertStringContainsString('PJ: Rina PIC Cabang', $suratJalan);
+        $this->assertStringContainsString('( Rina PIC Cabang )', $suratJalan);
+
+        $invoice = view('warehouse.transfers.invoice', [
+            'transfer' => $transfer,
+            'lines' => $lines,
+            'total' => 0,
+            'kepalaGudang' => config('warehouse.kepala_gudang'),
+            'fromPopAddress' => '-',
+            'suratJalanNumber' => 'SJ/WHUS/2026/11/001',
+        ])->render();
+
+        $this->assertMatchesRegularExpression('/Penerima<\/span>\s*Rina PIC Cabang/', $invoice);
+    }
+
+    #[Test]
+    public function penerima_surat_jalan_fallback_ke_pic_master_pop_kalau_belum_ada_pic_gudang(): void
+    {
+        $transfer = $this->transfer->fresh(['fromPop.gudangPics', 'toPop.gudangPics', 'createdBy']);
+
+        $html = view('warehouse.transfers.surat-jalan', [
+            'transfer' => $transfer,
+            'lines' => $transfer->transactions()->whereNotNull('from_pop_id')->with(['item', 'serial', 'roll'])->get(),
+            'suratJalanNumber' => 'SJ/WHUS/2026/11/001',
+            'fromPopAddress' => '-',
+            'toPopAddress' => '-',
+        ])->render();
+
+        $this->assertStringContainsString('( Budi Santoso )', $html);
+    }
+
+    #[Test]
+    public function ukuran_logo_kop_mengikuti_config_warehouse(): void
+    {
+        config(['warehouse.kop_logo.height' => 110]);
+
+        $transfer = $this->transfer->fresh(['fromPop.gudangPics', 'toPop.gudangPics', 'createdBy']);
+        $lines = $transfer->transactions()->whereNotNull('from_pop_id')->with(['item', 'serial', 'roll'])->get();
+
+        $suratJalan = view('warehouse.transfers.surat-jalan', [
+            'transfer' => $transfer,
+            'lines' => $lines,
+            'suratJalanNumber' => 'SJ/WHUS/2026/11/001',
+            'fromPopAddress' => '-',
+            'toPopAddress' => '-',
+        ])->render();
+
+        $invoice = view('warehouse.transfers.invoice', [
+            'transfer' => $transfer,
+            'lines' => $lines,
+            'total' => 0,
+            'kepalaGudang' => config('warehouse.kepala_gudang'),
+            'fromPopAddress' => '-',
+            'suratJalanNumber' => 'SJ/WHUS/2026/11/001',
+        ])->render();
+
+        foreach ([$suratJalan, $invoice] as $html) {
+            $this->assertMatchesRegularExpression('/\.kop-logo \{\s*height: 110px;/', $html);
+            // Kolom logo ikut melebar sesuai rasio gambar, supaya logo gak terpotong.
+            $this->assertDoesNotMatchRegularExpression('/\.kop-logo-td \{\s*width: 140px;/', $html);
+        }
+    }
 }

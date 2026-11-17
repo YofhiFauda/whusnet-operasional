@@ -21,4 +21,22 @@ return [
         'name' => 'Nadya Naralita Setiadi',
         'title' => 'Kepala Gudang',
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Ukuran Logo Kop Dokumen Gudang (PDF)
+    |--------------------------------------------------------------------------
+    |
+    | Tinggi logo (px) di kop Surat Jalan, Invoice Transfer, dan Surat
+    | Pengajuan Barang — SATU angka untuk ketiganya supaya kop seragam.
+    | Lebar menyesuaikan rasio gambar `public/images/kop-surat-logo.png`
+    | otomatis; kolom teks kop di sebelahnya ikut menyempit.
+    |
+    | Ubah lewat .env: WAREHOUSE_KOP_LOGO_HEIGHT=100, lalu
+    | `php artisan config:clear` (atau `config:cache` di produksi).
+    | Batas wajar: 52–120. Di atas ~120 teks kop jadi terlalu sempit.
+    */
+    'kop_logo' => [
+        'height' => (int) env('WAREHOUSE_KOP_LOGO_HEIGHT', 84),
+    ],
 ];

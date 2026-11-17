@@ -20,6 +20,12 @@
     <meta charset="utf-8">
     <title>Surat Jalan — {{ $transfer->reference_number }}</title>
 
+    @php
+        // Ukuran logo kop diatur di config/warehouse.php (kop_logo.height), bukan di sini.
+        $kopLogoHeight = (int) config('warehouse.kop_logo.height', 84);
+        $kopLogoSize = @getimagesize(public_path('images/kop-surat-logo.png'));
+        $kopLogoCellWidth = (int) ceil($kopLogoHeight * ($kopLogoSize ? $kopLogoSize[0] / $kopLogoSize[1] : 2.5)) + 12;
+    @endphp
     <style>
         * {
             box-sizing: border-box;
@@ -49,14 +55,14 @@
         }
 
         .kop-logo-td {
-            width: 140px;
+            width: {{ $kopLogoCellWidth }}px;
             vertical-align: middle;
             padding: 0;
             text-align: left;
         }
 
         .kop-logo {
-            height: 52px;
+            height: {{ $kopLogoHeight }}px;
             width: auto;
             display: block;
         }
@@ -319,13 +325,13 @@
                     <div class="party-name">{{ $transfer->fromPop->name }}</div>
                     {{ $fromPopAddress }}<br>
                     Telp: {{ $transfer->fromPop->pic_phone ?? '-' }}<br>
-                    PJ: {{ $transfer->fromPop->pic_name ?? '-' }}
+                    PJ: {{ $transfer->fromPop->pic_display_name ?? '-' }}
                 </td>
                 <td>
                     <div class="party-name">{{ $transfer->toPop->name }}</div>
                     {{ $toPopAddress }}<br>
                     Telp: {{ $transfer->toPop->pic_phone ?? '-' }}<br>
-                    PJ: {{ $transfer->toPop->pic_name ?? '-' }}
+                    PJ: {{ $transfer->toPop->pic_display_name ?? '-' }}
                 </td>
             </tr>
         </table>
@@ -392,7 +398,7 @@
                 </td>
                 <td>
                     <div class="signoff-space"></div>
-                    <div class="signoff-name">( {{ $transfer->toPop->pic_name ?? '-' }} )</div>
+                    <div class="signoff-name">( {{ $transfer->toPop->pic_display_name ?? '-' }} )</div>
                     <div class="signoff-date">Tgl: {{ $transfer->created_at->format('d/m/Y') }}</div>
                 </td>
             </tr>

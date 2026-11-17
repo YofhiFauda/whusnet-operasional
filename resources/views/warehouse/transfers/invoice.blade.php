@@ -28,6 +28,12 @@
     <meta charset="utf-8">
     <title>Invoice — {{ $transfer->reference_number }}</title>
 
+    @php
+        // Ukuran logo kop diatur di config/warehouse.php (kop_logo.height), bukan di sini.
+        $kopLogoHeight = (int) config('warehouse.kop_logo.height', 84);
+        $kopLogoSize = @getimagesize(public_path('images/kop-surat-logo.png'));
+        $kopLogoCellWidth = (int) ceil($kopLogoHeight * ($kopLogoSize ? $kopLogoSize[0] / $kopLogoSize[1] : 2.5)) + 12;
+    @endphp
     <style>
         * {
             box-sizing: border-box;
@@ -57,14 +63,14 @@
         }
 
         .kop-logo-td {
-            width: 140px;
+            width: {{ $kopLogoCellWidth }}px;
             vertical-align: middle;
             padding: 0;
             text-align: left;
         }
 
         .kop-logo {
-            height: 52px;
+            height: {{ $kopLogoHeight }}px;
             width: auto;
             display: block;
         }
@@ -302,7 +308,7 @@
                     <div class="row"><span class="label">Tanggal</span>{{ \App\Support\IndonesianDate::date($transfer->created_at) }}</div>
                 </td>
                 <td>
-                    <div class="row"><span class="label">Penerima</span>{{ $transfer->toPop->pic_name ?? '-' }}</div>
+                    <div class="row"><span class="label">Penerima</span>{{ $transfer->toPop->pic_display_name ?? '-' }}</div>
                     <div class="row"><span class="label">Pengiriman</span>Internal Antar Gudang</div>
                     <div class="row"><span class="label">No. Surat Jalan</span>{{ $suratJalanNumber }}</div>
                 </td>
