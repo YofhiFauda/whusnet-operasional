@@ -10,7 +10,7 @@
 @php
     $photoPath = $retrievalLog?->photoPath() ?? $taskDeviceRetrieval?->condition_photo;
     $accessories = $taskDeviceRetrieval?->accessories ?? $retrievalLog?->accessories ?? [];
-    $accessoryLabels = \App\Models\TaskDeviceRetrieval::ACCESSORY_OPTIONS;
+    $accessoryLabels = \App\Models\TaskDeviceRetrieval::ACCESSORY_LABELS;
 @endphp
 
 <div class="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">

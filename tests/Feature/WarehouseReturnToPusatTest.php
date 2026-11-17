@@ -26,6 +26,7 @@ use App\Models\Role;
 use App\Models\Task;
 use App\Models\TaskTeam;
 use App\Models\User;
+use App\Services\ActionQueueBadgeService;
 use App\Services\InventoryIssueService;
 use App\Services\InventoryReassignService;
 use App\Services\InventoryReceiveService;
@@ -474,5 +475,82 @@ class WarehouseReturnToPusatTest extends TestCase
 
         $serialsPage2 = $responsePage2->viewData('serials');
         $this->assertSame(5, $serialsPage2->count());
+    }
+
+    #[Test]
+    public function badge_retur_mengikuti_antrian_terima_retur_lalu_terima_di_pusat(): void
+    {
+        $queues = app(ActionQueueBadgeService::class);
+
+        [$serial] = app(InventoryReceiveService::class)->receiveSerialized($this->pusat, $this->modem, ['RTP-BADGE-1'], 250000, $this->owner);
+        $serial->update([
+            'status' => SerialStatus::INSTALLED,
+            'issued_from_pop_id' => $this->cabang->id,
+            'current_pop_id' => null,
+            'customer_id' => $this->customer->id,
+        ]);
+
+        $this->actingAs($this->teknisi)->post(route('tasks.device-retrieval.store', $this->task), [
+            'outcome' => DeviceRetrievalOutcome::DIAMBIL->value,
+            'serials' => [['serial_number' => 'RTP-BADGE-1', 'item_id' => '']],
+            'condition_photo' => UploadedFile::fake()->image('kondisi.jpg'),
+        ])->assertSessionHasNoErrors();
+
+        // Tahap 1 — modem transit di teknisi: badge Terima Retur menyala.
+        $this->assertSame(1, $queues->pendingReturnReceipts($this->owner)->count());
+        $this->assertSame(0, $queues->pendingPusatReturns($this->owner)->count());
+        $this->actingAs($this->owner)->get(route('warehouse.returns.index'))
+            ->assertOk()
+            ->assertSee('data-badge="return-receive"', false)
+            ->assertSee('data-badge="returns-total"', false)
+            ->assertDontSee('data-badge="return-pusat"', false);
+
+        // Sudah diterima cabang — tetap RETURNED, tapi bukan antrian Terima Retur lagi.
+        $this->actingAs($this->owner)
+            ->post(route('warehouse.returns.receive.store', $serial->refresh()), ['condition' => 'used_good'])
+            ->assertSessionHas('success');
+        $this->assertSame(0, $queues->pendingReturnReceipts($this->owner)->count());
+        $this->actingAs($this->owner)->get(route('warehouse.returns.index'))
+            ->assertOk()
+            // Cek tautan terimanya, bukan teks SN — flash sukses masih memuat SN.
+            ->assertDontSee(route('warehouse.returns.receive.create', $serial), false)
+            ->assertDontSee('data-badge="return-receive"', false);
+
+        // Tahap 2 — dikirim ke Pusat: badge Terima di Pusat menyala.
+        $this->actingAs($this->owner)->post(route('warehouse.returns.dispatch.store'), [
+            'serial_ids' => [$serial->id], 'pusat_id' => $this->pusat->id,
+        ])->assertSessionHas('success');
+        $this->assertSame(1, $queues->pendingPusatReturns($this->owner)->count());
+        $this->actingAs($this->owner)->get(route('warehouse.returns.pusat.index'))
+            ->assertOk()
+            ->assertSee('RTP-BADGE-1')
+            ->assertSee('data-badge="return-pusat"', false)
+            ->assertDontSee('data-badge="return-receive"', false);
+
+        // Tahap 3 — Pusat konfirmasi: semua badge padam.
+        $this->actingAs($this->owner)
+            ->post(route('warehouse.returns.pusat.store', $serial->refresh()), ['condition' => 'used_good'])
+            ->assertSessionHas('success');
+        $this->assertSame(0, $queues->pendingPusatReturns($this->owner)->count());
+        $this->actingAs($this->owner)->get(route('warehouse.returns.index'))
+            ->assertOk()
+            ->assertDontSee('data-badge="returns-total"', false);
+    }
+
+    #[Test]
+    public function badge_retur_tidak_menghitung_barang_di_luar_scope_pop(): void
+    {
+        $this->dispatchForPriceTest('RTP-BADGE-SCOPE');
+
+        $role = Role::where('code', 'admin_gudang')->firstOrFail();
+        $outsider = User::factory()->create(['role_id' => $role->id]);
+        $otherPop = Pop::create(['code' => 'RTP-LAIN', 'pop_code' => 'RTL', 'registration_prefix' => 'C', 'cid_prefix' => 'D', 'name' => 'Cabang Lain', 'type' => 'cabang', 'status' => 'active']);
+        $scope = $outsider->roleScopes()->create(['role_id' => $role->id, 'scope_type' => ScopeType::SELECTED_POP->value]);
+        $scope->targets()->create(['pop_id' => $otherPop->id]);
+
+        $queues = app(ActionQueueBadgeService::class);
+        $this->assertSame(1, $queues->pendingPusatReturns($this->owner)->count());
+        $this->assertSame(0, $queues->pendingPusatReturns($outsider)->count());
+        $this->assertSame(0, $queues->pendingReturnReceipts($outsider)->count());
     }
 }

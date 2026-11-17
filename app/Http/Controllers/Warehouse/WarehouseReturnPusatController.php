@@ -5,14 +5,13 @@ namespace App\Http\Controllers\Warehouse;
 use App\Enums\InventoryTransactionType;
 use App\Enums\ItemCondition;
 use App\Enums\OwnershipMode;
-use App\Enums\SerialStatus;
 use App\Enums\TrackingType;
-use App\Enums\TransferStatus;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Warehouse\Concerns\AuthorizesWarehousePop;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\Item;
+use App\Services\ActionQueueBadgeService;
 use App\Services\EffectiveAccessService;
 use App\Services\InventoryReturnTransferService;
 use App\Support\RupiahInput;
@@ -37,37 +36,15 @@ class WarehouseReturnPusatController extends Controller
     use AuthorizesWarehousePop;
 
     /**
-     * SN `TRANSFERRED` yang baris dispatch-nya (`type=TRANSFER`,
-     * `from_pop_id` terisi, `to_pop_id` KOSONG) menuju transfer berarah ke
-     * Pusat — dibedakan dari transfer stok BIASA (Pusat→Cabang, TIDAK
-     * PERNAH sebaliknya) murni lewat arah `to_pop.type`, tanpa kolom
-     * penanda baru (lihat docblock `InventoryReturnTransferService`).
+     * Daftar & guard memakai query yang SAMA dengan badge "Terima di Pusat"
+     * (`ActionQueueBadgeService::pendingPusatReturns()`) — kalau dipisah,
+     * badge bisa bilang "3" sementara daftarnya kosong (atau sebaliknya).
      */
-    private function pendingSerialIdsQuery(EffectiveAccessService $access, $user)
-    {
-        return InventoryTransaction::query()
-            ->where('type', InventoryTransactionType::TRANSFER->value)
-            ->whereNotNull('from_pop_id')
-            ->whereNull('to_pop_id')
-            ->whereNotNull('inventory_transfer_id')
-            ->whereHas('transfer', function ($q) use ($access, $user) {
-                $q->where('status', TransferStatus::IN_TRANSIT->value)
-                    ->whereHas('toPop', fn ($p) => $p->where('type', 'pusat'))
-                    ->when(! $access->hasAllPopAccess($user), fn ($q2) => $q2->whereIn('to_pop_id', $access->getAllowedPopIds($user)));
-            })
-            ->pluck('serial_id');
-    }
-
-    public function index(Request $request, EffectiveAccessService $access): View
+    public function index(Request $request, ActionQueueBadgeService $queues): View
     {
         Gate::authorize('warehouse_transfer.create');
-        $user = auth()->user();
 
-        $serialIds = $this->pendingSerialIdsQuery($access, $user);
-
-        $serials = InventorySerial::query()
-            ->whereIn('id', $serialIds)
-            ->where('status', SerialStatus::TRANSFERRED->value)
+        $serials = $queues->pendingPusatReturns(auth()->user())
             ->with(['item', 'latestRetrievalLog.task.creqDetail'])
             ->orderByDesc('updated_at')
             ->get();
@@ -75,12 +52,11 @@ class WarehouseReturnPusatController extends Controller
         return view('warehouse.returns.pusat-index', compact('serials'));
     }
 
-    public function create(InventorySerial $serial, EffectiveAccessService $access): View|RedirectResponse
+    public function create(InventorySerial $serial, ActionQueueBadgeService $queues): View|RedirectResponse
     {
         Gate::authorize('warehouse_transfer.create');
-        $user = auth()->user();
 
-        if ($serial->status !== SerialStatus::TRANSFERRED || ! $this->pendingSerialIdsQuery($access, $user)->contains($serial->id)) {
+        if (! $queues->pendingPusatReturns(auth()->user())->whereKey($serial->id)->exists()) {
             return redirect()->route('warehouse.returns.pusat.index')->with('error', "SN {$serial->serial_number} tidak sedang menunggu konfirmasi Pusat.");
         }
 

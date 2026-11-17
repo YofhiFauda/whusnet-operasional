@@ -147,7 +147,7 @@ Migrasi: `2026_09_19_100000_create`. 1:1 dengan `tasks` (**hanya** task tipe Amb
 | `task_id` | FK → `tasks.id`, **unique**, cascade delete | Satu laporan per task; kirim ulang setelah FOP me-reject memakai `updateOrCreate` |
 | `outcome` | string(20) | `App\Enums\DeviceRetrievalOutcome`: `diambil` / `tidak_ditemukan` / `ditolak` |
 | `condition_photo` | string nullable | Foto kondisi alat (disk `public`, folder `device-retrieval/`); wajib kalau `outcome=diambil` |
-| `accessories` | json nullable | Kunci dari `TaskDeviceRetrieval::ACCESSORY_OPTIONS` (`adaptor`, `patchcord`, `kabel_lan`, `remote`) |
+| `accessories` | json nullable | Kunci dari `TaskDeviceRetrieval::ACCESSORY_OPTIONS` (form: cuma `adaptor`). Kunci lama `patchcord`/`kabel_lan`/`remote` masih bisa ada di data lama — labelnya di `ACCESSORY_LABELS` |
 | `notes` | text nullable | Catatan teknisi; **wajib** kalau `outcome` ≠ `diambil` (alasan alat tidak diambil) |
 
 **SN yang dibawa TIDAK disimpan di sini** — sumber kebenarannya `inventory_serials` + ledger `inventory_transactions` + `device_retrieval_logs` ([warehouse/database-schema.md](../warehouse/database-schema.md#device_retrieval_logs-2026_09_21_100000-adhoc-88)), supaya tidak ada dua salinan yang bisa menyimpang. Relasi: `Task::deviceRetrieval()` (HasOne), `TaskDeviceRetrieval::task()`.

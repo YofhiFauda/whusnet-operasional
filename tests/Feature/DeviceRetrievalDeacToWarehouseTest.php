@@ -464,7 +464,7 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
         $serial = $this->makeInstalledSerial('DR-SN-FULL-REPORT');
         $this->submitReport([
             'serials' => [['serial_number' => 'DR-SN-FULL-REPORT', 'item_id' => '']],
-            'accessories' => ['adaptor', 'patchcord'],
+            'accessories' => ['adaptor'],
             'notes' => 'Modem ditarik kondisi utuh dari ruang tamu.',
             'condition_photo' => UploadedFile::fake()->image('modem.jpg'),
         ])->assertSessionHasNoErrors();
@@ -476,7 +476,6 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
             ->assertSee('DR-SN-FULL-REPORT')
             ->assertSee($this->customer->full_name)
             ->assertSee('Adaptor')
-            ->assertSee('Patchcord')
             ->assertSee('Modem ditarik kondisi utuh dari ruang tamu.')
             ->assertSee('Foto Bukti Fisik Lapangan')
             ->assertSee('Terima ke Gudang');

@@ -708,7 +708,7 @@
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kelengkapan yang Ikut Dibawa</p>
                     <div class="flex flex-wrap gap-1.5 mt-1">
                         @forelse(($retrieval->accessories ?? []) as $accessory)
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">{{ \App\Models\TaskDeviceRetrieval::ACCESSORY_OPTIONS[$accessory] ?? $accessory }}</span>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100">{{ \App\Models\TaskDeviceRetrieval::ACCESSORY_LABELS[$accessory] ?? $accessory }}</span>
                         @empty
                         <span class="text-slate-400 dark:text-slate-500">Tidak ada kelengkapan dicatat.</span>
                         @endforelse

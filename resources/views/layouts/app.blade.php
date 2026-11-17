@@ -983,8 +983,8 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4m0-14v14m9-14v10l-9 4"/>
                                 </svg>
                                 <span class="sidebar-text">Gudang</span>
-                                @if((($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0)) > 0)
-                                <span class="sidebar-parent-badge rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white">{{ ($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0) }}</span>
+                                @if((($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0) + ($badge_return_receive_count ?? 0) + ($badge_return_pusat_count ?? 0)) > 0)
+                                <span class="sidebar-parent-badge rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white">{{ ($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0) + ($badge_return_receive_count ?? 0) + ($badge_return_pusat_count ?? 0) }}</span>
                                 @endif
                             </div>
                             <svg id="chevron-warehouse"
@@ -1008,7 +1008,9 @@
                                 <a href="{{ route('warehouse.custody.index') }}" class="flex items-center justify-between sidebar-subitem {{ Request::is('warehouse/custody*') ? 'sidebar-subitem-active' : '' }}"><span>Barang di Tangan Teknisi</span></a>
                                 @endif
                                 @if(auth()->user()->hasPermission('warehouse_reassign.create'))
-                                <a href="{{ route('warehouse.returns.index') }}" class="flex items-center justify-between sidebar-subitem {{ (Request::is('warehouse/returns') || (Request::is('warehouse/returns/*') && ! Request::is('warehouse/returns/from-customer*'))) ? 'sidebar-subitem-active' : '' }}"><span>Terima Retur Modem</span></a>
+                                <a href="{{ route('warehouse.returns.index') }}" class="flex items-center justify-between sidebar-subitem {{ (Request::is('warehouse/returns') || (Request::is('warehouse/returns/*') && ! Request::is('warehouse/returns/from-customer*'))) ? 'sidebar-subitem-active' : '' }}"><span>Terima Retur Modem</span>
+                                    @if((($badge_return_receive_count ?? 0) + ($badge_return_pusat_count ?? 0)) > 0)<span data-badge="returns-total" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">{{ ($badge_return_receive_count ?? 0) + ($badge_return_pusat_count ?? 0) }}</span>@endif
+                                </a>
                                 <a href="{{ route('warehouse.returns.from-customer.create') }}" class="flex items-center justify-between sidebar-subitem {{ Request::is('warehouse/returns/from-customer*') ? 'sidebar-subitem-active' : '' }}"><span>Terima dari Pelanggan</span></a>
                                 @endif
                                 @if(auth()->user()->hasPermission('warehouse_traceability.view'))
