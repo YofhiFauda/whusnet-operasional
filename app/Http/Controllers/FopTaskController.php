@@ -403,7 +403,10 @@ class FopTaskController extends Controller
             'priority' => ['required', 'string', Rule::enum(FopTaskPriority::class)],
             'pending_reason' => ReasonValidationRule::requiredIf('status', 'pending', 255),
             'client_request_date' => ['nullable', 'required_if:status,pending', 'date'],
-            'technicians' => ['required', 'array', 'min:1'],
+            // Teknisi opsional: FOP boleh bikin task dulu, teknisinya dijadwalkan
+            // belakangan lewat Edit (update() mengangkat DRAFT → TERJADWAL dan
+            // membentuk Task teknisi begitu teknisi pertama di-assign).
+            'technicians' => ['nullable', 'array'],
             'technicians.*' => ['exists:users,id'],
             ...$this->infrastructureScopeRules(),
         ], [
@@ -411,7 +414,16 @@ class FopTaskController extends Controller
             'client_request_date.required_if' => 'Tanggal request client wajib diisi jika status Pending.',
         ]);
 
-        return DB::transaction(function () use ($validated) {
+        $technicians = $validated['technicians'] ?? [];
+
+        // "Terjadwal" tanpa satu pun teknisi itu bohong — belum ada yang dijadwalkan
+        // dan Task teknisi belum kebentuk. Turunkan ke DRAFT, sama seperti FopTask
+        // hasil eskalasi Ticketing yang belum di-assign. Pending tetap Pending.
+        if (empty($technicians) && $validated['status'] === TaskStatus::TERJADWAL->value) {
+            $validated['status'] = TaskStatus::DRAFT->value;
+        }
+
+        return DB::transaction(function () use ($validated, $technicians) {
             $taskNumber = app(NumberSequenceService::class)->fopTaskNumber();
 
             $fopTask = new FopTask;
@@ -438,8 +450,7 @@ class FopTaskController extends Controller
 
             $this->applyInfrastructureScope($fopTask, $validated, isCreate: true);
 
-            if (! empty($validated['technicians'])) {
-                $technicians = $validated['technicians'];
+            if (! empty($technicians)) {
                 $fopTask->technicians()->sync($technicians);
 
                 // Title dibuat polos dulu — prefix "[Nama Team]" diisi oleh

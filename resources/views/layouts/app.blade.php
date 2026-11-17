@@ -594,7 +594,7 @@
             </div>
 
             {{-- ── Group: JARINGAN & LAPANGAN ── --}}
-            @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('qr_scan_logs.view') || auth()->user()->hasPermission('network_nodes.view'))
+            @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('network_nodes.view'))
             <div>
                 <div class="sidebar-group-header px-2.5 mb-1.5">
                     <p class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest sidebar-text">Jaringan &amp; Lapangan</p>
@@ -695,18 +695,6 @@
                     </a>
                     @endcan
 
-                    @can('qr_scan_logs.view')
-                    <a href="{{ route('qr-scan-logs.index') }}" title="Riwayat Scan QR"
-                       class="sidebar-nav-item {{ Request::routeIs('qr-scan-logs.index') ? 'sidebar-nav-item-active' : '' }}">
-                        <div class="flex items-center gap-3 sidebar-item-content">
-                            <svg class="h-5 w-5 shrink-0 {{ Request::routeIs('qr-scan-logs.index') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1zm12 0h2a1 1 0 0 0 1-1V5a1 1 0 0 0-1-1h-2a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1zM5 20h2a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1H5a1 1 0 0 0-1 1v2a1 1 0 0 0 1 1z"/>
-                            </svg>
-                            <span class="sidebar-text truncate">Riwayat Scan QR</span>
-                        </div>
-                    </a>
-                    @endcan
-
                     @if(auth()->user()->hasPermission('tickets.view') || auth()->user()->hasPermission('tickets.create') || auth()->user()->hasPermission('noc_worksheet.view') || auth()->user()->hasPermission('noc_dashboard.view'))
                     @php
                         $isTicketingActive = Request::is('tickets*') || Request::is('noc/*');
@@ -779,7 +767,7 @@
             @endif
 
             {{-- ── Group: LAPORAN ── --}}
-            @if(auth()->user()->hasPermission('reports.view') || auth()->user()->hasPermission('audit_logs.view') || auth()->user()->hasPermission('webpush_dashboard.view'))
+            @if(auth()->user()->hasPermission('reports.view') || auth()->user()->hasPermission('audit_logs.view'))
             <div>
                 <div class="sidebar-group-header px-2.5 mb-1.5">
                     <p class="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest sidebar-text">Laporan</p>
@@ -857,18 +845,6 @@
                                 <path stroke-linecap="round" stroke-linejoin="round" d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>
                             </svg>
                             <span class="sidebar-text">Audit Log</span>
-                        </div>
-                    </a>
-                    @endif
-
-                    @if(auth()->user()->hasPermission('webpush_dashboard.view'))
-                    <a href="{{ route('webpush.dashboard') }}" title="Dashboard Delivery Push Notification"
-                       class="sidebar-nav-item {{ Request::is('webpush/dashboard*') ? 'sidebar-nav-item-active' : '' }}">
-                        <div class="flex items-center gap-3 sidebar-item-content">
-                            <svg class="h-5 w-5 shrink-0 {{ Request::is('webpush/dashboard*') ? 'text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M15 17h5l-1.405-1.405A2.032 2.032 0 0 1 18 14.158V11a6.002 6.002 0 0 0-4-5.659V5a2 2 0 1 0-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 1 1-6 0v-1m6 0H9" />
-                            </svg>
-                            <span class="sidebar-text">Delivery Push Notification</span>
                         </div>
                     </a>
                     @endif

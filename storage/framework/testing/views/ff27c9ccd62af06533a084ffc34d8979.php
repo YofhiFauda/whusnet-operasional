@@ -1,6 +1,6 @@
-<?php $__env->startSection('title', 'Dashboard - Whusnet Operasional'); ?>
-<?php $__env->startSection('page_title', 'Operational Command Center'); ?>
-<?php $__env->startSection('meta_description', 'Dashboard Operational Command Center ISP Whusnet - Monitoring Pelanggan, Finansial, dan Jaringan secara Real-time'); ?>
+<?php $__env->startSection('title', 'Dashboard'); ?>
+<?php $__env->startSection('page_title', 'Dashboard Operasional'); ?>
+<?php $__env->startSection('meta_description', 'Dashboard Operasional - Monitoring Pelanggan, Finansial, dan Jaringan secara Real-time'); ?>
 
 <?php $__env->startSection('content'); ?>
 <?php
@@ -1313,7 +1313,7 @@
     if (window.Chart) {
         renderDashboardCharts();
     } else {
-        window.addEventListener('chart:ready', renderDashboardCharts);
+        window.addEventListener('chart:ready', renderDashboardCharts, { once: true });
     }
     document.addEventListener('DOMContentLoaded', renderDashboardCharts);
 })();

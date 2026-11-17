@@ -92,7 +92,6 @@ class RolePermissionSeeder extends Seeder
                 'packages.view',
                 'payments.view',
                 'pops.view',
-                'qr_scan_logs.view', // Riwayat percobaan scan QR (docs/plan/qr-code/)
                 'reports.export',
                 'reports.view',
                 'roles.view',
@@ -117,7 +116,6 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_transfer.view',
                 'warehouse_branch_sale.view',
                 'warehouse_branch_sale_price.view',
-                'webpush_dashboard.view', // ADHOC-288 Tahap 8 — delivery rate push per merek/OS
             ],
 
             'admin' => [
@@ -183,7 +181,6 @@ class RolePermissionSeeder extends Seeder
                 'termination_reasons.update',
                 'termination_reasons.view',
                 'tickets.qr.create',
-                'webpush_dashboard.view', // ADHOC-288 Tahap 8 — delivery rate push per merek/OS
             ],
 
             // NOC sekarang (2026-10-02) juga pegang administrasi task.* penuh
@@ -455,7 +452,6 @@ class RolePermissionSeeder extends Seeder
                 'pops.update',
                 'pops.view',
                 'qr_scan.view', // Scan QR Internal (2026-08-27)
-                'qr_scan_logs.view', // Riwayat percobaan scan QR untuk pengawasan FOP
                 'task.approve',
                 'task.assign.team',
                 'task.cancel',

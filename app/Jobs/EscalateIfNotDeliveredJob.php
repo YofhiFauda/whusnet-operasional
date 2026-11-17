@@ -43,7 +43,9 @@ class EscalateIfNotDeliveredJob implements ShouldQueue
             'escalated_at' => now(),
         ]);
 
-        Log::warning('Push notification tidak ter-ack dalam 5 menit, dieskalasi.', [
+        // Channel `webpush` (2026-11-17), bukan laravel.log — satu tempat
+        // dengan log kirim & ack supaya alur satu delivery terbaca utuh.
+        Log::channel('webpush')->warning('Push notification tidak ter-ack dalam 5 menit, dieskalasi.', [
             'push_delivery_id' => $delivery->id,
             'notification_class' => $delivery->notification_class,
             'notifiable_type' => $delivery->notifiable_type,

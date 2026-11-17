@@ -227,12 +227,6 @@ return [
             ActionCode::CREATE->value,
         ],
 
-        // Dashboard anomali scan QR (Fase 2/3) — permission diseed sekarang,
-        // halamannya sendiri belum dibangun di Fase 1.
-        'qr_scan_logs' => [
-            ActionCode::VIEW->value,
-        ],
-
         // Scan QR Internal (staf) — 2026-08-27, resources/js/qr-scan.js.
         // Cuma `.view` (buka halaman + pakai kamera) — bukan aksi CRUD.
         'qr_scan' => [
@@ -782,14 +776,6 @@ return [
             ActionCode::APPROVE->value,
             ActionCode::REJECT->value,
         ],
-
-        // Dashboard Delivery Push Notification (ADHOC-288 Tahap 8, ditunda
-        // dari Tahap 6 item 4) — delivery rate `push_deliveries` per merek
-        // HP/OS dari `push_subscriptions.device_name`. Cuma VIEW, read-only
-        // murni, audiens manajemen/infra bukan operasional harian.
-        'webpush_dashboard' => [
-            ActionCode::VIEW->value,
-        ],
     ],
 
     /*
@@ -937,7 +923,6 @@ return [
         'customers.qr.cancel' => 'Cabut Token QR Pelanggan',
         'customers.qr.print' => 'Cetak Stiker QR Pelanggan',
         'tasks.qr_attendance.create' => 'Absen Task via Scan QR (Fase 3)',
-        'qr_scan_logs.view' => 'Lihat Dashboard Anomali Scan QR',
         // Scan QR internal (2026-08-27) — kamera DI DALAM app ini, bukan
         // app scanner luar (lihat resources/js/qr-scan.js kenapa).
         'qr_scan.view' => 'Buka Halaman Scan QR Internal (Staf)',
@@ -1011,7 +996,5 @@ return [
         // Rekap Pemakaian Material Lapangan (/warehouse/usage)
         'warehouse.usage.view' => 'Lihat Rekap Pemakaian Material Lapangan',
         'warehouse.infra_stock.view' => 'Lihat Barang Terpasang di Infrastruktur',
-
-        'webpush_dashboard.view' => 'Lihat Dashboard Delivery Push Notification',
     ],
 ];

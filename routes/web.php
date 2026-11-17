@@ -81,7 +81,6 @@ use App\Http\Controllers\PushSubscriptionController;
 use App\Http\Controllers\QrAttendanceController;
 use App\Http\Controllers\QrInAppScanController;
 use App\Http\Controllers\QrScanController;
-use App\Http\Controllers\QrScanLogController;
 use App\Http\Controllers\QrTicketController;
 use App\Http\Controllers\RolePermissionController;
 use App\Http\Controllers\SalesOmsetDashboardController;
@@ -128,7 +127,6 @@ use App\Http\Controllers\Warehouse\WarehouseSwitchPopController;
 use App\Http\Controllers\Warehouse\WarehouseTraceabilityController;
 use App\Http\Controllers\Warehouse\WarehouseTransferController;
 use App\Http\Controllers\Warehouse\WarehouseUsageController;
-use App\Http\Controllers\WebPushDashboardController;
 use App\Models\City;
 use App\Models\District;
 use App\Models\Pop;
@@ -217,12 +215,6 @@ Route::middleware('auth')->group(function () {
     Route::post('/webpush/unsubscribe', [PushSubscriptionController::class, 'unsubscribe'])->name('webpush.unsubscribe');
     Route::get('/webpush/subscriptions', [PushSubscriptionController::class, 'subscriptions'])->name('webpush.subscriptions');
     Route::post('/webpush/test', [PushSubscriptionController::class, 'sendTest'])->name('webpush.test');
-
-    // Dashboard delivery rate per merek HP/OS (ADHOC-288 Tahap 8, ditunda
-    // dari Tahap 6 item 4) — static route, sebelum bagian dynamic lain.
-    Route::middleware('permission:webpush_dashboard.view')->group(function () {
-        Route::get('/webpush/dashboard', [WebPushDashboardController::class, 'index'])->name('webpush.dashboard');
-    });
 
     Route::get('/panduan', [ManualBookController::class, 'index'])->name('manuals.index');
     Route::get('/panduan/konteks', [ManualBookController::class, 'context'])->name('manuals.context');
@@ -479,12 +471,6 @@ Route::middleware('auth')->group(function () {
 
     Route::middleware('permission:audit_logs.view')->group(function () {
         Route::get('/audit-logs', [AuditLogController::class, 'index'])->name('audit-logs.index');
-    });
-
-    // Riwayat Scan QR (docs/plan/qr-code/, feature+permission sudah
-    // ada sejak QrFeatureSeeder — baru dipakai sekarang, ADHOC audit dashboard 2026-10-12).
-    Route::middleware('permission:qr_scan_logs.view')->group(function () {
-        Route::get('/qr-scan-logs', [QrScanLogController::class, 'index'])->name('qr-scan-logs.index');
     });
 
     Route::middleware('permission:payments.create')->group(function () {

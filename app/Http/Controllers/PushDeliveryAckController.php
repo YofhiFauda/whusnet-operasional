@@ -5,6 +5,7 @@ namespace App\Http\Controllers;
 use App\Enums\PushDeliveryStatus;
 use App\Models\PushDelivery;
 use Illuminate\Http\Response;
+use Illuminate\Support\Facades\Log;
 
 /**
  * Endpoint ack delivery push (ADHOC-288, Tahap 6) — dipanggil `sw.js` dari
@@ -26,6 +27,15 @@ class PushDeliveryAckController extends Controller
     public function __invoke(PushDelivery $delivery): Response
     {
         if (in_array($delivery->status, [PushDeliveryStatus::Sent, PushDeliveryStatus::Escalated], true)) {
+            // `late` = ack nyampe SETELAH dieskalasi — sinyal battery saver /
+            // device sleep, berguna buat dibaca di storage/logs/webpush-*.log.
+            Log::channel('webpush')->info('Push sampai ke device', [
+                'push_delivery_id' => $delivery->id,
+                'notifiable_id' => $delivery->notifiable_id,
+                'late' => $delivery->status === PushDeliveryStatus::Escalated,
+                'seconds_after_sent' => $delivery->sent_at ? (int) $delivery->sent_at->diffInSeconds(now()) : null,
+            ]);
+
             $delivery->update([
                 'status' => PushDeliveryStatus::Delivered,
                 'delivered_at' => now(),

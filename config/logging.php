@@ -73,6 +73,28 @@ return [
             'replace_placeholders' => true,
         ],
 
+        // Log per fitur (2026-11-17) — pengganti halaman Riwayat Scan QR &
+        // Dashboard Delivery Push yang dihapus selagi dua fitur itu masih
+        // tahap uji. Dipisah dari laravel.log supaya developer bisa `tail -f`
+        // satu fitur tanpa tenggelam di log aplikasi lain. Data utamanya
+        // TETAP di tabel `qr_scan_logs`/`push_deliveries` (dibaca artisan
+        // `qr:scan-logs`/`webpush:delivery-stats`); file ini jejak kronologis.
+        'qr_scan' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/qr-scan.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
+        'webpush' => [
+            'driver' => 'daily',
+            'path' => storage_path('logs/webpush.log'),
+            'level' => env('LOG_LEVEL', 'debug'),
+            'days' => env('LOG_DAILY_DAYS', 14),
+            'replace_placeholders' => true,
+        ],
+
         'slack' => [
             'driver' => 'slack',
             'url' => env('LOG_SLACK_WEBHOOK_URL'),
