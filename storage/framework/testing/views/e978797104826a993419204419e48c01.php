@@ -29,20 +29,7 @@
                     </svg>
                 </a>
                 
-                <?php
-                    $statusStyle = match($task->status->value) {
-                        'terjadwal'  => 'background:var(--color-info-bg); color:var(--color-info); border-color:var(--color-info-border)',
-                        'in_progress'=> 'background:var(--color-warning-bg); color:var(--color-warning); border-color:var(--color-warning-border)',
-                        'lapor_nanti'=> 'background:#f5f3ff; color:#6d28d9; border-color:#c4b5fd',
-                        'selesai'    => 'background:var(--color-success-bg); color:var(--color-success); border-color:var(--color-success-border)',
-                        'dibatalkan' => 'background:var(--color-error-bg); color:var(--color-error); border-color:var(--color-error-border)',
-                        default      => 'background:var(--color-surface-muted); color:var(--color-text-muted); border-color:var(--color-border)',
-                    };
-                ?>
-                <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md border font-ui" style="<?php echo e($statusStyle); ?>">
-                    <?php echo e($task->status->label()); ?>
-
-                </span>
+                <?php echo $__env->make('tasks.partials._status-panel', ['task' => $task], array_diff_key(get_defined_vars(), ['__data' => 1, '__path' => 1]))->render(); ?>
                 <span class="text-[10px] font-bold uppercase tracking-wider px-2.5 py-0.5 rounded-md border font-ui <?php echo e($task->task_type->cardClasses()); ?>">
                     <?php echo e($task->task_type->label()); ?>
 
@@ -1848,6 +1835,53 @@ $taskData = [
 <?php $component = $__componentOriginalc54844c8500937c8c904b75d0190ca4d; ?>
 <?php unset($__componentOriginalc54844c8500937c8c904b75d0190ca4d); ?>
 <?php endif; ?>
+
+<script>
+    /**
+     * Live-refresh status badge tanpa reload — dengar TaskStarted/
+     * TaskCompleted di channel fop.{pop_id} (sudah ada, dipakai FOP
+     * Dashboard). Payload event bawa `id` = Task.id (lihat
+     * App\Events\TaskStarted::broadcastWith()), filter di sini supaya
+     * cuma task YANG SEDANG DIBUKA yang fetch ulang.
+     */
+    (function () {
+        const taskId = <?php echo e((int) $task->id); ?>;
+        const popId = <?php echo e((int) $task->pop_id); ?>;
+        const statusPanelUrl = <?php echo json_encode(route('tasks.status-panel', $task), 512) ?>;
+
+        function refreshStatusPanel() {
+            const el = document.getElementById('task-status-panel');
+            if (!el) {
+                return;
+            }
+
+            fetch(statusPanelUrl, { headers: { 'X-Requested-With': 'XMLHttpRequest' } })
+                .then((res) => res.text())
+                .then((html) => {
+                    el.outerHTML = html;
+                    const fresh = document.getElementById('task-status-panel');
+                    if (fresh && window.Alpine) {
+                        window.Alpine.initTree(fresh);
+                    }
+                })
+                .catch(() => {
+                    // Diam-diam gagal — badge tetap nampilin data lama.
+                });
+        }
+
+        function bind() {
+            window.pageEcho(`fop.${popId}`)
+                .listen('TaskStarted', (e) => { if (e.id === taskId) refreshStatusPanel(); })
+                .listen('TaskCompleted', (e) => { if (e.id === taskId) refreshStatusPanel(); });
+        }
+
+        if (window.Echo) {
+            bind();
+        } else {
+            window.addEventListener('echo:ready', bind, { once: true });
+        }
+    })();
+</script>
 
 <?php $__env->stopSection(); ?>
 

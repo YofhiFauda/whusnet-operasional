@@ -5,6 +5,7 @@ namespace App\Services;
 use App\Enums\PushDeliveryStatus;
 use App\Jobs\EscalateIfNotDeliveredJob;
 use App\Models\PushDelivery;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\URL;
 
 /**
@@ -25,6 +26,15 @@ class WebPushDeliveryTracker
             'notification_class' => $notificationClass,
             'status' => PushDeliveryStatus::Sent,
             'sent_at' => now(),
+        ]);
+
+        // Jejak kronologis ke storage/logs/webpush-*.log (2026-11-17) —
+        // pengganti Dashboard Delivery Push yang dihapus selagi tahap uji.
+        Log::channel('webpush')->info('Push dikirim', [
+            'push_delivery_id' => $delivery->id,
+            'notification_class' => $notificationClass,
+            'notifiable_type' => $delivery->notifiable_type,
+            'notifiable_id' => $delivery->notifiable_id,
         ]);
 
         EscalateIfNotDeliveredJob::dispatch($delivery->id)->delay(now()->addMinutes(5));

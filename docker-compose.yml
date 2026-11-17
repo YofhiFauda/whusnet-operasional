@@ -43,7 +43,7 @@ services:
       FPM_START_SERVERS: ${FPM_START_SERVERS:-6}
       FPM_MIN_SPARE_SERVERS: ${FPM_MIN_SPARE_SERVERS:-4}
       FPM_MAX_SPARE_SERVERS: ${FPM_MAX_SPARE_SERVERS:-10}
-      APP_NAME: ${APP_NAME:-Whusnet-Operasional}
+      APP_NAME: ${APP_NAME:-RUANG KERJA WHUSNET}
       APP_ENV: production
       APP_DEBUG: "false"
       APP_KEY: ${APP_KEY}
@@ -103,7 +103,7 @@ services:
       MAIL_USERNAME: ${MAIL_USERNAME:-}
       MAIL_PASSWORD: ${MAIL_PASSWORD:-}
       MAIL_FROM_ADDRESS: ${MAIL_FROM_ADDRESS:-}
-      MAIL_FROM_NAME: ${APP_NAME:-Whusnet-Operasional}
+      MAIL_FROM_NAME: ${APP_NAME:-RUANG KERJA WHUSNET}
       FILESYSTEM_DISK: local
       QR_HMAC_SECRET: ${QR_HMAC_SECRET}
       QR_BASE_URL: ${APP_URL}
@@ -182,19 +182,15 @@ services:
       timeout: 10s
       retries: 3
       start_period: 15s
+    # Portal Pelanggan (project Coolify terpisah, satu server) memanggil API
+    # lewat domain publik HTTPS (LARAVEL_API_URL=https://<APP_URL>/api/customer-portal),
+    # BUKAN lewat network internal: nama container Coolify berubah tiap
+    # redeploy (`nginx-<uuid>-<timestamp>`) dan `aliases:` di network
+    # `coolify` dibuang Coolify (dites 2026-11-16, Coolify 4.7.5).
+    # Webhook ke Portal sama: PORTAL_WEBHOOK_URL=https://<domain-portal>/api/webhooks/invoice-updated.
     networks:
-      app_network: {}
-      coolify:
-        # Alias DNS STABIL buat Portal Pelanggan (project Coolify terpisah,
-        # satu server) — Portal set LARAVEL_API_URL=http://whusnet-api/api/customer-portal.
-        # Kenapa bukan nama container: Coolify kasih suffix UUID + timestamp
-        # deploy (`nginx-<uuid>-20261116T023648`), berubah tiap redeploy.
-        # Kenapa bukan alias bawaan `nginx`: network `coolify` dipakai
-        # bareng SEMUA project di server — alias generik bisa bentrok,
-        # Docker DNS lalu round-robin & request Portal (plus header
-        # X-Portal-Client rahasia) nyasar ke container lain.
-        aliases:
-          - whusnet-api
+      - app_network
+      - coolify
 
   horizon:
     # Tanpa `build:` sendiri — pakai image yang sama persis dengan `app`

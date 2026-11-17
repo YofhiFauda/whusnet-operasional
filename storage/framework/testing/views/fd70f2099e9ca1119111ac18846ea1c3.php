@@ -1,6 +1,5 @@
 <?php $__env->startSection('title', 'Edit Pelanggan - Whusnet Operasional'); ?>
 <?php $__env->startSection('page_title', 'Edit Data Pelanggan'); ?>
-<?php $__env->startSection('breadcrumb_parent', 'Pelanggan'); ?>
 <?php $__env->startSection('breadcrumb_parent_url', '/customers'); ?>
 
 <?php $__env->startSection('content'); ?>
@@ -728,7 +727,26 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
 <?php endif; ?>
                                     </div>
                                     <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO RUMAH</span>
-                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Format: JPG, PNG (Max 2MB)</span>
+                                    <?php if (isset($component)) { $__componentOriginala82975a30b9db16b9f8ce6ba13694d76 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.upload-limit-hint','data' => ['size' => 'xs','format' => 'Format: JPG, PNG']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('upload-limit-hint'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['size' => 'xs','format' => 'Format: JPG, PNG']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $attributes = $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $component = $__componentOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
                                 </div>
 
                                 <div id="preview-container-foto_rumah" style="display: <?php echo e($fotoRumahUrl ? '' : 'none'); ?>;" class="py-2 flex flex-col items-center justify-center">
@@ -830,7 +848,26 @@ unset($__errorArgs, $__bag); ?> hover:border-sky-500 dark:hover:border-sky-400 r
 <?php endif; ?>
                                     </div>
                                     <span class="block text-xs font-bold text-slate-800 dark:text-slate-200">FOTO KONTRAK</span>
-                                    <span class="block text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">Format: JPG, PNG, PDF (Max 2MB)</span>
+                                    <?php if (isset($component)) { $__componentOriginala82975a30b9db16b9f8ce6ba13694d76 = $component; } ?>
+<?php if (isset($attributes)) { $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76 = $attributes; } ?>
+<?php $component = Illuminate\View\AnonymousComponent::resolve(['view' => 'components.upload-limit-hint','data' => ['size' => 'xs','format' => 'Format: JPG, PNG, PDF']] + (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag ? $attributes->all() : [])); ?>
+<?php $component->withName('upload-limit-hint'); ?>
+<?php if ($component->shouldRender()): ?>
+<?php $__env->startComponent($component->resolveView(), $component->data()); ?>
+<?php if (isset($attributes) && $attributes instanceof Illuminate\View\ComponentAttributeBag): ?>
+<?php $attributes = $attributes->except(\Illuminate\View\AnonymousComponent::ignoredParameterNames()); ?>
+<?php endif; ?>
+<?php $component->withAttributes(['size' => 'xs','format' => 'Format: JPG, PNG, PDF']); ?>
+<?php echo $__env->renderComponent(); ?>
+<?php endif; ?>
+<?php if (isset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $attributes = $__attributesOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__attributesOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
+<?php if (isset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76)): ?>
+<?php $component = $__componentOriginala82975a30b9db16b9f8ce6ba13694d76; ?>
+<?php unset($__componentOriginala82975a30b9db16b9f8ce6ba13694d76); ?>
+<?php endif; ?>
                                 </div>
 
                                 <div id="preview-container-foto_kontrak" style="display: <?php echo e($fotoKontrakUrl ? '' : 'none'); ?>;" class="py-2 flex flex-col items-center justify-center">
@@ -1790,8 +1827,11 @@ unset($__errorArgs, $__bag); ?>
 <?php $__env->startSection('scripts'); ?>
 <script>
     /* Skema 3 (2026-09-12) — autocomplete ID Referral Pelanggan (sama
-       komponen dengan customers/create.blade.php). */
-    document.addEventListener('alpine:init', () => {
+       komponen dengan customers/create.blade.php). Registrasi dibungkus
+       fungsi yang CEK dulu `window.Alpine` — lihat alasan lengkap di
+       components/ui/pop-filter.blade.php. */
+    (function () {
+        const register = () => {
         Alpine.data('referralSearch', () => ({
             query: <?php echo json_encode(old('referral_customer_id') ? '' : ($customer->referralCustomer ? $customer->referralCustomer->customer_code.' — '.$customer->referralCustomer->full_name : ''), 15, 512) ?>,
             results: [],
@@ -1810,15 +1850,26 @@ unset($__errorArgs, $__bag); ?>
                 this.results = [];
             },
         }));
-    });
+        };
 
-    /* ── Wizard Form Stepper & Live Validation Logic ── */
-    let currentActiveStep = 1;
-    const totalStepsCount = 7;
+        if (window.Alpine) {
+            register();
+        } else {
+            document.addEventListener('alpine:init', register, { once: true });
+        }
+    })();
+
+    /* ── Wizard Form Stepper & Live Validation Logic ──
+       `var`, BUKAN `let`/`const`: hx-boost nge-swap SELURUH <body> tiap
+       nav, script ini ikut ter-insert ulang tiap balik ke halaman edit
+       pelanggan ini — `let`/`const` top-level gak bisa redeclare (lihat
+       bug formToastLock/selectedCustomerData, 2026-11-04). */
+    var currentActiveStep = 1;
+    var totalStepsCount = 7;
 
     // Field wizard dikelompokkan mengikuti tab Detail Pelanggan
     // (identitas/alamat/pop dipisah) supaya per-step gak campur aduk.
-    const formFields = {
+    var formFields = {
         'identitas': {
             required: ['full_name', 'identity_number', 'gender', 'primary_phone', 'registration_date'],
             optional: ['email', 'alternative_phone', 'npwp']
@@ -1860,7 +1911,7 @@ unset($__errorArgs, $__bag); ?>
         }
     };
 
-    const stepKeys = {
+    var stepKeys = {
         1: 'identitas',
         2: 'alamat',
         3: 'pop',
@@ -1919,7 +1970,7 @@ unset($__errorArgs, $__bag); ?>
         filterChildOptions(distributionSelect, 'miniPopId', miniPopSelect.value);
     }
 
-    document.addEventListener("DOMContentLoaded", function() {
+    window.onPageReady(function() {
         syncNetworkDropdowns();
         document.getElementById('pop_id')?.addEventListener('change', syncNetworkDropdowns);
         document.getElementById('mini_pop_id')?.addEventListener('change', syncNetworkDropdowns);
@@ -1936,9 +1987,9 @@ unset($__errorArgs, $__bag); ?>
     });
 
     // Populate active city/district
-    const activeCityId = "<?php echo e(old('city_id', $customer->city_id)); ?>";
-    const activeDistrictId = "<?php echo e(old('district_id', $customer->district_id)); ?>";
-    const activeVillageId = "<?php echo e(old('village_id', $customer->village_id)); ?>";
+    var activeCityId = "<?php echo e(old('city_id', $customer->city_id)); ?>";
+    var activeDistrictId = "<?php echo e(old('district_id', $customer->district_id)); ?>";
+    var activeVillageId = "<?php echo e(old('village_id', $customer->village_id)); ?>";
 
     if (activeCityId) {
         loadDistricts(activeCityId, activeDistrictId, activeVillageId);

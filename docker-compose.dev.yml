@@ -66,7 +66,10 @@ services:
     image: app:latest
     build:
       context: .
-      dockerfile: Dockerfile
+      # Dockerfile.dev, BUKAN Dockerfile: `Dockerfile` sekarang isinya versi prod
+      # multi-stage yang stage terakhirnya `web` (nginx). Build tanpa `target`
+      # = image nginx ditag app:latest → container app "php-fpm: not found".
+      dockerfile: Dockerfile.dev
     container_name: whusnet-app
     restart: unless-stopped
     working_dir: /var/www

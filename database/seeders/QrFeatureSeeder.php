@@ -15,7 +15,9 @@ use Illuminate\Database\Seeder;
  *
  *   customers.qr       (sub dari root `customers`) — lihat/terbitkan/cabut/cetak token
  *   tasks.qr_attendance (sub dari root `tasks`)    — absen via QR, Fase 3 (diseed sekarang)
- *   qr_scan_logs        (root baru)                — dashboard anomali scan, Fase 2/3
+ *   (qr_scan_logs dihapus 2026-11-17 — halaman Riwayat Scan QR diganti
+ *    artisan `qr:scan-logs` + log `qr-scan`, lihat migration
+ *    remove_qr_scan_logs_and_webpush_dashboard_features)
  *   qr_scan             (root baru, 2026-08-27)     — halaman Scan QR Internal (staf), kamera
  *                                                      di dalam app, gantikan asumsi app scanner
  *                                                      luar (lihat resources/js/qr-scan.js)
@@ -94,17 +96,6 @@ class QrFeatureSeeder extends Seeder
                 'sort_order' => 20,
                 'is_active' => true,
                 'parent_id' => $tasksRootId,
-            ]
-        );
-
-        Feature::updateOrCreate(
-            ['code' => 'qr_scan_logs'],
-            [
-                'name' => 'Riwayat Scan QR',
-                'type' => FeatureType::ROOT,
-                'sort_order' => 11,
-                'is_active' => true,
-                'parent_id' => null,
             ]
         );
 

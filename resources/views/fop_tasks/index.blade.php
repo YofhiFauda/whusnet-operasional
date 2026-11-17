@@ -829,7 +829,7 @@
                                         </svg>
                                     </span>
                                     <label class="text-xs font-bold text-text-main uppercase tracking-wider">
-                                        Pilih &amp; Jadwalkan Teknisi <span class="text-error normal-case" x-show="!isTicketMode">*</span>
+                                        Pilih &amp; Jadwalkan Teknisi <span class="text-error normal-case" x-show="techsRequired">*</span>
                                     </label>
                                 </div>
                                 <p class="text-[11px] text-text-muted mt-0.5 flex items-center gap-1.5 font-medium flex-wrap">
@@ -1029,8 +1029,9 @@
                         <template x-for="tId in modal.techs" :key="'input-' + tId">
                             <input type="hidden" name="technicians[]" :value="tId">
                         </template>
-                        <input type="hidden" :required="!isTicketMode && modal.techs.length === 0" class="absolute w-0 h-0 opacity-0" name="technicians_required">
-                        <p class="mt-1 text-[10px] text-text-muted" x-show="isTicketMode">Teknisi opsional di sini — kosongkan buat masuk sebagai Ticket Masuk dulu, di-assign belakangan.</p>
+                        <input type="hidden" :required="techsRequired && modal.techs.length === 0" class="absolute w-0 h-0 opacity-0" name="technicians_required">
+                        <p class="mt-1 text-[10px] text-text-muted" x-show="isTicketMode && !modal.isEdit">Teknisi opsional di sini — kosongkan buat masuk sebagai Ticket Masuk dulu, di-assign belakangan.</p>
+                        <p class="mt-1 text-[10px] text-text-muted" x-show="!isTicketMode && !techsRequired">Teknisi opsional — kosongkan untuk simpan sebagai Draft, jadwalkan teknisinya belakangan lewat Edit.</p>
                     </div>
 
                     <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1562,7 +1563,8 @@
                     ticket: null,
                     status: 'terjadwal', priority: 'low', pending_reason: '', client_request_date: ''
                 },
-                techs: []
+                techs: [],
+                originalTechCount: 0
             },
 
             get isEditingLinkedTicket() {
@@ -2120,6 +2122,14 @@
                 this.modal.data.customer_id = '';
             },
 
+            // Teknisi cuma wajib saat Edit task yang SUDAH punya teknisi: update()
+            // menganggap request tanpa technicians[] = "tidak berubah", jadi
+            // mengosongkan semua teknisi di sini bakal gagal diam-diam. Task baru
+            // & Draft yang belum di-assign boleh disimpan tanpa teknisi.
+            get techsRequired() {
+                return this.modal.isEdit && (this.modal.originalTechCount || 0) > 0;
+            },
+
             get isTicketMode() {
                 return this.ticketValues.includes(this.modal.data.category);
             },
@@ -2174,6 +2184,7 @@
                     client_request_date: ''
                 };
                 this.modal.techs = [];
+                this.modal.originalTechCount = 0;
                 this.customerSearchResults = [];
                 this.searchTech = '';
                 this.techFilter = 'all';
@@ -2257,6 +2268,7 @@
                     client_request_date: reqDateStr
                 };
                 this.modal.techs = techIds ? [...techIds] : [];
+                this.modal.originalTechCount = this.modal.techs.length;
                 this.modal.open = true;
                 this.initInfraScope(task.scope_snapshot || null);
                 if (dateStr) {

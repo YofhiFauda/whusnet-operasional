@@ -11,6 +11,7 @@ use App\Models\User;
 use Illuminate\Contracts\Encryption\DecryptException;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use RuntimeException;
 
 /**
@@ -236,6 +237,24 @@ class CustomerQrTokenService
     public function recordScan(array $attributes): QrScanLog
     {
         $log = QrScanLog::create($attributes + ['scanned_at' => now()]);
+
+        // Jejak kronologis ke storage/logs/qr-scan-*.log (2026-11-17) —
+        // pengganti halaman Riwayat Scan QR yang dihapus. Scan gagal = WARNING
+        // supaya `grep WARNING` langsung menyaring yang perlu dilihat; scan
+        // sukses yang jaraknya perlu ditinjau (reason=perlu_review) ikut
+        // WARNING karena itu juga sinyal, bukan kejadian normal.
+        $isNormal = ($attributes['result'] ?? null) === 'success' && ($attributes['reason'] ?? null) === null;
+        Log::channel('qr_scan')->{$isNormal ? 'info' : 'warning'}('Scan QR '.($attributes['result'] ?? '-'), [
+            'qr_scan_log_id' => $log->id,
+            'purpose' => $attributes['purpose'] ?? null,
+            'result' => $attributes['result'] ?? null,
+            'reason' => $attributes['reason'] ?? null,
+            'user_id' => $attributes['user_id'] ?? null,
+            'customer_id' => $attributes['customer_id'] ?? null,
+            'task_id' => $attributes['task_id'] ?? null,
+            'distance_meters' => $attributes['distance_meters'] ?? null,
+            'ip_address' => $attributes['ip_address'] ?? null,
+        ]);
 
         if (($attributes['result'] ?? null) === 'success' && ! empty($attributes['customer_qr_token_id'])) {
             CustomerQrToken::whereKey($attributes['customer_qr_token_id'])->update([

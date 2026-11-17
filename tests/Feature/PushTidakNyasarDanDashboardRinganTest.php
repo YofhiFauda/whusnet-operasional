@@ -2,13 +2,11 @@
 
 namespace Tests\Feature;
 
-use App\Enums\PushDeliveryStatus;
-use App\Models\PushDelivery;
 use App\Models\Role;
 use App\Models\User;
 use App\Notifications\AppPushNotification;
+use Database\Seeders\RoleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
-use Illuminate\Support\Facades\Config;
 use PHPUnit\Framework\Attributes\Test;
 use Tests\TestCase;
 
@@ -21,6 +19,8 @@ use Tests\TestCase;
  *  #9  Logout tidak melepas subscription ⇒ push akun lama tampil di
  *      perangkat bersama.
  *  #11 Dashboard delivery memuat seluruh push_deliveries sepanjang masa.
+ *      (Halaman dashboard dihapus 2026-11-17 — penjaga periodenya pindah ke
+ *      DashboardPushJadiArtisanDanLogTest untuk `webpush:delivery-stats`.)
  *  #12 URL POST webpush dirakit klien, bukan dari route().
  */
 class PushTidakNyasarDanDashboardRinganTest extends TestCase
@@ -35,7 +35,7 @@ class PushTidakNyasarDanDashboardRinganTest extends TestCase
         $this->assertStringContainsString("client.postMessage({ type: 'whusnet-push-check', uid: uid }, [channel.port2]);", $sw);
         $this->assertStringContainsString('if (answers.some(Boolean)) {', $sw);
         // Tanpa jawaban ⇒ anggap tidak sanggup ⇒ notifikasi OS tampil.
-        $this->assertStringContainsString("setTimeout(function () { resolve(false); }, 1000);", $sw);
+        $this->assertStringContainsString('setTimeout(function () { resolve(false); }, 1000);', $sw);
         $this->assertStringNotContainsString('.navigate(', $sw);
 
         $js = file_get_contents(resource_path('js/webpush.js'));
@@ -47,7 +47,7 @@ class PushTidakNyasarDanDashboardRinganTest extends TestCase
     #[Test]
     public function payload_push_staf_membawa_id_penerima(): void
     {
-        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $this->seed(RoleSeeder::class);
         $user = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->firstOrFail()->id]);
 
         $message = (new AppPushNotification('Judul', 'Pesan', '/tasks/1'))->toWebPush($user, null);
@@ -84,7 +84,7 @@ class PushTidakNyasarDanDashboardRinganTest extends TestCase
     #[Test]
     public function logout_tidak_bisa_menghapus_subscription_user_lain(): void
     {
-        $this->seed(\Database\Seeders\RoleSeeder::class);
+        $this->seed(RoleSeeder::class);
         $lain = User::factory()->create(['role_id' => Role::where('code', 'teknisi')->firstOrFail()->id]);
         $lain->updatePushSubscription('https://push.example.test/milik-orang-lain', 'pk', 'auth');
 
@@ -101,37 +101,6 @@ class PushTidakNyasarDanDashboardRinganTest extends TestCase
 
         $this->get(route('dashboard'))
             ->assertSee('<input type="hidden" name="push_endpoint" value="">', false);
-    }
-
-    #[Test]
-    public function dashboard_delivery_hanya_menghitung_periode_terpilih(): void
-    {
-        $owner = $this->loginAsAdmin();
-        $owner->updatePushSubscription('https://endpoint-owner', 'pk', 'auth');
-        Config::string('webpush.model')::where('endpoint', 'https://endpoint-owner')->update(['device_name' => 'Samsung']);
-
-        foreach ([now()->subDays(2), now()->subDays(60)] as $sentAt) {
-            PushDelivery::create([
-                'notifiable_type' => $owner->getMorphClass(),
-                'notifiable_id' => $owner->id,
-                'notification_class' => AppPushNotification::class,
-                'status' => PushDeliveryStatus::Delivered->value,
-                'sent_at' => $sentAt,
-                'delivered_at' => $sentAt,
-            ]);
-        }
-
-        $this->get(route('webpush.dashboard'))
-            ->assertOk()
-            ->assertViewHas('days', 30)
-            ->assertViewHas('rows', fn ($rows) => $rows->firstWhere('brand', 'Samsung')['sent'] === 1);
-
-        $this->get(route('webpush.dashboard', ['days' => 90]))
-            ->assertOk()
-            ->assertViewHas('rows', fn ($rows) => $rows->firstWhere('brand', 'Samsung')['sent'] === 2);
-
-        // Nilai periode di luar pilihan jatuh ke default.
-        $this->get(route('webpush.dashboard', ['days' => 9999]))->assertViewHas('days', 30);
     }
 
     #[Test]
