@@ -282,7 +282,7 @@
 
                         {{-- 3. DAFTAR BARIS BARANG YANG DITRANSFER --}}
                         <div class="p-4 sm:p-5 space-y-4">
-                            <div class="flex items-center justify-between pb-3 border-b border-slate-100 dark:border-slate-700/60">
+                            <div class="flex flex-wrap items-center justify-between gap-2 pb-3 border-b border-slate-100 dark:border-slate-700/60">
                                 <div class="flex items-center gap-2">
                                     <h3 class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
                                         <span class="w-1.5 h-1.5 rounded-full bg-sky-600"></span>
@@ -292,22 +292,34 @@
                                           x-text="rows.length + ' Item'"></span>
                                 </div>
 
-                                <button type="button" @click="addRow()"
-                                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 border border-sky-200 dark:border-sky-800 rounded-lg transition-colors shadow-xs shrink-0 cursor-pointer">
-                                    <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                                    <span>Tambah Item</span>
-                                </button>
+                                <div class="flex items-center gap-1.5 shrink-0">
+                                    <button type="button" @click="$dispatch('open-stock-sheet', { tab: 'stock' })"
+                                            class="inline-flex items-center gap-1.5 px-3 min-h-[36px] lg:min-h-0 lg:py-1.5 text-xs font-semibold text-white bg-sky-600 hover:bg-sky-700 rounded-lg transition-colors shadow-xs cursor-pointer">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+                                        <span>Pilih dari Stok</span>
+                                    </button>
+                                    <button type="button" @click="addRow()"
+                                            class="inline-flex items-center gap-1.5 px-3 min-h-[36px] lg:min-h-0 lg:py-1.5 text-xs font-semibold text-sky-700 dark:text-sky-300 bg-sky-50 hover:bg-sky-100 dark:bg-sky-950/60 dark:hover:bg-sky-900/60 border border-sky-200 dark:border-sky-800 rounded-lg transition-colors shadow-xs cursor-pointer">
+                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                                        <span class="hidden sm:inline">Tambah Item</span><span class="sm:hidden">Manual</span>
+                                    </button>
+                                </div>
                             </div>
 
                             {{-- Empty State --}}
                             <template x-if="rows.length === 0">
                                 <div class="py-10 px-4 text-center border-2 border-dashed border-slate-200 dark:border-slate-700/80 rounded-lg bg-slate-50/50 dark:bg-slate-900/30">
                                     <h4 class="text-xs font-semibold text-slate-700 dark:text-slate-200">Belum ada barang pada transfer ini</h4>
-                                    <p class="text-[11px] text-slate-400 mt-0.5">Gunakan asisten di atas, klik chip stok siap kirim, atau klik tambah item.</p>
-                                    <button type="button" @click="addRow()" class="mt-3 inline-flex items-center gap-1.5 px-3.5 py-1.5 bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs cursor-pointer">
-                                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
-                                        <span>Tambah Item Pertama</span>
-                                    </button>
+                                    <p class="text-[11px] text-slate-400 mt-0.5">Gunakan asisten di atas, pilih chip dari stok siap kirim, atau tambah item manual.</p>
+                                    <div class="mt-3 flex flex-wrap items-center justify-center gap-2">
+                                        <button type="button" @click="$dispatch('open-stock-sheet', { tab: 'stock' })" class="inline-flex items-center gap-1.5 px-4 min-h-[40px] bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold rounded-lg transition-colors shadow-xs cursor-pointer">
+                                            <span>Pilih dari Stok</span>
+                                        </button>
+                                        <button type="button" @click="addRow()" class="inline-flex items-center gap-1.5 px-3.5 min-h-[40px] lg:min-h-0 lg:py-1.5 text-xs font-semibold rounded-lg transition-colors shadow-xs cursor-pointer bg-white dark:bg-slate-800 text-sky-700 dark:text-sky-300 border border-sky-200 dark:border-sky-800">
+                                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"/></svg>
+                                            <span>Tambah Item Pertama</span>
+                                        </button>
+                                    </div>
                                 </div>
                             </template>
 
@@ -382,10 +394,23 @@
                                                           x-text="serialCount(row) + ' Unit SN'"></span>
                                                 </div>
 
+                                                {{-- SN terpilih tampil sebagai chip (klik = lepas) — umpan balik
+                                                     utama di form; textarea di bawah tetap untuk input manual. --}}
+                                                <div class="flex flex-wrap gap-1.5" x-show="serialCount(row) > 0">
+                                                    <template x-for="code in splitCodes(row.serial_numbers)" :key="code">
+                                                        <button type="button" @click="unpickCode(row.item_id, 'serial_numbers', code)"
+                                                                class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-md bg-sky-600 hover:bg-sky-700 text-white text-[11px] font-mono font-bold cursor-pointer"
+                                                                :aria-label="'Lepas ' + code" title="Klik untuk melepas">
+                                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                                            <span x-text="code"></span>
+                                                            <svg class="w-3 h-3 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                        </button>
+                                                    </template>
+                                                </div>
                                                 <textarea :name="`lines[${index}][serial_numbers]`" x-model="row.serial_numbers" rows="2" required
                                                           placeholder="ZTEG00123&#10;ZTEG00124"
                                                           class="w-full text-xs font-mono px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500"></textarea>
-                                                <p class="text-[10px] text-slate-400">Tips: Klik chip nomor seri di panel Stok Siap Kirim untuk memasukkan SN secara instan.</p>
+                                                <p class="text-[10px] text-slate-400">Ketik/tempel SN manual di sini, atau pakai tombol "Pilih dari Stok". Klik chip biru untuk melepas.</p>
                                             </div>
                                         </template>
 
@@ -423,6 +448,18 @@
                                                           x-text="rollCount(row) + ' Roll'"></span>
                                                 </div>
 
+                                                {{-- Roll terpilih tampil sebagai chip (klik = lepas). --}}
+                                                <div class="flex flex-wrap gap-1.5" x-show="rollCount(row) > 0">
+                                                    <template x-for="code in splitCodes(row.roll_codes)" :key="code">
+                                                        <button type="button" @click="unpickCode(row.item_id, 'roll_codes', code)"
+                                                                class="inline-flex items-center gap-1 pl-2 pr-1.5 py-1 rounded-md bg-amber-600 hover:bg-amber-700 text-white text-[11px] font-mono font-bold cursor-pointer"
+                                                                :aria-label="'Lepas ' + code" title="Klik untuk melepas">
+                                                            <svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="3"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/></svg>
+                                                            <span x-text="code"></span>
+                                                            <svg class="w-3 h-3 opacity-80" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/></svg>
+                                                        </button>
+                                                    </template>
+                                                </div>
                                                 <textarea :name="`lines[${index}][roll_codes]`" x-model="row.roll_codes" rows="2" required
                                                           placeholder="WR-ROLL-FO-20260915-000001"
                                                           class="w-full text-xs font-mono px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:border-amber-500"></textarea>
@@ -443,7 +480,7 @@
                             <span>Kembali ke Stok</span>
                         </a>
 
-                        <div class="flex items-center gap-2">
+                        <div class="hidden lg:flex items-center gap-2">
                             <button type="submit" form="transfer-form"
                                     :disabled="!isFormValid"
                                     class="inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 dark:disabled:text-slate-600 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer disabled:cursor-not-allowed">
@@ -459,7 +496,10 @@
                      KOLOM SIDEBAR (DESKTOP - LG: 4 KOLOM)
                      Divided with 1px border (lg:border-l), NOT a separate card!
                      ======================================================== --}}
-                <div class="lg:col-span-4 lg:border-l border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/20 p-5 sm:p-6 space-y-5">
+                {{-- Mobile/tablet: seluruh isi kolom ini (ringkasan, checklist, stok,
+                     tombol kirim) sudah ada di x-warehouse.stock-picker-sheet.
+                     Dirender juga di < lg = halaman dobel panjang & 3 tombol Kirim. --}}
+                <div class="hidden lg:block lg:col-span-4 lg:border-l border-slate-200 dark:border-slate-700 bg-slate-50/40 dark:bg-slate-900/20 p-5 sm:p-6 space-y-5">
                     
                     {{-- Header Ringkasan --}}
                     <div class="flex items-center justify-between pb-3 border-b border-slate-200 dark:border-slate-700">
@@ -511,118 +551,35 @@
                         </div>
                     </div>
 
-                    {{-- PANEL STOK SIAP KIRIM (QUICK PICKER DARI GUDANG ASAL) --}}
+                    {{-- BARANG TERPILIH + PEMBUKA PEMILIH STOK
+                         Dulu di sini ada panel chip stok selebar sidebar (± 380px,
+                         tinggi terbatas) — sempit untuk gudang besar, dan hasil
+                         pilihan cuma masuk textarea. Sekarang pemilihan lewat dialog
+                         lebar (stock-picker-sheet), sidebar menampilkan hasilnya. --}}
                     <div class="p-4 bg-white dark:bg-slate-900/80 border border-slate-200 dark:border-slate-700 rounded-lg space-y-3">
                         <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-700/60">
                             <h4 class="text-[10px] font-semibold text-slate-500 dark:text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>
-                                <span>Stok Siap Kirim</span>
+                                <span class="w-1.5 h-1.5 rounded-full bg-sky-600"></span>
+                                <span>Barang Terpilih</span>
                             </h4>
-                            <span class="text-[10px] font-mono text-slate-400" x-show="fromPopId && !loadingStock" x-text="filteredAvailableStock.length + ' item'"></span>
+                            <span class="min-w-[22px] px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold text-center"
+                                  :class="validItemCount > 0 ? 'bg-sky-600 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-500'"
+                                  x-text="pickedUnitCount()"></span>
                         </div>
 
-                        {{-- Search Filter Input for Available Stock --}}
-                        <div x-show="fromPopId && availableStockItems.length > 0" class="relative">
-                            <input type="text" x-model="stockSearchQuery" placeholder="Cari nama barang, SKU, SN, lot, atau roll..."
-                                   class="w-full text-xs font-medium pl-8 pr-8 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50/50 dark:bg-slate-900/60 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-colors">
-                            <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
-                            </svg>
-                            <button type="button" x-show="stockSearchQuery.length > 0" @click="stockSearchQuery = ''"
-                                    class="absolute right-2 top-1.5 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md transition-colors cursor-pointer"
-                                    title="Hapus pencarian">
-                                <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                                </svg>
-                            </button>
-                        </div>
+                        <button type="button" @click="$dispatch('open-stock-sheet', { tab: 'stock' })"
+                                :disabled="!fromPopId"
+                                class="w-full min-h-[44px] inline-flex items-center justify-between gap-2 px-3.5 py-2 rounded-lg border-2 border-dashed border-sky-300 dark:border-sky-700 bg-sky-50/60 dark:bg-sky-950/30 text-sky-700 dark:text-sky-300 hover:bg-sky-100 dark:hover:bg-sky-900/40 hover:border-sky-400 disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer">
+                            <span class="inline-flex items-center gap-2 text-xs font-semibold">
+                                <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z"/></svg>
+                                <span>Pilih Barang dari Stok</span>
+                            </span>
+                            <span class="text-[10px] font-mono text-sky-600/80 dark:text-sky-400/80"
+                                  x-text="!fromPopId ? 'pilih gudang asal' : (loadingStock ? 'memuat…' : availableStockItems.length + ' jenis tersedia')"></span>
+                        </button>
 
-                        {{-- Prompt Belum Pilih Gudang --}}
-                        <template x-if="!fromPopId">
-                            <p class="py-3 text-center text-[11px] text-slate-400">Pilih Gudang Asal untuk memuat stok fisik siap kirim.</p>
-                        </template>
-
-                        {{-- Loading State --}}
-                        <template x-if="fromPopId && loadingStock">
-                            <div class="py-3 text-center text-slate-400 flex items-center justify-center gap-2">
-                                <svg class="w-4 h-4 animate-spin text-sky-500" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
-                                <span class="text-xs">Memuat data stok...</span>
-                            </div>
-                        </template>
-
-                        {{-- Empty State (Gudang Asal kosong) --}}
-                        <template x-if="fromPopId && !loadingStock && availableStockItems.length === 0">
-                            <p class="py-3 text-center text-xs text-slate-400 italic">Stok kosong di gudang asal ini.</p>
-                        </template>
-
-                        {{-- Empty Search Results State --}}
-                        <template x-if="fromPopId && !loadingStock && availableStockItems.length > 0 && filteredAvailableStock.length === 0">
-                            <div class="py-4 px-3 text-center rounded-lg border border-dashed border-slate-200 dark:border-slate-700/80 bg-slate-50/50 dark:bg-slate-900/40">
-                                <p class="text-xs font-semibold text-slate-700 dark:text-slate-300">Tidak ada stok yang cocok</p>
-                                <p class="text-[11px] text-slate-400 mt-0.5">Tidak ditemukan untuk "<span class="font-mono text-sky-600 dark:text-sky-400" x-text="stockSearchQuery"></span>"</p>
-                                <button type="button" @click="stockSearchQuery = ''" class="mt-2 text-[11px] font-semibold text-sky-600 hover:text-sky-700 dark:text-sky-400 dark:hover:text-sky-300 underline cursor-pointer">
-                                    Reset Pencarian
-                                </button>
-                            </div>
-                        </template>
-
-                        {{-- Available Stock Item List & Chip Quick Pickers --}}
-                        <div class="space-y-2.5 max-h-64 overflow-y-auto scroll-smooth pr-1" x-show="fromPopId && !loadingStock && filteredAvailableStock.length > 0">
-                            <template x-for="item in filteredAvailableStock" :key="item.item_id">
-                                <div class="bg-slate-50/70 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-700/60 rounded-lg p-2.5">
-                                    <div class="flex items-center justify-between gap-1">
-                                        <div class="min-w-0">
-                                            <p class="text-xs font-semibold text-slate-800 dark:text-slate-200 truncate" x-text="item.name"></p>
-                                            <p class="text-[10px] font-mono text-slate-400" x-show="item.code" x-text="item.code"></p>
-                                        </div>
-                                        <span class="text-[10px] font-mono text-slate-400 self-start shrink-0" x-text="item.unit"></span>
-                                    </div>
-
-                                    {{-- Serialized Item: Chip SN --}}
-                                    <template x-if="item.serials && item.serials.length > 0">
-                                        <div class="mt-1.5">
-                                            <div class="flex flex-wrap gap-1">
-                                                <template x-for="sn in filteredSerials(item)" :key="sn">
-                                                    <button type="button" @click="$dispatch('pick-serial', { itemId: item.item_id, serialNumber: sn })"
-                                                        class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 hover:bg-sky-600 hover:text-white transition-colors cursor-pointer"
-                                                        title="Klik untuk memasukkan SN ini"
-                                                        x-text="sn"></button>
-                                                </template>
-                                            </div>
-                                        </div>
-                                    </template>
-
-                                    {{-- Batch / Lot Item: Chip Lot & Qty --}}
-                                    <template x-if="item.lots && item.lots.length > 0">
-                                        <div class="mt-1.5">
-                                            <div class="flex flex-wrap gap-1">
-                                                <template x-for="lot in filteredLots(item)" :key="lot.lot_no ?? '-'">
-                                                    <button type="button" @click="$dispatch('pick-qty', { itemId: item.item_id, lotNo: lot.lot_no, qty: lot.qty })"
-                                                        class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-700 hover:text-white transition-colors cursor-pointer"
-                                                        title="Klik untuk memilih lot/qty ini">
-                                                        <span x-show="lot.lot_no" x-text="lot.lot_no + ': '"></span><span x-text="lot.qty"></span> <span x-text="item.unit"></span>
-                                                    </button>
-                                                </template>
-                                            </div>
-                                        </div>
-                                    </template>
-
-                                    {{-- Roll Kabel: Chip Roll ID + sisa meter --}}
-                                    <template x-if="item.rolls && item.rolls.length > 0">
-                                        <div class="mt-1.5">
-                                            <div class="flex flex-wrap gap-1">
-                                                <template x-for="roll in filteredRolls(item)" :key="roll.roll_code">
-                                                    <button type="button" @click="$dispatch('pick-roll', { itemId: item.item_id, rollCode: roll.roll_code })"
-                                                        class="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded-md bg-white dark:bg-slate-800 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300 hover:bg-amber-600 hover:text-white transition-colors cursor-pointer"
-                                                        title="Klik untuk memasukkan Roll ID ini">
-                                                        <span x-text="roll.roll_code"></span> <span x-text="'(' + roll.length_remaining + ' m)'"></span>
-                                                    </button>
-                                                </template>
-                                            </div>
-                                        </div>
-                                    </template>
-                                </div>
-                            </template>
+                        <div class="max-h-[50vh] overflow-y-auto pr-1">
+                            <x-warehouse.picked-items-list size="compact">Klik "Pilih Barang dari Stok", scan, atau tempel SN.</x-warehouse.picked-items-list>
                         </div>
                     </div>
 
@@ -649,185 +606,38 @@
 
         </div>
 
-        {{-- Mobile Bottom Clearance Spacer --}}
-        <div class="h-16 lg:hidden" aria-hidden="true"></div>
+        {{-- Ruang kosong supaya konten terakhir tidak tertutup bar bawah (mobile/tablet) --}}
+        <div class="h-24 lg:hidden" aria-hidden="true"></div>
 
-        {{-- ========================================================
-             MOBILE & TABLET FIXED BOTTOM COMMAND BAR & BOTTOM SHEET
-             ======================================================== --}}
-        <div class="lg:hidden" x-data="{ openMobileSheet: false }">
-            
-            {{-- Mobile Backdrop --}}
-            <div x-show="openMobileSheet" x-cloak
-                 @click="openMobileSheet = false"
-                 x-transition:enter="transition ease-out duration-200"
-                 x-transition:enter-start="opacity-0"
-                 x-transition:enter-end="opacity-100"
-                 x-transition:leave="transition ease-in duration-150"
-                 x-transition:leave-start="opacity-100"
-                 x-transition:leave-end="opacity-0"
-                 class="fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50"></div>
-
-            {{-- Mobile Bottom Sheet Drawer --}}
-            <div x-show="openMobileSheet" x-cloak
-                 x-transition:enter="transition ease-out duration-250 transform"
-                 x-transition:enter-start="translate-y-full"
-                 x-transition:enter-end="translate-y-0"
-                 x-transition:leave="transition ease-in duration-200 transform"
-                 x-transition:leave-start="translate-y-0"
-                 x-transition:leave-end="translate-y-full"
-                 class="fixed inset-x-0 bottom-0 w-full max-h-[85vh] bg-white dark:bg-slate-900 rounded-t-2xl border-t border-slate-200 dark:border-slate-700 p-5 z-50 overflow-y-auto space-y-4 shadow-xl">
-                
-                <div class="w-10 h-1 bg-slate-200 dark:bg-slate-700 rounded-full mx-auto -mt-1 mb-2"></div>
-                
-                <div class="flex items-center justify-between pb-2 border-b border-slate-100 dark:border-slate-800">
-                    <h4 class="text-xs font-semibold text-slate-900 dark:text-slate-100 uppercase tracking-wider">
-                        Rincian Pengiriman &amp; Validasi
-                    </h4>
-                    <button type="button" @click="openMobileSheet = false" class="p-1 text-slate-400 hover:text-slate-600 cursor-pointer">
-                        <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
-                    </button>
-                </div>
-
-                {{-- Metric Box Mobile --}}
-                <div class="grid grid-cols-2 gap-2 text-center text-xs">
-                    <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
-                        <span class="block text-[10px] font-semibold text-slate-400 uppercase">Total Item</span>
-                        <span class="font-bold font-mono text-slate-800 dark:text-slate-100" x-text="validItemCount + ' Item'"></span>
-                    </div>
-                    <div class="p-2.5 rounded-lg bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80">
-                        <span class="block text-[10px] font-semibold text-slate-400 uppercase">Total SN</span>
-                        <span class="font-bold font-mono text-sky-600 dark:text-sky-400" x-text="totalSnCount + ' Unit'"></span>
-                    </div>
-                </div>
-
-                {{-- Checklist Mobile / Tablet --}}
-                <div class="space-y-2 text-xs pt-1">
-                    <span class="block text-[10px] font-semibold uppercase tracking-wider text-slate-400">Status Kelengkapan:</span>
-                    <div class="flex items-center gap-2">
-                        <span :class="fromPopId ? 'text-emerald-500 font-bold' : 'text-slate-300'">✓</span>
-                        <span :class="fromPopId ? 'text-slate-700 dark:text-slate-200 font-medium' : 'text-slate-400'">Gudang Asal Terpilih</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span :class="toPopId && toPopId !== fromPopId ? 'text-emerald-500 font-bold' : 'text-slate-300'">✓</span>
-                        <span :class="toPopId && toPopId !== fromPopId ? 'text-slate-700 dark:text-slate-200 font-medium' : 'text-slate-400'">Gudang Tujuan Valid (Berbeda)</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span :class="validItemCount > 0 ? 'text-emerald-500 font-bold' : 'text-slate-300'">✓</span>
-                        <span :class="validItemCount > 0 ? 'text-slate-700 dark:text-slate-200 font-medium' : 'text-slate-400'">Minimal 1 Baris Barang</span>
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span :class="isDetailsComplete ? 'text-emerald-500 font-bold' : 'text-slate-300'">✓</span>
-                        <span :class="isDetailsComplete ? 'text-slate-700 dark:text-slate-200 font-medium' : 'text-slate-400'">Nomor Seri / Qty Lengkap</span>
-                    </div>
-                </div>
-
-                {{-- Mobile Available Stock Quick Tap --}}
-                <div x-show="fromPopId && availableStockItems.length > 0" class="pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2">
-                    <div class="flex items-center justify-between">
-                        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400">Pilih Cepat dari Stok Asal:</span>
-                        <span class="text-[10px] font-mono text-slate-400" x-text="filteredAvailableStock.length + ' item'"></span>
-                    </div>
-
-                    {{-- Search Filter Input for Mobile --}}
-                    <div class="relative">
-                        <input type="text" x-model="stockSearchQuery" placeholder="Cari nama, SKU, SN, lot, roll..."
-                               class="w-full text-xs font-medium pl-8 pr-8 py-1.5 border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-800 text-slate-800 dark:text-slate-100 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
-                        <svg class="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2 pointer-events-none" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                            <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-5.197-5.197m0 0A7.5 7.5 0 105.196 5.196a7.5 7.5 0 0010.607 10.607z"/>
-                        </svg>
-                        <button type="button" x-show="stockSearchQuery.length > 0" @click="stockSearchQuery = ''"
-                                class="absolute right-2 top-1.5 p-0.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 rounded-md cursor-pointer">
-                            <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
-                            </svg>
-                        </button>
-                    </div>
-
-                    <div class="space-y-2 max-h-52 overflow-y-auto scroll-smooth">
-                        <template x-if="filteredAvailableStock.length === 0">
-                            <p class="py-3 text-center text-[11px] text-slate-400 italic">Tidak ada stok yang cocok.</p>
-                        </template>
-
-                        <template x-for="item in filteredAvailableStock" :key="item.item_id">
-                            <div class="p-2 rounded-lg bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700 text-xs">
-                                <div class="flex items-center justify-between mb-1">
-                                    <div class="min-w-0">
-                                        <p class="font-semibold text-slate-800 dark:text-slate-200 truncate" x-text="item.name"></p>
-                                        <p class="text-[10px] font-mono text-slate-400" x-show="item.code" x-text="item.code"></p>
-                                    </div>
-                                    <span class="text-[10px] font-mono text-slate-400 shrink-0" x-text="item.unit"></span>
-                                </div>
-
-                                {{-- Serials Mobile --}}
-                                <div class="flex flex-wrap gap-1" x-show="item.serials && item.serials.length > 0">
-                                    <template x-for="sn in filteredSerials(item)" :key="sn">
-                                        <button type="button" @click="$dispatch('pick-serial', { itemId: item.item_id, serialNumber: sn }); openMobileSheet = false;"
-                                                class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300"
-                                                x-text="sn"></button>
-                                    </template>
-                                </div>
-
-                                {{-- Lots Mobile --}}
-                                <div class="flex flex-wrap gap-1 mt-1" x-show="item.lots && item.lots.length > 0">
-                                    <template x-for="lot in filteredLots(item)" :key="lot.lot_no ?? '-'">
-                                        <button type="button" @click="$dispatch('pick-qty', { itemId: item.item_id, lotNo: lot.lot_no, qty: lot.qty }); openMobileSheet = false;"
-                                                class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300">
-                                            <span x-show="lot.lot_no" x-text="lot.lot_no + ': '"></span><span x-text="lot.qty"></span> <span x-text="item.unit"></span>
-                                        </button>
-                                    </template>
-                                </div>
-
-                                {{-- Rolls Mobile --}}
-                                <div class="flex flex-wrap gap-1 mt-1" x-show="item.rolls && item.rolls.length > 0">
-                                    <template x-for="roll in filteredRolls(item)" :key="roll.roll_code">
-                                        <button type="button" @click="$dispatch('pick-roll', { itemId: item.item_id, rollCode: roll.roll_code }); openMobileSheet = false;"
-                                                class="text-[10px] font-mono font-bold px-2 py-0.5 rounded-md bg-white dark:bg-slate-900 border border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-300">
-                                            <span x-text="roll.roll_code"></span> <span x-text="'(' + roll.length_remaining + ' m)'"></span>
-                                        </button>
-                                    </template>
-                                </div>
-                            </div>
-                        </template>
-                    </div>
-                </div>
-
-                <div class="pt-3 border-t border-slate-100 dark:border-slate-800">
-                    <button type="submit" form="transfer-form"
-                            :disabled="!isFormValid"
-                            @click="openMobileSheet = false"
-                            class="w-full min-h-[44px] inline-flex items-center justify-center gap-2 px-5 py-2.5 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-200 dark:disabled:bg-slate-800 disabled:text-slate-400 text-white rounded-lg text-xs font-semibold transition-colors shadow-xs cursor-pointer disabled:cursor-not-allowed">
-                        <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                        <span>Kirim Transfer Sekarang</span>
-                    </button>
-                </div>
-            </div>
-
-            {{-- Floating Bottom Bar (Simple & Sleek) --}}
-            <div class="fixed bottom-3 inset-x-3 z-40 pointer-events-none">
-                <div class="bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-800 text-white rounded-lg shadow-xl p-2.5 flex items-center justify-between gap-3 max-w-lg mx-auto pointer-events-auto">
-                    
-                    {{-- Tapable Summary Area --}}
-                    <div class="flex-1 min-w-0 pl-2 cursor-pointer select-none" @click="openMobileSheet = true">
-                        <div class="flex items-center gap-1.5">
-                            <span class="font-mono text-sm font-bold text-sky-400 truncate" x-text="totalSnCount + ' SN • ' + validItemCount + ' Item'">0 Item</span>
-                            <svg class="w-3 h-3 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M5 15l7-7 7 7"/></svg>
-                        </div>
-                        <p class="text-[10px] text-slate-400 truncate">
-                            <span x-text="fromPopId ? 'Asal siap' : 'Pilih Asal'"></span> &bull; <span x-text="toPopId ? 'Tujuan siap' : 'Pilih Tujuan'"></span>
-                        </p>
-                    </div>
-
-                    {{-- Submit CTA Button --}}
-                    <button type="submit" form="transfer-form"
-                            :disabled="!isFormValid"
-                            class="min-h-[42px] px-4 py-2 bg-sky-600 hover:bg-sky-700 disabled:bg-slate-800 disabled:text-slate-500 text-white font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors shadow-md active:scale-95 shrink-0 cursor-pointer disabled:cursor-not-allowed">
-                        <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4"/></svg>
-                        <span>Kirim</span>
-                    </button>
-                </div>
-            </div>
-        </div>
+        <x-warehouse.stock-picker-sheet
+            pop="fromPopId"
+            form="transfer-form"
+            title="Rincian Pengiriman & Pilih Barang"
+            submit-label="Kirim Transfer Sekarang"
+            submit-short="Kirim"
+            stock-title="Stok Siap Kirim"
+            bar-hint="(fromPopId ? 'Asal ✓' : 'Pilih gudang asal') + ' • ' + (toPopId && toPopId !== fromPopId ? 'Tujuan ✓' : 'Pilih gudang tujuan')"
+            empty-pop-text="Pilih Gudang Asal di form untuk memuat stok siap kirim."
+            empty-stock-text="Stok kosong di gudang asal ini.">
+            <x-slot:status>
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold border"
+                      :class="fromPopId ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'">
+                    <span x-text="fromPopId ? '✓' : '○'"></span> Asal
+                </span>
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold border"
+                      :class="toPopId && toPopId !== fromPopId ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'">
+                    <span x-text="toPopId && toPopId !== fromPopId ? '✓' : '○'"></span> Tujuan
+                </span>
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold border"
+                      :class="validItemCount > 0 ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'">
+                    <span x-text="validItemCount > 0 ? '✓' : '○'"></span> Barang
+                </span>
+                <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-semibold border"
+                      :class="isDetailsComplete ? 'bg-emerald-50 dark:bg-emerald-950/40 border-emerald-200 dark:border-emerald-800 text-emerald-700 dark:text-emerald-300' : 'bg-slate-50 dark:bg-slate-800 border-slate-200 dark:border-slate-700 text-slate-400'">
+                    <span x-text="isDetailsComplete ? '✓' : '○'"></span> SN/Qty lengkap
+                </span>
+            </x-slot:status>
+        </x-warehouse.stock-picker-sheet>
 
     </form>
 </div>
@@ -835,7 +645,8 @@
 @push('scripts')
 <script>
 function warehouseTransferManager(itemOptions, categoryOptions, oldRows, stockEndpoint, initialFromPopId, initialToPopId) {
-    return {
+    // Mixin picker (toggle chip + state terpilih) dari x-warehouse.stock-quick-picker.
+    return Object.assign({
         itemOptions: itemOptions,
         categoryOptions: categoryOptions,
         stockEndpoint: stockEndpoint,
@@ -1160,7 +971,7 @@ function warehouseTransferManager(itemOptions, categoryOptions, oldRows, stockEn
                 window.Toast?.success('Batch Diproses', `${matched} SN masuk daftar transfer` + (mismatched > 0 ? `, ${mismatched} tidak ditemukan di stok.` : '.'));
             }
         }
-    };
+    }, warehouseStockPickerMixin());
 }
 </script>
 @endpush

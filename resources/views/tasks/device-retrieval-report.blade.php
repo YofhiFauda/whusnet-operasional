@@ -234,19 +234,6 @@
                 </button>
                 @endunless
 
-                {{-- Foto Kondisi Alat --}}
-                <div class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-1.5">
-                    <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui">
-                        Foto Kondisi Alat <span class="text-red-500">*</span>
-                    </label>
-                    <input type="file" name="condition_photo" accept="image/*"
-                           class="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 dark:file:bg-sky-950/60 dark:file:text-sky-300 font-ui transition-colors cursor-pointer">
-                    <x-upload-limit-hint />
-                    @if($existing?->condition_photo)
-                    <p class="text-[11px] text-slate-400 dark:text-slate-500 font-ui">Foto sebelumnya tersimpan — unggah lagi jika ingin menggantinya.</p>
-                    @endif
-                </div>
-
                 {{-- Kelengkapan Aksesori --}}
                 <div class="pt-3 border-t border-slate-200 dark:border-slate-800 space-y-2">
                     <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui">
@@ -319,6 +306,26 @@
             </div>
             @endif
 
+            {{-- ── FOTO — wajib untuk SEMUA hasil (Review Penarikan Alat). Dulu
+                 cuma ada di blok "diambil", jadi laporan gagal tidak punya
+                 bukti lokasi untuk direview FOP. ── --}}
+            <div class="p-5 sm:p-6 border-b border-slate-200 dark:border-slate-800 space-y-1.5">
+                <label class="block text-xs font-semibold text-slate-700 dark:text-slate-300 font-ui">
+                    <span x-show="outcome === 'diambil'">Foto Kondisi Alat</span>
+                    <span x-show="outcome !== 'diambil'" x-cloak>Foto Bukti Lokasi / Kondisi</span>
+                    <span class="text-red-500">*</span>
+                </label>
+                <input type="file" name="condition_photo" accept="image/*"
+                       class="block w-full text-xs text-slate-500 dark:text-slate-400 file:mr-3 file:py-2 file:px-4 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-sky-50 file:text-sky-700 hover:file:bg-sky-100 dark:file:bg-sky-950/60 dark:file:text-sky-300 font-ui transition-colors cursor-pointer">
+                <x-upload-limit-hint />
+                <p class="text-[11px] text-slate-400 dark:text-slate-500 font-ui" x-show="outcome !== 'diambil'" x-cloak>
+                    Foto rumah/lokasi yang membuktikan alasan alat tidak bisa diambil — dipakai FOP saat mereview.
+                </p>
+                @if($existing?->condition_photo)
+                <p class="text-[11px] text-slate-400 dark:text-slate-500 font-ui">Foto sebelumnya tersimpan — unggah lagi jika ingin menggantinya.</p>
+                @endif
+            </div>
+
             {{-- ── Section 3: CATATAN / ALASAN (Design.md §4) ── --}}
             <div class="p-5 sm:p-6 space-y-2">
                 <label class="block text-[10px] font-semibold tracking-wider uppercase text-slate-500 dark:text-slate-400 font-ui">
@@ -329,7 +336,7 @@
                           placeholder="Kondisi alat, kelengkapan yang kurang, atau alasan alat tidak berhasil diambil..."
                           class="w-full rounded-lg text-xs sm:text-sm font-ui bg-white dark:bg-slate-900 border border-slate-300 dark:border-slate-700 text-slate-900 dark:text-slate-100 p-3 focus:ring-2 focus:ring-sky-500 focus:border-sky-500 outline-none transition-colors placeholder-slate-400 dark:placeholder-slate-500 resize-y">{{ old('notes', $existing?->notes) }}</textarea>
                 <p class="text-[11px] text-slate-400 dark:text-slate-500 font-ui" x-show="outcome !== 'diambil'" x-cloak>
-                    Task tetap selesai, tapi alat belum tercatat diambil — tombol "Ambil Alat" muncul kembali di List Putus Langganan.
+                    Task tetap diselesaikan dengan catatan alat belum diambil. Alasan serta foto yang Anda unggah akan dipantau oleh tim FOP.
                 </p>
             </div>
         </div>

@@ -12,6 +12,7 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Notifications\Notifiable;
 use NotificationChannels\WebPush\HasPushSubscriptions;
@@ -580,6 +581,18 @@ class Customer extends Model
     public function fopTasks(): HasMany
     {
         return $this->hasMany(FopTask::class);
+    }
+
+    /**
+     * Semua laporan task Ambil Modem (DEAC) pelanggan ini, lintas task.
+     * Batas "kasus penarikan" (sejak putus langganan terakhir) TIDAK
+     * dipasang di sini — lihat DeviceRetrievalReviewService::constrainToCase().
+     *
+     * @return HasManyThrough<TaskDeviceRetrieval, Task, $this>
+     */
+    public function deviceRetrievals(): HasManyThrough
+    {
+        return $this->hasManyThrough(TaskDeviceRetrieval::class, Task::class);
     }
 
     /**

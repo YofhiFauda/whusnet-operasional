@@ -549,7 +549,7 @@ class MarketingMerchandiseRequestTest extends TestCase
             ->assertOk()
             ->assertSee('Mug Branding')
             ->assertSee('Cabang A')
-            ->assertSee('Yang terjadi setelah disimpan')
+            ->assertSee('Setelah disimpan:')
             ->assertSee('Stok Pusat')
             ->assertSee('Stok Cabang');
 
@@ -595,5 +595,39 @@ class MarketingMerchandiseRequestTest extends TestCase
         ])->assertSessionHasErrors('item_category_id');
 
         $this->assertSame('merchandise_marketing', $this->mug->fresh()->category->code);
+    }
+
+    /**
+     * Regresi keluhan UI 2026-11-17: di mobile/tablet halaman "tertutup" oleh
+     * paragraf penjelasan, alur 01→02→03, dan 6 kolom filter yang ditumpuk
+     * sebelum data muncul. Filter kini terlipat (< lg), deskripsi dibuang,
+     * tabel tampil sebagai kartu di < md lewat markup yang sama.
+     */
+    #[Test]
+    public function halaman_nonoperasional_ringkas_dan_filter_terlipat_di_mobile(): void
+    {
+        $response = $this->actingAs($this->owner)->get(route('warehouse.marketing.index'));
+
+        $response->assertOk()
+            ->assertSee("showFilter ? 'grid' : 'hidden lg:grid'", false)
+            ->assertSee('hidden md:table-header-group', false)
+            ->assertDontSee('Barang masuk menambah stok Pusat. Perpindahan ke Cabang')
+            ->assertDontSee('Periksa stok &amp; laporan', false)
+            ->assertDontSee('Tanggal filter tidak mengubah saldo saat ini')
+            ->assertDontSee('Setiap baris sudah mengurangi Pusat')
+            // Menu gudang mobile dilipat jadi satu tombol + label halaman aktif.
+            ->assertSee('x-show="mobNavOpen"', false)
+            ->assertSee('Menu Gudang')
+            ->assertSee('· Permintaan Stok', false);
+
+        $this->actingAs($this->owner)->get(route('warehouse.marketing.create'))
+            ->assertOk()
+            ->assertDontSee('01 / RUTE PERPINDAHAN')
+            ->assertDontSee('Dari mana, ke mana?');
+
+        $this->actingAs($this->owner)->get(route('warehouse.marketing.receive.create'))
+            ->assertOk()
+            ->assertDontSee('01 / LOKASI')
+            ->assertDontSee('Gunakan formulir ini saat kaos');
     }
 }

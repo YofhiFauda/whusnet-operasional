@@ -74,6 +74,15 @@
         default => null,
     };
 
+    // Label halaman aktif untuk tombol "Menu Gudang" mobile/tablet.
+    $mobileNavLabel = $transfersActiveLabel ?? $returnsActiveLabel ?? $fieldActiveLabel ?? $reportsActiveLabel ?? match ($active) {
+        'dashboard' => 'Dashboard',
+        'stock' => 'Kelola Stok',
+        'stock-requests' => 'Permintaan Stok',
+        'pengajuan-barang' => 'Pengajuan Barang',
+        default => null,
+    };
+
     $transfersUrl = $canViewTransfer
         ? route('warehouse.transfers.index')
         : ($canViewBranchSale ? route('warehouse.branch-sales.index') : ($canTransfer ? route('warehouse.transfers.create') : '#'));
@@ -739,11 +748,12 @@
 <div class="lg:hidden space-y-2.5 pb-2.5 mb-4 border-b border-slate-200/80 dark:border-slate-800"
      x-data="{
          mobGroup: null,
+         mobNavOpen: false,
          toggleMobGroup(name) {
              this.mobGroup = (this.mobGroup === name) ? null : name;
          }
      }"
-     @keydown.escape.window="mobGroup = null">
+     @keydown.escape.window="mobGroup = null; mobNavOpen = false">
 
     {{-- Baris 1: Tombol Kembali (opsional) + Judul Halaman + Fast Actions Hub --}}
     <div class="flex items-center justify-between gap-2">
@@ -872,8 +882,23 @@
     </div>
 
     {{-- Baris 3: Mobile Navigation Grid/Wrap Bar (Semua 7 Kategori Terlihat Tanpa Geser Horizontal) + Floating Vertical Popover --}}
-    <div class="relative" @click.outside="mobGroup = null">
-        <div class="rounded-xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 p-1.5 shadow-2xs">
+    {{-- Menu dilipat jadi satu tombol (keputusan user 2026-11-17): versi
+         flex-wrap 8 kategori yang selalu terbuka memakan ± separuh layar HP
+         sehingga isi halaman gudang terasa "tertutup". --}}
+    <div class="relative" @click.outside="mobGroup = null; mobNavOpen = false">
+        <button type="button" @click="mobNavOpen = ! mobNavOpen; mobGroup = null" :aria-expanded="mobNavOpen"
+                class="w-full min-h-[40px] flex items-center gap-2 px-3 rounded-lg border text-xs font-semibold transition-colors cursor-pointer"
+                :class="mobNavOpen ? 'border-sky-300 bg-sky-50 text-sky-700 dark:border-sky-700 dark:bg-sky-950/40 dark:text-sky-300' : 'border-slate-200 bg-white text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'">
+            <svg class="w-4 h-4 shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"/></svg>
+            <span class="shrink-0">Menu Gudang</span>
+            @if($mobileNavLabel)
+                <span class="min-w-0 truncate font-normal text-slate-500 dark:text-slate-400">· {{ $mobileNavLabel }}</span>
+            @endif
+            <svg class="ml-auto w-4 h-4 shrink-0 transition-transform" :class="mobNavOpen && 'rotate-180'" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5"/></svg>
+        </button>
+
+        <div x-show="mobNavOpen" x-cloak x-collapse.duration.150ms
+             class="mt-1.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/80 dark:border-slate-700/80 p-1.5 shadow-2xs">
             <nav class="flex flex-wrap items-center gap-1" aria-label="Navigasi Utama Gudang Mobile">
                 {{-- 1. Dashboard --}}
                 @if($canViewWarehouse)

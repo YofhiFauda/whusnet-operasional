@@ -8,7 +8,8 @@
 <x-warehouse.header active="returns" title="Konfirmasi Terima Retur Modem" subtitle="Terima custody fisik dari teknisi. Belum jadi stok — kondisi final & stok baru ditentukan Gudang Pusat setelah dikirim (menu Kirim ke Pusat)." backUrl="{{ route('warehouse.returns.index') }}" />
 
 @php
-    $photoPath = $retrievalLog?->photoPath() ?? $taskDeviceRetrieval?->condition_photo;
+    // Foto privat lewat controller ber-permission (bukan URL /storage publik).
+    $photoUrl = $retrievalLog?->photoUrl() ?? $taskDeviceRetrieval?->photoUrl();
     $accessories = $taskDeviceRetrieval?->accessories ?? $retrievalLog?->accessories ?? [];
     $accessoryLabels = \App\Models\TaskDeviceRetrieval::ACCESSORY_LABELS;
 @endphp
@@ -157,11 +158,11 @@
             {{-- Foto Kondisi Alat dari Lapangan --}}
             <div class="space-y-2">
                 <label class="block text-xs font-bold text-slate-700 dark:text-slate-300">Foto Bukti Fisik Lapangan</label>
-                @if($photoPath)
+                @if($photoUrl)
                 <div class="p-4 rounded-2xl bg-slate-50 dark:bg-slate-900/40 border border-slate-200/80 dark:border-slate-700/80 flex flex-col sm:flex-row items-start sm:items-center gap-4">
-                    <a href="{{ Storage::disk('public')->url($photoPath) }}" target="_blank" rel="noopener"
+                    <a href="{{ $photoUrl }}" target="_blank" rel="noopener"
                        class="group relative block w-full sm:w-44 h-32 rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 shadow-sm shrink-0 bg-slate-200 dark:bg-slate-800">
-                        <img src="{{ Storage::disk('public')->url($photoPath) }}" alt="Foto Kondisi Alat" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
+                        <img src="{{ $photoUrl }}" alt="Foto Kondisi Alat" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200">
                         <div class="absolute inset-0 bg-black/40 opacity-0 group-hover:opacity-100 flex items-center justify-center text-white text-xs font-bold transition-opacity">
                             Buka Ukuran Penuh ↗
                         </div>
@@ -171,7 +172,7 @@
                         <p class="text-slate-500 dark:text-slate-400 text-xs leading-relaxed">
                             Foto asli diambil oleh teknisi di lokasi pelanggan saat penyelesaian task penarikan alat.
                         </p>
-                        <a href="{{ Storage::disk('public')->url($photoPath) }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline pt-1">
+                        <a href="{{ $photoUrl }}" target="_blank" rel="noopener" class="inline-flex items-center gap-1.5 text-xs font-bold text-sky-600 dark:text-sky-400 hover:underline pt-1">
                             <span>Perbesar Gambar</span>
                             <svg class="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"/></svg>
                         </a>

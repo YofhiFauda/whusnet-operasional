@@ -124,7 +124,7 @@ class WarehouseIssueAvailableStockSearchTest extends TestCase
             ->get(route('warehouse.issues.create'));
 
         $response->assertOk();
-        $response->assertSee('x-model="stockSearchQuery"', false);
+        $response->assertSee('x-model.debounce.200ms="stockSearchQuery"', false);
         $response->assertSee('filteredAvailableStock', false);
         $response->assertSee('filteredSerials', false);
         $response->assertSee('filteredLots', false);

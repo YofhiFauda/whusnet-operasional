@@ -189,6 +189,8 @@ Alur:
 
 Guard di `TaskService::complete()`: task DEAC **tidak bisa selesai tanpa laporan** (menutup celah `POST /tasks/{task}/complete`). Reject FOP pada DEAC mengosongkan `device_retrieved_at`, tapi **tidak membalik SN yang sudah `RETURNED`** (modem memang ada di tangan teknisi; ledger append-only) — kirim ulang laporan aman karena idempoten.
 
+**Laporan DEAC gagal → Review Penarikan Alat (ADHOC-305, 2026-11-18).** Laporan "tidak ditemukan"/"pelanggan menolak" wajib alasan + foto bukti, lalu masuk antrian `/fop/device-retrieval-reviews` (`task_device_retrievals.review_status = menunggu`). FOP memutuskan: **Approve** → pelanggan dibebaskan (`customer_devices.retrieval_waived_at`, tombol Ambil Alat hilang permanen sampai Langganan Lagi), atau **Tolak** → FopTask DEAC baru (Draft) = percobaan berikutnya. Mulai percobaan ke-5 alasan boleh ditoleransi; approve sebelum itu wajib catatan. Reject/pending generik di Detail Task ditutup untuk laporan ini. Walk-in "modem diantar pelanggan" menutup otomatis laporan gagal yang masih menunggu review (status `ditutup`) — FOP tidak bisa lagi menolaknya dan memicu task DEAC untuk modem yang sudah di gudang. Foto penarikan alat (termasuk walk-in) kini **privat di disk `local`**, dilayani `DeviceRetrievalPhotoController`; foto percobaan ditolak dihapus 30 hari kemudian (`device-retrieval:prune-photos`, harian 00:40). Rancangan + penyimpangan: `docs/plan/warehouse/analisa-review-penarikan-deac.md` §9.
+
 Penanda asal DEAC di ledger: baris `RETURN` dengan `fop_task_id` terisi.
 
 `returnInstalledSerialFromCustomer()` tetap ada (INSTALLED → AVAILABLE langsung) tetapi tidak lagi dipanggil `TaskService`.

@@ -776,6 +776,16 @@ return [
             ActionCode::APPROVE->value,
             ActionCode::REJECT->value,
         ],
+
+        // Review Penarikan Alat — laporan DEAC gagal yang menunggu keputusan
+        // FOP. `review` (approve/tolak) cuma untuk FOP; CS & BD cuma `view` +
+        // `comment` (keputusan user K4).
+        // docs/plan/warehouse/analisa-review-penarikan-deac.md §3.3.
+        'device_retrieval_review' => [
+            ActionCode::VIEW->value,
+            ActionCode::REVIEW->value,
+            ActionCode::COMMENT->value,
+        ],
     ],
 
     /*
@@ -984,6 +994,11 @@ return [
         'creq_billing_verification.view' => 'Lihat Antrean Verifikasi Biaya C-REQ',
         'creq_billing_verification.approve' => 'Setujui Biaya C-REQ (lanjut ke Tagihan Manual)',
         'creq_billing_verification.reject' => 'Tolak Biaya C-REQ',
+
+        // Review Penarikan Alat (docs/plan/warehouse/analisa-review-penarikan-deac.md)
+        'device_retrieval_review.view' => 'Lihat Review Penarikan Alat (DEAC gagal)',
+        'device_retrieval_review.review' => 'Approve / Tolak Laporan Penarikan Alat Gagal',
+        'device_retrieval_review.comment' => 'Komentar pada Laporan Penarikan Alat',
 
         'warehouse_branch_sale.view' => 'Lihat Dokumen Jual Beli SN Antar Cabang',
         'warehouse_branch_sale.create' => 'Jual dan Kirim SN ke Cabang Lain',

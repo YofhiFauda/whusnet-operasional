@@ -40,22 +40,55 @@
     </div>
 </div>
 
+@php
+    $progressPercent = $billingProgress['percent'];
+    $progressBarClass = match (true) {
+        $progressPercent === null => 'bg-slate-300 dark:bg-slate-600',
+        $progressPercent >= 80 => 'bg-emerald-500',
+        $progressPercent >= 50 => 'bg-sky-500',
+        default => 'bg-amber-500',
+    };
+    $arrearsLinkParams = array_filter(['tunggakan' => 1, 'pop_id' => $popId, 'invoice_type' => $invoiceType ?? ''], fn ($v) => $v !== '' && $v !== null);
+@endphp
 <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-    <div class="bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-500/30 rounded-lg p-4 flex items-center justify-between">
-        <div>
-            <span class="block text-[10px] font-bold text-orange-600 dark:text-orange-500 uppercase tracking-wider mb-1">Belum Dibayar — Biaya Pendaftaran/Pasang Baru</span>
-            <span class="block text-lg font-bold text-slate-800 dark:text-slate-200 font-mono">Rp {{ number_format($unpaidAwalTotal, 0, ',', '.') }}</span>
+    {{-- Card 1: progres penagihan satu periode (filter Periode / bulan berjalan). --}}
+    <div class="bg-white dark:bg-slate-800 border border-sky-200 dark:border-sky-500/30 rounded-lg p-4">
+        <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold text-sky-600 dark:text-sky-500 uppercase tracking-wider">Penagihan {{ $billingProgress['period_label'] }}</span>
+            <span class="text-sm font-bold font-mono text-slate-800 dark:text-slate-200">{{ $progressPercent === null ? '-' : $progressPercent.'%' }}</span>
         </div>
-        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border uppercase tracking-wide bg-orange-50 dark:bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-200 dark:border-orange-500/20">Sekali Bayar</span>
+        <span class="block text-lg font-bold text-slate-800 dark:text-slate-200 font-mono">Rp {{ number_format($billingProgress['collected'], 0, ',', '.') }} <span class="text-xs font-sans font-normal text-slate-500 dark:text-slate-400">sudah masuk</span></span>
+        <span class="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">dari Rp {{ number_format($billingProgress['billed'], 0, ',', '.') }} yang ditagih</span>
+        <div class="mt-3 h-2 rounded-full bg-slate-100 dark:bg-slate-700 overflow-hidden" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="{{ $progressPercent ?? 0 }}" aria-label="Persentase tagihan terbayar">
+            <div class="h-full rounded-full {{ $progressBarClass }}" style="width: {{ min(100, $progressPercent ?? 0) }}%"></div>
+        </div>
     </div>
-    <div class="bg-white dark:bg-slate-800 border border-sky-200 dark:border-sky-500/30 rounded-lg p-4 flex items-center justify-between">
+
+    {{-- Card 2: tunggakan = piutang periode sebelum bulan berjalan. --}}
+    <div class="bg-white dark:bg-slate-800 border border-orange-200 dark:border-orange-500/30 rounded-lg p-4 flex flex-col justify-between">
         <div>
-            <span class="block text-[10px] font-bold text-sky-600 dark:text-sky-500 uppercase tracking-wider mb-1">Belum Dibayar — Langganan Bulanan</span>
-            <span class="block text-lg font-bold text-slate-800 dark:text-slate-200 font-mono">Rp {{ number_format($unpaidBulananTotal, 0, ',', '.') }}</span>
+            <span class="block text-[10px] font-bold text-orange-600 dark:text-orange-500 uppercase tracking-wider mb-1">Tunggakan Bulan Lalu</span>
+            <span class="block text-lg font-bold text-slate-800 dark:text-slate-200 font-mono">Rp {{ number_format($arrearsSummary['amount'], 0, ',', '.') }}</span>
+            <span class="block text-xs text-slate-500 dark:text-slate-400 mt-0.5">
+                @if($arrearsSummary['customer_count'] > 0)
+                    {{ number_format($arrearsSummary['customer_count'], 0, ',', '.') }} pelanggan belum bayar
+                @else
+                    Tidak ada tunggakan
+                @endif
+            </span>
         </div>
-        <span class="inline-flex items-center px-2 py-1 rounded text-[10px] font-bold border uppercase tracking-wide bg-sky-50 dark:bg-sky-500/10 text-sky-700 dark:text-sky-400 border-sky-200 dark:border-sky-500/20">Rutin</span>
+        @if($arrearsSummary['customer_count'] > 0)
+            <a href="{{ route('invoices.belum-lunas', $arrearsLinkParams) }}" class="mt-3 self-start text-xs font-semibold text-orange-700 dark:text-orange-400 hover:underline">Lihat daftar &rarr;</a>
+        @endif
     </div>
 </div>
+
+@if($showArrearsOnly ?? false)
+    <div class="mb-4 flex items-center justify-between gap-3 rounded-lg border border-orange-200 dark:border-orange-500/30 bg-orange-50 dark:bg-orange-500/10 px-4 py-2.5 text-xs text-orange-800 dark:text-orange-300">
+        <span>Menampilkan <strong>tunggakan bulan lalu</strong> saja (tagihan bulan ini disembunyikan).</span>
+        <a href="{{ route('invoices.belum-lunas', array_diff_key(request()->query(), ['tunggakan' => true, 'page' => true])) }}" class="font-semibold hover:underline">Tampilkan semua</a>
+    </div>
+@endif
 
 <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg p-6 mb-6">
     <form action="{{ $formAction }}" method="GET" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 items-end">
@@ -111,9 +144,20 @@
                 Reset
             </a>
         </div>
+        @if($showArrearsOnly ?? false)
+            <input type="hidden" name="tunggakan" value="1">
+        @endif
     </form>
 </div>
 
+@php
+    // ADHOC-95 §3 menyembunyikan badge status di halaman Tagihan Belum Lunas,
+    // tapi kolomnya dulu tertinggal → kolom STATUS kosong. Kolom dihapus utuh
+    // di halaman ini (header + sel + colspan). Bedanya Belum Dibayar vs
+    // Sebagian tetap terbaca dari tombol "Bayar"/"Bayar Cicil" & filter Status.
+    $showStatusColumn = ($statusGroup ?? '') !== 'belum_lunas';
+    $columnCount = $showStatusColumn ? 9 : 8;
+@endphp
 <div class="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
     <div class="overflow-x-auto">
         <table class="w-full border-collapse text-left text-sm text-slate-700 dark:text-slate-200">
@@ -126,7 +170,9 @@
                     <x-sortable-th sort-key="billing_period" label="PERIODE" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
                     <x-sortable-th sort-key="total_amount" label="TOTAL" align="center" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
                     <x-sortable-th sort-key="remaining_amount" label="SISA" align="center" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
-                    <x-sortable-th sort-key="invoice_status" label="STATUS" align="center" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
+                    @if($showStatusColumn)
+                        <x-sortable-th sort-key="invoice_status" label="STATUS" align="center" class="px-6 py-3.5" :current-sort="$activeSort" :current-dir="request()->query('dir', 'asc')" />
+                    @endif
                     <th class="px-6 py-3.5 text-center">ACTION</th>
                 </tr>
             </thead>
@@ -151,7 +197,6 @@
                         // lengkapnya ada di halaman Detail tagihan.
                         $isInstallment = $invoice->invoice_status->value === 'sebagian'
                             && $invoice->payments->isNotEmpty();
-                        $columnCount = 9;
                         // Invoice TIDAK punya relasi latestPayment (itu cuma ada di
                         // Customer) — ambil dari koleksi payments yang sudah dimuat
                         // terurut payment_date ASC, jadi tinggal last().
@@ -223,17 +268,15 @@
                         <td class="px-6 py-3.5 whitespace-nowrap font-mono">{{ $invoice->billing_period }}</td>
                         <td class="px-6 py-3.5 text-right font-mono font-semibold">Rp {{ number_format((float) $invoice->total_amount, 2, ',', '.') }}</td>
                         <td class="px-6 py-3.5 text-right font-mono" id="invoice-remaining-{{ $invoice->id }}">Rp {{ number_format((float) $invoice->remaining_amount, 2, ',', '.') }}</td>
-                        <td class="px-6 py-3.5 text-center">
-                            {{-- ADHOC-95 §3: badge status TIDAK DIRENDER SAMA SEKALI di halaman
-                                 Tagihan Belum Lunas (bukan pil kosong) — kedua status di sana
-                                 (belum_dibayar/sebagian) sudah jelas dari konteks halamannya
-                                 sendiri. Daftar Tagihan umum & filter manual tetap tampil. --}}
-                            @unless(($statusGroup ?? '') === 'belum_lunas')
+                        {{-- ADHOC-95 §3: di halaman Tagihan Belum Lunas badge — dan kini
+                             kolomnya — TIDAK dirender sama sekali. Lihat $showStatusColumn. --}}
+                        @if($showStatusColumn)
+                            <td class="px-6 py-3.5 text-center">
                                 <span id="invoice-status-badge-{{ $invoice->id }}" class="px-2 py-0.5 text-[10px] font-bold rounded-full border {{ $badgeClass }}">
                                     {{ $invoice->invoice_status->label() }}
                                 </span>
-                            @endunless
-                        </td>
+                            </td>
+                        @endif
                         <td class="px-6 py-3.5 text-right whitespace-nowrap">
                             <div class="inline-flex items-center gap-1.5">
                                 @can('payments.create')
@@ -296,16 +339,14 @@
                     @endif
                 @empty
                     <tr>
-                        <td colspan="9" class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">Belum ada tagihan yang sesuai filter.</td>
+                        <td colspan="{{ $columnCount }}" class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">Belum ada tagihan yang sesuai filter.</td>
                     </tr>
                 @endforelse
             </tbody>
         </table>
     </div>
 
-    <div class="px-6 py-4 border-t border-slate-100 dark:border-slate-700">
-        {{ $invoices->links() }}
-    </div>
+    <x-list-pagination :paginator="$invoices" label="tagihan" class="px-6 py-4 border-t border-slate-100 dark:border-slate-700" />
 </div>
 
 @include('payments.partials.quick-payment-modal')

@@ -54,6 +54,8 @@ class CableCrossingDeactTest extends TestCase
         parent::setUp();
 
         Storage::fake('public');
+        // Foto penarikan alat kini privat di disk local (Review Penarikan Alat).
+        Storage::fake('local');
 
         $this->seed(FeatureSeeder::class);
         $this->seed(ActionSeeder::class);
@@ -123,6 +125,7 @@ class CableCrossingDeactTest extends TestCase
         $payload = array_merge([
             'outcome' => DeviceRetrievalOutcome::TIDAK_DITEMUKAN->value,
             'notes' => 'Pelanggan tidak di rumah saat penarikan.',
+            'condition_photo' => UploadedFile::fake()->image('lokasi.jpg'),
         ], $overrides);
 
         return $this->actingAs($this->teknisi)->post(route('tasks.device-retrieval.store', $this->task), $payload);

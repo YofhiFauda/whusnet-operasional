@@ -3,14 +3,21 @@
 namespace App\Models;
 
 use App\Enums\DeviceRetrievalOutcome;
+use App\Enums\DeviceRetrievalReviewStatus;
+use App\Support\DeviceRetrievalPhoto;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 /**
  * Laporan lapangan task Ambil Modem (DEAC) — lihat migrasi
  * `create_task_device_retrievals_table` dan
  * docs/plan/warehouse/analisa-ambil-modem-deac-ke-gudang.md.
+ *
+ * Laporan GAGAL (modem tidak berhasil diambil) = satu percobaan penarikan
+ * yang direview FOP lewat `review_status` — lihat DeviceRetrievalReviewService
+ * dan docs/plan/warehouse/analisa-review-penarikan-deac.md.
  */
 #[Fillable([
     'task_id',
@@ -18,6 +25,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'condition_photo',
     'accessories',
     'notes',
+    'review_status',
+    'reviewed_by',
+    'reviewed_at',
+    'review_note',
+    'photo_purged_at',
 ])]
 class TaskDeviceRetrieval extends Model
 {
@@ -55,11 +67,43 @@ class TaskDeviceRetrieval extends Model
         return [
             'outcome' => DeviceRetrievalOutcome::class,
             'accessories' => 'array',
+            'review_status' => DeviceRetrievalReviewStatus::class,
+            'reviewed_at' => 'datetime',
+            'photo_purged_at' => 'datetime',
         ];
     }
 
     public function task(): BelongsTo
     {
         return $this->belongsTo(Task::class);
+    }
+
+    /**
+     * @return BelongsTo<User, $this>
+     */
+    public function reviewer(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    /**
+     * @return HasMany<DeviceRetrievalComment, $this>
+     */
+    public function comments(): HasMany
+    {
+        return $this->hasMany(DeviceRetrievalComment::class)->orderBy('created_at')->orderBy('id');
+    }
+
+    /**
+     * URL foto lewat controller ber-permission (bukan URL publik) — null kalau
+     * tidak ada foto, sudah dihapus retensi 30 hari, atau file-nya hilang.
+     */
+    public function photoUrl(): ?string
+    {
+        if ($this->photo_purged_at || ! DeviceRetrievalPhoto::exists($this->condition_photo)) {
+            return null;
+        }
+
+        return route('device-retrievals.photo', $this);
     }
 }

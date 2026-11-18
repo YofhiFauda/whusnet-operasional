@@ -151,7 +151,7 @@ class DashboardFinancialCashGrowthTest extends TestCase
         $this->assertSame(70000.0, $stats['cash_deposit_pending_amount']);
         $this->assertSame(1, $stats['cash_deposit_open_difference_count']);
         $response->assertSee('Posisi Keuangan & Arus Kas', false);
-        $response->assertSee('1 selisih admin');
+        $response->assertSee('1 setoran kasir tidak cocok');
     }
 
     /**

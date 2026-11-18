@@ -76,6 +76,8 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
         parent::setUp();
 
         Storage::fake('public');
+        // Foto penarikan alat kini privat di disk local (Review Penarikan Alat).
+        Storage::fake('local');
 
         $this->seed(FeatureSeeder::class);
         $this->seed(ActionSeeder::class);
@@ -297,7 +299,8 @@ class DeviceRetrievalDeacToWarehouseTest extends TestCase
         $this->submitReport([
             'outcome' => DeviceRetrievalOutcome::TIDAK_DITEMUKAN->value,
             'serials' => [],
-            'condition_photo' => null,
+            // Review Penarikan Alat: laporan gagal wajib foto bukti lokasi.
+            'condition_photo' => UploadedFile::fake()->image('lokasi.jpg'),
             'notes' => 'Pelanggan sudah pindah, alat tidak ada di rumah.',
         ])->assertSessionHasNoErrors();
 

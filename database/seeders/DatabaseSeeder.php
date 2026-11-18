@@ -48,6 +48,7 @@ class DatabaseSeeder extends Seeder
         $this->call(CustomerBalanceFeatureSeeder::class); // Saldo Pelanggan — Bayar di Muka + Auto-Pakai (ADHOC-92)
         $this->call(CustomerCableCrossingFeatureSeeder::class); // Kabel Melintang Jalan (ADHOC-205)
         $this->call(CreqBillingVerificationFeatureSeeder::class); // Antrean Verifikasi Biaya C-REQ (docs/plan/task-teknisi/rancangan-biaya-creq-verifikasi-cs.md)
+        $this->call(DeviceRetrievalReviewFeatureSeeder::class); // Review Penarikan Alat DEAC gagal (docs/plan/warehouse/analisa-review-penarikan-deac.md)
         $this->call(RolePermissionSeeder::class); // re-run biar permission ticket_*/items.*/item_categories.*/work_tools.*/customers.qr.*/warehouse*.*/fop_analytics.*/customer_acquisitions.*/agents.*/package_restrictions.*/sales_omset_dashboard.*/customer_registration_verification.*/termination_reasons.*/billing_waivers.*/customer_balance.*/creq_billing_verification.* ke-sync ke owner
         $this->call(ManualFeatureSeeder::class); // Idempotent; tidak mengubah matriks izin role
         $this->call(ManualArticleSeeder::class); // Artikel awal Infrastruktur; tidak menimpa revisi admin

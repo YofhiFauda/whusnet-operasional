@@ -664,7 +664,8 @@
                         ->get()
                     : collect();
                 $retrievalOutcome = $retrieval?->outcome;
-                $retrievalPhotoUrl = $retrieval ? foto_publik($retrieval->condition_photo) : null;
+                // Foto privat lewat controller ber-permission (bukan /storage publik).
+                $retrievalPhotoUrl = $retrieval?->photoUrl();
             @endphp
             @if($retrieval)
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
@@ -731,9 +732,25 @@
                     </a>
                     <a href="{{ $retrievalPhotoUrl }}" target="_blank" class="block mt-1 text-blue-600 hover:underline">Foto Kondisi Alat →</a>
                 </div>
+                @elseif($retrieval->photo_purged_at)
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 italic">Foto dihapus otomatis (retensi 30 hari setelah laporan ditolak).</p>
+                </div>
                 @elseif($retrieval->condition_photo)
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 italic">Foto kondisi alat tercatat, tetapi filenya tidak ditemukan di penyimpanan.</p>
+                </div>
+                @endif
+
+                @if($retrieval->review_status)
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Review Penarikan Alat</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200">{{ $retrieval->review_status->label() }}
+                        @if($retrieval->reviewed_at)<span class="text-slate-400 dark:text-slate-500 font-normal"> · {{ $retrieval->reviewer?->name ?? '—' }} · {{ $retrieval->reviewed_at->format('d/m/Y H:i') }}</span>@endif
+                    </p>
+                    @if($retrieval->review_note)
+                    <p class="text-slate-600 dark:text-slate-400 whitespace-pre-line break-words [word-break:break-word] mt-0.5">{{ $retrieval->review_note }}</p>
+                    @endif
                 </div>
                 @endif
             </div>

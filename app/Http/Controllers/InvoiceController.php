@@ -15,9 +15,12 @@ use App\Services\CustomerBalanceService;
 use App\Services\InvoiceWriteOffService;
 use App\Services\ManualCategoryInvoiceService;
 use App\Support\LikeSearch;
+use App\Support\PerPage;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
 use App\Support\SortRequest;
+use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -76,6 +79,14 @@ class InvoiceController extends Controller
             $query->where('invoice_type', $invoiceType);
         }
 
+        // Tujuan link "Lihat daftar" di card Tunggakan. Hanya berlaku di
+        // halaman Belum Lunas — di halaman lain piutang() bertabrakan dengan
+        // filter status (mis. Lunas ∩ piutang = selalu kosong).
+        $showArrearsOnly = $statusGroup === 'belum_lunas' && $request->boolean('tunggakan');
+        if ($showArrearsOnly) {
+            $query->piutang();
+        }
+
         if ($statusGroup === 'lunas') {
             $query->where('invoice_status', InvoiceStatus::LUNAS->value);
         } elseif ($statusGroup === 'belum_lunas') {
@@ -103,26 +114,35 @@ class InvoiceController extends Controller
             $query->latest('issue_date')->latest('id');
         }
 
-        $invoices = $query->paginate(10)->withQueryString();
+        $invoices = $query->paginate(PerPage::resolve($request))->withQueryString();
         // Dropdown filter POP cuma buat pilih Cabang — Pusat & Mini POP bukan
         // satuan billing (permintaan user 2026-11-03).
         $pops = Pop::forUser()->where('type', 'cabang')->orderBy('name')->get();
 
-        // Ringkasan tunggakan (independen dari filter/search di atas), supaya
-        // admin lihat total nunggak AWAL vs BULANAN tanpa hitung manual per baris.
-        // Tunggakan = piutang (periode sebelum bulan berjalan), bukan semua yang
-        // belum dibayar — lihat Invoice::scopePiutang().
-        $unpaidBase = Invoice::query()
-            ->applyUserScope()
-            ->piutang();
+        // Dua card ringkasan di atas tabel. Dulu "Belum Dibayar — Awal/Bulanan":
+        // labelnya bilang "belum dibayar" padahal isinya cuma piutang, tak ikut
+        // filter Cabang (angka card ≠ tabel di bawahnya), dan tagihan manual
+        // (denda dsb.) tidak terhitung. Sekarang keduanya ikut filter Cabang +
+        // Jenis, sengaja TIDAK ikut kotak Cari — search itu untuk mencari satu
+        // pelanggan, bukan memotong ringkasan.
+        $summaryBase = Invoice::query()->applyUserScope();
+        if ($popId !== '') {
+            $summaryBase->where('pop_id', $popId);
+        }
+        if ($invoiceType !== '') {
+            $summaryBase->where('invoice_type', $invoiceType);
+        }
 
-        $unpaidAwalTotal = (clone $unpaidBase)
-            ->where('invoice_type', 'awal')
-            ->sum('remaining_amount');
+        $billingProgress = $this->billingProgress(clone $summaryBase, $billingPeriod);
 
-        $unpaidBulananTotal = (clone $unpaidBase)
-            ->where('invoice_type', 'bulanan')
-            ->sum('remaining_amount');
+        // Tunggakan = piutang (periode sebelum bulan berjalan) — lihat
+        // Invoice::scopePiutang(). Link "Lihat daftar" di card memakai scope
+        // yang sama lewat ?tunggakan=1, jadi angka card = isi daftarnya.
+        $arrearsBase = (clone $summaryBase)->piutang();
+        $arrearsSummary = [
+            'amount' => (float) (clone $arrearsBase)->sum('remaining_amount'),
+            'customer_count' => (int) (clone $arrearsBase)->distinct()->count('customer_id'),
+        ];
 
         $customerIds = $invoices->pluck('customer_id')->filter()->unique();
         $customerIdsWithPiutang = $customerIds->isNotEmpty()
@@ -147,10 +167,43 @@ class InvoiceController extends Controller
             'statusGroup',
             'invoiceType',
             'allowedStatuses',
-            'unpaidAwalTotal',
-            'unpaidBulananTotal',
+            'billingProgress',
+            'arrearsSummary',
+            'showArrearsOnly',
             'customerIdsWithPiutang'
         ));
+    }
+
+    /**
+     * Progres penagihan satu periode: berapa yang sudah masuk dari total yang
+     * ditagih. Periode = filter Periode kalau diisi, kalau tidak bulan berjalan.
+     * Tagihan Batal dikeluarkan — tagihan itu memang tidak pernah ditagihkan.
+     * "Sudah masuk" dihitung total − sisa (bukan paid_amount) supaya lebih
+     * bayar tidak membuat persentase lewat 100%.
+     *
+     * @return array{period: string, period_label: string, billed: float, collected: float, percent: int|null}
+     */
+    private function billingProgress(Builder $base, string $billingPeriod): array
+    {
+        $period = preg_match('/^\d{4}-\d{2}$/', $billingPeriod) ? $billingPeriod : now()->format('Y-m');
+
+        $totals = $base
+            ->where('billing_period', $period)
+            ->where('invoice_status', '!=', InvoiceStatus::BATAL->value)
+            ->selectRaw('COALESCE(SUM(total_amount), 0) as billed, COALESCE(SUM(total_amount - remaining_amount), 0) as collected')
+            ->toBase()
+            ->first();
+
+        $billed = (float) $totals->billed;
+        $collected = (float) $totals->collected;
+
+        return [
+            'period' => $period,
+            'period_label' => Carbon::createFromFormat('Y-m-d', $period.'-01')->translatedFormat('F Y'),
+            'billed' => $billed,
+            'collected' => $collected,
+            'percent' => $billed > 0 ? (int) round($collected / $billed * 100) : null,
+        ];
     }
 
     public function lunas(Request $request): View

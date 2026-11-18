@@ -594,6 +594,17 @@ class TaskController extends Controller
     {
         $this->authorize('review', $task);
 
+        // Laporan DEAC GAGAL yang sudah masuk Review Penarikan Alat hanya
+        // boleh diputuskan di halaman itu. Reject/pending generik di sini
+        // mengembalikan task yang SAMA ke teknisi — laporan ditimpa di task
+        // itu juga dan percobaannya tidak terhitung (D4/Q6
+        // analisa-review-penarikan-deac.md). Tombolnya sudah disembunyikan
+        // di tasks/show; ini penjaga server-nya. Laporan gagal lama (tanpa
+        // review_status, sebelum fitur ini) tetap lewat jalur lama.
+        if ($task->task_type === TaskType::AMBIL_MODEM && $task->deviceRetrieval?->review_status !== null) {
+            return back()->with('error', 'Laporan penarikan alat yang gagal diputuskan di halaman Review Penarikan Alat, bukan dari sini.');
+        }
+
         $validated = $request->validate([
             'action' => 'required|in:approve,reject,pending',
             // 'reason' ditulis ke reject_reason (varchar 1000) ATAU pending_reason

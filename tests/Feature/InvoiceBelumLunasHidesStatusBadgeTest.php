@@ -58,6 +58,39 @@ class InvoiceBelumLunasHidesStatusBadgeTest extends TestCase
         $response->assertSee('const HIDE_INVOICE_STATUS_BADGE = true', false);
     }
 
+    /**
+     * Badge disembunyikan (ADHOC-95) tapi kolomnya dulu tertinggal → kolom
+     * STATUS kosong + sort tanpa makna. Kolom ikut dihapus di halaman ini,
+     * termasuk colspan baris cicilan/empty state (9 → 8) supaya tabel tak miring.
+     */
+    public function test_kolom_status_tidak_dirender_di_halaman_tagihan_belum_lunas(): void
+    {
+        $this->loginAsAdmin();
+
+        $response = $this->get(route('invoices.belum-lunas'));
+
+        $response->assertOk();
+        $response->assertDontSee('sort=invoice_status', false);
+
+        // Empty state memakai colspan yang sama dengan baris cicilan.
+        $this->get(route('invoices.belum-lunas', ['search' => 'TIDAK-ADA-SAMA-SEKALI']))
+            ->assertSee('colspan="8"', false)
+            ->assertDontSee('colspan="9"', false);
+    }
+
+    public function test_kolom_status_tetap_ada_di_daftar_tagihan_umum(): void
+    {
+        $this->loginAsAdmin();
+
+        $response = $this->get(route('invoices.index'));
+
+        $response->assertOk();
+        $response->assertSee('sort=invoice_status', false);
+
+        $this->get(route('invoices.index', ['search' => 'TIDAK-ADA-SAMA-SEKALI']))
+            ->assertSee('colspan="9"', false);
+    }
+
     public function test_badge_tetap_tampil_di_daftar_tagihan_umum(): void
     {
         $this->loginAsAdmin();

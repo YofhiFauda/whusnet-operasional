@@ -159,6 +159,16 @@ class ActionSeeder extends Seeder
                 'name' => 'Isolir',
                 'description' => 'Mengisolir atau mengaktifkan kembali layanan pelanggan',
             ],
+            [
+                'code' => ActionCode::REVIEW,
+                'name' => 'Review',
+                'description' => 'Memutuskan laporan (approve atau tolak) dalam satu hak yang sama',
+            ],
+            [
+                'code' => ActionCode::COMMENT,
+                'name' => 'Comment',
+                'description' => 'Menulis komentar pada laporan tanpa hak memutuskan',
+            ],
         ];
 
         foreach ($actions as $action) {

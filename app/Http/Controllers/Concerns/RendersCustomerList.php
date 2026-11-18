@@ -17,6 +17,7 @@ use App\Models\SubscriptionStatus;
 use App\Models\User;
 use App\Models\Village;
 use App\Services\CustomerListColumnService;
+use App\Services\DeviceRetrievalReviewService;
 use App\Support\LikeSearch;
 use Illuminate\Contracts\View\View;
 use Illuminate\Http\Request;
@@ -313,6 +314,11 @@ trait RendersCustomerList
                 ->pluck('customer_id')
                 ->flip();
 
+            // Review Penarikan Alat: laporan gagal yang menunggu keputusan FOP
+            // → badge "Menunggu Review" dan tombol Ambil Alat disembunyikan
+            // (penjaga server-nya di CustomerController::retrieveDevice()).
+            $customersAwaitingRetrievalReview = app(DeviceRetrievalReviewService::class)->customerIdsWithPendingReview($customerIds);
+
             // Kolom Tagihan (ADHOC-105): invoice tak tertagih per pelanggan,
             // satu kueri untuk seluruh halaman (bukan per baris). Halaman ini
             // sudah dibatasi POP scope lewat daftar `$customerIds` di atas.
@@ -338,6 +344,8 @@ trait RendersCustomerList
                 $customer->terminated_at = $customer->terminated_at ?? $log?->created_at;
                 $customer->device_retrieved_at = $customer->customerDevice?->device_retrieved_at;
                 $customer->device_retrieval_in_progress = $customersWithOpenRetrieval->has($customer->id);
+                $customer->device_retrieval_waived_at = $customer->customerDevice?->retrieval_waived_at;
+                $customer->device_retrieval_review_pending = isset($customersAwaitingRetrievalReview[$customer->id]);
             }
         }
 

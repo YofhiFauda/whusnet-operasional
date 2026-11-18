@@ -636,7 +636,8 @@
                         ->get()
                     : collect();
                 $retrievalOutcome = $retrieval?->outcome;
-                $retrievalPhotoUrl = $retrieval ? foto_publik($retrieval->condition_photo) : null;
+                // Foto privat lewat controller ber-permission (bukan /storage publik).
+                $retrievalPhotoUrl = $retrieval?->photoUrl();
             ?>
             <?php if($retrieval): ?>
             <div class="grid grid-cols-2 gap-4 p-4 text-[11px] font-ui">
@@ -682,7 +683,7 @@
                     <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Kelengkapan yang Ikut Dibawa</p>
                     <div class="flex flex-wrap gap-1.5 mt-1">
                         <?php $__empty_1 = true; $__currentLoopData = ($retrieval->accessories ?? []); $__env->addLoop($__currentLoopData); foreach($__currentLoopData as $accessory): $__env->incrementLoopIndices(); $loop = $__env->getLastLoop(); $__empty_1 = false; ?>
-                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100"><?php echo e(\App\Models\TaskDeviceRetrieval::ACCESSORY_OPTIONS[$accessory] ?? $accessory); ?></span>
+                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-100"><?php echo e(\App\Models\TaskDeviceRetrieval::ACCESSORY_LABELS[$accessory] ?? $accessory); ?></span>
                         <?php endforeach; $__env->popLoop(); $loop = $__env->getLastLoop(); if ($__empty_1): ?>
                         <span class="text-slate-400 dark:text-slate-500">Tidak ada kelengkapan dicatat.</span>
                         <?php endif; ?>
@@ -705,9 +706,26 @@
                     </a>
                     <a href="<?php echo e($retrievalPhotoUrl); ?>" target="_blank" class="block mt-1 text-blue-600 hover:underline">Foto Kondisi Alat →</a>
                 </div>
+                <?php elseif($retrieval->photo_purged_at): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 italic">Foto dihapus otomatis (retensi 30 hari setelah laporan ditolak).</p>
+                </div>
                 <?php elseif($retrieval->condition_photo): ?>
                 <div class="col-span-2">
                     <p class="text-slate-400 dark:text-slate-500 italic">Foto kondisi alat tercatat, tetapi filenya tidak ditemukan di penyimpanan.</p>
+                </div>
+                <?php endif; ?>
+
+                <?php if($retrieval->review_status): ?>
+                <div class="col-span-2">
+                    <p class="text-slate-400 dark:text-slate-500 uppercase tracking-wider text-[10px] mb-0.5">Review Penarikan Alat</p>
+                    <p class="font-medium text-slate-800 dark:text-slate-200"><?php echo e($retrieval->review_status->label()); ?>
+
+                        <?php if($retrieval->reviewed_at): ?><span class="text-slate-400 dark:text-slate-500 font-normal"> · <?php echo e($retrieval->reviewer?->name ?? '—'); ?> · <?php echo e($retrieval->reviewed_at->format('d/m/Y H:i')); ?></span><?php endif; ?>
+                    </p>
+                    <?php if($retrieval->review_note): ?>
+                    <p class="text-slate-600 dark:text-slate-400 whitespace-pre-line break-words [word-break:break-word] mt-0.5"><?php echo e($retrieval->review_note); ?></p>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
             </div>

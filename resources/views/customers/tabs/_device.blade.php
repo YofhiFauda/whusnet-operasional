@@ -639,8 +639,8 @@
                     </td>
                     <td class="px-5 py-3 text-slate-700 dark:text-slate-200">
                         {{ $log->condition?->label() ?? '-' }}
-                        @if($log->photoPath())
-                        <a href="{{ Storage::disk('public')->url($log->photoPath()) }}" target="_blank" rel="noopener" class="ml-2 font-bold text-sky-600 dark:text-sky-400">Foto</a>
+                        @if($logPhotoUrl = $log->photoUrl())
+                        <a href="{{ $logPhotoUrl }}" target="_blank" rel="noopener" class="ml-2 font-bold text-sky-600 dark:text-sky-400">Foto</a>
                         @endif
                     </td>
                 </tr>

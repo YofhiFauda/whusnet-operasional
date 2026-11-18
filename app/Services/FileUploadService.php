@@ -3,6 +3,7 @@
 namespace App\Services;
 
 use App\Models\Customer;
+use App\Support\DeviceRetrievalPhoto;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
 
@@ -150,8 +151,13 @@ class FileUploadService
     }
 
     /**
-     * Foto kondisi modem hasil pengambilan alat (task DEAC, ADHOC-86).
-     * Folder: device-retrieval/. Pola nama sama `uploadMaintenancePhoto()`.
+     * Foto kondisi modem hasil pengambilan alat (task DEAC, ADHOC-86) dan
+     * modem diantar pelanggan (ADHOC-88). Folder: device-retrieval/.
+     *
+     * Disimpan di disk PRIVAT `local` (bukan `public`): fotonya memuat rumah /
+     * lokasi pelanggan, dan nama file memuat CID + nama — dulu URL publiknya
+     * bisa ditebak dan dibuka tanpa login. Disajikan lewat
+     * DeviceRetrievalPhotoController. Lihat App\Support\DeviceRetrievalPhoto.
      */
     public static function uploadDeviceRetrievalPhoto(UploadedFile $file, ?Customer $customer): string
     {
@@ -159,11 +165,20 @@ class FileUploadService
         $customerName = self::getCustomerName($customer);
         $ext = $file->getClientOriginalExtension();
 
-        $folder = 'device-retrieval';
+        $folder = DeviceRetrievalPhoto::FOLDER;
         $baseName = "kondisi-alat_{$customerId}_{$customerName}";
-        $fileName = self::getUniqueFileName($folder, $baseName, $ext);
 
-        return $file->storeAs($folder, $fileName, 'public');
+        // Cek KEDUA disk, bukan cuma `local`: file lama yang belum dipindah
+        // command one-off masih di `public` dengan nama yang sama — tanpa ini
+        // nama baru bisa bentrok lalu tertimpa saat file lama dipindah.
+        $fileName = "{$baseName}.{$ext}";
+        $counter = 2;
+        while (DeviceRetrievalPhoto::exists("{$folder}/{$fileName}")) {
+            $fileName = "{$baseName}_{$counter}.{$ext}";
+            $counter++;
+        }
+
+        return $file->storeAs($folder, $fileName, DeviceRetrievalPhoto::DISK);
     }
 
     /**

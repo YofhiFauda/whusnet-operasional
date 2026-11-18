@@ -348,6 +348,10 @@ class RolePermissionSeeder extends Seeder
                 // Bypass Pelanggan (2026-11-15) — keputusan user: cuma Owner
                 // (lewat `*`) & CS. Melompati seluruh workflow aktivasi.
                 'customers.registration.bypass',
+                // Review Penarikan Alat: CS cuma pantau + komentar, TIDAK
+                // approve/tolak (keputusan user K4, analisa-review-penarikan-deac.md).
+                'device_retrieval_review.view',
+                'device_retrieval_review.comment',
                 'creq_billing_verification.approve',
                 'creq_billing_verification.reject',
                 'creq_billing_verification.view',
@@ -408,6 +412,11 @@ class RolePermissionSeeder extends Seeder
             // dasar — tiket dasar sekarang domain NOC/Helpdesk, FOP fokus ke
             // eksekusi task & FopTask.
             'fop' => [
+                // Review Penarikan Alat — satu-satunya role (selain Owner)
+                // yang boleh approve/tolak laporan DEAC gagal (keputusan user K4).
+                'device_retrieval_review.view',
+                'device_retrieval_review.review',
+                'device_retrieval_review.comment',
                 'customers.detail.address.update',
                 'customers.detail.address.view',
                 'customers.detail.devices.retrieve',
@@ -622,6 +631,9 @@ class RolePermissionSeeder extends Seeder
             ],
 
             'business_development' => [
+                // Review Penarikan Alat: BD cuma pantau + komentar (keputusan user K4).
+                'device_retrieval_review.view',
+                'device_retrieval_review.comment',
                 'agents.create',
                 'agents.update',
                 'agents.view',
