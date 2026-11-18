@@ -27,6 +27,9 @@ Schedule::command('billing:close-period')->monthlyOn(1, '00:10');
 // dipastikan sudah selesai dibuat sebelum data invoice berubah.
 Schedule::command('billing:write-off-terminated')->monthlyOn(1, '00:20');
 Schedule::command('notifications:prune-read')->dailyAt('00:30');
+// Retensi 30 hari foto percobaan penarikan alat yang DITOLAK (Review
+// Penarikan Alat, keputusan user K5). '00:40' — sesudah prune notifikasi.
+Schedule::command('device-retrieval:prune-photos')->dailyAt('00:40');
 Schedule::command('fop-tasks:check-sla-breach')->everyThirtyMinutes();
 // '01:15' — hindari bentrok dgn billing:generate-monthly-invoices (01:00,
 // cuma tanggal 1) dan notifications:prune-read (00:30).

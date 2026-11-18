@@ -131,7 +131,7 @@
                 @php
                     $log = $serial->latestRetrievalLog;
                     $taskReport = $log?->task?->deviceRetrieval;
-                    $photo = $log?->photoPath();
+                    $photo = $log?->photoUrl();
                 @endphp
                 <tr class="hover:bg-slate-50/80 dark:hover:bg-slate-900/40 transition-colors group">
                     <td class="px-4 py-4 align-top">
@@ -179,10 +179,10 @@
                     <td class="px-4 py-4 align-top">
                         <div class="flex items-start gap-2.5">
                             @if($photo)
-                            <a href="{{ Storage::disk('public')->url($photo) }}" target="_blank" rel="noopener"
+                            <a href="{{ $photo }}" target="_blank" rel="noopener"
                                class="group/img relative w-10 h-10 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 hover:ring-2 hover:ring-sky-500 transition-all shadow-xs"
                                title="Lihat Foto Bukti">
-                                <img src="{{ Storage::disk('public')->url($photo) }}" alt="Foto Bukti" class="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-200">
+                                <img src="{{ $photo }}" alt="Foto Bukti" class="w-full h-full object-cover group-hover/img:scale-110 transition-transform duration-200">
                                 <div class="absolute inset-0 bg-black/30 opacity-0 group-hover/img:opacity-100 flex items-center justify-center text-white text-[9px] font-bold transition-opacity">
                                     ↗
                                 </div>
@@ -228,7 +228,7 @@
         @php
             $log = $serial->latestRetrievalLog;
             $taskReport = $log?->task?->deviceRetrieval;
-            $photo = $log?->photoPath();
+            $photo = $log?->photoUrl();
         @endphp
         <div class="p-4 space-y-3.5 hover:bg-slate-50/50 dark:hover:bg-slate-900/30 transition-colors">
             {{-- Header Card: SN + Badge Status --}}
@@ -276,9 +276,9 @@
             @if($photo || !empty($taskReport?->accessories) || $taskReport?->notes)
             <div class="flex items-center gap-3 text-xs">
                 @if($photo)
-                <a href="{{ Storage::disk('public')->url($photo) }}" target="_blank" rel="noopener"
+                <a href="{{ $photo }}" target="_blank" rel="noopener"
                    class="w-12 h-12 rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 shrink-0 bg-slate-100 relative">
-                    <img src="{{ Storage::disk('public')->url($photo) }}" alt="Foto" class="w-full h-full object-cover">
+                    <img src="{{ $photo }}" alt="Foto" class="w-full h-full object-cover">
                 </a>
                 @endif
                 <div class="space-y-1 flex-1 min-w-0">

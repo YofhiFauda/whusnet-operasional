@@ -15,10 +15,12 @@ use App\Models\Item;
 use App\Models\Task;
 use App\Models\TaskDeviceRetrieval;
 use App\Services\CableCrossingService;
+use App\Services\DeviceRetrievalReviewService;
 use App\Services\FileUploadService;
 use App\Services\InventoryReassignService;
 use App\Services\LegacyDeviceHintService;
 use App\Services\TaskService;
+use App\Support\DeviceRetrievalPhoto;
 use App\Support\UploadLimit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -77,7 +79,7 @@ class TaskDeviceRetrievalController extends Controller
         return view('tasks.device-retrieval-report', compact('task', 'installedSerials', 'legacySerial', 'legacyHint', 'items', 'accessoryOptions', 'outcomes', 'showOwnershipSkipBanner', 'pendingCableCrossings'));
     }
 
-    public function store(Request $request, Task $task, TaskService $taskService, InventoryReassignService $inventory, CableCrossingService $cableCrossings): RedirectResponse
+    public function store(Request $request, Task $task, TaskService $taskService, InventoryReassignService $inventory, CableCrossingService $cableCrossings, DeviceRetrievalReviewService $reviews): RedirectResponse
     {
         $this->authorize('statusComplete', $task);
 
@@ -109,7 +111,19 @@ class TaskDeviceRetrievalController extends Controller
             ],
             'serials.*.serial_number' => ['required', 'string', 'max:100'],
             'serials.*.item_id' => ['nullable', 'integer', 'exists:items,id'],
-            'condition_photo' => ['required_if:outcome,'.DeviceRetrievalOutcome::DIAMBIL->value, 'nullable', 'image', UploadLimit::rule()],
+            // Foto wajib untuk SEMUA hasil: laporan gagal kini direview FOP
+            // (Review Penarikan Alat) dan foto lokasi adalah buktinya — dulu
+            // cuma wajib kalau `diambil` (D3 analisa-review-penarikan-deac.md).
+            // Pengecualian: kirim ulang laporan task yang sama boleh memakai
+            // foto lama (lihat $photoPath di bawah) — HANYA kalau jenis
+            // hasilnya sama (diambil ↔ diambil, gagal ↔ gagal) dan filenya
+            // masih ada. Foto kondisi modem dari laporan "diambil" yang
+            // di-reject bukan bukti lokasi untuk laporan gagal, dan foto
+            // yang sudah hilang/dipurge tidak membuktikan apa pun.
+            'condition_photo' => [
+                Rule::requiredIf(fn () => ! $this->canReuseExistingPhoto($task->deviceRetrieval, (string) $request->input('outcome'))),
+                'nullable', 'image', UploadLimit::rule(),
+            ],
             'accessories' => ['nullable', 'array'],
             'accessories.*' => ['string', Rule::in(array_keys(TaskDeviceRetrieval::ACCESSORY_OPTIONS))],
             // Alasan wajib kalau alat TIDAK diambil — satu-satunya jejak kenapa
@@ -122,7 +136,7 @@ class TaskDeviceRetrievalController extends Controller
             ],
         ], [
             'serials.required' => 'Isi minimal satu nomor seri (SN) modem yang dibawa.',
-            'condition_photo.required_if' => 'Foto kondisi alat wajib diunggah kalau alat berhasil diambil.',
+            'condition_photo.required' => 'Foto wajib diunggah: kondisi alat kalau berhasil diambil, atau bukti lokasi kalau tidak berhasil diambil.',
             'notes.required' => 'Alasan wajib diisi kalau alat tidak berhasil diambil.',
         ]);
 
@@ -153,7 +167,7 @@ class TaskDeviceRetrievalController extends Controller
         $task->loadMissing(['customer', 'pop', 'fopTask']);
 
         try {
-            DB::transaction(function () use ($request, $task, $taskService, $inventory, $cableCrossings, $crossingInput, $technician, $outcome, $rows, $validated) {
+            DB::transaction(function () use ($request, $task, $taskService, $inventory, $cableCrossings, $reviews, $crossingInput, $technician, $outcome, $rows, $validated) {
                 foreach ($rows as $row) {
                     $item = ! empty($row['item_id']) ? Item::find($row['item_id']) : null;
 
@@ -182,12 +196,16 @@ class TaskDeviceRetrievalController extends Controller
                     ? FileUploadService::uploadDeviceRetrievalPhoto($request->file('condition_photo'), $task->customer)
                     : $task->deviceRetrieval?->condition_photo;
 
-                $task->deviceRetrieval()->updateOrCreate(['task_id' => $task->id], [
+                $retrieval = $task->deviceRetrieval()->updateOrCreate(['task_id' => $task->id], [
                     'outcome' => $outcome,
                     'condition_photo' => $photoPath,
                     'accessories' => $outcome->isRetrieved() ? ($validated['accessories'] ?? []) : [],
                     'notes' => $validated['notes'] ?? null,
                 ]);
+
+                // Laporan gagal → antrian Review Penarikan Alat (FOP). Laporan
+                // `diambil` tidak (diverifikasi gudang lewat Terima Retur, K3).
+                $reviews->markSubmitted($retrieval);
 
                 // Sebelum complete(): task DEAC tidak boleh tertutup dengan rute
                 // kabel yang masih `terpasang` (lihat CableCrossingService::resolveForDeact()).
@@ -203,7 +221,7 @@ class TaskDeviceRetrievalController extends Controller
 
         return redirect()->route('tasks.show', $task)->with('success', $outcome->isRetrieved()
             ? 'Laporan pengambilan alat tersimpan. Modem menunggu diterima Gudang cabang.'
-            : 'Laporan tersimpan. Alat belum diambil — tombol Ambil Alat akan muncul lagi di List Putus Langganan.');
+            : 'Laporan tersimpan. Alat belum diambil — alasan & foto menunggu review FOP di halaman Review Penarikan Alat.');
     }
 
     /**
@@ -223,6 +241,22 @@ class TaskDeviceRetrievalController extends Controller
      *      cabang ini teknisi dipaksa lewat jalur "tidak berhasil diambil +
      *      alasan" padahal tidak ada yang gagal.
      */
+    /**
+     * Kirim ulang laporan boleh tanpa unggah foto baru hanya kalau foto lama
+     * masih ada dan jenis hasilnya sama — lihat rule `condition_photo`.
+     */
+    private function canReuseExistingPhoto(?TaskDeviceRetrieval $existing, string $outcome): bool
+    {
+        $newOutcome = DeviceRetrievalOutcome::tryFrom($outcome);
+
+        if (! $existing || ! $newOutcome || $existing->photo_purged_at !== null) {
+            return false;
+        }
+
+        return $existing->outcome->isRetrieved() === $newOutcome->isRetrieved()
+            && DeviceRetrievalPhoto::exists($existing->condition_photo);
+    }
+
     private function nothingToRetrieve(Task $task): bool
     {
         $customer = $task->customer;

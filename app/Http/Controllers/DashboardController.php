@@ -988,10 +988,10 @@ class DashboardController extends Controller
             $diffs = $stats['cash_deposit_open_difference_count'] ?? 0;
             if ($shortfall > 0 || $diffs > 0) {
                 $financeStatus = 'danger';
-                $financeLabel = ($shortfall + $diffs).' Masalah Kas';
+                $financeLabel = ($shortfall + $diffs).' Setoran Bermasalah';
             } elseif (($stats['collection_rate'] ?? 100) !== null && ($stats['collection_rate'] ?? 100) < 70) {
                 $financeStatus = 'warning';
-                $financeLabel = 'Collection <70%';
+                $financeLabel = 'Terbayar <70%';
             }
         }
 
@@ -1003,10 +1003,10 @@ class DashboardController extends Controller
             $activeTickets = ($stats['ticket_bucket_masuk'] ?? 0) + ($stats['ticket_bucket_diproses'] ?? 0);
             if ($breaches > 0) {
                 $networkStatus = 'danger';
-                $networkLabel = $breaches.' Breach SLA';
+                $networkLabel = $breaches.' Tiket Terlambat';
             } elseif ($activeTickets > 10) {
                 $networkStatus = 'warning';
-                $networkLabel = $activeTickets.' Tiket Aktif';
+                $networkLabel = $activeTickets.' Tiket Belum Selesai';
             }
         }
 
@@ -1019,10 +1019,10 @@ class DashboardController extends Controller
             $totalOverdue = $overduePsb + $overdueSurvey;
             if ($totalOverdue > 3) {
                 $fieldStatus = 'danger';
-                $fieldLabel = $totalOverdue.' Overdue Antrean';
+                $fieldLabel = $totalOverdue.' Pekerjaan Terlambat';
             } elseif ($totalOverdue > 0) {
                 $fieldStatus = 'warning';
-                $fieldLabel = $totalOverdue.' Perlu Perhatian';
+                $fieldLabel = $totalOverdue.' Mulai Terlambat';
             }
         }
 
@@ -1033,7 +1033,7 @@ class DashboardController extends Controller
             $lowStock = $stats['low_stock_count'] ?? 0;
             if ($lowStock > 5) {
                 $warehouseStatus = 'danger';
-                $warehouseLabel = $lowStock.' Item Kritis';
+                $warehouseLabel = $lowStock.' Barang Hampir Habis';
             } elseif ($lowStock > 0) {
                 $warehouseStatus = 'warning';
                 $warehouseLabel = $lowStock.' Stok Menipis';
@@ -1042,11 +1042,11 @@ class DashboardController extends Controller
 
         $allStatuses = [$financeStatus, $networkStatus, $fieldStatus, $warehouseStatus];
         if (in_array('danger', $allStatuses, true)) {
-            $overall = ['status' => 'danger', 'label' => 'Perhatian Kritis'];
+            $overall = ['status' => 'danger', 'label' => 'Ada yang Mendesak'];
         } elseif (in_array('warning', $allStatuses, true)) {
-            $overall = ['status' => 'warning', 'label' => 'Waspada'];
+            $overall = ['status' => 'warning', 'label' => 'Perlu Diperhatikan'];
         } else {
-            $overall = ['status' => 'good', 'label' => 'Sistem Prima'];
+            $overall = ['status' => 'good', 'label' => 'Semua Aman'];
         }
 
         return [

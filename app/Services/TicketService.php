@@ -634,10 +634,14 @@ class TicketService
      * dari NumberSequenceService, deret yang sama dengan jalur FOP lainnya
      * (lihat CLAUDE.md § Sinkronisasi Ticket ↔ FopTask ↔ Task). device_retrieved_at sendiri
      * baru keisi otomatis saat Task-nya selesai (lihat TaskService::complete()).
+     *
+     * `$origin` cuma mengisi pointer pendek di `notes` (aturan #6 CLAUDE.md):
+     * jalur kedua pemanggil adalah Tolak di Review Penarikan Alat
+     * (DeviceRetrievalReviewService::reject()) — deact diulang lewat task baru.
      */
-    public function createDeviceRetrievalTask(Customer $customer, User $actor): FopTask
+    public function createDeviceRetrievalTask(Customer $customer, User $actor, string $origin = 'List Putus Langganan'): FopTask
     {
-        return DB::transaction(function () use ($customer, $actor) {
+        return DB::transaction(function () use ($customer, $actor, $origin) {
             $fopTask = new FopTask;
             $fopTask->task_number = app(NumberSequenceService::class)->fopTaskNumber();
             $fopTask->task_date = now();
@@ -647,7 +651,7 @@ class TicketService
             $fopTask->pop_id = $customer->pop_id;
             $fopTask->customer_id = $customer->id;
             $fopTask->issue = 'Pengambilan alat pelanggan putus langganan.';
-            $fopTask->notes = "Ambil Alat — diajukan oleh {$actor->name} dari List Putus Langganan.";
+            $fopTask->notes = "Ambil Alat — diajukan oleh {$actor->name} dari {$origin}.";
             $fopTask->status = TaskStatus::DRAFT;
             $fopTask->priority = FopTaskPriority::MEDIUM;
             $fopTask->save();

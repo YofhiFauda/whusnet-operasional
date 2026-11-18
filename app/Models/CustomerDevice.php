@@ -26,6 +26,8 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
     'connection_mode',
     'technical_note',
     'device_retrieved_at',
+    'retrieval_waived_at',
+    'retrieval_waived_by',
     'acquisition_source',
 ])]
 class CustomerDevice extends Model
@@ -53,6 +55,9 @@ class CustomerDevice extends Model
         return [
             'signal_rx_power' => 'decimal:2',
             'device_retrieved_at' => 'datetime',
+            // "Dibebaskan" — FOP menerima alasan modem tidak bisa diambil
+            // (Review Penarikan Alat). Lihat migrasi add_retrieval_waived_*.
+            'retrieval_waived_at' => 'datetime',
             'acquisition_source' => DeviceAcquisitionSource::class,
         ];
     }

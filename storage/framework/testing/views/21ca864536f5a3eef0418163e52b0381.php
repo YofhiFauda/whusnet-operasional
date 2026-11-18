@@ -629,8 +629,8 @@
                     <td class="px-5 py-3 text-slate-700 dark:text-slate-200">
                         <?php echo e($log->condition?->label() ?? '-'); ?>
 
-                        <?php if($log->photoPath()): ?>
-                        <a href="<?php echo e(Storage::disk('public')->url($log->photoPath())); ?>" target="_blank" rel="noopener" class="ml-2 font-bold text-sky-600 dark:text-sky-400">Foto</a>
+                        <?php if($logPhotoUrl = $log->photoUrl()): ?>
+                        <a href="<?php echo e($logPhotoUrl); ?>" target="_blank" rel="noopener" class="ml-2 font-bold text-sky-600 dark:text-sky-400">Foto</a>
                         <?php endif; ?>
                     </td>
                 </tr>

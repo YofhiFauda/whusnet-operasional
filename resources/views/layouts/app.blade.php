@@ -602,8 +602,11 @@
                 </div>
                 <div class="space-y-1">
 
-                    @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('fop_analytics.view'))
-                    @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('fop_analytics.view'))
+                    {{-- device_retrieval_review.view ikut membuka grup: CS & BD
+                         (Review Penarikan Alat, lihat + komentar) tidak punya
+                         task.view.all, tapi menunya ada di grup ini (Q9). --}}
+                    @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('fop_analytics.view') || auth()->user()->hasPermission('device_retrieval_review.view'))
+                    @if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('fop_analytics.view') || auth()->user()->hasPermission('device_retrieval_review.view'))
                     @php
                         $isTasksActive = Request::is('tasks*') || Request::is('fop*');
                     @endphp
@@ -616,6 +619,9 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m3 17 2 2 4-4"/><path stroke-linecap="round" stroke-linejoin="round" d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>
                                 </svg>
                                 <span class="sidebar-text">Penjadwalan Teknis</span>
+                                @if(($badge_retrieval_review_count ?? 0) > 0)
+                                <span class="sidebar-parent-badge rounded-full bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold text-white">{{ $badge_retrieval_review_count }}</span>
+                                @endif
                             </div>
                             <svg id="chevron-tasks"
                                  class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 {{ $isTasksActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500' }}"
@@ -646,6 +652,13 @@
                                 <a href="{{ route('fop-tasks.history') }}"
                                    class="flex items-center justify-between sidebar-subitem {{ Request::routeIs('fop-tasks.history') ? 'sidebar-subitem-active' : '' }}">
                                     <span>Riwayat Task FOP</span>
+                                </a>
+                                @endif
+                                @if(auth()->user()->hasPermission('device_retrieval_review.view'))
+                                <a href="{{ route('device-retrieval-reviews.index') }}"
+                                   class="flex items-center justify-between sidebar-subitem {{ Request::routeIs('device-retrieval-reviews.*') ? 'sidebar-subitem-active' : '' }}">
+                                    <span>Review Penarikan Alat</span>
+                                    @if(($badge_retrieval_review_count ?? 0) > 0)<span data-badge="retrieval-review" class="sidebar-badge rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[9px] font-bold text-rose-600">{{ $badge_retrieval_review_count }}</span>@endif
                                 </a>
                                 @endif
                                 @if(auth()->user()->hasPermission('task.view.own'))

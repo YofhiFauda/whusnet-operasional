@@ -143,8 +143,7 @@ class PiutangDitampilkanBerdasarkanPeriodeTest extends TestCase
     {
         $response = $this->actingAs($this->owner)->get(route('invoices.index'));
 
-        $this->assertEquals(70000, $response->viewData('unpaidBulananTotal'));
-        $this->assertEquals(0, $response->viewData('unpaidAwalTotal'));
+        $this->assertEquals(70000, $response->viewData('arrearsSummary')['amount']);
     }
 
     public function test_laporan_tagihan_total_tunggakan_dan_toggle_hanya_piutang(): void

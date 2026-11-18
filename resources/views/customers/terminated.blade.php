@@ -74,17 +74,25 @@
                         default => '-',
                     };
                     $isDeviceRetrieved = (bool) $customer->device_retrieved_at;
+                    // "Dibebaskan" = FOP menerima alasan modem tidak bisa diambil;
+                    // "Menunggu Review" = laporan gagal menunggu keputusan FOP
+                    // (Review Penarikan Alat). Keduanya menutup tombol Ambil Alat:
+                    // percobaan berikutnya lahir dari Tolak di halaman review.
+                    $isDeviceWaived = ! $isDeviceRetrieved && (bool) ($customer->device_retrieval_waived_at ?? null);
+                    $isDeviceAwaitingReview = ! $isDeviceRetrieved && ! $isDeviceWaived && (bool) ($customer->device_retrieval_review_pending ?? false);
                     // "Sedang Diproses" = task Ambil Alat sudah dibuat tapi belum
                     // selesai. Penanda buat FOP (mana yang sudah dijadwalkan), dan
                     // tombol Ambil Alat disembunyikan selama status ini (juga saat
                     // "Sudah Diambil") supaya tidak dijadwalkan dua kali.
-                    $isDeviceInProgress = ! $isDeviceRetrieved && (bool) ($customer->device_retrieval_in_progress ?? false);
-                    $deviceBadgeTone = $isDeviceRetrieved
-                        ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
-                        : ($isDeviceInProgress
-                            ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60'
-                            : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60');
-                    $deviceBadgeLabel = $isDeviceRetrieved ? 'Sudah Diambil' : ($isDeviceInProgress ? 'Sedang Diproses' : 'Belum Diambil');
+                    $isDeviceInProgress = ! $isDeviceRetrieved && ! $isDeviceWaived && ! $isDeviceAwaitingReview && (bool) ($customer->device_retrieval_in_progress ?? false);
+                    [$deviceBadgeTone, $deviceBadgeLabel] = match (true) {
+                        $isDeviceRetrieved => ['bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60', 'Sudah Diambil'],
+                        $isDeviceWaived => ['bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/50 dark:text-violet-300 dark:border-violet-800/60', 'Dibebaskan'],
+                        $isDeviceAwaitingReview => ['bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/60', 'Menunggu Review'],
+                        $isDeviceInProgress => ['bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60', 'Sedang Diproses'],
+                        default => ['bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60', 'Belum Diambil'],
+                    };
+                    $canRequestRetrieval = ! $isDeviceRetrieved && ! $isDeviceWaived && ! $isDeviceAwaitingReview && ! $isDeviceInProgress;
                 @endphp
                 <tr class="hover:bg-sky-50/40 dark:hover:bg-sky-950/20 transition-colors">
                     <td class="px-5 py-3.5 font-mono font-semibold text-sky-600 dark:text-sky-400 whitespace-nowrap">
@@ -125,7 +133,7 @@
                             </a>
                             @endif
                             {{-- Tombol hanya untuk status "Belum Diambil": sudah diambil atau task-nya sedang berjalan → disembunyikan (server juga menolak duplikat). --}}
-                            @if(!$isDeviceRetrieved && !$isDeviceInProgress && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
+                            @if($canRequestRetrieval && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                             <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
                                   onsubmit="event.preventDefault(); window.confirmAction(@js('Buat Task FOP pengambilan alat untuk '.($customer->full_name).'?'), this);">
                                 @csrf
@@ -166,14 +174,18 @@
                     default => '-',
                 };
                 $isDeviceRetrieved = (bool) $customer->device_retrieved_at;
-                // Sama dengan tabel desktop di atas: penanda "Sedang Diproses" untuk FOP.
-                $isDeviceInProgress = ! $isDeviceRetrieved && (bool) ($customer->device_retrieval_in_progress ?? false);
-                $deviceBadgeTone = $isDeviceRetrieved
-                    ? 'bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60'
-                    : ($isDeviceInProgress
-                        ? 'bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60'
-                        : 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60');
-                $deviceBadgeLabel = $isDeviceRetrieved ? 'Sudah Diambil' : ($isDeviceInProgress ? 'Sedang Diproses' : 'Belum Diambil');
+                // Sama dengan tabel desktop di atas (Dibebaskan / Menunggu Review / Sedang Diproses).
+                $isDeviceWaived = ! $isDeviceRetrieved && (bool) ($customer->device_retrieval_waived_at ?? null);
+                $isDeviceAwaitingReview = ! $isDeviceRetrieved && ! $isDeviceWaived && (bool) ($customer->device_retrieval_review_pending ?? false);
+                $isDeviceInProgress = ! $isDeviceRetrieved && ! $isDeviceWaived && ! $isDeviceAwaitingReview && (bool) ($customer->device_retrieval_in_progress ?? false);
+                [$deviceBadgeTone, $deviceBadgeLabel] = match (true) {
+                    $isDeviceRetrieved => ['bg-emerald-50 text-emerald-700 border-emerald-200 dark:bg-emerald-950/50 dark:text-emerald-300 dark:border-emerald-800/60', 'Sudah Diambil'],
+                    $isDeviceWaived => ['bg-violet-50 text-violet-700 border-violet-200 dark:bg-violet-950/50 dark:text-violet-300 dark:border-violet-800/60', 'Dibebaskan'],
+                    $isDeviceAwaitingReview => ['bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/60', 'Menunggu Review'],
+                    $isDeviceInProgress => ['bg-sky-50 text-sky-700 border-sky-200 dark:bg-sky-950/50 dark:text-sky-300 dark:border-sky-800/60', 'Sedang Diproses'],
+                    default => ['bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60', 'Belum Diambil'],
+                };
+                $canRequestRetrieval = ! $isDeviceRetrieved && ! $isDeviceWaived && ! $isDeviceAwaitingReview && ! $isDeviceInProgress;
             @endphp
             <article class="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3.5 shadow-sm hover:border-sky-300 dark:hover:border-sky-700/60 transition-all duration-200 hover:shadow-md">
                 <div class="flex items-start justify-between gap-3">
@@ -221,7 +233,7 @@
                         Detail
                     </a>
                     @endif
-                    @if(!$isDeviceRetrieved && !$isDeviceInProgress && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
+                    @if($canRequestRetrieval && auth()->user()->hasPermission('customers.detail.devices.retrieve'))
                     <form action="{{ route('customers.retrieve-device', $customer->id) }}" method="POST"
                           class="flex-1 sm:flex-none flex"
                           onsubmit="event.preventDefault(); window.confirmAction(@js('Buat Task FOP pengambilan alat untuk '.($customer->full_name).'?'), this);">

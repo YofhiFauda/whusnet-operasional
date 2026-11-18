@@ -475,7 +475,10 @@ class AppServiceProvider extends ServiceProvider
                 ->with('badge_return_receive_count', $user ? $queues->pendingReturnReceipts($user)->count() : 0)
                 ->with('badge_return_pusat_count', $user ? $queues->pendingPusatReturns($user)->count() : 0)
                 ->with('badge_collector_deposit_count', $user ? $queues->collectorDeposits($user)->count() : 0)
-                ->with('badge_cash_deposit_count', $user ? $queues->cashDeposits($user)->count() : 0);
+                ->with('badge_cash_deposit_count', $user ? $queues->cashDeposits($user)->count() : 0)
+                // Dicek permission dulu supaya role tanpa hak review tidak
+                // menjalankan query bersarang ini di setiap halaman.
+                ->with('badge_retrieval_review_count', $user?->hasPermission('device_retrieval_review.review') ? $queues->pendingRetrievalReviews($user)->count() : 0);
         });
 
         View::composer('components.warehouse.header', function ($view): void {

@@ -22,7 +22,8 @@
         \App\Enums\DeviceRetrievalOutcome::TIDAK_DITEMUKAN => 'bg-amber-50 text-amber-700 border-amber-200 dark:bg-amber-950/50 dark:text-amber-300 dark:border-amber-800/60',
         default => 'bg-rose-50 text-rose-700 border-rose-200 dark:bg-rose-950/50 dark:text-rose-300 dark:border-rose-800/60',
     };
-    $conditionPhotoUrl = $retrieval ? foto_publik($retrieval->condition_photo) : null;
+    // Foto privat (disk local) lewat controller ber-permission — bukan URL /storage publik.
+    $conditionPhotoUrl = $retrieval?->photoUrl();
     $accessoryLabels = collect($retrieval?->accessories ?? [])
         ->map(fn ($key) => \App\Models\TaskDeviceRetrieval::ACCESSORY_LABELS[$key] ?? $key)
         ->values();
@@ -108,9 +109,38 @@
     @endif
 
     @unless($outcome->isRetrieved())
+    {{-- Laporan gagal: foto bukti lokasi + status Review Penarikan Alat. --}}
+    @if($conditionPhotoUrl)
+    <div x-data class="bg-surface border border-border rounded-xl overflow-hidden shadow-xs select-none">
+        <div class="px-3.5 py-2 border-b border-border bg-surface-muted">
+            <span class="text-[10px] text-text-muted font-bold uppercase tracking-wider font-ui">Foto Bukti Lokasi / Kondisi</span>
+        </div>
+        <div class="p-3.5">
+            <button type="button" @click="$dispatch('open-image-preview', { url: '{{ $conditionPhotoUrl }}', label: 'Foto Bukti Lokasi' })" class="group relative block w-40 rounded-lg overflow-hidden aspect-square bg-slate-100 dark:bg-slate-800 border border-border hover:border-sky-500 transition-all cursor-pointer">
+                <img src="{{ $conditionPhotoUrl }}" alt="Foto Bukti Lokasi" class="h-full w-full object-cover">
+            </button>
+        </div>
+    </div>
+    @elseif($retrieval->photo_purged_at)
+    <p class="text-[11px] text-text-muted font-ui italic select-none">Foto dihapus otomatis (retensi 30 hari setelah laporan ditolak).</p>
+    @endif
+
+    @if($retrieval->review_status)
+    <div class="bg-surface-muted border border-border rounded-xl p-4 shadow-xs text-xs font-ui space-y-1">
+        <span class="block text-[10px] text-text-muted font-bold uppercase tracking-wider select-none">Review Penarikan Alat</span>
+        <p class="font-semibold text-text-main">{{ $retrieval->review_status->label() }}</p>
+        @if($retrieval->reviewed_at)
+        <p class="text-[11px] text-text-muted">oleh {{ $retrieval->reviewer?->name ?? '-' }} · {{ $retrieval->reviewed_at->translatedFormat('d M Y H:i') }} WIB</p>
+        @endif
+        @if($retrieval->review_note)
+        <p class="text-[11px] text-text-secondary whitespace-pre-line break-words [word-break:break-word]">{{ $retrieval->review_note }}</p>
+        @endif
+    </div>
+    @else
     <p class="text-[11px] text-text-muted font-ui select-none">
         Alat belum tercatat diambil — tombol "Ambil Alat" muncul lagi di List Putus Langganan untuk dijadwalkan ulang.
     </p>
+    @endif
     @endunless
 </div>
 @endif

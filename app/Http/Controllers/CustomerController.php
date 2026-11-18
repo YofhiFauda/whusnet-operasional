@@ -60,6 +60,7 @@ use App\Services\CustomerRegistrationService;
 use App\Services\CustomerRelocationService;
 use App\Services\CustomerValidationService;
 use App\Services\CustomerWorkflowService;
+use App\Services\DeviceRetrievalReviewService;
 use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
@@ -172,7 +173,7 @@ class CustomerController extends Controller
      * TaskService::complete()). Alurnya sengaja disamakan dengan MTN/C-REQ
      * (detail + pelaporan lewat pipeline Task FOP yang sama).
      */
-    public function retrieveDevice(Customer $customer, TicketService $ticketService)
+    public function retrieveDevice(Customer $customer, TicketService $ticketService, DeviceRetrievalReviewService $reviews)
     {
         abort_unless(auth()->user()->hasPermission('customers.detail.devices.retrieve'), 403);
 
@@ -192,6 +193,18 @@ class CustomerController extends Controller
 
         if ($device->device_retrieved_at) {
             return redirect()->back()->with('error', 'Alat pelanggan ini sudah ditandai diambil.');
+        }
+
+        // Review Penarikan Alat: kasus yang sudah dibebaskan FOP ditutup, dan
+        // laporan gagal yang masih menunggu review tidak boleh didahului task
+        // baru — percobaan berikutnya lahir dari Tolak di halaman review.
+        // Tombolnya juga disembunyikan di List Putus Langganan.
+        if ($device->retrieval_waived_at) {
+            return redirect()->back()->with('error', 'Penarikan alat pelanggan ini sudah dibebaskan FOP (Review Penarikan Alat).');
+        }
+
+        if ($reviews->hasPendingReview($customer)) {
+            return redirect()->back()->with('error', 'Laporan penarikan alat pelanggan ini masih menunggu review FOP di halaman Review Penarikan Alat.');
         }
 
         if (! $customer->pop_id || ! $customer->village_id) {
@@ -284,7 +297,20 @@ class CustomerController extends Controller
             // pemutusan berikutnya ("sudah diambil"). Riwayat pengambilan yang
             // sudah terjadi TIDAK hilang: ia tersimpan di `device_retrieval_logs`
             // (tampil di tab Perangkat), bukan di flag ini (ADHOC-88).
-            $customer->customerDevice?->update(['device_retrieved_at' => null]);
+            // Status "Dibebaskan" (Review Penarikan Alat) ikut dicabut: kasus
+            // penarikan berhenti saat Langganan Lagi (keputusan user Q5), dan
+            // pemutusan berikutnya membuka kasus baru dari percobaan ke-1.
+            // Riwayat percobaan & review tetap utuh di task_device_retrievals.
+            $customer->customerDevice?->update([
+                'device_retrieved_at' => null,
+                'retrieval_waived_at' => null,
+                'retrieval_waived_by' => null,
+            ]);
+
+            // Laporan gagal yang masih menunggu review ikut ditutup — kalau
+            // tidak, ia yatim: di luar kasus berikutnya (tidak tampil di
+            // halaman review) tapi review generik di Detail Task diblokir.
+            app(DeviceRetrievalReviewService::class)->closeOpenCase($customer, 'Ditutup otomatis: pelanggan Langganan Lagi.', auth()->user());
         });
 
         $message = $deviceAlreadyRetrieved

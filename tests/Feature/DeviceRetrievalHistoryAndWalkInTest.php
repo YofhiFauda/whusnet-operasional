@@ -76,6 +76,8 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
         parent::setUp();
 
         Storage::fake('public');
+        // Foto penarikan alat kini privat di disk local (Review Penarikan Alat).
+        Storage::fake('local');
 
         $this->seed(FeatureSeeder::class);
         $this->seed(ActionSeeder::class);
@@ -283,7 +285,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
 
         $this->assertEquals(SerialStatus::INSTALLED, $serial->refresh()->status);
         $this->assertFalse(DeviceRetrievalLog::where('serial_id', $serial->id)->exists());
-        $this->assertSame([], Storage::disk('public')->allFiles());
+        $this->assertSame([], Storage::disk('local')->allFiles());
     }
 
     #[Test]
@@ -480,7 +482,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
         $this->assertEquals($this->owner->id, $log->received_by);
         $this->assertTrue($log->isReceived());
         $this->assertNotNull($log->condition_photo);
-        Storage::disk('public')->assertExists($log->condition_photo);
+        Storage::disk('local')->assertExists($log->condition_photo);
 
         $this->assertNotNull($this->customer->customerDevice->refresh()->device_retrieved_at);
     }
@@ -531,7 +533,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
         $this->assertDatabaseMissing('inventory_serials', ['serial_number' => 'WI-OK-NEW']);
         $this->assertEquals(SerialStatus::INSTALLED, InventorySerial::where('serial_number', 'WI-BAD')->value('status'));
         $this->assertEquals(0, DeviceRetrievalLog::count());
-        $this->assertSame([], Storage::disk('public')->allFiles('device-retrieval'));
+        $this->assertSame([], Storage::disk('local')->allFiles('device-retrieval'));
     }
 
     #[Test]
@@ -636,6 +638,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
         $this->actingAs($this->teknisi)->post(route('tasks.device-retrieval.store', $this->task), [
             'outcome' => DeviceRetrievalOutcome::DITOLAK->value,
             'notes' => 'Pelanggan tidak mau menyerahkan modem',
+            'condition_photo' => UploadedFile::fake()->image('lokasi.jpg'),
         ])->assertSessionHasNoErrors();
 
         $this->actingAs($this->owner)
@@ -752,7 +755,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
         ])->assertSessionHasNoErrors();
 
         $photoPath = $this->task->refresh()->deviceRetrieval->condition_photo;
-        Storage::disk('public')->assertExists($photoPath);
+        Storage::disk('local')->assertExists($photoPath);
 
         $this->actingAs($this->owner)
             ->get(route('fop-tasks.history.show', $fopTask->id))
@@ -765,9 +768,11 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
             ->assertSee('Transit — di teknisi')
             ->assertSee('Adaptor / power')
             ->assertSee('Kabel LAN ikut dibawa')
-            // Foto kondisi terlampir: thumbnail + tautan ke file di disk public.
+            // Foto kondisi terlampir: thumbnail lewat rute privat ber-permission
+            // (bukan URL /storage publik — Review Penarikan Alat, Q3).
             ->assertSee('Foto Kondisi Alat')
-            ->assertSee('<img src="'.asset('storage/'.$photoPath).'"', false)
+            ->assertSee('<img src="'.route('device-retrievals.photo', $this->task->deviceRetrieval).'"', false)
+            ->assertDontSee('storage/'.$photoPath, false)
             // Bukan lagi fallback "tidak punya laporan" maupun format Maintenance.
             ->assertDontSee('Tipe task ini tidak punya laporan lapangan terstruktur')
             ->assertDontSee('Foto OPM')
@@ -793,6 +798,7 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
         $this->actingAs($this->teknisi)->post(route('tasks.device-retrieval.store', $this->task), [
             'outcome' => DeviceRetrievalOutcome::TIDAK_DITEMUKAN->value,
             'notes' => 'Rumah kosong, pelanggan sudah pindah',
+            'condition_photo' => UploadedFile::fake()->image('lokasi.jpg'),
         ])->assertSessionHasNoErrors();
 
         $this->actingAs($this->owner)
@@ -824,13 +830,14 @@ class DeviceRetrievalHistoryAndWalkInTest extends TestCase
         $this->makeInstalledSerial('HS-SN-401');
         $this->deacPickup('HS-SN-401');
 
-        Storage::disk('public')->delete($this->task->refresh()->deviceRetrieval->condition_photo);
+        Storage::disk('local')->delete($this->task->refresh()->deviceRetrieval->condition_photo);
 
         $this->actingAs($this->owner)
             ->get(route('fop-tasks.history.show', $fopTask->id))
             ->assertOk()
             ->assertSee('filenya tidak ditemukan di penyimpanan')
-            ->assertDontSee('<img src', false);
+            // Sempit ke foto kondisi: layout kini punya <img> logo sendiri.
+            ->assertDontSee('alt="Foto Kondisi Alat"', false);
     }
 
     // ── Petunjuk merek dari data lama ───────────────────────────────────

@@ -107,4 +107,21 @@ enum ActionCode: string
      * permission sendiri — pola sama kayak `customers.deactivate`.
      */
     case ISOLIR = 'isolir';
+
+    /**
+     * Memutuskan laporan penarikan alat yang gagal (DEAC): Approve
+     * (pelanggan dibebaskan) atau Tolak (deact diulang lewat task baru).
+     * SENGAJA bukan pasangan APPROVE/REJECT: keduanya satu keputusan yang
+     * sama-sama milik FOP saja (keputusan user K4) — dipisah dua permission
+     * cuma membuka kemungkinan role memegang setengahnya. Lihat
+     * docs/plan/warehouse/analisa-review-penarikan-deac.md §3.3.
+     */
+    case REVIEW = 'review';
+
+    /**
+     * Menulis komentar pada laporan (CS/BD ikut memantau tanpa hak
+     * memutuskan). SENGAJA bukan CREATE: `x.create` lazimnya membuat
+     * entitas utama fitur, padahal di sini cuma menambah catatan.
+     */
+    case COMMENT = 'comment';
 }

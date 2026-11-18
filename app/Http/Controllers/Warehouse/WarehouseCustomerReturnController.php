@@ -20,12 +20,12 @@ use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\InventoryReassignService;
 use App\Services\LegacyDeviceHintService;
+use App\Support\DeviceRetrievalPhoto;
 use App\Support\LikeSearch;
 use App\Support\UploadLimit;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Illuminate\View\View;
@@ -165,7 +165,8 @@ class WarehouseCustomerReturnController extends Controller
             });
         } catch (InvalidArgumentException $e) {
             // Foto sudah terunggah sebelum gerak inventori — jangan tinggalkan file yatim.
-            Storage::disk('public')->delete($photoPath);
+            // Foto penarikan alat kini di disk privat (DeviceRetrievalPhoto).
+            DeviceRetrievalPhoto::delete($photoPath);
 
             throw ValidationException::withMessages(['serials' => $e->getMessage()]);
         }

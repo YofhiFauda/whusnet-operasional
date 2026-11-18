@@ -507,8 +507,9 @@
                 </div>
                 <div class="space-y-1">
 
-                    <?php if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('fop_analytics.view')): ?>
-                    <?php if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('fop_analytics.view')): ?>
+                    
+                    <?php if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('task.view.own') || auth()->user()->hasPermission('fop_analytics.view') || auth()->user()->hasPermission('device_retrieval_review.view')): ?>
+                    <?php if(auth()->user()->hasPermission('task.view.all') || auth()->user()->hasPermission('fop_analytics.view') || auth()->user()->hasPermission('device_retrieval_review.view')): ?>
                     <?php
                         $isTasksActive = Request::is('tasks*') || Request::is('fop*');
                     ?>
@@ -521,6 +522,9 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m3 17 2 2 4-4"/><path stroke-linecap="round" stroke-linejoin="round" d="m3 7 2 2 4-4"/><path d="M13 6h8"/><path d="M13 12h8"/><path d="M13 18h8"/>
                                 </svg>
                                 <span class="sidebar-text">Penjadwalan Teknis</span>
+                                <?php if(($badge_retrieval_review_count ?? 0) > 0): ?>
+                                <span class="sidebar-parent-badge rounded-full bg-rose-600 px-1.5 py-0.5 text-[9px] font-bold text-white"><?php echo e($badge_retrieval_review_count); ?></span>
+                                <?php endif; ?>
                             </div>
                             <svg id="chevron-tasks"
                                  class="chevron-icon h-3.5 w-3.5 shrink-0 transition-transform duration-300 <?php echo e($isTasksActive ? 'rotate-180 text-sky-600 dark:text-sky-400' : 'text-slate-400 dark:text-slate-500'); ?>"
@@ -551,6 +555,13 @@
                                 <a href="<?php echo e(route('fop-tasks.history')); ?>"
                                    class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('fop-tasks.history') ? 'sidebar-subitem-active' : ''); ?>">
                                     <span>Riwayat Task FOP</span>
+                                </a>
+                                <?php endif; ?>
+                                <?php if(auth()->user()->hasPermission('device_retrieval_review.view')): ?>
+                                <a href="<?php echo e(route('device-retrieval-reviews.index')); ?>"
+                                   class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('device-retrieval-reviews.*') ? 'sidebar-subitem-active' : ''); ?>">
+                                    <span>Review Penarikan Alat</span>
+                                    <?php if(($badge_retrieval_review_count ?? 0) > 0): ?><span data-badge="retrieval-review" class="sidebar-badge rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[9px] font-bold text-rose-600"><?php echo e($badge_retrieval_review_count); ?></span><?php endif; ?>
                                 </a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('task.view.own')): ?>
@@ -888,8 +899,8 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4m0-14v14m9-14v10l-9 4"/>
                                 </svg>
                                 <span class="sidebar-text">Gudang</span>
-                                <?php if((($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0)) > 0): ?>
-                                <span class="sidebar-parent-badge rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white"><?php echo e(($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0)); ?></span>
+                                <?php if((($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0) + ($badge_return_receive_count ?? 0) + ($badge_return_pusat_count ?? 0)) > 0): ?>
+                                <span class="sidebar-parent-badge rounded-full bg-amber-600 px-1.5 py-0.5 text-[9px] font-bold text-white"><?php echo e(($badge_transfer_confirmation_count ?? 0) + ($badge_stock_request_count ?? 0) + ($badge_pengajuan_barang_count ?? 0) + ($badge_return_receive_count ?? 0) + ($badge_return_pusat_count ?? 0)); ?></span>
                                 <?php endif; ?>
                             </div>
                             <svg id="chevron-warehouse"
@@ -913,7 +924,9 @@
                                 <a href="<?php echo e(route('warehouse.custody.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/custody*') ? 'sidebar-subitem-active' : ''); ?>"><span>Barang di Tangan Teknisi</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_reassign.create')): ?>
-                                <a href="<?php echo e(route('warehouse.returns.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e((Request::is('warehouse/returns') || (Request::is('warehouse/returns/*') && ! Request::is('warehouse/returns/from-customer*'))) ? 'sidebar-subitem-active' : ''); ?>"><span>Terima Retur Modem</span></a>
+                                <a href="<?php echo e(route('warehouse.returns.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e((Request::is('warehouse/returns') || (Request::is('warehouse/returns/*') && ! Request::is('warehouse/returns/from-customer*'))) ? 'sidebar-subitem-active' : ''); ?>"><span>Terima Retur Modem</span>
+                                    <?php if((($badge_return_receive_count ?? 0) + ($badge_return_pusat_count ?? 0)) > 0): ?><span data-badge="returns-total" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600"><?php echo e(($badge_return_receive_count ?? 0) + ($badge_return_pusat_count ?? 0)); ?></span><?php endif; ?>
+                                </a>
                                 <a href="<?php echo e(route('warehouse.returns.from-customer.create')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/returns/from-customer*') ? 'sidebar-subitem-active' : ''); ?>"><span>Terima dari Pelanggan</span></a>
                                 <?php endif; ?>
                                 <?php if(auth()->user()->hasPermission('warehouse_traceability.view')): ?>

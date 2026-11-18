@@ -1164,6 +1164,20 @@
                 <?php endif; ?>
             <?php endif; ?>
         </div>
+        <?php elseif($task->task_type === \App\Enums\TaskType::AMBIL_MODEM && $task->deviceRetrieval?->review_status !== null): ?>
+        
+        <div class="p-4 sm:p-5 border-t border-border flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/20 dark:bg-slate-800/5 select-none">
+            <div class="min-w-0 flex-1">
+                <h4 class="text-xs font-bold text-text-main mb-0.5 font-ui">Review Penarikan Alat</h4>
+                <p class="text-[11px] text-text-muted font-ui leading-relaxed">Alat tidak berhasil diambil — status review: <b><?php echo e($task->deviceRetrieval->review_status->label()); ?></b>. Approve/Tolak dilakukan di halaman Review Penarikan Alat.</p>
+            </div>
+            <?php if(auth()->user()->hasPermission('device_retrieval_review.view') && $task->customer_id): ?>
+            <a href="<?php echo e(route('device-retrieval-reviews.show', $task->customer_id)); ?>"
+               class="w-full sm:w-auto inline-flex items-center justify-center gap-1.5 text-xs font-bold px-3.5 py-2.5 border border-sky-200 dark:border-sky-800 text-sky-700 dark:text-sky-300 bg-surface hover:bg-surface-muted transition-all rounded-xl font-ui shadow-sm">
+                Buka Review Penarikan
+            </a>
+            <?php endif; ?>
+        </div>
         <?php else: ?>
         <div class="p-4 sm:p-5 border-t border-border flex flex-col sm:flex-row gap-3 items-center justify-between bg-slate-50/20 dark:bg-slate-800/5 select-none">
             <div>

@@ -439,9 +439,7 @@
             </table>
         </div>
 
-        <div class="px-4 py-3 border-t border-border bg-surface-muted/30">
-            {{ $payments->links() }}
-        </div>
+        <x-list-pagination :paginator="$payments" label="pembayaran" class="px-4 py-3 border-t border-border bg-surface-muted/30" />
     </div>
 
     <!-- Modal: Action Sheet Transaksi Pembayaran -->

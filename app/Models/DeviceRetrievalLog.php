@@ -5,6 +5,7 @@ namespace App\Models;
 use App\Enums\CReqCategory;
 use App\Enums\DeviceRetrievalSource;
 use App\Enums\ItemCondition;
+use App\Support\DeviceRetrievalPhoto;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -95,11 +96,27 @@ class DeviceRetrievalLog extends Model
 
     /**
      * Foto kondisi: milik log sendiri (jalur diantar pelanggan) atau milik
-     * laporan task DEAC. Path relatif ke disk `public`.
+     * laporan task DEAC. Path relatif ke disk privat — lihat DeviceRetrievalPhoto.
      */
     public function photoPath(): ?string
     {
         return $this->condition_photo ?? $this->task?->deviceRetrieval?->condition_photo;
+    }
+
+    /**
+     * URL foto lewat controller ber-permission (foto privat). View WAJIB pakai
+     * ini, bukan `Storage::disk('public')->url($log->photoPath())` — disk
+     * public sudah tidak dipakai untuk foto penarikan alat.
+     */
+    public function photoUrl(): ?string
+    {
+        if ($this->condition_photo) {
+            return DeviceRetrievalPhoto::exists($this->condition_photo)
+                ? route('device-retrieval-logs.photo', $this)
+                : null;
+        }
+
+        return $this->task?->deviceRetrieval?->photoUrl();
     }
 
     /**

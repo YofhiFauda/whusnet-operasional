@@ -437,6 +437,11 @@ class InventoryReassignService
                 $device->update(['device_retrieved_at' => now()]);
             }
 
+            // Laporan DEAC gagal yang masih menunggu review FOP sudah tidak
+            // relevan — modemnya kembali. Kalau dibiarkan, FOP bisa menolak
+            // dan memicu task DEAC untuk modem yang sudah di gudang.
+            app(DeviceRetrievalReviewService::class)->closeOpenCase($customer, 'Ditutup otomatis: modem diantar pelanggan ke gudang.', $actor);
+
             return $serial;
         });
     }

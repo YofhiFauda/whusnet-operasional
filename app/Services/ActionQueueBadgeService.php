@@ -15,6 +15,7 @@ use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
 use App\Models\PengajuanBarang;
 use App\Models\StockRequest;
+use App\Models\TaskDeviceRetrieval;
 use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
@@ -94,6 +95,26 @@ class ActionQueueBadgeService
 
         if (! $this->access->hasAllPopAccess($user)) {
             $query->whereIn('pop_id', $this->access->getAllowedPopIds($user));
+        }
+
+        return $query;
+    }
+
+    /**
+     * Laporan penarikan alat GAGAL yang menunggu keputusan FOP (Review
+     * Penarikan Alat). Badge hanya untuk pemegang `device_retrieval_review.review`
+     * — CS/BD yang cuma bisa melihat tidak perlu ditagih angka antrian yang
+     * tidak bisa mereka selesaikan. Query & POP scope satu sumber dengan
+     * halaman (DeviceRetrievalReviewService::pendingForUser()).
+     *
+     * @return Builder<TaskDeviceRetrieval>
+     */
+    public function pendingRetrievalReviews(User $user): Builder
+    {
+        $query = app(DeviceRetrievalReviewService::class)->pendingForUser($user);
+
+        if (! $user->hasPermission('device_retrieval_review.view') || ! $user->hasPermission('device_retrieval_review.review')) {
+            return $query->whereRaw('1 = 0');
         }
 
         return $query;

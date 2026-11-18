@@ -20,6 +20,7 @@ use App\Services\PaymentService;
 use App\Services\Receipts\ReceiptPresenter;
 use App\Support\LikeSearch;
 use App\Support\Money;
+use App\Support\PerPage;
 use App\Support\ReasonValidationRule;
 use App\Support\RupiahInput;
 use App\Support\SortRequest;
@@ -135,7 +136,7 @@ class PaymentController extends Controller
             $query->latest('payment_date')->latest('id');
         }
 
-        $payments = $query->paginate(10)->withQueryString();
+        $payments = $query->paginate(PerPage::resolve($request))->withQueryString();
         // Dropdown filter POP cuma buat pilih Cabang — Pusat & Mini POP bukan
         // satuan billing (permintaan user 2026-11-03).
         $pops = Pop::forUser()->where('type', 'cabang')->orderBy('name')->get();

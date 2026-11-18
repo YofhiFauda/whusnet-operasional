@@ -38,6 +38,8 @@ use App\Http\Controllers\CustomerTerminationController;
 use App\Http\Controllers\CustomerTestReportController;
 use App\Http\Controllers\CustomerVerificationController;
 use App\Http\Controllers\DashboardController;
+use App\Http\Controllers\DeviceRetrievalPhotoController;
+use App\Http\Controllers\DeviceRetrievalReviewController;
 use App\Http\Controllers\FopAnalyticsController;
 use App\Http\Controllers\FopDashboardController;
 use App\Http\Controllers\FopTaskController;
@@ -1487,6 +1489,28 @@ Route::middleware('auth')->group(function () {
     Route::middleware('permission:creq_billing_verification.reject')->group(function () {
         Route::put('/tasks-creq-billing/{task}/reject', [TaskCreqBillingController::class, 'reject'])->name('tasks.creq-billing.reject');
     });
+
+    // Review Penarikan Alat — laporan DEAC gagal diputuskan FOP (approve =
+    // dibebaskan, tolak = deact diulang lewat task baru); CS/BD lihat +
+    // komentar. Prefix /fop/ supaya menu grup Penjadwalan Teknis ikut aktif.
+    // docs/plan/warehouse/analisa-review-penarikan-deac.md
+    Route::middleware('permission:device_retrieval_review.view')->group(function () {
+        Route::get('/fop/device-retrieval-reviews', [DeviceRetrievalReviewController::class, 'index'])->name('device-retrieval-reviews.index');
+        Route::get('/fop/device-retrieval-reviews/{customer}', [DeviceRetrievalReviewController::class, 'show'])->name('device-retrieval-reviews.show');
+    });
+    Route::middleware('permission:device_retrieval_review.review')->group(function () {
+        Route::post('/fop/device-retrieval-reviews/retrievals/{retrieval}/approve', [DeviceRetrievalReviewController::class, 'approve'])->name('device-retrieval-reviews.approve');
+        Route::post('/fop/device-retrieval-reviews/retrievals/{retrieval}/reject', [DeviceRetrievalReviewController::class, 'reject'])->name('device-retrieval-reviews.reject');
+    });
+    Route::middleware('permission:device_retrieval_review.comment')->group(function () {
+        Route::post('/fop/device-retrieval-reviews/retrievals/{retrieval}/comments', [DeviceRetrievalReviewController::class, 'comment'])->name('device-retrieval-reviews.comment');
+    });
+
+    // Foto kondisi alat (laporan DEAC & modem diantar pelanggan) — disk
+    // PRIVAT, otorisasi di controller (permission + POP scope), pola
+    // TicketController::download(). Jangan ganti dengan URL /storage publik.
+    Route::get('/device-retrievals/{retrieval}/photo', [DeviceRetrievalPhotoController::class, 'retrieval'])->name('device-retrievals.photo');
+    Route::get('/device-retrieval-logs/{log}/photo', [DeviceRetrievalPhotoController::class, 'log'])->name('device-retrieval-logs.photo');
 
     Route::middleware('permission:task.execute')->group(function () {
         // Lapor Nanti — status sendiri (lapor_nanti), BUKAN pending. Lihat TaskStatus::LAPOR_NANTI.

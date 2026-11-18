@@ -98,7 +98,7 @@ class DashboardExecutiveMonitoringTest extends TestCase
 
         $response->assertOk();
         $response->assertSee('Dashboard Operasional');
-        $response->assertSee('Executive Operational Pulse');
+        $response->assertSee('Kondisi Usaha Saat Ini');
         $response->assertSee('chart-financial-trend');
         $response->assertSee('chart-payment-channels');
         $response->assertSee('chart-aging-receivables');
