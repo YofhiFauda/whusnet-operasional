@@ -9,6 +9,7 @@ use App\Enums\IsolationCaseStatus;
 use App\Enums\IsolationEventType;
 use App\Enums\IsolationTriggerType;
 use App\Events\IsolationCaseQueueChanged;
+use App\Events\IsolationCaseReadyForExecution;
 use App\Models\Customer;
 use App\Models\CustomerService;
 use App\Models\Invoice;
@@ -213,6 +214,16 @@ class IsolationCaseService
             $this->recordEvent($case, $eventType, $actor, $note, $fromStatus, $case->status);
 
             IsolationCaseQueueChanged::dispatch($case->pop_id);
+
+            // Webhook "siap isolir" ke Web A (docs/superpowers/specs/2026-11-20-
+            // webhook-isolir-web-a-design.md) — cuma pas BENAR-BENAR pindah ke
+            // READY_FOR_ISOLATION, bukan tiap kali Admin menekan "Eksekusi"
+            // (mis. re-klik saat kasus sudah di status itu) — Web A tidak boleh
+            // dapat webhook dobel untuk kasus yang sama.
+            if ($decision === IsolationAdminDecision::EXECUTE && $fromStatus !== IsolationCaseStatus::READY_FOR_ISOLATION) {
+                $case->loadMissing(['customer', 'service.internetPackage']);
+                IsolationCaseReadyForExecution::dispatch($case);
+            }
 
             return $case;
         });
