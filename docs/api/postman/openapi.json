@@ -2644,16 +2644,23 @@
         "/api/customer-portal/push/vapid-key": {
             "get": {
                 "operationId": "customer-portal.push.vapid-key",
+                "description": "Public key buat `PushSubscription` browser/PWA. Tidak sensitif \u2014 boleh\ndiminta tanpa identitas pelanggan (cuma butuh `X-Portal-Client`).",
+                "summary": "VAPID public key",
                 "tags": [
                     "Portal Pelanggan"
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Public key VAPID aktif.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
+                                    "examples": [
+                                        {
+                                            "publicKey": "BIv1y6...example"
+                                        }
+                                    ],
                                     "properties": {
                                         "publicKey": {
                                             "type": "string"
@@ -2678,6 +2685,8 @@
         "/api/customer-portal/push/subscribe": {
             "post": {
                 "operationId": "customer-portal.push.subscribe",
+                "description": "Simpan/perbarui `PushSubscription` perangkat pelanggan buat notif\nTagihan/Pembayaran.",
+                "summary": "Subscribe perangkat",
                 "tags": [
                     "Portal Pelanggan"
                 ],
@@ -2690,16 +2699,28 @@
                                 "properties": {
                                     "endpoint": {
                                         "type": "string",
+                                        "description": "Endpoint push service browser.",
+                                        "examples": [
+                                            "https://fcm.googleapis.com/fcm/send/abc123"
+                                        ],
                                         "maxLength": 1024
                                     },
                                     "keys": {
                                         "type": "object",
                                         "properties": {
                                             "p256dh": {
-                                                "type": "string"
+                                                "type": "string",
+                                                "description": "Public key enkripsi dari `PushSubscription`.",
+                                                "examples": [
+                                                    "BNc...example"
+                                                ]
                                             },
                                             "auth": {
-                                                "type": "string"
+                                                "type": "string",
+                                                "description": "Auth secret dari `PushSubscription`.",
+                                                "examples": [
+                                                    "tBHI...example"
+                                                ]
                                             }
                                         },
                                         "required": [
@@ -2711,6 +2732,10 @@
                                         "type": [
                                             "string",
                                             "null"
+                                        ],
+                                        "description": "Content encoding opsional (`aes128gcm`/`aesgcm`).",
+                                        "examples": [
+                                            "aes128gcm"
                                         ]
                                     }
                                 },
@@ -2724,11 +2749,16 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Subscription tersimpan.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
+                                    "examples": [
+                                        {
+                                            "message": "Subscribed."
+                                        }
+                                    ],
                                     "properties": {
                                         "message": {
                                             "type": "string",
@@ -2744,6 +2774,16 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "description": "Token pelanggan tidak ada/tidak valid/kedaluwarsa.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -2757,6 +2797,8 @@
         "/api/customer-portal/push/unsubscribe": {
             "post": {
                 "operationId": "customer-portal.push.unsubscribe",
+                "description": "Hapus `PushSubscription` perangkat ini \u2014 berhenti menerima notif.",
+                "summary": "Unsubscribe perangkat",
                 "tags": [
                     "Portal Pelanggan"
                 ],
@@ -2769,6 +2811,10 @@
                                 "properties": {
                                     "endpoint": {
                                         "type": "string",
+                                        "description": "Endpoint push service yang mau dihapus.",
+                                        "examples": [
+                                            "https://fcm.googleapis.com/fcm/send/abc123"
+                                        ],
                                         "maxLength": 1024
                                     }
                                 },
@@ -2781,11 +2827,16 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Subscription dihapus (idempotent \u2014 tidak error kalau sudah tidak ada).",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
+                                    "examples": [
+                                        {
+                                            "message": "Unsubscribed."
+                                        }
+                                    ],
                                     "properties": {
                                         "message": {
                                             "type": "string",
@@ -2801,6 +2852,16 @@
                     },
                     "422": {
                         "$ref": "#/components/responses/ValidationException"
+                    },
+                    "401": {
+                        "description": "Token pelanggan tidak ada/tidak valid/kedaluwarsa.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -2814,16 +2875,29 @@
         "/api/customer-portal/push/subscriptions": {
             "get": {
                 "operationId": "customer-portal.push.subscriptions",
+                "description": "Semua perangkat yang sedang subscribe notif push buat pelanggan ini.",
+                "summary": "Daftar subscription",
                 "tags": [
                     "Portal Pelanggan"
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Daftar subscription aktif (bisa kosong).",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
+                                    "examples": [
+                                        {
+                                            "subscriptions": [
+                                                {
+                                                    "id": 1,
+                                                    "endpoint": "https://fcm.googleapis.com/fcm/send/abc123",
+                                                    "created_at": "2026-11-01T08:00:00+07:00"
+                                                }
+                                            ]
+                                        }
+                                    ],
                                     "properties": {
                                         "subscriptions": {
                                             "type": "array",
@@ -2835,6 +2909,16 @@
                                     "required": [
                                         "subscriptions"
                                     ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token pelanggan tidak ada/tidak valid/kedaluwarsa.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
                                 }
                             }
                         }
@@ -2851,16 +2935,23 @@
         "/api/customer-portal/push/test": {
             "post": {
                 "operationId": "customer-portal.push.test",
+                "description": "Tombol \"Kirim notifikasi uji\" di Portal Next.js \u2014 reuse\n`TestWebPushNotification` yang sama dgn staf (`PushSubscriptionController`).",
+                "summary": "Kirim notifikasi uji",
                 "tags": [
                     "Portal Pelanggan"
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Notifikasi uji dikirim ke semua perangkat aktif pelanggan.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
+                                    "examples": [
+                                        {
+                                            "message": "Notifikasi uji dikirim."
+                                        }
+                                    ],
                                     "properties": {
                                         "message": {
                                             "type": "string",
@@ -2875,11 +2966,16 @@
                         }
                     },
                     "422": {
-                        "description": "",
+                        "description": "Belum ada perangkat aktif \u2014 pelanggan belum subscribe push sama sekali.",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
+                                    "examples": [
+                                        {
+                                            "message": "Belum ada perangkat aktif. Aktifkan notifikasi dulu."
+                                        }
+                                    ],
                                     "properties": {
                                         "message": {
                                             "type": "string",
@@ -2889,6 +2985,16 @@
                                     "required": [
                                         "message"
                                     ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token pelanggan tidak ada/tidak valid/kedaluwarsa.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
                                 }
                             }
                         }
@@ -3751,46 +3857,12 @@
                 ]
             }
         },
-        "/api/customer-portal/ping": {
-            "get": {
-                "operationId": "customer-portal.ping",
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "data": {
-                                            "type": "object",
-                                            "properties": {
-                                                "status": {
-                                                    "type": "string",
-                                                    "const": "ok"
-                                                }
-                                            },
-                                            "required": [
-                                                "status"
-                                            ]
-                                        }
-                                    },
-                                    "required": [
-                                        "data"
-                                    ]
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        },
         "/api/customer-portal/teknisi/worklist/{code}": {
             "get": {
                 "operationId": "customer-portal.teknisi.worklist",
                 "summary": "Tagihan belum lunas pelanggan ini dalam POP scope teknisi. Tidak\nmengonsumsi token (boleh dibaca berkali-kali dalam TTL)",
                 "tags": [
-                    "PortalStaffTeknisi"
+                    "Portal Pelanggan \u2014 Staf"
                 ],
                 "parameters": [
                     {
@@ -3804,11 +3876,39 @@
                 ],
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Tagihan belum lunas pelanggan ini (bisa kosong kalau semua sudah lunas).",
                         "content": {
                             "application/json": {
                                 "schema": {
                                     "type": "object",
+                                    "examples": [
+                                        {
+                                            "data": {
+                                                "customer": {
+                                                    "customer_code": "RQ000123",
+                                                    "full_name": "Budi Santoso",
+                                                    "balance": "0.00"
+                                                },
+                                                "bank_accounts": [
+                                                    {
+                                                        "id": 1,
+                                                        "bank_name": "BCA",
+                                                        "account_number": "1234567890",
+                                                        "account_name": "Whusnet Operasional"
+                                                    }
+                                                ],
+                                                "invoices": [
+                                                    {
+                                                        "id": 45,
+                                                        "invoice_number": "INV-2026-000123",
+                                                        "billing_period": "2026-08",
+                                                        "due_date": "2026-08-15",
+                                                        "remaining_amount": "150000.00"
+                                                    }
+                                                ]
+                                            }
+                                        }
+                                    ],
                                     "properties": {
                                         "data": {
                                             "type": "object",
@@ -3897,7 +3997,7 @@
                         }
                     },
                     "403": {
-                        "description": "An error",
+                        "description": "User pemilik token bukan teknisi, atau pelanggan di luar POP scope teknisi ini.",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -3917,6 +4017,26 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "description": "Token staf tidak ada/tidak valid/kedaluwarsa, atau bukan purpose `teknisi_bayar`.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "404": {
+                        "description": "`code` di URL tidak cocok dengan pelanggan yang tertaut ke token (dicegah \"pinjam\" token pelanggan lain).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -3932,7 +4052,7 @@
                 "operationId": "customer-portal.teknisi.payments",
                 "summary": "Catat pembayaran. Token dikonsumsi HANYA kalau batch benar-benar\ndiproses (bukan replay idempotency key, bukan validasi gagal)",
                 "tags": [
-                    "PortalStaffTeknisi"
+                    "Portal Pelanggan \u2014 Staf"
                 ],
                 "requestBody": {
                     "required": true,
@@ -4021,10 +4141,17 @@
                 },
                 "responses": {
                     "200": {
-                        "description": "",
+                        "description": "Batch pembayaran berhasil dicatat (atau idempotency key sudah pernah diproses).",
                         "content": {
                             "application/json": {
                                 "schema": {
+                                    "examples": [
+                                        {
+                                            "success": true,
+                                            "message": "1 pembayaran berhasil dicatat untuk teknisi Budi.",
+                                            "processed": 1
+                                        }
+                                    ],
                                     "anyOf": [
                                         {
                                             "type": "object",
@@ -4079,10 +4206,176 @@
                         }
                     },
                     "422": {
-                        "$ref": "#/components/responses/ValidationException"
+                        "description": "Baris tidak valid \u2014 invoice di luar scope, sudah lunas, atau nominal melebihi sisa.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "examples": [
+                                        {
+                                            "success": false,
+                                            "message": "Batch ditolak \u2014 ada baris tidak valid. Tidak ada payment yang tersimpan.",
+                                            "failures": [
+                                                {
+                                                    "invoice_id": 45,
+                                                    "reason": "INV-2026-000123: sudah lunas."
+                                                }
+                                            ]
+                                        }
+                                    ],
+                                    "anyOf": [
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean"
+                                                },
+                                                "message": {
+                                                    "type": "string"
+                                                },
+                                                "failures": {
+                                                    "type": "array",
+                                                    "prefixItems": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "reason": {
+                                                                    "type": "string"
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "reason"
+                                                            ]
+                                                        }
+                                                    ],
+                                                    "minItems": 1,
+                                                    "maxItems": 1
+                                                }
+                                            },
+                                            "required": [
+                                                "success",
+                                                "message",
+                                                "failures"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Batch ditolak karena gangguan sistem. Silakan coba lagi."
+                                                },
+                                                "failures": {
+                                                    "type": "array",
+                                                    "prefixItems": [
+                                                        {
+                                                            "type": "object",
+                                                            "properties": {
+                                                                "reason": {
+                                                                    "type": "string",
+                                                                    "const": "Gangguan sistem, belum ada pembayaran yang tersimpan."
+                                                                }
+                                                            },
+                                                            "required": [
+                                                                "reason"
+                                                            ]
+                                                        }
+                                                    ],
+                                                    "minItems": 1,
+                                                    "maxItems": 1
+                                                }
+                                            },
+                                            "required": [
+                                                "success",
+                                                "message",
+                                                "failures"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Batch ditolak \u2014 ada baris tidak valid. Tidak ada payment yang tersimpan."
+                                                },
+                                                "failures": {
+                                                    "type": "string"
+                                                }
+                                            },
+                                            "required": [
+                                                "success",
+                                                "message",
+                                                "failures"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Batch ditolak \u2014 ada baris tidak valid. Tidak ada payment yang tersimpan."
+                                                },
+                                                "failures": {
+                                                    "type": "array",
+                                                    "items": {
+                                                        "type": "object",
+                                                        "properties": {
+                                                            "invoice_id": {
+                                                                "type": "integer"
+                                                            },
+                                                            "reason": {
+                                                                "type": "string"
+                                                            }
+                                                        },
+                                                        "required": [
+                                                            "invoice_id",
+                                                            "reason"
+                                                        ]
+                                                    }
+                                                }
+                                            },
+                                            "required": [
+                                                "success",
+                                                "message",
+                                                "failures"
+                                            ]
+                                        },
+                                        {
+                                            "type": "object",
+                                            "properties": {
+                                                "success": {
+                                                    "type": "boolean"
+                                                },
+                                                "message": {
+                                                    "type": "string",
+                                                    "const": "Batch ditolak \u2014 ada baris tidak valid. Tidak ada payment yang tersimpan."
+                                                },
+                                                "failures": {
+                                                    "type": "array",
+                                                    "items": {}
+                                                }
+                                            },
+                                            "required": [
+                                                "success",
+                                                "message",
+                                                "failures"
+                                            ]
+                                        }
+                                    ]
+                                }
+                            }
+                        }
                     },
                     "403": {
-                        "description": "An error",
+                        "description": "User pemilik token bukan teknisi, atau sudah berperan kolektor (jalur ini khusus teknisi).",
                         "content": {
                             "application/json": {
                                 "schema": {
@@ -4102,6 +4395,16 @@
                                 }
                             }
                         }
+                    },
+                    "401": {
+                        "description": "Token staf tidak ada/tidak valid/kedaluwarsa, atau bukan purpose `teknisi_bayar`.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
                     }
                 },
                 "security": [
@@ -4110,6 +4413,49 @@
                         "PortalAccessToken": []
                     }
                 ]
+            }
+        },
+        "/api/customer-portal/ping": {
+            "get": {
+                "operationId": "customer-portal.ping",
+                "description": "Verifikasi server hidup + CORS + JSON error sebelum auth ada.\nTanpa proteksi token \u2014 data kosong, risiko disclosure nol.",
+                "summary": "Health check",
+                "responses": {
+                    "200": {
+                        "description": "Server hidup.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "data": {
+                                                "status": "ok"
+                                            }
+                                        }
+                                    ],
+                                    "properties": {
+                                        "data": {
+                                            "type": "object",
+                                            "properties": {
+                                                "status": {
+                                                    "type": "string",
+                                                    "const": "ok"
+                                                }
+                                            },
+                                            "required": [
+                                                "status"
+                                            ]
+                                        }
+                                    },
+                                    "required": [
+                                        "data"
+                                    ]
+                                }
+                            }
+                        }
+                    }
+                }
             }
         }
     },

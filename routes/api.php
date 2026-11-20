@@ -14,6 +14,7 @@ use App\Http\Controllers\CustomerPortal\PortalStaffKolektorController;
 use App\Http\Controllers\CustomerPortal\PortalStaffTeknisiController;
 use App\Http\Controllers\CustomerPortal\PortalStaffTicketController;
 use App\Http\Controllers\CustomerPortal\PortalTicketController;
+use Dedoc\Scramble\Attributes\Response;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -68,8 +69,17 @@ Route::prefix('v1')->group(function () {
 */
 
 Route::prefix('customer-portal')->group(function () {
-    Route::get('/ping', fn () => response()->json(['data' => ['status' => 'ok']]))
-        ->middleware(['throttle:customer-portal-ping'])
+    Route::get(
+        '/ping',
+        /**
+         * Health check
+         *
+         * Verifikasi server hidup + CORS + JSON error sebelum auth ada.
+         * Tanpa proteksi token — data kosong, risiko disclosure nol.
+         */
+        #[Response(200, description: 'Server hidup.', examples: [['data' => ['status' => 'ok']]])]
+        fn () => response()->json(['data' => ['status' => 'ok']])
+    )->middleware(['throttle:customer-portal-ping'])
         ->name('api.customer-portal.ping');
 
     // Fase 2 — semua route di bawah ini butuh client secret portal
