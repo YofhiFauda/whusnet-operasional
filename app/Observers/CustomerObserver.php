@@ -123,6 +123,13 @@ class CustomerObserver
         if ($customer->wasChanged('status')) {
             CustomerVerificationStatusChanged::dispatch($customer);
 
+            // Kasus isolir (`isolation_cases`) TIDAK dibersihkan/diubah di
+            // sini (docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md §21,
+            // BR-10: kasus tidak hilang saat status layanan berubah). Lifecycle
+            // kasus dikelola khusus lewat `IsolationCaseService`, dipanggil
+            // dari `CustomerController::toggleSuspend()` — bukan di sini,
+            // supaya observer ini tetap fokus ke invariant status pelanggan.
+
             // Pelanggan terminated → akun portal dinonaktifkan & semua token
             // dicabut (docs/api/api-portal-pelanggan/business-logic.md
             // §Token). `WorkflowTransition::TERMINATED->value`, bukan

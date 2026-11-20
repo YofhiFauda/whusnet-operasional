@@ -397,6 +397,23 @@
                 return false;
             }
 
+            // Halaman Tagihan Belum Lunas: begitu tagihan lunas/batal, baris
+            // sudah TIDAK cocok filter halaman ini — dihapus langsung, bukan
+            // cuma disembunyikan tombol Bayar-nya (bug: pelanggan yang baru
+            // dibayar masih kelihatan nyangkut di daftar tanpa reload, 2026-11-18).
+            if (HIDE_INVOICE_STATUS_BADGE && (data.invoice_status === 'lunas' || data.invoice_status === 'batal')) {
+                row.remove();
+
+                const tbody = document.querySelector('table tbody');
+                if (tbody && tbody.querySelectorAll('tr[id^="invoice-row-"]').length === 0) {
+                    const emptyRow = document.createElement('tr');
+                    emptyRow.innerHTML = `<td colspan="{{ $columnCount }}" class="px-6 py-10 text-center text-sm text-slate-500 dark:text-slate-400">Belum ada tagihan yang sesuai filter.</td>`;
+                    tbody.appendChild(emptyRow);
+                }
+
+                return true;
+            }
+
             const remainingCell = document.getElementById('invoice-remaining-' + data.invoice_id);
             if (remainingCell) {
                 remainingCell.textContent = 'Rp ' + Number(data.remaining_amount).toLocaleString('id-ID', { minimumFractionDigits: 2, maximumFractionDigits: 2 });

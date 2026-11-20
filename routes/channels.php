@@ -67,6 +67,27 @@ Broadcast::channel('customers.{popId}', function ($user, $popId) {
 });
 
 /**
+ * Badge tab Aktif/Isolir + hapus baris di List Pelanggan
+ * (App\Events\CustomerVerificationStatusChanged, channel KEDUA event yang
+ * sama). Gate `customers.view` — BUKAN numpang `customers.{popId}` di atas,
+ * karena List Pelanggan digerbangi permission yang beda dari antrean
+ * verifikasi (`customers.detail.installation.view`).
+ */
+Broadcast::channel('customers-list.{popId}', function ($user, $popId) {
+    if (! $user->hasPermission('customers.view')) {
+        return false;
+    }
+
+    $access = app(EffectiveAccessService::class);
+
+    if ($access->hasAllPopAccess($user)) {
+        return true;
+    }
+
+    return in_array((int) $popId, $access->getAllowedPopIds($user), true);
+});
+
+/**
  * Badge sidebar Verifikasi Registrasi (App\Events\RegistrationVerificationQueueChanged).
  * Gate sama dengan route antreannya (customer_registration_verification.view)
  * + POP scope — BUKAN numpang customers.{popId} di atas, karena verifikator
@@ -74,6 +95,29 @@ Broadcast::channel('customers.{popId}', function ($user, $popId) {
  */
 Broadcast::channel('registration-verifications.{popId}', function ($user, $popId) {
     if (! $user->hasPermission('customer_registration_verification.view')) {
+        return false;
+    }
+
+    $access = app(EffectiveAccessService::class);
+
+    if ($access->hasAllPopAccess($user)) {
+        return true;
+    }
+
+    return in_array((int) $popId, $access->getAllowedPopIds($user), true);
+});
+
+/**
+ * Badge sidebar Monitoring Isolir (App\Events\IsolationCaseQueueChanged) —
+ * jalur "tandai manual"/"batalkan" yang tidak mengubah status layanan
+ * pelanggan, jadi tidak tercakup broadcast `customers-list.{popId}`/
+ * `invoices.{popId}` yang sudah ada (docs/plan/Rancangan_Monitoring_
+ * Isolir_Pelanggan.md §21). Gate sama dengan route antreannya
+ * (customers.isolir_queue.view) — BUKAN numpang customers-list.{popId},
+ * karena gate permission-nya beda.
+ */
+Broadcast::channel('isolation-cases.{popId}', function ($user, $popId) {
+    if (! $user->hasPermission('customers.isolir_queue.view')) {
         return false;
     }
 

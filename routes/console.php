@@ -27,6 +27,10 @@ Schedule::command('billing:close-period')->monthlyOn(1, '00:10');
 // dipastikan sudah selesai dibuat sebelum data invoice berubah.
 Schedule::command('billing:write-off-terminated')->monthlyOn(1, '00:20');
 Schedule::command('notifications:prune-read')->dailyAt('00:30');
+// Monitoring Isolir (docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md §21.1
+// #1) — deteksi harian layanan menunggak baru, buat kasus "Menunggu Isolir".
+// '00:25' — sesudah prune notifikasi, sebelum cutoff lain di bawah.
+Schedule::command('isolir:sync-cases')->dailyAt('00:25');
 // Retensi 30 hari foto percobaan penarikan alat yang DITOLAK (Review
 // Penarikan Alat, keputusan user K5). '00:40' — sesudah prune notifikasi.
 Schedule::command('device-retrieval:prune-photos')->dailyAt('00:40');

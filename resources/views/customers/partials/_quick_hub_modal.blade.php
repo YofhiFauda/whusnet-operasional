@@ -489,6 +489,19 @@
                 </button>
                 @endif
 
+                {{-- Tandai Antrean Isolir (docs/plan/rancangan-list-isolir.md) —
+                     cuma menandai pelanggan masuk antrean, BUKAN mengisolir
+                     langsung. Permission terpisah dari customers.isolir supaya
+                     bisa ditoggle independen (mengelola antrean ≠ eksekusi isolir),
+                     walau keputusan user eksekutornya sama persis. --}}
+                @if(auth()->user()->hasPermission('customers.isolir_queue.create'))
+                <button type="button" onclick="triggerMarkIsolirQueue()" title="Tandai Antrean Isolir"
+                        class="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-slate-800 transition-colors btn-interactive touch-target">
+                    <svg class="w-5 h-5 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                    <span class="text-[9px] sm:text-[10px] font-semibold leading-none">Antrean</span>
+                </button>
+                @endif
+
                 @if(auth()->user()->hasPermission('customers.deactivate'))
                 <button type="button" onclick="triggerTerminate()" title="Putus Langganan"
                         class="flex flex-col items-center justify-center gap-1 py-1.5 px-1 rounded-xl text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-slate-800 transition-colors btn-interactive touch-target">

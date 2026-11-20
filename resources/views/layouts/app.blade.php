@@ -416,6 +416,16 @@
                                     <span>Pelanggan Putus</span>
                                 </a>
                                 @endif
+                                @if(auth()->user()->hasPermission('customers.isolir_queue.view'))
+                                <a href="{{ route('customers.isolir-queue.index') }}"
+                                   class="flex items-center justify-between sidebar-subitem {{ Request::routeIs('customers.isolir-queue.index') ? 'sidebar-subitem-active' : '' }}">
+                                    <span>Antrean Isolir</span>
+                                    <span id="badge-isolir-queue"
+                                          data-count-url="{{ route('customers.isolir-queue.badge-count') }}"
+                                          data-pop-ids='@json($badge_isolir_queue_pop_ids ?? [])'
+                                          class="sidebar-badge rounded-full bg-rose-500/15 px-1.5 py-0.5 text-[9px] font-bold text-rose-600 dark:text-rose-400 {{ ($badge_isolir_queue_count ?? 0) > 0 ? '' : 'hidden' }}">{{ $badge_isolir_queue_count ?? 0 }}</span>
+                                </a>
+                                @endif
 
                                 @if(auth()->user()->hasPermission('customers.import.import') || auth()->user()->hasPermission('customers.import.view') || auth()->user()->hasPermission('customers.import'))
                                 <a href="/customers/import"
@@ -2136,6 +2146,84 @@
             popIds.forEach((popId) => {
                 window.Echo.private('registration-verifications.' + popId)
                     .listen('.RegistrationVerificationQueueChanged', refresh);
+            });
+        };
+
+        if (typeof window.Echo !== 'undefined') {
+            attach();
+        } else {
+            window.addEventListener('echo:ready', attach, { once: true });
+        }
+    })();
+</script>
+
+<script>
+    /*
+     * Badge "Antrean Isolir"/Monitoring Isolir realtime
+     * (docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md §21 Tahap 5) —
+     * tanpa ini, angkanya cuma dihitung View Composer saat render, jadi baru
+     * berubah setelah user pindah halaman (pola sama dengan badge Verifikasi
+     * Registrasi di atas). Tiga pemicu yang bisa mengubah isi antrean:
+     *   - CustomerVerificationStatusChanged di `customers-list.{popId}` —
+     *     isolir/aktifkan kembali (broadcast fitur lain, didengarkan ulang).
+     *   - InvoiceStatusUpdated di `invoices.{popId}` — piutang lunas
+     *     (broadcast fitur lain, didengarkan ulang).
+     *   - IsolationCaseQueueChanged di `isolation-cases.{popId}` — tandai
+     *     manual/batalkan kasus, JALUR YANG TIDAK mengubah status layanan
+     *     atau invoice, jadi butuh event khusus sendiri (tidak tercakup dua
+     *     broadcast di atas).
+     */
+    (function () {
+        const badge = () => document.getElementById('badge-isolir-queue');
+        const el = badge();
+        if (!el || window.__isolirQueueBadgeBound) {
+            return;
+        }
+
+        const popIds = JSON.parse(el.dataset.popIds || '[]');
+        if (popIds.length === 0) {
+            return;
+        }
+
+        const setCount = (target, count) => {
+            target.textContent = count;
+            target.classList.toggle('hidden', count <= 0);
+        };
+
+        let timer = null;
+        const refresh = () => {
+            clearTimeout(timer);
+            timer = setTimeout(async () => {
+                const current = badge();
+                if (!current) {
+                    return;
+                }
+                try {
+                    const response = await fetch(current.dataset.countUrl, {
+                        headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                        credentials: 'same-origin',
+                    });
+                    if (!response.ok) {
+                        return;
+                    }
+                    const { count } = await response.json();
+                    setCount(current, count);
+                } catch (e) {
+                    // Gagal jaringan ⇒ biarkan angka lama; navigasi berikutnya
+                    // merender angka terbaru dari server.
+                }
+            }, 300);
+        };
+
+        const attach = () => {
+            if (window.__isolirQueueBadgeBound || typeof window.Echo === 'undefined') {
+                return;
+            }
+            window.__isolirQueueBadgeBound = true;
+            popIds.forEach((popId) => {
+                window.Echo.private('customers-list.' + popId).listen('.CustomerVerificationStatusChanged', refresh);
+                window.Echo.private('invoices.' + popId).listen('.InvoiceStatusUpdated', refresh);
+                window.Echo.private('isolation-cases.' + popId).listen('.IsolationCaseQueueChanged', refresh);
             });
         };
 

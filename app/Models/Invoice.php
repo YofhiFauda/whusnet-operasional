@@ -291,6 +291,28 @@ class Invoice extends Model
     }
 
     /**
+     * Piutang berbasis JATUH TEMPO (tgl 10) — DUA definisi "piutang" yang
+     * SENGAJA beda (konfirmasi user 2026-11-19), jangan disatukan:
+     *
+     * - `scopePiutang()` di atas = piutang PEMBUKUAN. Tagihan periode
+     *   berjalan belum "resmi" piutang sampai bulan berganti, karena
+     *   pelanggan masih boleh menutup tagihan itu sampai akhir bulan tanpa
+     *   konsekuensi pembukuan. Dipakai laporan piutang, dashboard, kolektor.
+     * - Scope ini = piutang JATUH TEMPO, KHUSUS pemicu Monitoring Isolir
+     *   (`SyncIsolationCasesCommand`, `IsolationCaseService::syncInvoices()`).
+     *   Begitu lewat `due_date` (tgl 10) dan belum dibayar — TERMASUK
+     *   tagihan periode berjalan — sudah dianggap piutang untuk isolir,
+     *   tidak menunggu pergantian bulan seperti piutang pembukuan.
+     */
+    public function scopeJatuhTempoUntukIsolir(Builder $query): Builder
+    {
+        return $query
+            ->whereIn('invoice_status', self::OUTSTANDING_STATUSES)
+            ->whereNotNull('due_date')
+            ->where('due_date', '<', now()->toDateString());
+    }
+
+    /**
      * Tagihan LEBIH LAMA (`billing_period` lebih kecil) milik pelanggan yang
      * sama, yang masih `belum_dibayar`/`sebagian` — dasar peringatan piutang
      * di form/modal bayar (ADHOC-84 §2.4). Dipakai dua jalur (form Input

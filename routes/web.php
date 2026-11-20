@@ -26,6 +26,7 @@ use App\Http\Controllers\CustomerFailedController;
 use App\Http\Controllers\CustomerFieldworkController;
 use App\Http\Controllers\CustomerInstallationAdditionalDeviceController;
 use App\Http\Controllers\CustomerInstallationController;
+use App\Http\Controllers\CustomerIsolirQueueController;
 use App\Http\Controllers\CustomerListColumnController;
 use App\Http\Controllers\CustomerNetworkAssignmentController;
 use App\Http\Controllers\CustomerPackageController;
@@ -288,6 +289,28 @@ Route::middleware('auth')->group(function () {
         // sebagai id pelanggan.
         Route::put('/customers/list-columns', [CustomerListColumnController::class, 'update'])->name('customers.list-columns.update');
         Route::delete('/customers/list-columns', [CustomerListColumnController::class, 'destroy'])->name('customers.list-columns.destroy');
+        // Badge tab Aktif/Isolir realtime (docs/plan/rancangan-list-isolir.md
+        // §3.3) — static, sebelum /customers/{customer} dinamis.
+        Route::get('/customers/status-counts', [CustomerController::class, 'statusCounts'])->name('customers.status-counts');
+    });
+
+    // List Pelanggan Isolir (docs/plan/rancangan-list-isolir.md) — permission
+    // SENDIRI, pola sama dengan customers.terminated/customers.failed di
+    // bawah: halaman antrean, bukan status pelanggan, jadi bukan numpang
+    // customers.view.
+    Route::middleware('permission:customers.isolir_queue.view')->group(function () {
+        Route::get('/customers/isolir-queue', [CustomerIsolirQueueController::class, 'index'])->name('customers.isolir-queue.index');
+        Route::get('/customers/isolir-queue/badge-count', [CustomerIsolirQueueController::class, 'badgeCount'])->name('customers.isolir-queue.badge-count');
+    });
+    Route::middleware('permission:customers.isolir_queue.create')->group(function () {
+        Route::post('/customers/isolir-queue', [CustomerIsolirQueueController::class, 'store'])->name('customers.isolir-queue.store');
+        // Keputusan Admin "Eksekusi Isolir"/"Toleransi" (follow-up 2026-11-19)
+        // — gerbang sebelum NOC bisa isolir, permission sama dengan Tandai
+        // Manual (kelompok aktor yang menentukan antrean, bukan eksekutor).
+        Route::post('/customers/isolir-queue/{customerService}/decide', [CustomerIsolirQueueController::class, 'decide'])->name('customers.isolir-queue.decide');
+    });
+    Route::middleware('permission:customers.isolir_queue.delete')->group(function () {
+        Route::delete('/customers/isolir-queue/{customerService}', [CustomerIsolirQueueController::class, 'destroy'])->name('customers.isolir-queue.destroy');
     });
 
     // Daftar pemantauan Kabel Melintang Jalan (ADHOC-205) — static, sebelum /customers/{customer}.

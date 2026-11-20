@@ -29,8 +29,8 @@
                     </div>
                     {{-- Mini preview ringkas saat collapsed di mobile --}}
                     <p x-show="!mobileStatsOpen" class="text-[11px] text-slate-600 dark:text-slate-400 truncate mt-0.5">
-                        <span class="text-emerald-700 dark:text-emerald-400 font-semibold">{{ number_format($statusCounts['active'] ?? 0) }} Aktif</span> •
-                        <span class="text-amber-700 dark:text-amber-400 font-semibold">{{ number_format($statusCounts['suspended'] ?? 0) }} Isolir</span> •
+                        <span class="text-emerald-700 dark:text-emerald-400 font-semibold"><span data-customer-status-count="active">{{ number_format($statusCounts['active'] ?? 0) }}</span> Aktif</span> •
+                        <span class="text-amber-700 dark:text-amber-400 font-semibold"><span data-customer-status-count="suspended">{{ number_format($statusCounts['suspended'] ?? 0) }}</span> Isolir</span> •
                         <span class="text-rose-700 dark:text-rose-400 font-semibold">{{ number_format($overdueCount ?? 0) }} Piutang</span>
                     </p>
                 </div>
@@ -63,7 +63,7 @@
             <div class="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center justify-between card-interactive min-w-0">
                 <div class="min-w-0 flex-1 pr-2">
                     <h3 class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 truncate">Layanan Aktif</h3>
-                    <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1">{{ number_format($statusCounts['active'] ?? 0) }}</p>
+                    <p class="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1" data-customer-status-count="active">{{ number_format($statusCounts['active'] ?? 0) }}</p>
                     <p class="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 truncate">Berlangganan lancar</p>
                 </div>
                 <div class="w-10 h-10 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
@@ -75,7 +75,7 @@
             <div class="p-3.5 sm:p-4 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 shadow-sm flex items-center justify-between card-interactive min-w-0">
                 <div class="min-w-0 flex-1 pr-2">
                     <h3 class="text-[10px] sm:text-[11px] font-semibold uppercase tracking-wider text-slate-600 dark:text-slate-300 truncate">Isolir / Suspend</h3>
-                    <p class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1">{{ number_format($statusCounts['suspended'] ?? 0) }}</p>
+                    <p class="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1" data-customer-status-count="suspended">{{ number_format($statusCounts['suspended'] ?? 0) }}</p>
                     <p class="text-[10px] text-slate-600 dark:text-slate-400 mt-0.5 truncate">Penangguhan sementara</p>
                 </div>
                 <div class="w-10 h-10 rounded-xl bg-amber-50 dark:bg-amber-950/60 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">

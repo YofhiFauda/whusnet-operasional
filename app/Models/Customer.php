@@ -360,6 +360,19 @@ class Customer extends Model
     }
 
     /**
+     * SELURUH kasus isolir pelanggan ini, lintas layanan
+     * (docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md §21) — menggantikan
+     * `isolirQueueEntries`/`activeIsolirQueueEntry` (ADHOC-306, belum pernah
+     * commit). Lihat `CustomerService::isolationCases()` untuk per-layanan.
+     *
+     * @return HasMany<IsolationCase, $this>
+     */
+    public function isolationCases(): HasMany
+    {
+        return $this->hasMany(IsolationCase::class);
+    }
+
+    /**
      * Riwayat kunjungan kolektor — termasuk kunjungan yang tidak menghasilkan
      * uang. Dipakai laporan aging untuk memunculkan pola "berulang tidak ada
      * orang tapi tunggakannya menua"

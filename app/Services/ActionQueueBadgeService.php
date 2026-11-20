@@ -13,6 +13,7 @@ use App\Models\CashDeposit;
 use App\Models\CollectorDeposit;
 use App\Models\InventorySerial;
 use App\Models\InventoryTransaction;
+use App\Models\IsolationCase;
 use App\Models\PengajuanBarang;
 use App\Models\StockRequest;
 use App\Models\TaskDeviceRetrieval;
@@ -21,7 +22,10 @@ use Illuminate\Database\Eloquent\Builder;
 
 class ActionQueueBadgeService
 {
-    public function __construct(private readonly EffectiveAccessService $access) {}
+    public function __construct(
+        private readonly EffectiveAccessService $access,
+        private readonly IsolationCaseService $isolationCaseService,
+    ) {}
 
     /** @return Builder<StockRequest> */
     public function stockRequests(User $user): Builder
@@ -181,5 +185,23 @@ class ActionQueueBadgeService
                 ->where('status', TransferStatus::IN_TRANSIT->value)
                 ->whereHas('toPop', fn (Builder $pop) => $pop->where('type', 'pusat'))
                 ->when(! $allPop, fn (Builder $scoped) => $scoped->whereIn('to_pop_id', $popIds))));
+    }
+
+    /**
+     * Monitoring Isolir — total kasus yang masih perlu dipantau/ditindaklanjuti
+     * (menunggu isolir + sudah diisolir + pemulihan), TIDAK termasuk riwayat
+     * (docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md §21). SATU sumber
+     * query dengan halaman (`IsolationCaseService`), bukan dihitung ulang
+     * di sini.
+     *
+     * @return Builder<IsolationCase>
+     */
+    public function isolirQueue(User $user): Builder
+    {
+        if (! $user->hasPermission('customers.isolir_queue.view')) {
+            return IsolationCase::query()->whereRaw('1 = 0');
+        }
+
+        return $this->isolationCaseService->casesQuery($user)->where('active_slot', 1);
     }
 }

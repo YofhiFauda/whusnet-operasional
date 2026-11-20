@@ -6,6 +6,7 @@ use App\Models\Concerns\RecordsAuditLogs;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 #[Fillable([
     'customer_id',
@@ -67,6 +68,19 @@ class CustomerService extends Model
     public function customer(): BelongsTo
     {
         return $this->belongsTo(Customer::class);
+    }
+
+    /**
+     * Seluruh kasus isolir pada layanan ini
+     * (docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md §21) — BR-03
+     * (satu kasus aktif per layanan) ditegakkan di `isolation_cases` lewat
+     * kolom `active_slot`, bukan di query relasi ini.
+     *
+     * @return HasMany<IsolationCase, $this>
+     */
+    public function isolationCases(): HasMany
+    {
+        return $this->hasMany(IsolationCase::class, 'service_id');
     }
 
     /**
