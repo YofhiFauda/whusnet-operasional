@@ -234,6 +234,12 @@ class AppServiceProvider extends ServiceProvider
             return Limit::perMinute(20)->by(($request->bearerToken() ?? 'anon').'|'.$request->ip());
         });
 
+        // Eksekusi isolir Web A (docs/superpowers/specs/2026-11-20-webhook-
+        // isolir-web-a-design.md) — pola & angka sama network-assignment-write.
+        RateLimiter::for('web-a-isolation-execute', function (Request $request) {
+            return Limit::perMinute(20)->by(($request->bearerToken() ?? 'anon').'|'.$request->ip());
+        });
+
         // API Portal Pelanggan (docs/api/api-portal-pelanggan/, Fase 0). Limiter
         // beda kelas risiko — pola RateLimiter::for-nya sama seperti tiga di atas.
         //
