@@ -45,6 +45,9 @@ use Throwable;
  */
 class IsolationExecutionService
 {
+    /**
+     * @return array{already_suspended: bool}
+     */
     public function suspendFromWebA(IsolationCase $case): array
     {
         $gateError = null;

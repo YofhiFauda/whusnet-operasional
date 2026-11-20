@@ -16,6 +16,10 @@
             "description": "Endpoint bagi sistem mitra untuk membaca struktur Mini POP dan Distribusi, serta mengonfirmasi penugasan jaringan pelanggan setelah proses pemasangan. Seluruh permintaan diautentikasi menggunakan token Bearer."
         },
         {
+            "name": "Isolir \u2014 Eksekusi Web A",
+            "description": "Endpoint arah masuk bagi Web A untuk mengeksekusi isolir setelah menerima webhook keluar `isolation.ready_for_execution`. Diautentikasi menggunakan token Bearer statis terpisah dari token-token lain di API ini."
+        },
+        {
             "name": "Portal Pelanggan",
             "description": "Endpoint bagi aplikasi Portal Pelanggan (domain terpisah, tanpa kredensial DB operasional) untuk kredensial, tagihan, pembayaran, kwitansi, saldo, dan riwayat ticketing pelanggan. Semua permintaan WAJIB header `X-Portal-Client` (client secret statis); endpoint `/me/*` tambah `Authorization: Bearer <access_token>`."
         },
@@ -25,6 +29,133 @@
         }
     ],
     "paths": {
+        "/api/v1/isolation-cases/execute": {
+            "post": {
+                "operationId": "isolation-cases.execute",
+                "description": "Mengeksekusi isolir untuk kasus yang `case_number`-nya dikirim pada\npayload webhook `isolation.ready_for_execution`.\n\nDirectional (\"pastikan status pelanggan suspended\"), bukan toggle \u2014\naman dipanggil berkali-kali untuk `case_number` yang sama (retry\njaringan, atau NOC sudah isolir manual duluan): balasannya tetap\n`200` dengan `already_suspended: true`, tidak pernah membalik\npelanggan ke aktif.\n\n`case_number` yang basi (kasusnya sudah dibatalkan/selesai, atau\nsudah digantikan kasus baru untuk layanan yang sama) ditolak `422`,\ntidak ikut mengeksekusi kasus lain yang kebetulan aktif sekarang.",
+                "summary": "Eksekusi Isolir",
+                "tags": [
+                    "Isolir \u2014 Eksekusi Web A"
+                ],
+                "requestBody": {
+                    "required": true,
+                    "content": {
+                        "application/json": {
+                            "schema": {
+                                "type": "object",
+                                "properties": {
+                                    "case_number": {
+                                        "type": "string",
+                                        "description": "Nomor kasus isolir, diambil dari payload webhook `isolation.ready_for_execution` (field `case_number`).",
+                                        "examples": [
+                                            "TFOP-20261120-000005"
+                                        ]
+                                    }
+                                },
+                                "required": [
+                                    "case_number"
+                                ]
+                            }
+                        }
+                    }
+                },
+                "responses": {
+                    "200": {
+                        "description": "Isolir berhasil dieksekusi. `already_suspended: false` kalau ini eksekusi pertama; `true` kalau pelanggan sudah berstatus suspended sebelumnya (idempotent no-op, tidak ada perubahan).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "success": true,
+                                            "case_number": "TFOP-20261120-000005",
+                                            "status": "suspended",
+                                            "already_suspended": false
+                                        },
+                                        {
+                                            "success": true,
+                                            "case_number": "TFOP-20261120-000005",
+                                            "status": "suspended",
+                                            "already_suspended": true
+                                        }
+                                    ],
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "case_number": {
+                                            "type": "string"
+                                        },
+                                        "status": {
+                                            "type": "string",
+                                            "const": "suspended"
+                                        },
+                                        "already_suspended": {
+                                            "type": "boolean"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "case_number",
+                                        "status",
+                                        "already_suspended"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "422": {
+                        "description": "`case_number` tidak ditemukan, atau kasus ditemukan tapi tidak lagi siap dieksekusi (sudah dibatalkan/selesai/digantikan kasus baru), atau pelanggan tidak punya layanan aktif.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "examples": [
+                                        {
+                                            "success": false,
+                                            "message": "Kasus ini tidak lagi siap dieksekusi."
+                                        }
+                                    ],
+                                    "properties": {
+                                        "success": {
+                                            "type": "boolean"
+                                        },
+                                        "message": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "success",
+                                        "message"
+                                    ]
+                                }
+                            }
+                        }
+                    },
+                    "401": {
+                        "description": "Token akses tidak disertakan atau tidak valid.",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    },
+                    "429": {
+                        "description": "Jumlah permintaan melebihi batas yang diizinkan (20 permintaan per menit).",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "string"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        },
         "/api/v1/pop-distribusi": {
             "get": {
                 "operationId": "pop-distribusi.index",
@@ -3650,68 +3781,6 @@
                                 }
                             }
                         }
-                    }
-                }
-            }
-        },
-        "/api/v1/isolation-cases/execute": {
-            "post": {
-                "operationId": "isolation-cases.execute",
-                "tags": [
-                    "IsolationExecution"
-                ],
-                "requestBody": {
-                    "required": true,
-                    "content": {
-                        "application/json": {
-                            "schema": {
-                                "type": "object",
-                                "properties": {
-                                    "case_number": {
-                                        "type": "string"
-                                    }
-                                },
-                                "required": [
-                                    "case_number"
-                                ]
-                            }
-                        }
-                    }
-                },
-                "responses": {
-                    "200": {
-                        "description": "",
-                        "content": {
-                            "application/json": {
-                                "schema": {
-                                    "type": "object",
-                                    "properties": {
-                                        "success": {
-                                            "type": "boolean"
-                                        },
-                                        "case_number": {
-                                            "type": "string"
-                                        },
-                                        "status": {
-                                            "type": "string",
-                                            "const": "suspended"
-                                        },
-                                        "already_suspended": {
-                                            "type": "string"
-                                        }
-                                    },
-                                    "required": [
-                                        "success",
-                                        "case_number",
-                                        "status",
-                                        "already_suspended"
-                                    ]
-                                }
-                            }
-                        }
-                    },
-                    "422": {
-                        "$ref": "#/components/responses/ValidationException"
                     }
                 }
             }
