@@ -6803,6 +6803,82 @@
 					]
 				}
 			]
+		},
+		{
+			"name": "Webhook Keluar (Outbound)",
+			"description": "**Arah KELUAR** — Whusnet yang mengirim, bukan yang menerima. Dua request di folder ini CONTOH BENTUK PAYLOAD, bukan endpoint Whusnet — isi `{{webAUrl}}` / `{{websiteBUrl}}` dengan URL webhook.site-mu kalau mau coba kirim manual dan lihat hasilnya di sana.\n\n**isolation.ready_for_execution** → destinasi `web_a`. Dikirim otomatis saat Admin menekan \"Eksekusi\" di Monitoring Isolir dan kasus beneran pindah ke status `READY_FOR_ISOLATION` (`IsolationCaseService::setAdminDecision()`). Detail: `docs/api/api-webhook-isolir-web-a/business-logic.md`.\n\n**installation.activated** → destinasi `website_b`. Dikirim otomatis saat pemasangan pelanggan diaktivasi (`CustomerInstallationController`). Detail: `docs/api/api-webhook-pemasangan/business-logic.md`.\n\nKeduanya lewat `WebhookOutbox` + `SendWebhookOutboxJob` (HMAC-SHA256, retry 8x). Status pengiriman tiap baris: cek tabel `webhook_outbox` (`status`/`attempts`/`response_status`/`last_error`).",
+			"item": [
+				{
+					"name": "isolation.ready_for_execution → Web A",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Whusnet-Signature",
+								"value": "t={{timestamp}},v1={{signature}}",
+								"description": "HMAC-SHA256 atas string \"{timestamp}.{body}\" pakai secret destinasi (WEBHOOK_WEB_A_SECRET / WEBHOOK_WEBSITE_B_SECRET). Isi {{timestamp}} dan {{signature}} manual kalau mau verifikasi tanda tangan — kalau cuma mau lihat bentuk payload di webhook.site, header ini boleh dihapus/diabaikan."
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event_id\": \"6dd309a5-d88c-4a16-a34e-fcd2ae7891bd\",\n  \"event\": \"isolation.ready_for_execution\",\n  \"occurred_at\": \"2026-11-20T13:20:31+07:00\",\n  \"case_number\": \"TFOP-20261120-000005\",\n  \"cid\": \"C1X4ARQ000631\",\n  \"customer_name\": \"Contoh Nama Pelanggan\",\n  \"package_name\": \"Net138\",\n  \"outstanding_amount\": \"150000.00\"\n}",
+							"options": {
+								"raw": {
+									"headerFamily": "json",
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{webAUrl}}",
+							"host": [
+								"{{webAUrl}}"
+							]
+						},
+						"description": "**Ini request KELUAR dari Whusnet** (dikirim `SendWebhookOutboxJob`), bukan endpoint yang dipanggil dari sini. Disalin ke Postman supaya bentuk payload-nya kelihatan tanpa buka kode — kalau mau benar-benar lihat hasilnya, arahkan `{{webAUrl}}` ke URL webhook.site-mu dan klik Send, atau trigger alurnya di aplikasi (lihat deskripsi folder)."
+					},
+					"response": []
+				},
+				{
+					"name": "installation.activated → Website B",
+					"request": {
+						"method": "POST",
+						"header": [
+							{
+								"key": "Content-Type",
+								"value": "application/json"
+							},
+							{
+								"key": "X-Whusnet-Signature",
+								"value": "t={{timestamp}},v1={{signature}}",
+								"description": "HMAC-SHA256 atas string \"{timestamp}.{body}\" pakai secret destinasi (WEBHOOK_WEB_A_SECRET / WEBHOOK_WEBSITE_B_SECRET). Isi {{timestamp}} dan {{signature}} manual kalau mau verifikasi tanda tangan — kalau cuma mau lihat bentuk payload di webhook.site, header ini boleh dihapus/diabaikan."
+							}
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"event\": \"installation.activated\",\n  \"event_id\": \"3f6b0e9a-6f2e-4e7a-9c1a-2b7c9f1e4a21\",\n  \"idempotency_key\": \"installation:1938:activation:1\",\n  \"occurred_at\": \"2026-11-20T13:21:38+07:00\",\n  \"data\": {\n    \"customer\": {\n      \"cid\": \"C1X4ARQ000631\",\n      \"nama\": \"Contoh Nama Pelanggan\"\n    },\n    \"pop\": {\n      \"code\": \"PNO\",\n      \"name\": \"POP Ponorogo Kota\",\n      \"type\": \"branch\"\n    },\n    \"desa\": {\n      \"id\": 1,\n      \"name\": \"Contoh Desa\",\n      \"kecamatan\": \"Contoh Kecamatan\",\n      \"kota\": \"Ponorogo\"\n    },\n    \"paket\": {\n      \"code\": \"NET138\",\n      \"name\": \"Net138\",\n      \"bandwidth\": \"10 Mbps\",\n      \"harga_bulanan\": \"150000.00\"\n    },\n    \"perangkat\": {\n      \"sn\": \"ONT1234567890\",\n      \"odp\": \"ODP-01\",\n      \"odp_port\": \"3\",\n      \"olt\": \"OLT-01\",\n      \"vlan\": \"100\"\n    },\n    \"task\": {\n      \"number\": \"TASK-20261120-000001\",\n      \"started_at\": \"2026-11-20T09:00:00+07:00\"\n    }\n  }\n}",
+							"options": {
+								"raw": {
+									"headerFamily": "json",
+									"language": "json"
+								}
+							}
+						},
+						"url": {
+							"raw": "{{websiteBUrl}}",
+							"host": [
+								"{{websiteBUrl}}"
+							]
+						},
+						"description": "**Ini request KELUAR dari Whusnet** (dikirim `SendWebhookOutboxJob`), bukan endpoint yang dipanggil dari sini. Disalin ke Postman supaya bentuk payload-nya kelihatan tanpa buka kode — kalau mau benar-benar lihat hasilnya, arahkan `{{websiteBUrl}}` ke URL webhook.site-mu dan klik Send, atau trigger alurnya di aplikasi (lihat deskripsi folder)."
+					},
+					"response": []
+				}
+			]
 		}
 	],
 	"auth": {
