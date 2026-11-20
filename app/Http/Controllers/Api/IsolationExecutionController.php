@@ -21,10 +21,10 @@ class IsolationExecutionController extends Controller
             'case_number' => ['required', 'string', 'exists:isolation_cases,case_number'],
         ]);
 
-        $case = IsolationCase::where('case_number', $data['case_number'])->with('customer')->firstOrFail();
+        $case = IsolationCase::where('case_number', $data['case_number'])->firstOrFail();
 
         try {
-            $result = app(IsolationExecutionService::class)->suspendFromWebA($case->customer);
+            $result = app(IsolationExecutionService::class)->suspendFromWebA($case);
         } catch (IsolationExecutionException $e) {
             return response()->json(['success' => false, 'message' => $e->getMessage()], 422);
         }

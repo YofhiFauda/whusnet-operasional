@@ -160,6 +160,41 @@ class SendWebhookOutboxJobTest extends TestCase
         Http::assertNothingSent();
     }
 
+    public function test_non_https_web_a_url_marks_failed_without_retry(): void
+    {
+        config(['webhooks.web_a.url' => 'http://web-a.test/isolir']);
+        config(['webhooks.web_a.secret' => 'secret-web-a']);
+        Http::preventStrayRequests();
+        Http::fake();
+
+        $row = $this->makeOutboxRow('web_a');
+
+        $this->runJob($row);
+
+        $row->refresh();
+        $this->assertSame('failed', $row->status);
+        $this->assertStringContainsString('https://', $row->last_error);
+        $this->assertSame(0, $row->attempts, 'Salah konfigurasi bukan kegagalan jaringan — jangan dihitung sebagai percobaan.');
+
+        Http::assertNothingSent();
+    }
+
+    public function test_missing_web_a_secret_marks_failed_without_retry(): void
+    {
+        config(['webhooks.web_a.url' => 'https://web-a.test/isolir']);
+        config(['webhooks.web_a.secret' => '']);
+        Http::preventStrayRequests();
+        Http::fake();
+
+        $row = $this->makeOutboxRow('web_a');
+
+        $this->runJob($row);
+
+        $row->refresh();
+        $this->assertSame('failed', $row->status);
+        Http::assertNothingSent();
+    }
+
     public function test_max_attempts_exhausted_marks_row_failed(): void
     {
         Http::preventStrayRequests();

@@ -6,6 +6,7 @@ use App\Enums\IsolationCaseStatus;
 use App\Exceptions\IsolationExecutionException;
 use App\Models\AuditLog;
 use App\Models\Customer;
+use App\Models\CustomerService;
 use App\Models\CustomerStatusLog;
 use App\Models\IsolationCase;
 use Illuminate\Support\Facades\DB;
@@ -26,6 +27,16 @@ use Throwable;
  * jaringan Web A, atau NOC sudah isolir manual duluan) aman: kalau pelanggan
  * sudah `suspended`, balas idempotent no-op, tidak pernah membalik ke aktif.
  *
+ * Menerima `IsolationCase`, bukan `Customer` — gerbangnya harus menolak kasus
+ * BASI (webhook lama diputar ulang Web A setelah kasus dibatalkan/selesai,
+ * atau setelah kasus baru menggantikannya sebagai `active_slot`), bukan cuma
+ * "apakah pelanggan punya kasus siap apa pun". Gerbang lock+cek dilakukan
+ * pada BARIS kasus yang sama persis dengan `case_number` yang dikirim Web A,
+ * dimuat ulang dari DB di dalam transaksi (bukan objek lama di memori) —
+ * dua eksekusi hampir-bersamaan untuk kasus yang sama (retry Web A, atau NOC
+ * isolir manual duluan) sama-sama melihat baris pelanggan yang di-lock, bukan
+ * cuma status kasus di memori yang belum tentu terbarui.
+ *
  * `markTrackingFailed()` SENGAJA tidak dipanggil di sini kalau
  * `markIsolationSucceeded()` gagal (beda dari `toggleSuspend()`) — method itu
  * belum ada di riwayat git yang di-commit (bagian WIP terpisah, tidak
@@ -34,31 +45,53 @@ use Throwable;
  */
 class IsolationExecutionService
 {
-    public function suspendFromWebA(Customer $customer): array
+    public function suspendFromWebA(IsolationCase $case): array
     {
-        if ($customer->status === 'suspended') {
-            return ['already_suspended' => true];
-        }
-
         $gateError = null;
+        $alreadySuspended = false;
+        $customerServiceId = $case->service_id;
 
-        DB::transaction(function () use ($customer, &$gateError) {
-            if (! $customer->customerService) {
+        DB::transaction(function () use ($case, $customerServiceId, &$gateError, &$alreadySuspended) {
+            $service = CustomerService::find($customerServiceId);
+
+            if (! $service) {
                 $gateError = 'Pelanggan ini tidak punya layanan aktif.';
 
                 return;
             }
 
-            // lockForUpdate() DI DALAM transaksi yang sama dengan
-            // $customer->update() — persis pola toggleSuspend() pasca fix
-            // 2026-11-20. Mencegah dua eksekusi hampir-bersamaan (retry Web A
-            // vs NOC klik manual) lolos gerbang berdua.
-            $activeCase = IsolationCase::where('service_id', $customer->customerService->id)
-                ->where('active_slot', 1)
-                ->lockForUpdate()
-                ->first();
+            // Baris pelanggan dikunci di transaksi yang sama — gerbang
+            // idempotensi ("sudah suspended?") dibaca di SINI, bukan sebelum
+            // transaksi, supaya dua eksekusi hampir-bersamaan tidak lolos
+            // berdua lewat jendela antara baca status dan commit. Dicek
+            // SEBELUM gerbang status kasus supaya panggilan kedua (retry Web
+            // A setelah kasus sendiri sudah berpindah ke SUSPENDED oleh
+            // panggilan pertama) tetap balas idempotent, bukan 422.
+            $customer = Customer::whereKey($service->customer_id)->lockForUpdate()->first();
 
-            if (! $activeCase || ! in_array($activeCase->status, IsolationCaseStatus::readyForIsolationGroup(), true)) {
+            if (! $customer) {
+                $gateError = 'Pelanggan ini tidak punya layanan aktif.';
+
+                return;
+            }
+
+            if ($customer->status === 'suspended') {
+                $alreadySuspended = true;
+
+                return;
+            }
+
+            // Dikunci & dimuat ulang dari DB pakai ID kasus yang SAMA PERSIS
+            // dengan yang dikirim Web A — bukan "kasus aktif layanan ini apa
+            // pun itu". Kasus basi (sudah dibatalkan, atau sudah digantikan
+            // kasus baru sebagai active_slot) gagal di gerbang ini, tidak
+            // ikut mengeksekusi kasus lain yang kebetulan aktif sekarang.
+            $lockedCase = IsolationCase::whereKey($case->id)->lockForUpdate()->first();
+
+            if (! $lockedCase
+                || (int) $lockedCase->active_slot !== 1
+                || ! in_array($lockedCase->status, IsolationCaseStatus::readyForIsolationGroup(), true)
+            ) {
                 $gateError = 'Kasus ini tidak lagi siap dieksekusi.';
 
                 return;
@@ -72,7 +105,7 @@ class IsolationExecutionService
 
             $oldStatus = $customer->status;
             $customer->update(['status' => 'suspended']);
-            $customer->customerService->update(['service_status' => 'isolir']);
+            $service->update(['service_status' => 'isolir']);
 
             AuditLog::create([
                 'user_id' => null,
@@ -100,16 +133,21 @@ class IsolationExecutionService
             throw new IsolationExecutionException($gateError);
         }
 
+        if ($alreadySuspended) {
+            return ['already_suspended' => true];
+        }
+
         try {
+            $service = CustomerService::find($customerServiceId);
             app(IsolationCaseService::class)->markIsolationSucceeded(
-                $customer->customerService,
+                $service,
                 null,
                 'external_web_a'
             );
         } catch (Throwable $e) {
             report($e);
             Log::error('IsolationExecutionService: markIsolationSucceeded gagal setelah isolir Web A sukses.', [
-                'customer_id' => $customer->id,
+                'service_id' => $customerServiceId,
                 'error' => $e->getMessage(),
             ]);
         }

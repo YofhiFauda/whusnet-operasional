@@ -10,10 +10,12 @@ use App\Models\City;
 use App\Models\Customer;
 use App\Models\CustomerAddress;
 use App\Models\CustomerService;
+use App\Models\CustomerStatusLog;
 use App\Models\District;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
 use App\Models\IsolationCase;
+use App\Models\IsolationEvent;
 use App\Models\Pop;
 use App\Models\Role;
 use App\Models\User;
@@ -169,9 +171,9 @@ class IsolationExecutionServiceTest extends TestCase
         $this->travelTo(now()->parse('2026-09-25'));
 
         $customer = $this->createCustomer('active');
-        $this->makeReadyCase($customer);
+        $case = $this->makeReadyCase($customer);
 
-        $result = app(IsolationExecutionService::class)->suspendFromWebA($customer);
+        $result = app(IsolationExecutionService::class)->suspendFromWebA($case);
 
         $this->assertFalse($result['already_suspended']);
         $this->assertSame('suspended', $customer->refresh()->status);
@@ -196,16 +198,19 @@ class IsolationExecutionServiceTest extends TestCase
         $this->travelTo(now()->parse('2026-09-25'));
 
         $customer = $this->createCustomer('active');
-        $this->makeReadyCase($customer);
+        $case = $this->makeReadyCase($customer);
 
-        app(IsolationExecutionService::class)->suspendFromWebA($customer);
+        app(IsolationExecutionService::class)->suspendFromWebA($case);
         $auditCountBefore = AuditLog::where('auditable_id', $customer->id)->count();
+        $eventCountBefore = IsolationEvent::where('isolation_case_id', $case->id)->count();
+        $statusLogCountBefore = CustomerStatusLog::where('customer_id', $customer->id)->count();
 
-        $result = app(IsolationExecutionService::class)->suspendFromWebA($customer->refresh());
+        $result = app(IsolationExecutionService::class)->suspendFromWebA($case->refresh());
 
         $this->assertTrue($result['already_suspended']);
-        $auditCountAfter = AuditLog::where('auditable_id', $customer->id)->count();
-        $this->assertSame($auditCountBefore, $auditCountAfter);
+        $this->assertSame($auditCountBefore, AuditLog::where('auditable_id', $customer->id)->count());
+        $this->assertSame($eventCountBefore, IsolationEvent::where('isolation_case_id', $case->id)->count());
+        $this->assertSame($statusLogCountBefore, CustomerStatusLog::where('customer_id', $customer->id)->count());
 
         $this->travelBack();
     }
@@ -219,9 +224,10 @@ class IsolationExecutionServiceTest extends TestCase
         $this->createOverdueInvoice($customer, '2026-08');
         $this->artisan('isolir:sync-cases')->assertSuccessful();
         // Kasus masih WAITING_ISOLATION — belum diputuskan Admin.
+        $case = IsolationCase::where('service_id', $customer->customerService->id)->first();
 
         $this->expectException(IsolationExecutionException::class);
-        app(IsolationExecutionService::class)->suspendFromWebA($customer);
+        app(IsolationExecutionService::class)->suspendFromWebA($case);
 
         $this->travelBack();
     }
@@ -229,10 +235,63 @@ class IsolationExecutionServiceTest extends TestCase
     #[Test]
     public function suspend_from_web_a_menolak_tanpa_customer_service(): void
     {
+        $this->travelTo(now()->parse('2026-09-25'));
+
         $customer = $this->createCustomer('active');
-        $customer->customerService->delete();
+        $case = $this->makeReadyCase($customer);
+        // Simulasikan layanan yang sudah tidak ada lagi (dihapus/dipindah)
+        // tanpa melanggar FK restrictOnDelete sungguhan di skenario ini.
+        $case->service_id = 999999;
 
         $this->expectException(IsolationExecutionException::class);
-        app(IsolationExecutionService::class)->suspendFromWebA($customer->refresh());
+        app(IsolationExecutionService::class)->suspendFromWebA($case);
+
+        $this->travelBack();
+    }
+
+    #[Test]
+    public function suspend_from_web_a_menolak_case_number_basi_yang_sudah_dibatalkan(): void
+    {
+        $this->travelTo(now()->parse('2026-09-25'));
+
+        $customer = $this->createCustomer('active');
+        $staleCase = $this->makeReadyCase($customer);
+
+        // Pelanggan bayar sebelum diisolir — kasus dibatalkan, Web A tidak
+        // pernah tahu (webhook sudah terkirim duluan, lalu basi).
+        app(IsolationCaseService::class)->cancelCase($staleCase, $this->adminUser, 'Lunas sebelum isolir');
+
+        $this->expectException(IsolationExecutionException::class);
+        app(IsolationExecutionService::class)->suspendFromWebA($staleCase->refresh());
+
+        $this->travelBack();
+    }
+
+    #[Test]
+    public function suspend_from_web_a_menolak_case_number_basi_saat_sudah_ada_kasus_baru(): void
+    {
+        $this->travelTo(now()->parse('2026-09-25'));
+
+        $customer = $this->createCustomer('active');
+        $staleCase = $this->makeReadyCase($customer);
+
+        app(IsolationCaseService::class)->cancelCase($staleCase, $this->adminUser, 'Lunas sebelum isolir');
+        $this->createOverdueInvoice($customer, '2026-09');
+        $this->artisan('isolir:sync-cases')->assertSuccessful();
+        app(IsolationCaseService::class)->setAdminDecision(
+            IsolationCase::where('service_id', $customer->customerService->id)->where('active_slot', 1)->first(),
+            IsolationAdminDecision::EXECUTE,
+            $this->adminUser,
+            null
+        );
+
+        // Web A memutar ulang webhook kasus lama yang basi — harus ditolak,
+        // bukan ikut mengeksekusi kasus baru yang aktif sekarang.
+        $this->expectException(IsolationExecutionException::class);
+        app(IsolationExecutionService::class)->suspendFromWebA($staleCase->refresh());
+
+        $this->assertSame('active', $customer->refresh()->status);
+
+        $this->travelBack();
     }
 }

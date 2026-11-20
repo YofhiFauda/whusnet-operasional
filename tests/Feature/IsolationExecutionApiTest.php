@@ -131,7 +131,7 @@ class IsolationExecutionApiTest extends TestCase
         $customer = $this->createCustomer('active');
         $case = $this->makeReadyCase($customer);
 
-        app(IsolationExecutionService::class)->suspendFromWebA($customer);
+        app(IsolationExecutionService::class)->suspendFromWebA($case);
 
         $this->postJson('/api/v1/isolation-cases/execute', ['case_number' => $case->refresh()->case_number], [
             'Authorization' => 'Bearer token-benar',
