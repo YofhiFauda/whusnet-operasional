@@ -884,4 +884,35 @@ class IsolirQueueTest extends TestCase
 
         $this->travelBack();
     }
+
+    #[Test]
+    public function mark_isolation_succeeded_dengan_actor_null_tercatat_actor_type_custom(): void
+    {
+        $this->travelTo(now()->parse('2026-09-25'));
+
+        $customer = $this->createCustomer('active');
+        $this->createOverdueInvoice($customer, '2026-08');
+        $this->artisan('isolir:sync-cases')->assertSuccessful();
+        $this->decideExecute($customer);
+
+        $customer->update(['status' => 'suspended']);
+        $customer->customerService->update(['service_status' => 'isolir']);
+
+        app(IsolationCaseService::class)->markIsolationSucceeded(
+            $customer->customerService,
+            null,
+            'external_web_a'
+        );
+
+        $case = IsolationCase::where('service_id', $customer->customerService->id)->first();
+
+        $this->assertDatabaseHas('isolation_events', [
+            'isolation_case_id' => $case->id,
+            'event_type' => 'isolation_succeeded',
+            'actor_type' => 'external_web_a',
+            'actor_id' => null,
+        ]);
+
+        $this->travelBack();
+    }
 }

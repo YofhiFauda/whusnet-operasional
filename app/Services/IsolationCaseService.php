@@ -260,13 +260,13 @@ class IsolationCaseService
      * supaya SETIAP isolir yang terjadi selalu punya kasus, tidak ada yang
      * luput dari Monitoring Isolir.
      */
-    public function markIsolationSucceeded(CustomerService $service, User $actor): IsolationCase
+    public function markIsolationSucceeded(CustomerService $service, ?User $actor = null, string $actorType = 'system'): IsolationCase
     {
-        return DB::transaction(function () use ($service, $actor) {
+        return DB::transaction(function () use ($service, $actor, $actorType) {
             $case = $this->createOrSyncCase($service, IsolationTriggerType::MANUAL, $actor);
 
             $fromStatus = $case->status;
-            $this->recordEvent($case, IsolationEventType::ISOLATION_STARTED, $actor, null, $fromStatus, IsolationCaseStatus::ISOLATION_IN_PROGRESS);
+            $this->recordEvent($case, IsolationEventType::ISOLATION_STARTED, $actor, null, $fromStatus, IsolationCaseStatus::ISOLATION_IN_PROGRESS, actorType: $actorType);
 
             $this->recordAction($case, IsolationActionType::SUSPEND, $actor);
 
@@ -276,7 +276,7 @@ class IsolationCaseService
             $case->syncActiveSlot();
             $case->save();
 
-            $this->recordEvent($case, IsolationEventType::ISOLATION_SUCCEEDED, $actor, null, IsolationCaseStatus::ISOLATION_IN_PROGRESS, IsolationCaseStatus::SUSPENDED);
+            $this->recordEvent($case, IsolationEventType::ISOLATION_SUCCEEDED, $actor, null, IsolationCaseStatus::ISOLATION_IN_PROGRESS, IsolationCaseStatus::SUSPENDED, actorType: $actorType);
 
             return $case;
         });
@@ -448,13 +448,14 @@ class IsolationCaseService
         ?IsolationCaseStatus $from = null,
         ?IsolationCaseStatus $to = null,
         array $metadata = [],
+        string $actorType = 'system',
     ): IsolationEvent {
         return IsolationEvent::create([
             'isolation_case_id' => $case->id,
             'event_type' => $type,
             'from_status' => $from?->value,
             'to_status' => $to?->value,
-            'actor_type' => $actor ? 'user' : 'system',
+            'actor_type' => $actor ? 'user' : $actorType,
             'actor_id' => $actor?->id,
             'description' => $description,
             'metadata' => $metadata ?: null,
