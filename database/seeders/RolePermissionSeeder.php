@@ -144,6 +144,14 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.packages.view',
                 'customers.detail.view',
                 'customers.failed.view', // List Pelanggan Gagal — permission sendiri, bukan wildcard customers.detail.*
+                // Isolir/aktivasi-kembali & Antrean Isolir (docs/plan/
+                // rancangan-list-isolir.md, keputusan user 2026-11-18):
+                // eksekutor = Admin, Customer Service, NOC. Admin sebelumnya
+                // TIDAK punya customers.isolir sama sekali — ditambah di sini.
+                'customers.isolir',
+                'customers.isolir_queue.create',
+                'customers.isolir_queue.delete',
+                'customers.isolir_queue.view',
                 'customers.qr.create',
                 'customers.qr.print',
                 'customers.qr.view',
@@ -217,6 +225,12 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.view',
                 'customers.failed.view',
                 'customers.isolir',
+                // Antrean Isolir (docs/plan/rancangan-list-isolir.md,
+                // keputusan user 2026-11-18): eksekutor = Admin, Customer
+                // Service, NOC.
+                'customers.isolir_queue.create',
+                'customers.isolir_queue.delete',
+                'customers.isolir_queue.view',
                 'customers.terminated.view',
                 'customers.update',
                 'customers.view',
@@ -388,6 +402,12 @@ class RolePermissionSeeder extends Seeder
                 'customers.detail.view',
                 'customers.failed.view',
                 'customers.isolir',
+                // Antrean Isolir (docs/plan/rancangan-list-isolir.md,
+                // keputusan user 2026-11-18): eksekutor = Admin, Customer
+                // Service, NOC.
+                'customers.isolir_queue.create',
+                'customers.isolir_queue.delete',
+                'customers.isolir_queue.view',
                 'customers.qr.cancel',
                 'customers.qr.create',
                 'customers.qr.print',

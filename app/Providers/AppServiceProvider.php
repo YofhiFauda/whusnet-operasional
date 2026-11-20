@@ -468,6 +468,18 @@ class AppServiceProvider extends ServiceProvider
                 : 0;
 
             $queues = app(ActionQueueBadgeService::class);
+
+            // POP yang di-subscribe JS buat realtime badge "Antrean Isolir" —
+            // dipicu CustomerVerificationStatusChanged (isolir/aktifkan) &
+            // InvoiceStatusUpdated (piutang lunas). Lihat layouts/app.blade.php.
+            $isolirQueuePopIds = [];
+            if ($user?->hasPermission('customers.isolir_queue.view')) {
+                $access = app(EffectiveAccessService::class);
+                $isolirQueuePopIds = $access->hasAllPopAccess($user)
+                    ? Pop::query()->pluck('id')->all()
+                    : array_values($access->getAllowedPopIds($user));
+            }
+
             $view->with('badge_business_development_verification_count', $count)
                 ->with('badge_transfer_confirmation_count', $user?->hasPermission('warehouse_transfer.receive') ? app(WarehouseTransferActionQueue::class)->forUser($user)->count() : 0)
                 ->with('badge_stock_request_count', $user ? $queues->stockRequests($user)->count() : 0)
@@ -478,7 +490,9 @@ class AppServiceProvider extends ServiceProvider
                 ->with('badge_cash_deposit_count', $user ? $queues->cashDeposits($user)->count() : 0)
                 // Dicek permission dulu supaya role tanpa hak review tidak
                 // menjalankan query bersarang ini di setiap halaman.
-                ->with('badge_retrieval_review_count', $user?->hasPermission('device_retrieval_review.review') ? $queues->pendingRetrievalReviews($user)->count() : 0);
+                ->with('badge_retrieval_review_count', $user?->hasPermission('device_retrieval_review.review') ? $queues->pendingRetrievalReviews($user)->count() : 0)
+                ->with('badge_isolir_queue_count', $user?->hasPermission('customers.isolir_queue.view') ? $queues->isolirQueue($user)->count() : 0)
+                ->with('badge_isolir_queue_pop_ids', $isolirQueuePopIds);
         });
 
         View::composer('components.warehouse.header', function ($view): void {

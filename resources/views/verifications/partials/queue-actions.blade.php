@@ -95,18 +95,47 @@
         @endcan
 
         @if ($customer->status === 'waiting_installation')
-            <form action="{{ route('customers.installation.start', $customer) }}" method="POST" class="m-0 p-0 {{ $isCard ? 'flex-1 flex' : 'inline-block' }}" onsubmit="event.preventDefault(); window.confirmAction('Mulai proses pemasangan untuk pelanggan ini?', this);">
-                @csrf
-                <button type="submit" class="{{ $btn }} bg-primary hover:bg-primary/90">Start Proses</button>
-            </form>
+            {{-- CustomerInstallationController::start() wajib
+                 customers.detail.installation.update — tombol ini dulu
+                 kerender buat SEMUA role yang bisa buka antrean (termasuk
+                 yang cuma punya .view, mis. CS), jadi diklik langsung 403.
+                 Role tanpa .update dikasih $detailUrl sebagai gantinya. --}}
+            @can('customers.detail.installation.update')
+                <form action="{{ route('customers.installation.start', $customer) }}" method="POST" class="m-0 p-0 {{ $isCard ? 'flex-1 flex' : 'inline-block' }}" onsubmit="event.preventDefault(); window.confirmAction('Mulai proses pemasangan untuk pelanggan ini?', this);">
+                    @csrf
+                    <button type="submit" class="{{ $btn }} bg-primary hover:bg-primary/90">Start Proses</button>
+                </form>
+            @elseif ($detailUrl)
+                <a href="{{ $detailUrl }}" class="{{ $isCard ? $btn.' bg-primary hover:bg-primary/90' : $iconBtn.' hover:text-primary' }}" title="Detail" aria-label="Lihat detail pelanggan">
+                    <svg class="{{ $isCard ? 'w-4 h-4 shrink-0' : $iconSize }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    @if ($isCard) Detail @endif
+                </a>
+            @endcan
         @elseif ($customer->status === 'installation_in_progress')
-            <a href="{{ route('customers.installation.report', ['customer' => $customer, 'return_to' => route('verifications.queue')]) }}" class="{{ $btn }} bg-success hover:bg-success/90">
-                Lapor Pemasangan
-            </a>
+            {{-- CustomerInstallationController::report() wajib permission
+                 sama dengan start() di atas (.update) — guard yang sama,
+                 bug yang sama kalau dibiarkan telanjang. --}}
+            @can('customers.detail.installation.update')
+                <a href="{{ route('customers.installation.report', ['customer' => $customer, 'return_to' => route('verifications.queue')]) }}" class="{{ $btn }} bg-success hover:bg-success/90">
+                    Lapor Pemasangan
+                </a>
+            @elseif ($detailUrl)
+                <a href="{{ $detailUrl }}" class="{{ $isCard ? $btn.' bg-primary hover:bg-primary/90' : $iconBtn.' hover:text-primary' }}" title="Detail" aria-label="Lihat detail pelanggan">
+                    <svg class="{{ $isCard ? 'w-4 h-4 shrink-0' : $iconSize }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    @if ($isCard) Detail @endif
+                </a>
+            @endcan
         @elseif ($customer->status === 'revision_installation')
-            <a href="{{ route('customers.installation.report', ['customer' => $customer, 'return_to' => route('verifications.queue')]) }}" class="{{ $btn }} bg-error hover:bg-error/90">
-                Revisi
-            </a>
+            @can('customers.detail.installation.update')
+                <a href="{{ route('customers.installation.report', ['customer' => $customer, 'return_to' => route('verifications.queue')]) }}" class="{{ $btn }} bg-error hover:bg-error/90">
+                    Revisi
+                </a>
+            @elseif ($detailUrl)
+                <a href="{{ $detailUrl }}" class="{{ $isCard ? $btn.' bg-primary hover:bg-primary/90' : $iconBtn.' hover:text-primary' }}" title="Detail" aria-label="Lihat detail pelanggan">
+                    <svg class="{{ $isCard ? 'w-4 h-4 shrink-0' : $iconSize }}" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /><path stroke-linecap="round" stroke-linejoin="round" d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" /></svg>
+                    @if ($isCard) Detail @endif
+                </a>
+            @endcan
         @endif
     @endif
 </div>

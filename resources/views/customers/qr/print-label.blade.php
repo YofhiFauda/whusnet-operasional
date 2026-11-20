@@ -40,26 +40,26 @@
             cursor: pointer;
         }
 
-        /* Canvas 50mm x 60mm + bleed 2mm tiap sisi = 54mm x 64mm */
+        /* Permintaan user 2026-11-19: kertas 5x5cm, QR 4x4cm */
         .label {
-            width: 54mm;
-            height: 64mm;
+            width: 50mm;
+            height: 50mm;
             margin: 0 auto;
             background: #fff;
             border: 1px solid #cbd5e1;
-            padding: 5mm;
+            padding: 3mm;
             position: relative;
             display: flex;
             flex-direction: column;
             align-items: center;
             justify-content: center;
-            gap: 2mm;
+            gap: 1mm;
             overflow: hidden;
         }
 
         .label img {
-            width: 42mm;
-            height: 42mm;
+            width: 40mm;
+            height: 40mm;
             display: block;
         }
 
@@ -110,7 +110,7 @@
                 page-break-inside: avoid;
             }
             @page {
-                size: 54mm 64mm;
+                size: 50mm 50mm;
                 margin: 0;
             }
         }
@@ -123,7 +123,6 @@
 
     <div class="label">
         <img src="{{ $qrDataUri }}" alt="QR {{ $customer->display_id }}">
-        <div class="cid">{{ $customer->display_id }}</div>
     </div>
 </body>
 </html>

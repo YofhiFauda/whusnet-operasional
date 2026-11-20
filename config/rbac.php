@@ -152,6 +152,18 @@ return [
             ActionCode::VIEW->value,
         ],
 
+        // List Pelanggan Isolir (docs/plan/rancangan-list-isolir.md) — antrean
+        // pelanggan yang akan diisolir (tunggakan periode lalu + tanda
+        // manual). CREATE/DELETE di sini cuma mengelola ANTREAN (tandai/
+        // batalkan manual) — eksekusi isolir-nya sendiri tetap digerbangi
+        // `customers.isolir` yang sudah ada, dipakai dari List Pelanggan
+        // & Quick Hub.
+        'customers.isolir_queue' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::DELETE->value,
+        ],
+
         // Skip Survey saat Registrasi — Sales input data survey langsung,
         // pelanggan lompat ke antrean ACC Admin. Sempit & terpisah dari
         // customers.create biasa (lihat ActionCode::SKIP_SURVEY).

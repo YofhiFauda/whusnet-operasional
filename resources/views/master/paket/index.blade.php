@@ -67,7 +67,7 @@
                 Reset
             </a>
             @endif
-            @if(auth()->user()->hasPermission('manage_packages'))
+            @if(auth()->user()->hasPermission('packages.create'))
             <a href="{{ route('master.paket.create') }}" class="flex-1 lg:flex-none px-4 py-2 rounded-md text-sm font-semibold text-white bg-sky-600 dark:bg-sky-500 hover:bg-sky-700">
                 Tambah Package
             </a>
@@ -185,7 +185,7 @@
                 </div>
                 @endif
 
-                @if(auth()->user()->hasPermission('manage_packages'))
+                @if(auth()->user()->hasPermission('packages.update'))
                 <div class="flex items-center justify-end gap-2 pt-4 border-t border-slate-100 dark:border-slate-700/50">
                     <a href="{{ route('master.paket.edit', $package) }}" class="px-3 py-1.5 text-xs font-semibold text-sky-700 dark:text-sky-400 bg-sky-50 dark:bg-sky-900/20 border border-sky-100 dark:border-sky-800/30 rounded-md hover:bg-sky-100 dark:hover:bg-sky-900/40">
                         Edit

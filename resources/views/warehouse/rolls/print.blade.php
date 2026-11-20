@@ -46,15 +46,16 @@
             cursor: pointer;
         }
 
-        /* Sticker barcode 1D 104mm x 40mm, safe area 3mm 4mm — dibuat press
-           terhadap barcode 1D (koreksi layout 2026-09-22). */
+        /* Permintaan user 2026-11-20: sticker 60mm x 25mm (dari 104mm x
+           40mm). Semua ukuran internal (barcode, font, margin) diciutkan
+           proporsional biar masih muat 3 baris (barcode, roll_code, nama). */
         .sticker {
-            width: 104mm;
-            height: 40mm;
+            width: 60mm;
+            height: 25mm;
             margin: 0 auto 6mm;
             background: #fff;
             border: 1px solid #cbd5e1;
-            padding: 3mm 4mm;
+            padding: 1.5mm 2mm;
             position: relative;
             display: flex;
             flex-direction: column;
@@ -70,29 +71,29 @@
         }
 
         .sticker-barcode img {
-            width: 88mm;
+            width: 54mm;
             height: auto;
-            max-height: 22mm;
+            max-height: 12mm;
             display: block;
         }
 
         .sticker .roll-code {
             font-weight: 800;
-            font-size: 13px;
+            font-size: 9px;
             font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
             line-height: 1.2;
             color: #000;
             text-align: center;
-            margin-top: 1.5mm;
+            margin-top: 0.8mm;
             word-break: break-all;
         }
 
         .sticker .item-name {
-            font-size: 11px;
+            font-size: 7px;
             font-weight: 700;
             color: #1e293b;
             text-align: center;
-            margin-top: 1mm;
+            margin-top: 0.5mm;
         }
 
         @media screen {
@@ -124,7 +125,7 @@
                 page-break-inside: avoid;
             }
             @page {
-                size: 104mm 40mm;
+                size: 60mm 25mm;
                 margin: 0;
             }
         }

@@ -33,7 +33,6 @@ class PortalTicketController extends Controller
             'ticket_number' => 'TKT-2026-0045',
             'created_at' => '2026-08-20T08:00:00+07:00',
             'issue_category' => 'Internet Lambat',
-            'detail_keluhan' => 'Internet lemot sejak kemarin.',
             'status' => ['value' => 'sedang_ditangani', 'label' => 'Sedang Ditangani'],
             'resolved_at' => null,
         ]],
@@ -41,8 +40,11 @@ class PortalTicketController extends Controller
     #[Response(401, description: 'Access token tidak disertakan atau tidak valid.')]
     public function index(Request $request): AnonymousResourceCollection
     {
+        // fopTask WAJIB di-load — TicketPortalStatusPresenter::resolve()
+        // butuh ini lewat Ticket::resolveStatus() (sama alasannya dengan
+        // show() di bawah), TAPI TIDAK PERNAH diekspos langsung ke response.
         $tickets = $this->ticketsQuery($request)
-            ->with('issueCategory')
+            ->with(['issueCategory', 'fopTask'])
             ->latest()
             ->paginate(10)
             ->withQueryString();

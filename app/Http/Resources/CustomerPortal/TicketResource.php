@@ -27,7 +27,6 @@ class TicketResource extends ApiResource
             'ticket_number' => $this->ticket_number,
             'created_at' => $this->created_at?->toIso8601String(),
             'issue_category' => $this->issueCategory?->name,
-            'detail_keluhan' => $this->detail_keluhan,
             'status' => TicketPortalStatusPresenter::resolve($this->resource),
             'resolved_at' => $this->resolved_at?->toIso8601String(),
         ];

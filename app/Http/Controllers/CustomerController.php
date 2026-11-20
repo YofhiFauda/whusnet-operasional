@@ -6,6 +6,8 @@ use App\Enums\BillingWaiverSource;
 use App\Enums\DocumentType;
 use App\Enums\InvoiceStatus;
 use App\Enums\InvoiceType;
+use App\Enums\IsolationAdminDecision;
+use App\Enums\IsolationCaseStatus;
 use App\Enums\NotificationType;
 use App\Enums\PaymentStatus;
 use App\Enums\ScopeType;
@@ -64,6 +66,7 @@ use App\Services\DeviceRetrievalReviewService;
 use App\Services\EffectiveAccessService;
 use App\Services\FileUploadService;
 use App\Services\FopTaskProvisioningService;
+use App\Services\IsolationCaseService;
 use App\Services\NetworkAssignmentService;
 use App\Services\NumberSequenceService;
 use App\Services\TelegramBotService;
@@ -321,6 +324,28 @@ class CustomerController extends Controller
     }
 
     /**
+     * Jumlah pelanggan aktif/isolir, scope-aware — dipanggil ulang oleh List
+     * Pelanggan tiap `CustomerVerificationStatusChanged` diterima (realtime
+     * badge tab Aktif/Isolir & strip statistik, docs/plan/rancangan-list-isolir.md
+     * §3.3), bukan cuma dihitung sekali saat halaman dirender.
+     *
+     * @return array{active: int, suspended: int}
+     */
+    public function statusCounts(Request $request): JsonResponse
+    {
+        $counts = Customer::applyUserScope($request->user())
+            ->selectRaw('status, count(*) as count')
+            ->whereIn('status', ['active', 'suspended'])
+            ->groupBy('status')
+            ->pluck('count', 'status');
+
+        return response()->json([
+            'active' => (int) ($counts['active'] ?? 0),
+            'suspended' => (int) ($counts['suspended'] ?? 0),
+        ]);
+    }
+
+    /**
      * Toggle status layanan pelanggan antara active (aktif) dan suspended (isolir).
      */
     public function toggleSuspend(Request $request, Customer $customer): JsonResponse|RedirectResponse
@@ -343,12 +368,52 @@ class CustomerController extends Controller
         $actionName = $isCurrentlyActive ? 'isolir' : 'aktivasi_kembali';
         $note = $request->input('note', $isCurrentlyActive ? 'Isolir Layanan' : 'Aktivasi Kembali Layanan');
 
-        DB::transaction(function () use ($customer, $newStatus, $serviceStatus, $actionName, $note) {
+        // Gerbang keputusan Admin (follow-up 2026-11-19, diperkuat lagi hari
+        // ini, docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md §21) —
+        // "Admin menandai mana yang harus diisolir, mana yang masih
+        // ditoleransi; NOC mengeksekusi perintah Admin." Digerbangi lewat
+        // STATUS kasus (`readyForIsolationGroup()`), BUKAN cuma kolom
+        // `admin_decision` — begitu Admin "Eksekusi", kasus beneran pindah
+        // tab ke "Siap Isolir" (lihat `IsolationCaseService::setAdminDecision()`);
+        // kalau masih di tab "Menunggu Isolir" (`WAITING_ISOLATION`, belum
+        // diputuskan ATAU ditoleransi), NOC tidak berhak isolir. Cuma
+        // mengecek arah ISOLIR (bukan aktifkan-kembali) — DAN cuma kalau
+        // kasusnya memang ada; isolir di luar jalur Monitoring Isolir (tidak
+        // pernah masuk antrean) tidak punya apa pun untuk diputuskan, jadi
+        // tidak digerbangi.
+        if ($isCurrentlyActive && $customer->customerService) {
+            $activeCase = app(IsolationCaseService::class)->findActiveCaseForService($customer->customerService);
+
+            if ($activeCase && ! in_array($activeCase->status, IsolationCaseStatus::readyForIsolationGroup(), true)) {
+                $msg = $activeCase->admin_decision === IsolationAdminDecision::TOLERATE
+                    ? "Pelanggan {$customer->full_name} masih ditoleransi Admin".($activeCase->admin_decision_note ? ': '.rtrim($activeCase->admin_decision_note, '.').'.' : '.')
+                    : "Pelanggan {$customer->full_name} menunggu keputusan Admin (Eksekusi Isolir/Toleransi) sebelum bisa diisolir.";
+
+                if ($request->expectsJson() || $request->wantsJson()) {
+                    return response()->json(['success' => false, 'message' => $msg], 422);
+                }
+
+                return redirect()->back()->with('error', $msg);
+            }
+        }
+
+        DB::transaction(function () use ($customer, $newStatus, $serviceStatus, $actionName, $note, $isCurrentlyActive) {
             $oldStatus = $customer->status;
             $customer->update(['status' => $newStatus]);
 
             if ($customer->customerService) {
                 $customer->customerService->update(['service_status' => $serviceStatus]);
+
+                // Monitoring Isolir (docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md
+                // §21) — DIPANGGIL SETELAH status layanan berubah di atas,
+                // bukan sebaliknya: service ini cuma mencatat lifecycle
+                // kasus, tidak pernah mengubah status layanan sendiri.
+                $isolationCases = app(IsolationCaseService::class);
+                if ($isCurrentlyActive) {
+                    $isolationCases->markIsolationSucceeded($customer->customerService, auth()->user());
+                } else {
+                    $isolationCases->markRestorationSucceeded($customer->customerService, auth()->user());
+                }
             }
 
             AuditLog::create([

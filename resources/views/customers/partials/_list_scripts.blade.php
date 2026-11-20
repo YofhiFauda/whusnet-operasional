@@ -105,6 +105,12 @@
     var selectedCustomerData = {};
     var hubRemainingAmount = 0;
 
+    // Realtime badge tab Aktif/Isolir + hapus baris (docs/plan/
+    // rancangan-list-isolir.md §3.3). `var`, alasan sama dengan
+    // selectedCustomerData di atas — script ini di-inject ulang tiap nav boost.
+    var CURRENT_STATUS_FILTER = @json($status ?? '');
+    var ISOLIR_QUEUE_STORE_URL = @json(auth()->user()->hasPermission('customers.isolir_queue.create') ? route('customers.isolir-queue.store') : null);
+
     // Cuma kelas STATE yang ditukar, bukan className utuh. Menimpa className
     // penuh (versi lama) ikut menghapus kelas responsif tab (text-[11px]
     // sm:text-xs, sm:px-4, snap-start) — begitu user pindah tab sekali, header
@@ -571,6 +577,9 @@ ODP/Distribusi: ${dist}`;
             return data;
         })
         .then(data => {
+            // Capture SEBELUM updateHubStatusUi menimpa rawStatus — delta
+            // badge butuh status LAMA & BARU (docs/plan/rancangan-list-isolir.md §3.3).
+            const oldStatus = selectedCustomerData.rawStatus;
             updateHubStatusUi(data.raw_status);
             showModalToast(data.message || 'Status layanan berhasil diperbarui.');
 
@@ -594,6 +603,13 @@ ODP/Distribusi: ${dist}`;
                     }
                 }
             });
+
+            // Aksi sendiri: badge tab Aktif/Isolir + strip statistik dihitung
+            // LANGSUNG dari delta (tahu persis apa yang berubah, gak perlu
+            // nunggu round-trip Reverb) — ini perbaikan utama ADHOC yang
+            // diminta user (badge gak nambah, baris gak hilang dari tab Isolir).
+            bumpCustomerStatusBadges(oldStatus, data.raw_status);
+            removeCustomerRowIfMismatch(selectedCustomerData.id, data.raw_status);
         })
         .catch(err => {
             console.error(err);
@@ -605,9 +621,177 @@ ODP/Distribusi: ${dist}`;
         });
     }
 
+    /* ── Realtime badge tab Aktif/Isolir + hapus baris ──
+       docs/plan/rancangan-list-isolir.md §3.3. Dua pemicu:
+       1. Aksi SENDIRI (toggle isolir di atas) — delta diketahui pasti, jadi
+          badge dihitung LANGSUNG tanpa fetch (lihat bumpCustomerStatusBadges).
+       2. Aksi user LAIN di POP yang sama, lewat Reverb
+          (App\Events\CustomerVerificationStatusChanged, channel
+          `customers-list.{popId}`) — delta TIDAK diketahui (payload cuma
+          customer_id + status baru), jadi badge diambil ulang dari server
+          lewat refreshCustomerStatusCounts() (scope-aware, authoritative). */
+    function setCustomerStatusCountEl(id, count) {
+        document.querySelectorAll(`[data-customer-status-count="${id}"]`).forEach(el => {
+            el.textContent = Number(count).toLocaleString('id-ID');
+        });
+    }
+
+    function applyCustomerStatusCounts(active, suspended) {
+        setCustomerStatusCountEl('active', active);
+        setCustomerStatusCountEl('suspended', suspended);
+    }
+
+    function bumpCustomerStatusBadges(oldStatus, newStatus) {
+        if (oldStatus === newStatus) return;
+
+        const read = (id) => {
+            const el = document.querySelector(`[data-customer-status-count="${id}"]`);
+            return el ? (parseInt(el.textContent.replace(/\D/g, ''), 10) || 0) : 0;
+        };
+
+        let active = read('active');
+        let suspended = read('suspended');
+
+        if (oldStatus === 'active') active = Math.max(0, active - 1);
+        if (oldStatus === 'suspended') suspended = Math.max(0, suspended - 1);
+        if (newStatus === 'active') active += 1;
+        if (newStatus === 'suspended') suspended += 1;
+
+        applyCustomerStatusCounts(active, suspended);
+    }
+
+    // `var` (bukan `let`) — lihat alasan selectedCustomerData di atas.
+    var customerStatusCountsTimer = null;
+    function refreshCustomerStatusCounts() {
+        clearTimeout(customerStatusCountsTimer);
+        customerStatusCountsTimer = setTimeout(async () => {
+            try {
+                const res = await fetch('{{ route('customers.status-counts') }}', {
+                    headers: { 'Accept': 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) return;
+                const data = await res.json();
+                applyCustomerStatusCounts(data.active, data.suspended);
+            } catch (e) {
+                // Gagal jaringan ⇒ biarkan angka lama; event berikutnya atau
+                // navigasi ulang akan mengoreksi.
+            }
+        }, 300);
+    }
+
+    // Hapus baris pelanggan dari tabel kalau status barunya TIDAK LAGI cocok
+    // filter tab yang sedang dibuka (?status=active / ?status=suspended).
+    // Tab "Semua" (CURRENT_STATUS_FILTER === '') tidak pernah menghapus baris
+    // — active & suspended dua-duanya tetap tampil di sana.
+    function removeCustomerRowIfMismatch(customerId, newStatus) {
+        if (CURRENT_STATUS_FILTER === '' || CURRENT_STATUS_FILTER === newStatus) {
+            return;
+        }
+
+        document.querySelectorAll(`button[data-id="${customerId}"]`).forEach(btn => {
+            btn.closest('tr[data-customer-row]')?.remove();
+        });
+    }
+
+    window.onPageReady(function () {
+        if (typeof window.Echo === 'undefined' || !window.Echo) {
+            return;
+        }
+
+        // POP yang kelihatan di HALAMAN INI (bukan seluruh scope user) — sama
+        // persis keterbatasannya dengan invoices/index.blade.php: pelanggan
+        // yang berubah di POP yang TIDAK tampil di halaman saat ini tidak
+        // memicu refresh baris (badge tetap kena, itu scope-aware sendiri di
+        // server). Baris baru "muncul masuk" ke tab lewat aksi user lain juga
+        // di luar cakupan — sama seperti baris cicilan baru di invoices,
+        // perlu buka ulang/filter ulang.
+        const popIds = @json($customers->pluck('pop_id')->unique()->values());
+        popIds.forEach(function (popId) {
+            window.pageEcho('customers-list.' + popId, document.getElementById('customerTable') || document.body)
+                .listen('.CustomerVerificationStatusChanged', function (payload) {
+                    refreshCustomerStatusCounts();
+                    removeCustomerRowIfMismatch(payload.customer_id, payload.status);
+                });
+        });
+    });
+
     function triggerDetail() {
         if (!selectedCustomerData.detailUrl) return;
         window.location.href = selectedCustomerData.detailUrl;
+    }
+
+    /* ── Tandai Antrean Isolir (docs/plan/rancangan-list-isolir.md) ──
+       Fetch/JSON, BUKAN form tradisional — dialog ini dipanggil dari List
+       Pelanggan (halaman List), bukan halaman Antrean sendiri, jadi
+       back()->withErrors() bakal nutup modal & nampilin List kosong tanpa
+       pesan error (lihat aturan 3-pola aksi baru di CLAUDE.md). Pola identik
+       triggerHubToggleConnection di atas. */
+    function triggerMarkIsolirQueue() {
+        if (!selectedCustomerData.id || !ISOLIR_QUEUE_STORE_URL) return;
+
+        const fieldId = 'isolir-queue-note';
+        const errorId = fieldId + '-error';
+
+        const doSubmit = () => {
+            const input = document.getElementById(fieldId);
+            const note = (input?.value || '').trim();
+
+            if (note === '') {
+                document.getElementById(errorId)?.classList.remove('hidden');
+                input?.focus();
+                return;
+            }
+
+            window.Dialog.close();
+            submitMarkIsolirQueue(note);
+        };
+
+        window.Dialog.show({
+            title: 'Tandai Antrean Isolir',
+            icon: 'warning',
+            contentHtml: `
+                <p class="mb-3">Tandai pelanggan "${selectedCustomerData.name}" masuk Antrean Isolir. Catatan/alasan wajib diisi:</p>
+                <textarea id="${fieldId}" rows="3" maxlength="500"
+                    placeholder="Contoh: Menunggak 2 bulan, sudah diingatkan lewat telepon."
+                    class="w-full text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-2.5 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500 transition-all"></textarea>
+                <span id="${errorId}" class="hidden text-xs text-rose-600 font-semibold">Catatan wajib diisi.</span>
+            `,
+            buttons: [
+                { text: 'Batal', type: 'secondary', onClick: () => window.Dialog.close() },
+                { text: 'Tandai', type: 'primary', onClick: () => doSubmit() },
+            ],
+        });
+
+        setTimeout(() => document.getElementById(fieldId)?.focus(), 50);
+    }
+
+    function submitMarkIsolirQueue(note) {
+        const csrfToken = document.querySelector('meta[name="csrf-token"]')?.content;
+
+        fetch(ISOLIR_QUEUE_STORE_URL, {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+                'X-Requested-With': 'XMLHttpRequest',
+                'X-CSRF-TOKEN': csrfToken,
+            },
+            body: JSON.stringify({ customer_id: selectedCustomerData.id, note: note }),
+        })
+            .then(async (res) => {
+                const data = await res.json().catch(() => ({}));
+                if (!res.ok) {
+                    throw new Error(data.message || 'Gagal menandai pelanggan.');
+                }
+                return data;
+            })
+            .then((data) => {
+                showModalToast(data.message || 'Pelanggan ditandai masuk Antrean Isolir.');
+            })
+            .catch((err) => {
+                showModalToast(err.message || 'Terjadi kesalahan sistem.');
+            });
     }
 
     // Jembatan Modal Hub → Modal Atur Jaringan.

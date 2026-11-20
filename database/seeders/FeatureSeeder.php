@@ -240,6 +240,13 @@ class FeatureSeeder extends Seeder
                 'sort_order' => 4,
             ],
             [
+                'parent_code' => 'customers',
+                'code' => 'customers.isolir_queue',
+                'name' => 'List Pelanggan Isolir',
+                'type' => FeatureType::SUB_FEATURE,
+                'sort_order' => 6,
+            ],
+            [
                 // Kemampuan sempit di dalam form Registrasi (bukan halaman
                 // sendiri) — Sales lompat tahap survey lapangan, isi data
                 // survey langsung. Sub-feature sendiri (bukan numpang

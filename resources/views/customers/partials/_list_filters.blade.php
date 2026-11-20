@@ -113,7 +113,7 @@
                class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer
                       {{ $status === 'active' ? 'bg-white dark:bg-slate-900 text-emerald-700 dark:text-emerald-300 shadow-sm' : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100' }}">
                 <span>Aktif</span>
-                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
+                <span data-customer-status-count="active" class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
                              {{ $status === 'active' ? 'bg-emerald-100 dark:bg-emerald-950/60 text-emerald-800 dark:text-emerald-200' : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200' }}">{{ $statusCounts['active'] ?? 0 }}</span>
             </a>
             <a href="{{ route('customers.index', ['status' => 'suspended']) }}"
@@ -121,7 +121,7 @@
                class="px-3.5 py-1.5 rounded-lg transition-all flex items-center gap-2 cursor-pointer
                       {{ $status === 'suspended' ? 'bg-white dark:bg-slate-900 text-amber-800 dark:text-amber-300 shadow-sm' : 'text-slate-700 dark:text-slate-300 hover:text-slate-900 dark:hover:text-slate-100' }}">
                 <span>Isolir</span>
-                <span class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
+                <span data-customer-status-count="suspended" class="px-1.5 py-0.5 rounded-full text-[10px] font-mono
                              {{ $status === 'suspended' ? 'bg-amber-100 dark:bg-amber-950/60 text-amber-800 dark:text-amber-200' : 'bg-slate-200/80 dark:bg-slate-700 text-slate-700 dark:text-slate-200' }}">{{ $statusCounts['suspended'] ?? 0 }}</span>
             </a>
         </nav>

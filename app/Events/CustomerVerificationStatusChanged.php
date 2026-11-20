@@ -35,6 +35,11 @@ use Illuminate\Queue\SerializesModels;
  * jadi listener refetch partial row-nya sendiri lewat endpoint yang sudah lolos
  * scope & permission user (verifications.row), bukan percaya payload broadcast
  * mentah buat re-render.
+ *
+ * Dipakai JUGA oleh List Pelanggan (badge tab Aktif/Isolir + hapus baris yang
+ * tak lagi cocok filter status aktif, docs/plan/rancangan-list-isolir.md §3.3)
+ * lewat channel KEDUA `customers-list.{popId}` di `broadcastOn()` — event yang
+ * sama, gate permission yang beda, bukan event baru.
  */
 class CustomerVerificationStatusChanged implements ShouldBroadcastNow
 {
@@ -49,6 +54,15 @@ class CustomerVerificationStatusChanged implements ShouldBroadcastNow
     {
         return [
             new PrivateChannel('customers.'.$this->customer->pop_id),
+            // Channel TERPISAH untuk List Pelanggan (badge tab Aktif/Isolir +
+            // baris tabel, docs/plan/rancangan-list-isolir.md §3.3) — BUKAN
+            // numpang `customers.{popId}` di atas. Gate channel itu
+            // `customers.detail.installation.view` (punya antrean verifikasi),
+            // sedangkan List Pelanggan digerbangi `customers.view` — dua
+            // permission yang tidak selalu sama-sama dipegang (persis alasan
+            // `registration-verifications.{popId}` dipisah dari channel ini,
+            // lihat routes/channels.php).
+            new PrivateChannel('customers-list.'.$this->customer->pop_id),
         ];
     }
 

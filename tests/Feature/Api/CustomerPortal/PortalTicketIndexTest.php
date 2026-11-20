@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api\CustomerPortal;
 
 use App\Models\Customer;
+use App\Models\FopTask;
 use App\Models\Ticket;
 use App\Models\TicketIssueCategory;
 use App\Models\User;
@@ -71,7 +72,7 @@ class PortalTicketIndexTest extends TestCase
         // 'status', tapi isinya objek {value,label} hasil TicketPortalStatusPresenter,
         // bukan kolom mentah. Yang haram itu `handler` mentah, dicek terpisah.
         foreach ([
-            'id', 'catatan_teknis', 'handler', 'fop_task_id', 'pop_id',
+            'id', 'catatan_teknis', 'detail_keluhan', 'handler', 'fop_task_id', 'pop_id',
             'created_by', 'priority', 'type', 'customer_name', 'customer_address',
             'customer_phone', 'customer_odp', 'customer_package', 'customer_device',
             'customer_latitude', 'customer_longitude',
@@ -105,5 +106,30 @@ class PortalTicketIndexTest extends TestCase
 
         $response->assertJsonPath('data.0.status.value', 'diterima');
         $response->assertJsonPath('data.0.status.label', 'Diterima');
+    }
+
+    /**
+     * Regresi: `index()` sempat gak eager-load `fopTask`, padahal
+     * `Ticket::resolveStatus()` (dipanggil `TicketPortalStatusPresenter`)
+     * mengaksesnya begitu `handler` = FOP — meledak
+     * `LazyLoadingViolationException` (500) di halaman Tiket Portal Pelanggan.
+     */
+    public function test_daftar_tiket_yang_sudah_sampai_fop_tidak_meledak_lazy_loading(): void
+    {
+        $seed = $this->seedActivePortalCustomer();
+        $fopTask = FopTask::create([
+            'task_number' => 'TFOP-IDX-'.random_int(100000, 999999),
+            'category' => 'MTN',
+            'tugas' => 'Uji lazy loading index',
+            'issue' => 'Lemot',
+            'status' => 'draft',
+        ]);
+        $this->seedTicketFor($seed['customer'], ['handler' => 'fop', 'fop_task_id' => $fopTask->id]);
+
+        $tokens = $this->loginAndGetTokens($seed['login_id']);
+        $response = $this->withHeaders($this->authenticatedHeaders($tokens['access_token']))
+            ->getJson('/api/customer-portal/me/tickets');
+
+        $response->assertOk();
     }
 }

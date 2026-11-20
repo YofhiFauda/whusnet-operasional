@@ -7,6 +7,7 @@ use App\Models\FopTask;
 use App\Models\InventoryTransaction;
 use App\Models\InventoryTransfer;
 use App\Models\Invoice;
+use App\Models\IsolationCase;
 use App\Models\Payment;
 use App\Models\PengajuanBarang;
 use App\Models\StockRequest;
@@ -74,6 +75,19 @@ class NumberSequenceService
         ));
 
         return sprintf('TFOP-%s-%06d', $ymd, $value);
+    }
+
+    /**
+     * Nomor kasus isolir (docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md §21.2).
+     */
+    public function isolationCaseNumber(): string
+    {
+        $ymd = date('Ymd');
+        $value = $this->next("ISO:{$ymd}", fn () => $this->lastSuffix(
+            IsolationCase::where('case_number', 'like', "ISO-{$ymd}-%")->pluck('case_number')
+        ));
+
+        return sprintf('ISO-%s-%06d', $ymd, $value);
     }
 
     /**
