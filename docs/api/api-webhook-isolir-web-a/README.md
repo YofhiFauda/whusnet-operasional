@@ -16,7 +16,7 @@ Bidirectional, dua arah berbeda:
 | Payload keluar | `event_id`, `event`, `occurred_at`, `case_number`, `cid`, `customer_name`, `package_name`, `outstanding_amount`. |
 | Auth masuk | Token bearer statis `WEB_A_WRITE_TOKEN` (middleware `web_a.write` → `EnsureWebAWriteToken`), `hash_equals()`, bukan DB lookup — pola sama `network_assignment.write`. |
 | Rate limit masuk | `web-a-isolation-execute`, 20/menit per token+IP — pola sama `network-assignment-write`. |
-| Eksekusi | `IsolationExecutionService::suspendFromWebA(Customer)` — BERDIRI SENDIRI dari `CustomerController::toggleSuspend()` (tidak saling panggil), directional ("pastikan suspended", bukan toggle), **idempotent**: kalau pelanggan sudah `suspended`, balas 200 no-op, tidak pernah membalik ke aktif. |
+| Eksekusi | `IsolationExecutionService::suspendFromWebA(IsolationCase)` — BERDIRI SENDIRI dari `CustomerController::toggleSuspend()` (tidak saling panggil), directional ("pastikan suspended", bukan toggle), **idempotent**: kalau pelanggan sudah `suspended`, balas 200 no-op, tidak pernah membalik ke aktif. Menerima `IsolationCase` (bukan `Customer`) supaya bisa menolak `case_number` basi (dibatalkan/digantikan kasus baru) — gerbang mengunci baris kasus DAN baris pelanggan yang sama persis di dalam satu transaksi (hasil review akhir, 2026-11-20). |
 | Atribusi aktor | `actor_type = 'external_web_a'`, `actor_id = null` di `isolation_events` (bukan user login, bukan `'system'` generik) — lihat `markIsolationSucceeded()` yang sekarang menerima `actorType` opsional. |
 
 ## Kenapa berdiri sendiri dari `toggleSuspend()`
