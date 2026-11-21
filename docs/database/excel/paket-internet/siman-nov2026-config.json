@@ -1,0 +1,51 @@
+{
+    "package_code_typo_fixes": {
+        "Up to 45Mbps": "Net150",
+        "Up to 70Mbps": "Net165",
+        "Up to 100 Mbps": "Net198",
+        "Up to 150 Mbps": "PK000042",
+        "400M": "PK000014",
+        "115M": "PK000034"
+    },
+    "skip_names": [
+        "Muh Busri"
+    ],
+    "name_aliases": {
+        "Muhamad Muclis Prastio H.": "Muhamad Muclis Prastio H",
+        "Tika Martianasari (Migrasi Whusnet) / Winamaya": "Tika Martianasari",
+        "Roby Sulistyo": "Roby Sulistiyo",
+        "Sigid Purnomo": "Sigit Purnomo",
+        "Ahmad Saifudin": "Akhmad Saifudin",
+        "Riska Akbar (migrasi)": "Riska Akbar Muazan",
+        "Hermin Marlina Sudarwati": "Hermin Marliana Sudarwati",
+        "Farales Sindi Jl Pramuka": "Farales Sindy",
+        "Hefida Tri Puspitasari Siman": "Hefida Tri Puspitasari 2",
+        "Achmad Yasin Rifai / Masjid Baitul Mabrur": "Masjid Baitul Mabrur Achmad Yasin",
+        "Hefida Tri Puspitasari Toko Siman": "Hefida Tri Puspitasari 3",
+        "Moh Mushlihudin": "Moh Mushlihuddin",
+        "Septian Hendra Wijaya": "Septian Harendra Wijaya",
+        "Farid Wajdi Ardjono": "Farid Wadji Ardjono"
+    },
+    "manual_terminate_cids": [
+        "D1X6BRQ000378",
+        "D1X6BRQ000627",
+        "D1X6ARQ000997",
+        "D1X6CRQ001309",
+        "D1X6CRQ001315",
+        "D1X6CRQ001330",
+        "D1X6CRQ001355",
+        "D1X6ARQ001014",
+        "D1X6ARQ001077",
+        "D1X6CRQ001217",
+        "D1X6CRQ001238",
+        "D1X6CRQ001263",
+        "D1X6CRQ001264",
+        "D00RQ000110",
+        "D1X6BRQ000566",
+        "D1X6BRQ000036",
+        "D1X6BRQ000281",
+        "D1X6BRQ000323",
+        "D1X6ARQ000410"
+
+    ]
+}

@@ -322,6 +322,69 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
         $this->assertSame('110000.00', $service->refresh()->monthly_price);
     }
 
+    public function test_cid_fallback_suffix_dipakai_kalau_prefix_beda_tapi_nomor_urut_sama(): void
+    {
+        // Kasus Siman: CID Excel pakai skema prefix LAMA (sebelum CID
+        // regenerate ikut POP/Mini POP/Distribusi sekarang), nomor urut
+        // "RQ+NNNNNN" di buntutnya tetap sama persis dengan CID sistem
+        // sekarang yang prefix-nya beda total.
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $package = $this->makePackage('NetP110', 'NetP110', 110000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Tika Martianasari', 'cid' => 'D1X6BRQ000114']);
+        $service = $this->makeService($customer, $package, 90357);
+
+        $file = $this->writeExcelFixture([
+            ['CID' => 'D00RQ000114', 'Nama' => 'Tika Martianasari', 'Paket' => 110000, 'paket ' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->expectsOutputToContain('1 diubah')
+            ->assertSuccessful();
+
+        $this->assertSame('110000.00', $service->refresh()->monthly_price);
+    }
+
+    public function test_cid_fallback_suffix_ketemu_tapi_nama_gak_nyambung_ditolak(): void
+    {
+        // Suffix "RQ000027" kebetulan sama, tapi pemiliknya beneran beda
+        // orang (CID Excel nyasar total, bukan cuma beda prefix skema) —
+        // sanity check nama tetap wajib menolak, seperti CID exact-match.
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $package = $this->makePackage('NetP110', 'NetP110', 115000);
+        $korbanSalahCid = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Miko Aprilianto', 'cid' => 'D00RQ000027']);
+        $service = $this->makeService($korbanSalahCid, $package, 77903);
+
+        $file = $this->writeExcelFixture([
+            ['CID' => 'D20RQ000027', 'Nama' => 'Farid Wajdi Ardjono', 'Paket' => 115000, 'paket ' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->expectsOutputToContain('1 dilewati')
+            ->assertSuccessful();
+
+        $this->assertSame('77903.00', $service->refresh()->monthly_price);
+        $this->assertSame($package->id, $service->internet_package_id);
+    }
+
+    public function test_cid_fallback_suffix_ambigu_tidak_ditebak(): void
+    {
+        // Suffix sama jatuh ke 2 pelanggan berbeda (nomor urut sama,
+        // kebetulan ada di 2 Cabang/Mini POP beda prefix) — jangan ditebak
+        // salah satu, biarkan gagal dan jatuh ke fallback nama di bawah.
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $package = $this->makePackage('NetP110', 'NetP110', 110000);
+        Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Kandidat Satu', 'cid' => 'D00RQ000500']);
+        Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Kandidat Dua', 'cid' => 'D1X6BRQ000500']);
+
+        $file = $this->writeExcelFixture([
+            ['CID' => 'D20RQ000500', 'Nama' => 'Nama Yang Gak Ketemu', 'Paket' => 110000, 'paket ' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->expectsOutputToContain('1 dilewati')
+            ->assertSuccessful();
+    }
+
     public function test_cid_ketemu_tapi_nama_gak_nyambung_ditolak_tidak_menimpa_pelanggan_lain(): void
     {
         // Regresi temuan nyata cabang Caruban: CID di Excel kolektor "nyasar"
@@ -415,6 +478,53 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
             ->assertSuccessful();
 
         $this->assertSame('111000.00', $service->refresh()->monthly_price);
+    }
+
+    public function test_fallback_kolom_paket_dipakai_kalau_nama_paket_isinya_teks_speed(): void
+    {
+        // Regresi temuan nyata cabang Siman: header `Nama Paket`/`Paket` di
+        // file ini TERBALIK dari konvensi Caruban/Sambit — `Nama Paket`
+        // isinya teks speed ("Up to 25 Mbps "), kode katalog asli justru di
+        // `Paket` ("NetP110"). Command harus coba `Paket` sebagai kode
+        // ALTERNATIF begitu `Nama Paket` gak dikenal katalog.
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $defaultPackage = $this->makePackage('PK000001', 'default', 0);
+        $realPackage = $this->makePackage('NetP110', '110K Up to 5M', 110000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Nilam Juliana']);
+        $service = $this->makeService($customer, $defaultPackage, 0);
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Nilam Juliana', 'Harga' => 110000, 'Nama Paket' => 'Up to 25 Mbps ', 'Paket' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->expectsOutputToContain('1 diubah')
+            ->assertSuccessful();
+
+        $service->refresh();
+        $this->assertSame('110000.00', $service->monthly_price);
+        $this->assertSame($realPackage->id, $service->internet_package_id);
+    }
+
+    public function test_fallback_kolom_paket_tidak_dipakai_kalau_harga_tidak_ada(): void
+    {
+        // Jangan sampai fallback ini kebawa ke file lama (Sambit) yang
+        // kolom `Paket`-nya MEMANG dipakai buat nominal (tanpa `Harga`) —
+        // fallback cuma aman kalau `Harga` ADA, supaya `Paket` di situ pasti
+        // bukan field nominal.
+        $pop = Pop::factory()->create(['name' => 'Sambit']);
+        $package = $this->makePackage('NetP110', 'NetP110', 110000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Imam Choirul Anam']);
+        $service = $this->makeService($customer, $package, 90357);
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Imam Choirul Anam', 'Paket' => 110000, 'paket ' => 'NetP110'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->assertSuccessful();
+
+        $this->assertSame('110000.00', $service->refresh()->monthly_price);
     }
 
     public function test_cid_kosong_tetap_pakai_nama_seperti_sebelumnya(): void
@@ -818,6 +928,118 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
             ->assertSuccessful();
 
         $this->assertSame('active', $tidakDiExcel->refresh()->status);
+    }
+
+    /**
+     * `manual_terminate_cids` (kasus Siman) — kebalikan `--terminate-missing`:
+     * pelanggan DIPUTUS walau baris Excel-nya ADA, karena admin tahu dari
+     * lapangan dia sudah berhenti (rekap kolektor basi, belum dicoret).
+     */
+    public function test_manual_terminate_cids_memutus_pelanggan_walau_ada_di_excel(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $package = $this->makePackage('NetP110', 'NetP110', 110000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Yoyok Priyo Handoko', 'cid' => 'D1X6ARQ000997', 'status' => 'active']);
+        $this->makeService($customer, $package, 110000);
+        $actor = User::factory()->create();
+
+        $file = $this->writeExcelFixture([
+            ['CID' => 'D1X6ARQ000997', 'Nama' => 'Yoyok Priyo Handoko', 'Paket' => 110000, 'paket ' => 'NetP110'],
+        ]);
+        $config = $this->writeConfigFixture([
+            'manual_terminate_cids' => ['D1X6ARQ000997'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--actor-id' => $actor->id, '--apply' => true,
+        ])->expectsOutputToContain('1 diputus langganan')
+            ->assertSuccessful();
+
+        $this->assertSame('terminated', $customer->refresh()->status);
+        $reason = CustomerTerminationReason::where('name', 'Rekonsiliasi Data Excel')->first();
+        $this->assertNotNull($reason);
+        $this->assertSame($reason->id, $customer->termination_reason_id);
+    }
+
+    public function test_manual_terminate_cids_dry_run_tidak_menulis_db(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Yoyok Priyo Handoko', 'cid' => 'D1X6ARQ000997', 'status' => 'active']);
+        $this->makeService($customer, null, 110000);
+        $actor = User::factory()->create();
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Nama Lain', 'Paket' => 50000, 'paket ' => 'TidakAda'],
+        ]);
+        $config = $this->writeConfigFixture([
+            'manual_terminate_cids' => ['D1X6ARQ000997'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--actor-id' => $actor->id,
+        ])->expectsOutputToContain('1 diputus langganan')
+            ->assertSuccessful();
+
+        $this->assertSame('active', $customer->refresh()->status);
+        $this->assertNull(CustomerTerminationReason::where('name', 'Rekonsiliasi Data Excel')->first());
+    }
+
+    public function test_manual_terminate_cids_sudah_terminated_tidak_diulang(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Sudah Putus', 'cid' => 'D1X6ARQ000998', 'status' => 'terminated']);
+        $this->makeService($customer, null, 0);
+        $actor = User::factory()->create();
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Nama Lain', 'Paket' => 50000, 'paket ' => 'TidakAda'],
+        ]);
+        $config = $this->writeConfigFixture([
+            'manual_terminate_cids' => ['D1X6ARQ000998'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--actor-id' => $actor->id, '--apply' => true,
+        ])->expectsOutputToContain('0 diputus langganan')
+            ->assertSuccessful();
+
+        $this->assertSame('terminated', $customer->refresh()->status);
+    }
+
+    public function test_manual_terminate_cids_cid_tidak_ditemukan_dilewati(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $actor = User::factory()->create();
+
+        $file = $this->writeExcelFixture([]);
+        $config = $this->writeConfigFixture([
+            'manual_terminate_cids' => ['CID-TIDAK-ADA'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--actor-id' => $actor->id, '--apply' => true,
+        ])->expectsOutputToContain('1 dilewati')
+            ->assertSuccessful();
+    }
+
+    public function test_manual_terminate_cids_tanpa_actor_id_gagal(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Yoyok Priyo Handoko', 'cid' => 'D1X6ARQ000997', 'status' => 'active']);
+        $this->makeService($customer, null, 110000);
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Nama Lain', 'Paket' => 50000, 'paket ' => 'TidakAda'],
+        ]);
+        $config = $this->writeConfigFixture([
+            'manual_terminate_cids' => ['D1X6ARQ000997'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--apply' => true,
+        ])->assertFailed();
+
+        $this->assertSame('active', $customer->refresh()->status);
     }
 
     public function test_terminate_missing_reason_tidak_duplikat_kalau_jalan_dua_kali(): void

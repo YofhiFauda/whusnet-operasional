@@ -125,6 +125,17 @@ class CustomerPackageReconcileFromExcelCommand extends Command
      * `--actor-id` wajib kalau `--terminate-missing` — console command
      * tidak punya `Auth::user()`, dan `AuditLog`/`CustomerTerminationService`
      * butuh user id pelaku yang valid.
+     *
+     * **`manual_terminate_cids` (2026-11-21, kasus Siman):** list CID di
+     * config — putus langganan paksa walau baris Excel-nya ADA (kebalikan
+     * `--terminate-missing`, yang justru mempercayai Excel sebagai sumber
+     * kebenaran terbaru). Temuan nyata Siman: rekap kolektor bisa punya
+     * baris aktif basi buat pelanggan yang admin TAHU dari lapangan sudah
+     * putus — kolektor belum coret dari sheet. Daftar ini WAJIB hasil
+     * review manual, bukan ditebak. Jalan lewat `terminateCandidate()`,
+     * jalur `CustomerTerminationService::terminate()` yang SAMA dengan
+     * `--terminate-missing` — juga butuh `--actor-id`, independen dari flag
+     * `--terminate-missing` (gak perlu diaktifkan bareng).
      */
     private const TERMINATION_REASON_NAME = 'Rekonsiliasi Data Excel';
 
@@ -158,18 +169,18 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             return self::FAILURE;
         }
 
-        [$nameAliases, $skipNames, $typoFixes, $manualOverrides] = $this->loadConfig();
+        [$nameAliases, $skipNames, $typoFixes, $manualOverrides, $manualTerminateCids] = $this->loadConfig();
         if ($nameAliases === null) {
             return self::FAILURE;
         }
 
         $terminateMissing = (bool) $this->option('terminate-missing');
         $actor = null;
-        if ($terminateMissing) {
+        if ($terminateMissing || $manualTerminateCids !== []) {
             $actorId = $this->option('actor-id');
             $actor = $actorId ? User::find((int) $actorId) : null;
             if (! $actor) {
-                $this->error('--terminate-missing butuh --actor-id yang valid (user id pelaku, dicatat di audit log).');
+                $this->error('--terminate-missing / manual_terminate_cids butuh --actor-id yang valid (user id pelaku, dicatat di audit log).');
 
                 return self::FAILURE;
             }
@@ -223,6 +234,27 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             $customer = $cidExcel !== ''
                 ? Customer::query()->where('pop_id', $pop->id)->where('cid', $cidExcel)->first()
                 : null;
+
+            // Fallback suffix CID (2026-11-21, kasus Siman) — CID Excel bisa
+            // pakai skema LAMA (prefix POP/MiniPOP/Distribusi beda dari CID
+            // sistem SEKARANG, karena nomenklatur CID migrasi/rename cabang),
+            // tapi nomor urut "RQ+NNNNNN" di buntutnya tetap sama persis.
+            // Exact match di atas gagal, coba lagi cuma cocokkan suffix-nya.
+            // Kalau suffix ini jatuh ke >1 pelanggan (beda Cabang/Mini POP
+            // kebetulan nomor urut sama), JANGAN ditebak — biarkan gagal,
+            // fallback ke pencarian nama di bawah. Sanity check nama
+            // (namaCocokLonggar di bawah) tetap wajib jalan buat kasus CID
+            // suffix ketemu tapi beneran nyasar ke pelanggan lain.
+            if (! $customer && $cidExcel !== '' && preg_match('/RQ\d+$/', $cidExcel, $suffixMatch)) {
+                $suffixCandidates = Customer::query()
+                    ->where('pop_id', $pop->id)
+                    ->where('cid', 'like', '%'.$suffixMatch[0])
+                    ->get();
+
+                if ($suffixCandidates->count() === 1) {
+                    $customer = $suffixCandidates->first();
+                }
+            }
 
             // Alias nama dicek DULUAN (bukan cuma di fallback nama) —
             // temuan nyata: CID bisa match pelanggan yang BENERAN tepat,
@@ -309,6 +341,20 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             // dengan "NEW 45 Mbps (150K)" vs "Net150").
             $code = $typoFixes[$kodeRaw] ?? $kodeRaw;
             $targetPackage = InternetPackage::where('package_code', $code)->first();
+
+            // Fallback kolom `Paket` sebagai kode ALTERNATIF (2026-11-21, kasus
+            // Siman) — kebalikan dari quirk Sambit: di file ini `Nama Paket`
+            // isinya teks speed ("Up to 25 Mbps") dan `Paket` isinya KODE
+            // katalog asli ("NetP110"). HANYA dicoba kalau kolom `Harga` ADA
+            // (Paket), jadi `Paket` di sini sama sekali bukan dipakai buat
+            // nominal (lihat parsing $nominal di atas) — aman dicoba sebagai
+            // kode tanpa risiko salah baca angka harga sebagai kode paket.
+            if (! $targetPackage && array_key_exists('Harga', $row)) {
+                $altCodeRaw = trim((string) ($row['Paket'] ?? ''));
+                if ($altCodeRaw !== '' && $altCodeRaw !== $kodeRaw) {
+                    $targetPackage = InternetPackage::where('package_code', $typoFixes[$altCodeRaw] ?? $altCodeRaw)->first();
+                }
+            }
 
             if ($targetPackage) {
                 $current = $service->internetPackage;
@@ -440,30 +486,43 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             foreach ($candidates as $customer) {
                 $note = 'Reconcile Excel '.basename($fullPath)." ({$pop->name}, ".now()->toDateString().'): tidak ditemukan di rekap';
 
-                if ($apply) {
-                    // `firstOrCreate` baru dijalankan sekarang (bukan di atas
-                    // sebelum loop) — supaya dry-run TIDAK meninggalkan baris
-                    // master alasan baru di DB walau tidak ada kandidat yang
-                    // benar-benar diputus.
-                    $reason = CustomerTerminationReason::firstOrCreate(
-                        ['name' => self::TERMINATION_REASON_NAME],
-                        ['default_penalty_amount' => 0, 'is_active' => true],
-                    );
+                $this->terminateCandidate($customer, $note, $actor, $apply, $skipped, $terminated);
+            }
+        }
 
-                    try {
-                        app(CustomerTerminationService::class)->terminate($customer, [
-                            'termination_reason_id' => $reason->id,
-                            'termination_note' => $note,
-                            'penalty_amount' => 0,
-                        ], $actor->id);
-                    } catch (Throwable $e) {
-                        $skipped[] = [$customer->full_name." ({$customer->id})", 'gagal diputus otomatis: '.$e->getMessage()];
+        // `manual_terminate_cids` (2026-11-21, kasus Siman) — pelanggan yang
+        // SECARA EKSPLISIT diketahui admin sudah putus langganan di lapangan,
+        // walau baris Excel-nya masih ada (kolektor belum coret dari rekap —
+        // Excel rekap kolektor TIDAK selalu baru, beda dari `--terminate-missing`
+        // yang justru mempercayai Excel sebagai sumber kebenaran). Daftar CID
+        // ini HARUS hasil review manual admin, BUKAN ditebak dari pola apa
+        // pun — sama prinsipnya dengan `manual_overrides`, cuma buat status
+        // putus bukan koreksi paket. Jalan independen dari `--terminate-missing`
+        // (gak butuh flag itu aktif) karena ini daftar eksplisit, bukan hasil
+        // deteksi otomatis "gak ada di Excel".
+        if ($manualTerminateCids !== []) {
+            foreach ($manualTerminateCids as $cid) {
+                $customer = Customer::query()
+                    ->with(['customerService.customer', 'portalAccount'])
+                    ->where('pop_id', $pop->id)
+                    ->where('cid', $cid)
+                    ->first();
 
-                        continue;
-                    }
+                if (! $customer) {
+                    $skipped[] = ["[manual_terminate] {$cid}", 'CID ini tidak ditemukan di Cabang yang dipilih — cek lagi CID-nya atau Cabang yang dipilih'];
+
+                    continue;
                 }
 
-                $terminated[] = [$customer->id, $customer->full_name];
+                if (! in_array($customer->status, [WorkflowTransition::ACTIVE->value, WorkflowTransition::SUSPENDED->value], true)) {
+                    // Sudah terminated (atau status lain) — bukan error, cuma
+                    // gak ada yang perlu dikerjakan lagi.
+                    continue;
+                }
+
+                $note = 'Reconcile Excel '.basename($fullPath)." ({$pop->name}, ".now()->toDateString().'): ditandai putus manual oleh admin';
+
+                $this->terminateCandidate($customer, $note, $actor, $apply, $skipped, $terminated);
             }
         }
 
@@ -608,6 +667,37 @@ class CustomerPackageReconcileFromExcelCommand extends Command
         return str_contains($a, $b) || str_contains($b, $a);
     }
 
+    /**
+     * Satu-satunya titik yang memanggil `CustomerTerminationService::terminate()`
+     * dari command ini — dipakai `--terminate-missing` DAN `manual_terminate_cids`,
+     * supaya dua jalur itu selalu mencatat reason/note dengan cara yang sama.
+     * `firstOrCreate` reason baru dijalankan saat `$apply` true — dry-run TIDAK
+     * boleh meninggalkan baris master alasan baru di DB.
+     */
+    private function terminateCandidate(Customer $customer, string $note, ?User $actor, bool $apply, array &$skipped, array &$terminated): void
+    {
+        if ($apply) {
+            $reason = CustomerTerminationReason::firstOrCreate(
+                ['name' => self::TERMINATION_REASON_NAME],
+                ['default_penalty_amount' => 0, 'is_active' => true],
+            );
+
+            try {
+                app(CustomerTerminationService::class)->terminate($customer, [
+                    'termination_reason_id' => $reason->id,
+                    'termination_note' => $note,
+                    'penalty_amount' => 0,
+                ], $actor->id);
+            } catch (Throwable $e) {
+                $skipped[] = [$customer->full_name." ({$customer->id})", 'gagal diputus otomatis: '.$e->getMessage()];
+
+                return;
+            }
+        }
+
+        $terminated[] = [$customer->id, $customer->full_name];
+    }
+
     private function resolvePop(): ?Pop
     {
         if ($this->option('pop-id')) {
@@ -622,27 +712,27 @@ class CustomerPackageReconcileFromExcelCommand extends Command
     }
 
     /**
-     * @return array{0: array<string, string>|null, 1: list<string>, 2: array<string, string>, 3: array<string, string>}
+     * @return array{0: array<string, string>|null, 1: list<string>, 2: array<string, string>, 3: array<string, string>, 4: list<string>}
      */
     private function loadConfig(): array
     {
         $path = $this->option('config');
         if (! $path) {
-            return [[], [], [], []];
+            return [[], [], [], [], []];
         }
 
         $fullPath = str_starts_with($path, '/') ? $path : base_path($path);
         if (! file_exists($fullPath)) {
             $this->error("File config tidak ditemukan: {$fullPath}");
 
-            return [null, [], [], []];
+            return [null, [], [], [], []];
         }
 
         $data = json_decode((string) file_get_contents($fullPath), true);
         if (! is_array($data)) {
             $this->error("File config bukan JSON valid: {$fullPath}");
 
-            return [null, [], [], []];
+            return [null, [], [], [], []];
         }
 
         return [
@@ -653,6 +743,11 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             // otomatis dari Excel, lewat jalur applyCorrection() yang SAMA
             // (non-prorate). Lihat docblock kelas ini.
             $data['manual_overrides'] ?? [],
+            // list CID — putus langganan manual yang gak bisa dideteksi
+            // `--terminate-missing` (pelanggan ADA di baris Excel, tapi admin
+            // tahu dari lapangan dia sudah putus). Lihat docblock blok
+            // `manual_terminate_cids` di handle().
+            $data['manual_terminate_cids'] ?? [],
         ];
     }
 }
