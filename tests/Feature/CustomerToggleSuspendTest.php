@@ -10,6 +10,7 @@ use App\Models\District;
 use App\Models\InternetPackage;
 use App\Models\Pop;
 use App\Models\Role;
+use App\Models\SubscriptionStatus;
 use App\Models\User;
 use App\Models\UserRoleScope;
 use App\Models\Village;
@@ -133,7 +134,7 @@ class CustomerToggleSuspendTest extends TestCase
                 'success' => true,
                 'status' => 'suspended',
                 'raw_status' => 'suspended',
-                'status_label' => 'ISOLIR',
+                'status_label' => 'Suspended',
             ]);
 
         $customer->refresh();
@@ -170,7 +171,7 @@ class CustomerToggleSuspendTest extends TestCase
                 'success' => true,
                 'status' => 'active',
                 'raw_status' => 'active',
-                'status_label' => 'ACTIVE',
+                'status_label' => 'Active',
             ]);
 
         $customer->refresh();
@@ -191,6 +192,28 @@ class CustomerToggleSuspendTest extends TestCase
             'auditable_type' => Customer::class,
             'auditable_id' => $customer->id,
         ]);
+    }
+
+    /**
+     * Bug user 2026-11-20: badge List Pelanggan tampil "ISOLIR" (optimistik,
+     * hardcode literal lama) lalu balik jadi "Suspended" setelah refresh
+     * (server-render pakai nama master SubscriptionStatus). status_label
+     * respons toggle HARUS == nama master, sumber yang sama dengan
+     * $customer->subscriptionStatus->name yang dipakai _status.blade.php,
+     * supaya optimistik & hasil refresh selalu sinkron.
+     */
+    public function test_status_label_matches_subscription_status_master_name(): void
+    {
+        $customer = $this->createCustomer('active', 'aktif');
+
+        $response = $this->actingAs($this->helpdeskUser)
+            ->postJson(route('customers.toggle-suspend', $customer->id));
+
+        $expectedLabel = SubscriptionStatus::where('code', 'suspended')->value('name');
+        $response->assertOk()->assertJson(['status_label' => $expectedLabel]);
+
+        $customer->refresh();
+        $this->assertSame($expectedLabel, $customer->subscriptionStatus->name);
     }
 
     public function test_cannot_toggle_suspend_for_non_active_or_suspended_customer(): void

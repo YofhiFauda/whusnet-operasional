@@ -387,7 +387,31 @@ class IsolationCaseService
                 'remaining_amount' => (float) $invoice->remaining_amount,
             ]);
 
+            // Fix bug 2026-11-20: kasus `restoration_pending` artinya "sudah
+            // kecek lunas, nunggu NOC konfirmasi" — tapi billing TETAP jalan
+            // walau layanan masih suspended, jadi bisa ada tagihan BARU yang
+            // numpuk & lewat jatuh tempo lagi SEBELUM NOC sempat eksekusi
+            // "Aktifkan Kembali". `syncInvoices()` di atas menautkan tagihan
+            // baru itu ke kasus yang SAMA (masih kasus aktif layanan ini),
+            // jadi `current_outstanding_amount` bisa balik > 0 lagi SETELAH
+            // kasus sempat sampai `restoration_pending`. Tanpa blok ini,
+            // status kasus diam di `restoration_pending` (label "Menunggu
+            // Pemulihan", seolah tinggal konfirmasi) padahal piutangnya sudah
+            // muncul lagi — NOC bisa salah aktifkan pelanggan yang
+            // sebenarnya nunggak lagi. Dibalik ke `suspended` (status
+            // layanan di `Customer`/`CustomerService` TIDAK disentuh — sudah
+            // suspended dari awal, cuma kasusnya yang disinkronkan balik).
             if ((float) $case->current_outstanding_amount > 0) {
+                if ($case->status === IsolationCaseStatus::RESTORATION_PENDING) {
+                    $fromStatus = $case->status;
+                    $case->status = IsolationCaseStatus::SUSPENDED;
+                    $case->paid_at = null;
+                    $case->syncActiveSlot();
+                    $case->save();
+
+                    $this->recordEvent($case, IsolationEventType::RESTORATION_REVERTED, null, null, $fromStatus, IsolationCaseStatus::SUSPENDED);
+                }
+
                 return;
             }
 
@@ -406,6 +430,49 @@ class IsolationCaseService
 
                 $this->recordEvent($case, IsolationEventType::RESTORATION_QUEUED, null, null, $fromStatus, IsolationCaseStatus::RESTORATION_PENDING);
             }
+        });
+    }
+
+    /**
+     * Fix bug 2026-11-20: kalau pencatatan lifecycle kasus (`markIsolationSucceeded()`/
+     * `markRestorationSucceeded()`) di `toggleSuspend()` lempar exception,
+     * aksi isolir/aktivasi-kembali yang SUDAH TERJADI (status
+     * `Customer`/`CustomerService` sudah berubah & commit) tidak boleh
+     * dianggap "tidak pernah terjadi" — dipanggil DI LUAR transaksi aksi
+     * utama itu, jadi tetap tercatat meski aksi utamanya sendiri sudah
+     * selesai. Kalau kasus aktifnya sendiri tidak ketemu (mis. layanan ini
+     * memang tidak pernah masuk antrean Monitoring Isolir), tidak ada yang
+     * perlu ditandai — aksi utamanya tetap sukses, cuma tidak punya kasus
+     * untuk dilacak.
+     */
+    public function markTrackingFailed(CustomerService $service, User $actor, bool $wasIsolating, \Throwable $error): void
+    {
+        $case = $this->findActiveCaseForService($service);
+
+        if (! $case) {
+            return;
+        }
+
+        DB::transaction(function () use ($case, $actor, $wasIsolating, $error) {
+            $fromStatus = $case->status;
+            $toStatus = $wasIsolating ? IsolationCaseStatus::ISOLATION_FAILED : IsolationCaseStatus::RESTORATION_FAILED;
+
+            $case->status = $toStatus;
+            $case->syncActiveSlot();
+            $case->save();
+
+            $this->recordAction(
+                $case,
+                $wasIsolating ? IsolationActionType::SUSPEND : IsolationActionType::RESTORE,
+                $actor,
+                IsolationActionStatus::FAILED,
+                $error->getMessage()
+            );
+
+            $eventType = $wasIsolating ? IsolationEventType::ISOLATION_FAILED : IsolationEventType::RESTORATION_FAILED;
+            $this->recordEvent($case, $eventType, $actor, $error->getMessage(), $fromStatus, $toStatus);
+
+            IsolationCaseQueueChanged::dispatch($case->pop_id);
         });
     }
 
@@ -475,18 +542,24 @@ class IsolationCaseService
         ]);
     }
 
-    private function recordAction(IsolationCase $case, IsolationActionType $type, ?User $actor): IsolationAction
-    {
+    private function recordAction(
+        IsolationCase $case,
+        IsolationActionType $type,
+        ?User $actor,
+        IsolationActionStatus $status = IsolationActionStatus::SUCCEEDED,
+        ?string $resultMessage = null,
+    ): IsolationAction {
         $attemptNumber = $case->actions()->where('action_type', $type->value)->count() + 1;
 
         return IsolationAction::create([
             'isolation_case_id' => $case->id,
             'action_type' => $type,
-            'status' => IsolationActionStatus::SUCCEEDED,
+            'status' => $status,
             'idempotency_key' => "{$case->id}:{$type->value}:{$attemptNumber}",
             'attempt_number' => $attemptNumber,
             'requested_by' => $actor?->id,
             'executed_by' => $actor?->id,
+            'result_message' => $resultMessage,
             'started_at' => now(),
             'finished_at' => now(),
         ]);

@@ -13,6 +13,7 @@
     if (!empty($packageId)) $activeFilterCount++;
     if (!empty($completenessStatus)) $activeFilterCount++;
     if (!empty($collectorId)) $activeFilterCount++;
+    if (!empty($actorId)) $activeFilterCount++;
     if (!empty($selectedCabang)) $activeFilterCount += is_array($selectedCabang) ? count($selectedCabang) : 1;
     if (!empty($selectedMini)) $activeFilterCount += is_array($selectedMini) ? count($selectedMini) : 1;
     if (!empty($selectedDistricts) && count((array)$selectedDistricts) > 0) $activeFilterCount += count((array)$selectedDistricts);
@@ -292,6 +293,22 @@
                 <option value="none" {{ $collectorId === 'none' ? 'selected' : '' }}>Belum Ada Kolektor</option>
                 @foreach($collectorOptions as $collectorOption)
                     <option value="{{ $collectorOption->id }}" {{ (string) $collectorId === (string) $collectorOption->id ? 'selected' : '' }}>{{ $collectorOption->name }}</option>
+                @endforeach
+            </select>
+        </div>
+        @endif
+
+        {{-- Pelaku Input --}}
+        @if($actorOptions->isNotEmpty())
+        <div>
+            <label for="actor_id" class="sr-only">Filter Pelaku Input</label>
+            <select name="actor_id" id="actor_id" onchange="this.form.submit()"
+                    aria-label="Filter Pelaku Input"
+                    class="w-full h-9 px-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs text-slate-700 dark:text-slate-200 focus:outline-none focus:border-sky-500">
+                <option value="">Semua Pelaku Input</option>
+                <option value="legacy" {{ $actorId === 'legacy' ? 'selected' : '' }}>Data Migrasi Legacy</option>
+                @foreach($actorOptions as $actorOption)
+                    <option value="{{ $actorOption->id }}" {{ (string) $actorId === (string) $actorOption->id ? 'selected' : '' }}>{{ $actorOption->name }}</option>
                 @endforeach
             </select>
         </div>

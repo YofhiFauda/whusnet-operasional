@@ -31,6 +31,21 @@
     ];
 
     $statusOptions = collect($tabStatuses)->mapWithKeys(fn ($s) => [$s->value => $s->label()]);
+
+    // Warna titik timeline per jenis kejadian (permintaan "timeline mudah
+    // dibaca", 2026-11-20) — dicocokkan dari substring `IsolationEventType`
+    // value, bukan daftar 14 case manual: "gagal" selalu merah, "berhasil"/
+    // "verified" selalu hijau, dst. Konsisten dengan §2.3 Design.md (warna
+    // status cuma di teks/dot, bukan background blok).
+    $eventDot = function (string $typeValue): string {
+        return match (true) {
+            str_contains($typeValue, 'failed') => 'bg-rose-500',
+            str_contains($typeValue, 'succeeded'), str_contains($typeValue, 'verified') => 'bg-emerald-500',
+            str_contains($typeValue, 'cancelled') => 'bg-slate-400',
+            str_contains($typeValue, 'admin_marked') => 'bg-amber-500',
+            default => 'bg-sky-500',
+        };
+    };
 @endphp
 
 @section('title', $pageTitle)
@@ -38,118 +53,102 @@
 @section('breadcrumb_parent_url', '/customers')
 
 @section('content')
-<div class="mb-4 text-xs text-slate-500 dark:text-slate-400">
-    Memantau seluruh perjalanan kasus isolir — dari pelanggan menunggak, menunggu tindakan NOC, sudah diisolir,
-    membayar, hingga dipulihkan — tanpa kehilangan jejak saat status layanan berubah.
+{{-- Header + tombol Import/Tambah. Tombolnya digerbangi permission masing-masing
+     (customers.import.view / customers.create), jadi aman ikut di halaman Putus &
+     Gagal juga — role yang cuma boleh melihat arsip tidak melihatnya. --}}
+<div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 mb-5">
+    <div>
+        <h1 class="text-2xl font-bold text-slate-900 dark:text-slate-50 tracking-tight">{{ $pageTitle }}</h1>
+        <p class="text-xs sm:text-sm text-slate-600 dark:text-slate-400 mt-1">Memantau seluruh perjalanan kasus isolir — dari pelanggan menunggak, menunggu tindakan NOC, sudah diisolir,
+    membayar, hingga dipulihkan — tanpa kehilangan jejak saat status layanan berubah..</p>
+    </div>
 </div>
 
-{{-- KPI/ringkasan (§8.2) — angka ikut filter POP scope user, tanpa filter tab aktif
-     (ringkasan lintas tab, bukan hitungan tab yang sedang ditampilkan). Tiap
-     kartu = satu/beberapa status `IsolationCaseStatus` (lihat
+{{-- KPI/ringkasan (§8.2) — angka ikut filter POP scope user, tanpa filter tab
+     aktif (ringkasan lintas tab, bukan hitungan tab yang sedang ditampilkan).
+     Tiap kolom = satu/beberapa status `IsolationCaseStatus` (lihat
      `IsolationCaseService::kpiSummary()`) dari tabel `isolation_cases`
      ter-scope POP user — BUKAN hitungan pelanggan, satu pelanggan bisa punya
-     >1 kasus di tab Riwayat. Kartu nge-link ke tab + filter status terkait,
-     jadi berfungsi sebagai pintasan, bukan cuma angka mati.
+     >1 kasus di tab Riwayat.
 
-     Disederhanakan 8 → 6 kartu (permintaan user 2026-11-20, "cuma yang
-     benar-benar dibutuhkan"): `isolation_in_progress`/`restoration_in_progress`
-     DICABUT jadi kartu sendiri — keduanya status TRANSIEN yang cuma hidup
-     selama satu request `toggleSuspend()` (lihat ISOLATION_STARTED →
-     ISOLATION_IN_PROGRESS → ISOLATION_SUCCEEDED di IsolationCaseService),
-     praktis selalu 0 kalau dilihat di antara request, jadi bukan kartu yang
-     "benar-benar dibutuhkan" buat dipantau terus. Datanya TIDAK dibuang,
-     cuma dipindah jadi badge kecil nempel di kartu induknya (Siap Isolir /
-     Menunggu Pemulihan) dan HANYA muncul kalau nilainya > 0 — itu artinya
-     ada kasus yang nyangkut di tengah proses (biasanya job gagal setengah
-     jalan), justru saat itu baru perlu kelihatan. "Gagal / Perlu Tindakan"
-     tetap menggabung `isolation_failed` (tab Siap Isolir) +
-     `restoration_failed` (tab Pemulihan) — diarahkan ke Siap Isolir karena
-     retry paling sering terjadi di sana, captionnya menyebut keduanya. --}}
-<div class="grid grid-cols-2 @min-[40rem]:grid-cols-3 @min-[64rem]:grid-cols-6 gap-3 mb-6">
-    @php
-        $kpiCards = [
-            [
-                'label' => 'Menunggu Isolir', 'value' => $kpi['waiting_isolation'],
-                'caption' => 'Menunggak, belum diputuskan Admin.',
-                'accent' => 'border-l-amber-500', 'icon_bg' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400',
-                'value_class' => 'text-amber-600 dark:text-amber-400',
-                'icon' => 'M12 6v6l4 2M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20Z',
-                'href' => route('customers.isolir-queue.index', ['tab' => 'menunggu']),
-            ],
-            [
-                'label' => 'Siap Isolir', 'value' => $kpi['ready_for_isolation'],
-                'caption' => 'Sudah "Eksekusi" Admin, antre NOC isolir.',
-                'accent' => 'border-l-amber-500', 'icon_bg' => 'bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400',
-                'value_class' => 'text-amber-600 dark:text-amber-400',
-                'icon' => 'M13 2 3 14h7l-1 8 10-12h-7l1-8Z',
-                'href' => route('customers.isolir-queue.index', ['tab' => 'siap', 'status' => 'ready_for_isolation']),
-                'sub_label' => 'proses', 'sub_value' => $kpi['isolation_in_progress'],
-                'sub_href' => route('customers.isolir-queue.index', ['tab' => 'siap', 'status' => 'isolation_in_progress']),
-            ],
-            [
-                'label' => 'Sudah Diisolir', 'value' => $kpi['suspended'],
-                'caption' => 'Layanan aktif suspended, menunggu pelanggan bayar/respon.',
-                'accent' => 'border-l-rose-500', 'icon_bg' => 'bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400',
-                'value_class' => 'text-rose-600 dark:text-rose-400',
-                'icon' => 'M12 15v2m-6 4h12a2 2 0 0 0 2-2v-6a2 2 0 0 0-2-2H6a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2ZM8 11V7a4 4 0 1 1 8 0v4',
-                'href' => route('customers.isolir-queue.index', ['tab' => 'diisolir']),
-            ],
-            [
-                'label' => 'Menunggu Pemulihan', 'value' => $kpi['restoration_pending'],
-                'caption' => 'Terdeteksi lunas, menunggu NOC aktifkan kembali.',
-                'accent' => 'border-l-sky-500', 'icon_bg' => 'bg-sky-50 dark:bg-sky-950/40 text-sky-600 dark:text-sky-400',
-                'value_class' => 'text-sky-600 dark:text-sky-400',
-                'icon' => 'M3 12a9 9 0 0 1 15-6.7L21 8M21 3v6h-6M21 12a9 9 0 0 1-15 6.7L3 16m-0-1v6h6',
-                'href' => route('customers.isolir-queue.index', ['tab' => 'pemulihan', 'status' => 'restoration_pending']),
-                'sub_label' => 'proses', 'sub_value' => $kpi['restoration_in_progress'],
-                'sub_href' => route('customers.isolir-queue.index', ['tab' => 'pemulihan', 'status' => 'restoration_in_progress']),
-            ],
-            [
-                'label' => 'Gagal / Perlu Tindakan', 'value' => $kpi['failed'],
-                'caption' => 'Eksekusi isolir ATAU aktivasi-kembali gagal — cek & ulangi manual.',
-                'accent' => 'border-l-red-500', 'icon_bg' => 'bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400',
-                'value_class' => 'text-red-600 dark:text-red-400',
-                'icon' => 'M12 9v4m0 4h.01M10.29 3.86 1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0Z',
-                'href' => route('customers.isolir-queue.index', ['tab' => 'siap', 'status' => 'isolation_failed']),
-            ],
-            [
-                'label' => 'Selesai Hari Ini', 'value' => $kpi['completed_today'],
-                'caption' => 'Kasus ditutup "completed" (lunas & pulih) hari ini.',
-                'accent' => 'border-l-emerald-500', 'icon_bg' => 'bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400',
-                'value_class' => 'text-emerald-600 dark:text-emerald-400',
-                'icon' => 'M20 6 9 17l-5-5',
-                'href' => route('customers.isolir-queue.index', ['tab' => 'riwayat', 'status' => 'completed']),
-            ],
-        ];
-    @endphp
-    @foreach($kpiCards as $card)
-    <a href="{{ $card['href'] }}"
-       title="{{ $card['caption'] }}"
-       class="group bg-white dark:bg-slate-900 rounded-xl border border-slate-200/80 dark:border-slate-800/80 border-l-4 {{ $card['accent'] }} p-3.5 flex flex-col gap-2 hover:shadow-sm hover:-translate-y-0.5 transition-all">
-        <div class="flex items-center justify-between">
-            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 leading-tight">{{ $card['label'] }}</span>
-            <span class="shrink-0 w-7 h-7 rounded-lg flex items-center justify-center {{ $card['icon_bg'] }}">
-                <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                    <path d="{{ $card['icon'] }}"></path>
-                </svg>
-            </span>
-        </div>
+     Dirender sebagai SATU summary-strip (bar flat + divider vertikal),
+     BUKAN grid of card — ini halaman Type A (data list) di
+     design-system/whusnet-operasional/Design.md §1.3/§1.6: "Summary/KPI
+     strip di Type A adalah flat bar, bukan grid card" (card per-KPI eksplisit
+     didaftar sebagai pattern terlarang di §1.5). Tiap kolom tetap nge-link
+     ke tab + filter status terkait (pintasan, bukan angka mati), dan warna
+     cuma nempel di teks angka (§1.5 poin 4 — bukan background kolom).
+
+     `isolation_in_progress`/`restoration_in_progress` TIDAK dapat kolom
+     sendiri — status TRANSIEN yang cuma hidup selama satu request
+     `toggleSuspend()` (ISOLATION_STARTED → ISOLATION_IN_PROGRESS →
+     ISOLATION_SUCCEEDED di IsolationCaseService), praktis selalu 0 di antara
+     request. Munculnya cuma sebagai badge kecil nempel di kolom induknya
+     (Siap Isolir / Menunggu Pemulihan), HANYA kalau >0 (artinya ada kasus
+     nyangkut di tengah proses — justru saat itu baru perlu kelihatan).
+     "Gagal / Perlu Tindakan" menggabung `isolation_failed` (tab Siap Isolir)
+     + `restoration_failed` (tab Pemulihan) — diarahkan ke Siap Isolir karena
+     retry paling sering terjadi di sana. --}}
+@php
+    $kpiCols = [
+        [
+            'label' => 'Menunggu Isolir', 'value' => $kpi['waiting_isolation'],
+            'sub' => 'Menunggak, belum diputuskan Admin.', 'value_class' => 'text-amber-600 dark:text-amber-400',
+            'href' => route('customers.isolir-queue.index', ['tab' => 'menunggu']),
+        ],
+        [
+            'label' => 'Siap Isolir', 'value' => $kpi['ready_for_isolation'],
+            'sub' => 'Sudah "Eksekusi" Admin, antre NOC isolir.', 'value_class' => 'text-amber-600 dark:text-amber-400',
+            'href' => route('customers.isolir-queue.index', ['tab' => 'siap', 'status' => 'ready_for_isolation']),
+            'badge_label' => 'proses', 'badge_value' => $kpi['isolation_in_progress'],
+            'badge_href' => route('customers.isolir-queue.index', ['tab' => 'siap', 'status' => 'isolation_in_progress']),
+        ],
+        [
+            'label' => 'Sudah Diisolir', 'value' => $kpi['suspended'],
+            'sub' => 'Layanan suspended, menunggu bayar/respon.', 'value_class' => 'text-purple-600 dark:text-purple-400',
+            'href' => route('customers.isolir-queue.index', ['tab' => 'diisolir']),
+        ],
+        [
+            'label' => 'Menunggu Pemulihan', 'value' => $kpi['restoration_pending'],
+            'sub' => 'Terdeteksi lunas, menunggu NOC aktifkan.', 'value_class' => 'text-sky-600 dark:text-sky-400',
+            'href' => route('customers.isolir-queue.index', ['tab' => 'pemulihan', 'status' => 'restoration_pending']),
+            'badge_label' => 'proses', 'badge_value' => $kpi['restoration_in_progress'],
+            'badge_href' => route('customers.isolir-queue.index', ['tab' => 'pemulihan', 'status' => 'restoration_in_progress']),
+        ],
+        [
+            'label' => 'Gagal / Perlu Tindakan', 'value' => $kpi['failed'],
+            'sub' => 'Isolir ATAU aktivasi-kembali gagal.', 'value_class' => 'text-red-600 dark:text-red-400',
+            'href' => route('customers.isolir-queue.index', ['tab' => 'siap', 'status' => 'isolation_failed']),
+        ],
+        [
+            'label' => 'Selesai Hari Ini', 'value' => $kpi['completed_today'],
+            'sub' => 'Kasus ditutup "completed" hari ini.', 'value_class' => 'text-emerald-600 dark:text-emerald-400',
+            'href' => route('customers.isolir-queue.index', ['tab' => 'riwayat', 'status' => 'completed']),
+        ],
+    ];
+@endphp
+<div class="flex flex-wrap @min-[72rem]:flex-nowrap bg-white dark:bg-slate-900 border border-slate-200/80 dark:border-slate-800/80 rounded-lg mb-6 overflow-hidden">
+    @foreach($kpiCols as $i => $col)
+    <a href="{{ $col['href'] }}"
+       title="{{ $col['sub'] }}"
+       class="group flex-1 min-w-[9rem] px-4 py-3 flex flex-col gap-1 border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-800/40 transition-colors {{ $i > 0 ? 'border-t @min-[72rem]:border-t-0 @min-[72rem]:border-l' : '' }}">
+        <span class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 dark:text-slate-500">{{ $col['label'] }}</span>
         <div class="flex items-baseline gap-2">
-            <span class="text-2xl font-bold {{ $card['value_class'] }}">{{ $card['value'] }}</span>
-            @if(($card['sub_value'] ?? 0) > 0)
-            <span onclick="event.preventDefault(); event.stopPropagation(); window.location.href = '{{ $card['sub_href'] }}';"
-                  class="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer">
-                {{ $card['sub_value'] }} {{ $card['sub_label'] }}
+            <span class="font-mono text-lg font-semibold {{ $col['value_class'] }}">{{ $col['value'] }}</span>
+            @if(($col['badge_value'] ?? 0) > 0)
+            <span onclick="event.preventDefault(); event.stopPropagation(); window.location.href = '{{ $col['badge_href'] }}';"
+                  class="text-[10px] font-semibold px-1.5 py-0.5 rounded-full bg-slate-100 text-slate-500 dark:bg-slate-800 dark:text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer">
+                {{ $col['badge_value'] }} {{ $col['badge_label'] }}
             </span>
             @endif
         </div>
-        <p class="text-[10.5px] leading-snug text-slate-400 dark:text-slate-500 group-hover:text-slate-500 dark:group-hover:text-slate-400">{{ $card['caption'] }}</p>
+        <span class="text-[10.5px] leading-snug text-slate-400 dark:text-slate-500">{{ $col['sub'] }}</span>
     </a>
     @endforeach
 </div>
 
 <div class="@container bg-white dark:bg-slate-900 rounded-2xl border border-slate-200/80 dark:border-slate-800/80 shadow-sm overflow-hidden mb-6">
-    <div class="border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/30 overflow-x-auto">
+    <div class="border-b border-slate-200 dark:border-slate-800 px-6 flex items-center justify-between bg-slate-50/50 dark:bg-slate-900/30 overflow-x-auto scrollbar-none">
         <nav class="flex gap-1 -mb-px">
             @foreach($tabs as $key => $label)
             <a href="{{ route('customers.isolir-queue.index', array_merge(request()->except(['tab', 'page', 'status']), ['tab' => $key])) }}"
@@ -192,14 +191,6 @@
         </div>
         @endif
         <div class="min-w-[8rem]">
-            <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Status Tagihan</label>
-            <select name="invoice_status" class="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:outline-none focus:border-sky-500">
-                <option value="">Semua</option>
-                <option value="belum_lunas" {{ $filters['invoice_status'] === 'belum_lunas' ? 'selected' : '' }}>Belum Lunas</option>
-                <option value="lunas" {{ $filters['invoice_status'] === 'lunas' ? 'selected' : '' }}>Lunas</option>
-            </select>
-        </div>
-        <div class="min-w-[8rem]">
             <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Dari Tgl Deteksi</label>
             <input type="date" name="date_from" value="{{ $filters['date_from'] }}"
                    class="w-full h-9 px-2.5 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs focus:outline-none focus:border-sky-500">
@@ -211,7 +202,7 @@
         </div>
         <div class="flex gap-2">
             <button type="submit" class="h-9 px-4 rounded-lg bg-sky-600 hover:bg-sky-700 text-white text-xs font-semibold transition-colors cursor-pointer">Terapkan</button>
-            @if($filters['q'] !== '' || $filters['pop_id'] || $filters['status'] || $filters['invoice_status'] || $filters['date_from'] || $filters['date_to'])
+            @if($filters['q'] !== '' || $filters['pop_id'] || $filters['status'] || $filters['date_from'] || $filters['date_to'])
             <a href="{{ route('customers.isolir-queue.index', ['tab' => $tab]) }}" class="h-9 px-4 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold flex items-center hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors">Reset</a>
             @endif
         </div>
@@ -219,16 +210,59 @@
 
     {{-- DESKTOP --}}
     <div class="hidden @min-[64rem]:block overflow-x-auto">
+        @php
+            // Sort header (permintaan user 2026-11-20) — toggle ASC → DESC →
+            // balik ke default (detected_at DESC, lihat
+            // CustomerIsolirQueueController::applySort()). Pola & markup sama
+            // dengan List Pelanggan (_list_table.blade.php) biar konsisten
+            // satu aplikasi: klik kolom baru → asc, klik lagi → desc, klik
+            // lagi → lepas sort. request()->fullUrlWithQuery() ikut bawa
+            // filter/tab yang lagi aktif, 'page' sengaja dihapus (hasil sort
+            // baru selalu balik ke halaman 1).
+            $sortHeaders = [
+                'case_number' => 'Kasus',
+                'customer_name' => 'Nama Pelanggan',
+                'pop_name' => 'POP',
+                'outstanding' => 'Piutang Kasus',
+                'status' => 'Status Proses',
+            ];
+            $sortLink = function (string $key) use ($sort, $dir) {
+                $isSorted = $sort === $key;
+                $next = ! $isSorted
+                    ? ['sort' => $key, 'dir' => 'asc', 'page' => null]
+                    : ($dir === 'asc' ? ['sort' => $key, 'dir' => 'desc', 'page' => null] : ['sort' => null, 'dir' => null, 'page' => null]);
+
+                return ['sorted' => $isSorted, 'href' => request()->fullUrlWithQuery($next)];
+            };
+        @endphp
         <table class="w-full min-w-[1140px] border-collapse text-left text-xs">
             <thead>
                 <tr class="bg-slate-50/80 dark:bg-slate-800/50 border-b border-slate-200/80 dark:border-slate-800 text-[11px] font-bold text-slate-400 uppercase tracking-wider">
                     <th scope="col" class="py-3.5 px-4 w-12 text-center">No</th>
-                    <th scope="col" class="py-3.5 px-4">Kasus</th>
-                    <th scope="col" class="py-3.5 px-4">Nama Pelanggan</th>
-                    <th scope="col" class="py-3.5 px-4">POP</th>
-                    <th scope="col" class="py-3.5 px-4 text-right">Piutang Kasus</th>
+                    @foreach(['case_number', 'customer_name', 'pop_name'] as $key)
+                        @php $s = $sortLink($key); @endphp
+                        <th scope="col" class="py-3.5 px-4 select-none">
+                            <a href="{{ $s['href'] }}" class="inline-flex items-center gap-1 hover:text-sky-600 dark:hover:text-sky-400 {{ $s['sorted'] ? 'text-sky-600 dark:text-sky-400' : '' }}" title="Klik untuk urutkan">
+                                <span>{{ $sortHeaders[$key] }}</span>
+                                <span class="text-[9px]" aria-hidden="true">{{ $s['sorted'] ? ($dir === 'desc' ? '▼' : '▲') : '' }}</span>
+                            </a>
+                        </th>
+                    @endforeach
+                    @php $s = $sortLink('outstanding'); @endphp
+                    <th scope="col" class="py-3.5 px-4 text-right select-none">
+                        <a href="{{ $s['href'] }}" class="inline-flex items-center justify-end gap-1 w-full hover:text-sky-600 dark:hover:text-sky-400 {{ $s['sorted'] ? 'text-sky-600 dark:text-sky-400' : '' }}" title="Klik untuk urutkan">
+                            <span>Piutang Kasus</span>
+                            <span class="text-[9px]" aria-hidden="true">{{ $s['sorted'] ? ($dir === 'desc' ? '▼' : '▲') : '' }}</span>
+                        </a>
+                    </th>
                     <th scope="col" class="py-3.5 px-4">Status Layanan</th>
-                    <th scope="col" class="py-3.5 px-4">Status Proses</th>
+                    @php $s = $sortLink('status'); @endphp
+                    <th scope="col" class="py-3.5 px-4 select-none">
+                        <a href="{{ $s['href'] }}" class="inline-flex items-center gap-1 hover:text-sky-600 dark:hover:text-sky-400 {{ $s['sorted'] ? 'text-sky-600 dark:text-sky-400' : '' }}" title="Klik untuk urutkan">
+                            <span>Status Proses</span>
+                            <span class="text-[9px]" aria-hidden="true">{{ $s['sorted'] ? ($dir === 'desc' ? '▼' : '▲') : '' }}</span>
+                        </a>
+                    </th>
                     <th scope="col" class="py-3.5 px-4">Riwayat</th>
                     <th scope="col" class="py-3.5 px-4 text-right">Aksi</th>
                 </tr>
@@ -275,23 +309,44 @@
                             @endif
                         </td>
                         <td class="px-4 py-3.5 max-w-xs text-slate-600 dark:text-slate-400">
+                            {{-- Timeline (permintaan user 2026-11-20: "mudah dibaca") — event
+                                 terbaru selalu tampil sebagai baris ringkas bertitik warna
+                                 (lihat $eventDot), sisanya di balik toggle. Dulu semuanya
+                                 10px rapat tanpa pembeda visual antar jenis kejadian —
+                                 sekarang titik + garis sambung bikin urutan kejadian
+                                 kebaca sebagai ALUR, bukan daftar teks lepas. --}}
                             @php $latest = $case->events->first(); @endphp
                             @if($latest)
-                                <div class="truncate">{{ $latest->event_type->label() }}</div>
-                                <div class="text-[10px] text-slate-400 mt-0.5">{{ $latest->actor?->name ?? 'Sistem' }} • {{ \App\Support\IndonesianDate::dateTime($latest->occurred_at) }}</div>
+                                <div class="flex items-start gap-2">
+                                    <span class="mt-1 w-2 h-2 rounded-full shrink-0 {{ $eventDot($latest->event_type->value) }}"></span>
+                                    <div class="min-w-0">
+                                        <div class="text-xs font-semibold text-slate-700 dark:text-slate-200 truncate">{{ $latest->event_type->label() }}</div>
+                                        <div class="text-[10px] text-slate-400 mt-0.5">{{ $latest->actor?->name ?? 'Sistem' }} • {{ \App\Support\IndonesianDate::dateTime($latest->occurred_at) }}</div>
+                                    </div>
+                                </div>
                             @else
-                                -
+                                <span class="text-slate-400">-</span>
                             @endif
                             @if($case->events->count() > 1)
-                            <button type="button" @click="open = !open" class="text-[10px] text-sky-600 dark:text-sky-400 hover:underline mt-1 cursor-pointer">
-                                <span x-text="open ? 'Tutup timeline' : 'Lihat timeline ({{ $case->events->count() }})'"></span>
+                            <button type="button" @click="open = !open" class="text-[10px] font-semibold text-sky-600 dark:text-sky-400 hover:underline mt-1.5 ml-4 cursor-pointer">
+                                <span x-text="open ? 'Tutup timeline' : 'Lihat riwayat lengkap ({{ $case->events->count() }})'"></span>
                             </button>
-                            <div x-show="open" x-collapse class="mt-2 space-y-1.5 border-l-2 border-slate-200 dark:border-slate-700 pl-2.5">
+                            <div x-show="open" x-collapse class="mt-2 ml-1 space-y-3">
                                 @foreach($case->events as $event)
-                                <div class="text-[10px] text-slate-500 dark:text-slate-400">
-                                    <div class="font-semibold">{{ $event->event_type->label() }}</div>
-                                    @if($event->description)<div>{{ $event->description }}</div>@endif
-                                    <div>{{ $event->actor?->name ?? 'Sistem' }} • {{ \App\Support\IndonesianDate::dateTime($event->occurred_at) }}</div>
+                                <div class="flex items-start gap-2 {{ ! $loop->last ? 'relative' : '' }}">
+                                    <span class="flex flex-col items-center shrink-0 self-stretch">
+                                        <span class="w-2 h-2 rounded-full mt-1 {{ $eventDot($event->event_type->value) }}"></span>
+                                        @if(! $loop->last)
+                                        <span class="w-px flex-1 bg-slate-200 dark:bg-slate-700 mt-1"></span>
+                                        @endif
+                                    </span>
+                                    <div class="min-w-0 pb-0.5">
+                                        <div class="text-[11px] font-semibold text-slate-600 dark:text-slate-300">{{ $event->event_type->label() }}</div>
+                                        @if($event->description)
+                                        <div class="text-[10.5px] text-slate-500 dark:text-slate-400 mt-0.5">{{ $event->description }}</div>
+                                        @endif
+                                        <div class="text-[10px] text-slate-400 mt-0.5">{{ $event->actor?->name ?? 'Sistem' }} • {{ \App\Support\IndonesianDate::dateTime($event->occurred_at) }}</div>
+                                    </div>
                                 </div>
                                 @endforeach
                             </div>

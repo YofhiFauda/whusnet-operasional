@@ -13,6 +13,8 @@ enum DocumentType: string
     // divalidasi/diverifikasi Business Development, Skema 1). Lihat
     // CustomerRegistrationRequest::rules() & CustomerController::store().
     case FAB = 'fab';
+    case BAA = 'baa';
+    case BAST = 'bast';
 
     public function label(): string
     {
@@ -22,6 +24,8 @@ enum DocumentType: string
             self::SURVEY => 'Foto Survey',
             self::PEMASANGAN => 'Foto Pemasangan',
             self::FAB => 'Formulir Akan Berlangganan Bisnis (FAB)',
+            self::BAA => 'Berita Acara Aktivasi (BAA)',
+            self::BAST => 'Berita Acara Serah Terima (BAST)',
         };
     }
 }

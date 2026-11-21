@@ -20,6 +20,12 @@ enum IsolationEventType: string
     case RESTORATION_FAILED = 'restoration_failed';
     case CASE_CANCELLED = 'case_cancelled';
     case RETRY_REQUESTED = 'retry_requested';
+    // Fix bug 2026-11-20: `restoration_pending` artinya "sudah lunas,
+    // nunggu NOC" — kalau ada tagihan baru numpuk & lewat jatuh tempo LAGI
+    // SEBELUM NOC konfirmasi, kasusnya dibalik ke `suspended` (bukan diam
+    // di `restoration_pending` dengan piutang yang sudah > 0 lagi). Lihat
+    // `IsolationCaseService::handlePaymentVerified()`.
+    case RESTORATION_REVERTED = 'restoration_reverted';
     case ADMIN_MARKED_EXECUTE = 'admin_marked_execute';
     case ADMIN_MARKED_TOLERATE = 'admin_marked_tolerate';
 
@@ -38,6 +44,7 @@ enum IsolationEventType: string
             self::RESTORATION_FAILED => 'Pemulihan gagal',
             self::CASE_CANCELLED => 'Kasus dibatalkan',
             self::RETRY_REQUESTED => 'Dicoba ulang',
+            self::RESTORATION_REVERTED => 'Piutang muncul lagi, dibatalkan dari antrean pemulihan',
             self::ADMIN_MARKED_EXECUTE => 'Admin memutuskan: Eksekusi Isolir',
             self::ADMIN_MARKED_TOLERATE => 'Admin memutuskan: Toleransi',
         };

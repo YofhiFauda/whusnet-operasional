@@ -89,22 +89,27 @@ class CustomerVerificationEditService
      * @throws \RuntimeException lewat CustomerPackageService::assertAdditionalDevicesWithinLimit()
      *                           kalau perangkat tambahan pelanggan melebihi batas paket baru
      */
-    public function updatePackage(Customer $customer, int $internetPackageId, User $actor): Customer
+    public function updatePackage(Customer $customer, int $internetPackageId, User $actor, ?string $contractType = null): Customer
     {
-        if ($internetPackageId === (int) $customer->internet_package_id) {
+        $service = $customer->customerService()->first();
+
+        $packageChanged = $internetPackageId !== (int) $customer->internet_package_id;
+        $contractChanged = $contractType !== null && $contractType !== $service?->contract_type;
+
+        if (! $packageChanged && ! $contractChanged) {
             return $customer;
         }
 
-        $package = InternetPackage::findOrFail($internetPackageId);
+        $package = $packageChanged ? InternetPackage::findOrFail($internetPackageId) : $customer->internetPackage;
 
-        // Guard yang sama dipakai CustomerPackageService::change() — koreksi
-        // paket dari layar Verifikasi juga menulis
-        // `customer_services.internet_package_id` langsung, jadi harus lewat
-        // guard yang sama supaya tidak jadi jalur bypass limit perangkat
-        // tambahan paket.
-        $this->customerPackageService->assertAdditionalDevicesWithinLimit($customer, $package);
-
-        $service = $customer->customerService()->first();
+        if ($packageChanged) {
+            // Guard yang sama dipakai CustomerPackageService::change() — koreksi
+            // paket dari layar Verifikasi juga menulis
+            // `customer_services.internet_package_id` langsung, jadi harus lewat
+            // guard yang sama supaya tidak jadi jalur bypass limit perangkat
+            // tambahan paket.
+            $this->customerPackageService->assertAdditionalDevicesWithinLimit($customer, $package);
+        }
 
         $discount = (float) ($service->discount ?? 0);
         $ppn = (float) ($service->ppn ?? 0);
@@ -114,8 +119,12 @@ class CustomerVerificationEditService
         $totalBill = $discountedPrice * (1 + $ppn / 100) + $otherFee;
 
         $oldPackageId = $customer->internet_package_id;
+        $oldContractType = $service?->contract_type;
 
-        $customer->update(['internet_package_id' => $package->id]);
+        if ($packageChanged) {
+            $customer->update(['internet_package_id' => $package->id]);
+        }
+
         $customer->customerService()->updateOrCreate([], [
             'internet_package_id' => $package->id,
             'package_name_snapshot' => $package->name,
@@ -123,15 +132,21 @@ class CustomerVerificationEditService
             'upload_speed_snapshot' => isset($package->upload_speed_mbps) ? $package->upload_speed_mbps.' Mbps' : null,
             'monthly_price' => $monthlyPrice,
             'total_monthly_bill' => $totalBill,
+            'contract_type' => $contractChanged ? $contractType : $oldContractType,
         ]);
 
-        $this->logChange(
-            $customer,
-            $actor,
-            'update_paket_verifikasi',
-            ['internet_package_id' => $oldPackageId],
-            ['internet_package_id' => $package->id]
-        );
+        $before = [];
+        $after = [];
+        if ($packageChanged) {
+            $before['internet_package_id'] = $oldPackageId;
+            $after['internet_package_id'] = $package->id;
+        }
+        if ($contractChanged) {
+            $before['contract_type'] = $oldContractType;
+            $after['contract_type'] = $contractType;
+        }
+
+        $this->logChange($customer, $actor, 'update_paket_verifikasi', $before, $after);
 
         return $customer->refresh();
     }

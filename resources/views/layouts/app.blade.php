@@ -419,7 +419,7 @@
                                 @if(auth()->user()->hasPermission('customers.isolir_queue.view'))
                                 <a href="{{ route('customers.isolir-queue.index') }}"
                                    class="flex items-center justify-between sidebar-subitem {{ Request::routeIs('customers.isolir-queue.index') ? 'sidebar-subitem-active' : '' }}">
-                                    <span>Antrean Isolir</span>
+                                    <span>Monitoring Isolir</span>
                                     <span id="badge-isolir-queue"
                                           data-count-url="{{ route('customers.isolir-queue.badge-count') }}"
                                           data-pop-ids='@json($badge_isolir_queue_pop_ids ?? [])'
