@@ -81,6 +81,42 @@ class CustomerDocumentTest extends TestCase
         $this->assertSame('rumah', $auditLog->new_values['document_type']);
     }
 
+    public function test_technician_can_upload_baa_and_bast_documents(): void
+    {
+        Storage::fake('public');
+
+        $pop = $this->createPop('DOC10');
+        $helpdesk = $this->createUserWithRole('Helpdesk');
+        $helpdesk->pops()->attach($pop->id);
+        $this->grantPopScope($helpdesk, $pop);
+        $customer = $this->createCustomer($pop, 'TEST-DOC-010');
+
+        $this->actingAs($helpdesk)
+            ->post(route('customers.documents.store', $customer->id), [
+                'document_type' => 'baa',
+                'document_file' => UploadedFile::fake()->create('baa.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect(route('customers.show', $customer->id));
+
+        $this->actingAs($helpdesk)
+            ->post(route('customers.documents.store', $customer->id), [
+                'document_type' => 'bast',
+                'document_file' => UploadedFile::fake()->create('bast.pdf', 10, 'application/pdf'),
+            ])
+            ->assertRedirect(route('customers.show', $customer->id));
+
+        $baa = CustomerDocument::where('document_type', 'baa')->firstOrFail();
+        $bast = CustomerDocument::where('document_type', 'bast')->firstOrFail();
+        Storage::disk('public')->assertExists($baa->file_path);
+        Storage::disk('public')->assertExists($bast->file_path);
+
+        $this->actingAs($helpdesk)
+            ->get(route('customers.show', $customer->id))
+            ->assertOk()
+            ->assertSee('Berita Acara Aktivasi (BAA)')
+            ->assertSee('Berita Acara Serah Terima (BAST)');
+    }
+
     public function test_customer_document_is_visible_on_customer_detail_for_permitted_user(): void
     {
         Storage::fake('local');

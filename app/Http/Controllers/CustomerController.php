@@ -39,6 +39,7 @@ use App\Models\ImportBatch;
 use App\Models\ImportError;
 use App\Models\InternetPackage;
 use App\Models\Invoice;
+use App\Models\IsolationCase;
 use App\Models\Payment;
 use App\Models\Person;
 use App\Models\Pop;
@@ -381,39 +382,39 @@ class CustomerController extends Controller
         // kasusnya memang ada; isolir di luar jalur Monitoring Isolir (tidak
         // pernah masuk antrean) tidak punya apa pun untuk diputuskan, jadi
         // tidak digerbangi.
-        if ($isCurrentlyActive && $customer->customerService) {
-            $activeCase = app(IsolationCaseService::class)->findActiveCaseForService($customer->customerService);
+        //
+        // `lockForUpdate()` + gerbang DIPINDAH KE DALAM transaksi yang sama
+        // dengan `$customer->update()` (fix bug 2026-11-20): sebelumnya baris
+        // kasus dibaca SEBELUM transaksi dibuka (tanpa lock) — dua klik
+        // "Isolir" nyaris bersamaan dari dua tab/operator bisa LOLOS gerbang
+        // berdua, karena keduanya baca status kasus yang sama sebelum salah
+        // satunya selesai mengeksekusi. Dengan row lock di sini, klik kedua
+        // menunggu klik pertama commit, baru baca ulang status kasus yang
+        // sudah berubah (tidak lagi `readyForIsolationGroup()`) dan ditolak
+        // dengan benar.
+        $gateError = null;
 
-            if ($activeCase && ! in_array($activeCase->status, IsolationCaseStatus::readyForIsolationGroup(), true)) {
-                $msg = $activeCase->admin_decision === IsolationAdminDecision::TOLERATE
-                    ? "Pelanggan {$customer->full_name} masih ditoleransi Admin".($activeCase->admin_decision_note ? ': '.rtrim($activeCase->admin_decision_note, '.').'.' : '.')
-                    : "Pelanggan {$customer->full_name} menunggu keputusan Admin (Eksekusi Isolir/Toleransi) sebelum bisa diisolir.";
+        DB::transaction(function () use ($customer, $newStatus, $serviceStatus, $actionName, $note, $isCurrentlyActive, &$gateError) {
+            if ($isCurrentlyActive && $customer->customerService) {
+                $activeCase = IsolationCase::where('service_id', $customer->customerService->id)
+                    ->where('active_slot', 1)
+                    ->lockForUpdate()
+                    ->first();
 
-                if ($request->expectsJson() || $request->wantsJson()) {
-                    return response()->json(['success' => false, 'message' => $msg], 422);
+                if ($activeCase && ! in_array($activeCase->status, IsolationCaseStatus::readyForIsolationGroup(), true)) {
+                    $gateError = $activeCase->admin_decision === IsolationAdminDecision::TOLERATE
+                        ? "Pelanggan {$customer->full_name} masih ditoleransi Admin".($activeCase->admin_decision_note ? ': '.rtrim($activeCase->admin_decision_note, '.').'.' : '.')
+                        : "Pelanggan {$customer->full_name} menunggu keputusan Admin (Eksekusi Isolir/Toleransi) sebelum bisa diisolir.";
+
+                    return;
                 }
-
-                return redirect()->back()->with('error', $msg);
             }
-        }
 
-        DB::transaction(function () use ($customer, $newStatus, $serviceStatus, $actionName, $note, $isCurrentlyActive) {
             $oldStatus = $customer->status;
             $customer->update(['status' => $newStatus]);
 
             if ($customer->customerService) {
                 $customer->customerService->update(['service_status' => $serviceStatus]);
-
-                // Monitoring Isolir (docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md
-                // §21) — DIPANGGIL SETELAH status layanan berubah di atas,
-                // bukan sebaliknya: service ini cuma mencatat lifecycle
-                // kasus, tidak pernah mengubah status layanan sendiri.
-                $isolationCases = app(IsolationCaseService::class);
-                if ($isCurrentlyActive) {
-                    $isolationCases->markIsolationSucceeded($customer->customerService, auth()->user());
-                } else {
-                    $isolationCases->markRestorationSucceeded($customer->customerService, auth()->user());
-                }
             }
 
             AuditLog::create([
@@ -438,17 +439,59 @@ class CustomerController extends Controller
             ]);
         });
 
+        if ($gateError) {
+            if ($request->expectsJson() || $request->wantsJson()) {
+                return response()->json(['success' => false, 'message' => $gateError], 422);
+            }
+
+            return redirect()->back()->with('error', $gateError);
+        }
+
+        // Monitoring Isolir (docs/plan/Rancangan_Monitoring_Isolir_Pelanggan.md
+        // §21) — DIPANGGIL SETELAH status layanan berubah & transaksi di
+        // atas COMMIT, SENGAJA DI LUAR transaksi itu (fix bug 2026-11-20):
+        // sebelumnya ini ikut satu transaksi dengan aksi isolir/aktivasi-
+        // kembali — kalau tracking kasus di sini lempar exception apa pun
+        // (mis. `NumberSequenceService` gagal), SELURUH aksi billing di atas
+        // ikut rollback, padahal itu aksi inti yang diminta NOC/Admin dan
+        // harus tetap jalan terlepas dari subsistem monitoring. Kegagalan di
+        // sini sekarang cuma dicatat (`markTrackingFailed()` → status kasus
+        // `*_failed`, kelihatan di kartu "Gagal / Perlu Tindakan"), tidak
+        // pernah menggagalkan permintaan yang sudah terjadi.
+        if ($customer->customerService) {
+            $isolationCases = app(IsolationCaseService::class);
+
+            try {
+                if ($isCurrentlyActive) {
+                    $isolationCases->markIsolationSucceeded($customer->customerService, auth()->user());
+                } else {
+                    $isolationCases->markRestorationSucceeded($customer->customerService, auth()->user());
+                }
+            } catch (\Throwable $e) {
+                report($e);
+                $isolationCases->markTrackingFailed($customer->customerService, auth()->user(), $isCurrentlyActive, $e);
+            }
+        }
+
         $message = $isCurrentlyActive
             ? "Layanan pelanggan {$customer->full_name} berhasil diisolir."
             : "Layanan pelanggan {$customer->full_name} berhasil diaktifkan kembali.";
 
         if ($request->expectsJson() || $request->wantsJson()) {
+            // Label literal ('ISOLIR'/'ACTIVE') dulu tidak sinkron dengan
+            // badge List Pelanggan hasil refresh — badge list server-render
+            // pakai nama master SubscriptionStatus (mis. "Suspended"), bukan
+            // literal ini (lihat _status.blade.php). Ambil dari sumber yang
+            // sama supaya label hasil toggle (optimistik) == label setelah
+            // refresh halaman (bug user 2026-11-20).
+            $statusLabel = SubscriptionStatus::where('code', $newStatus)->value('name') ?? strtoupper($newStatus);
+
             return response()->json([
                 'success' => true,
                 'message' => $message,
                 'status' => $newStatus,
                 'raw_status' => $newStatus,
-                'status_label' => strtoupper($newStatus === 'suspended' ? 'ISOLIR' : 'ACTIVE'),
+                'status_label' => $statusLabel,
             ]);
         }
 
@@ -1370,7 +1413,11 @@ class CustomerController extends Controller
             'additionalDevices.inventorySerial',
             'documents.uploader',
             'invoices' => function ($query) {
-                $query->with('creator')->orderBy('billing_period', 'desc');
+                // 'items' (ADHOC-60) WAJIB ikut — "Rincian Tagihan Awal" di
+                // bawah membaca `$initialInvoice->items`, dan pelanggan dengan
+                // ≥2 invoice (lazim, tagihan bulanan rutin) kena guard
+                // preventLazyLoading Laravel begitu lupa (bug 2026-11-20).
+                $query->with(['creator', 'items'])->orderBy('billing_period', 'desc');
             },
             'payments' => function ($query) {
                 $query->with(['invoice', 'receiver'])->latest('payment_date')->latest('id');

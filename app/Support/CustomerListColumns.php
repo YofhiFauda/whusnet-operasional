@@ -46,6 +46,12 @@ final class CustomerListColumns
             'kolektor' => ['label' => 'Kolektor', 'default' => false, 'align' => 'left', 'sort' => ['type' => 'relation', 'table' => 'users', 'column' => 'name', 'fk' => 'collector_id']],
             'tgl_daftar' => ['label' => 'Tgl. Daftar', 'default' => false, 'align' => 'left', 'sort' => ['type' => 'column', 'column' => 'registration_date']],
             'sales' => ['label' => 'Sales', 'default' => false, 'align' => 'left', 'sort' => ['type' => 'relation', 'table' => 'users', 'column' => 'name', 'fk' => 'sales_user_id'], 'with' => 'salesUser:id,name'],
+            // Nilainya gabungan dua sumber (registered_by_name legacy ATAU
+            // relasi creator) — lihat Customer::creator() & migration
+            // add_registration_and_admin_filter_actor_fields. Belum ada tipe
+            // sort katalog yang bisa menggabungkan keduanya dengan jujur,
+            // jadi sengaja TIDAK sortable (null) daripada sort yang salah.
+            'pelaku_input' => ['label' => 'Pelaku Input', 'default' => false, 'align' => 'left', 'sort' => null, 'with' => 'creator:id,name'],
         ];
     }
 

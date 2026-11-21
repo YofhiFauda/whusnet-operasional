@@ -728,6 +728,91 @@ class IsolirQueueTest extends TestCase
     }
 
     #[Test]
+    public function tagihan_baru_numpuk_saat_restoration_pending_membalik_kasus_ke_suspended(): void
+    {
+        // Regresi bug (2026-11-20): `restoration_pending` artinya "sudah
+        // lunas, nunggu NOC" — tapi billing tetap jalan walau layanan masih
+        // suspended, jadi tagihan BARU bisa numpuk & lewat jatuh tempo lagi
+        // sebelum NOC sempat konfirmasi. Dulu kasus diam di
+        // `restoration_pending` (label "Menunggu Pemulihan") walau
+        // `current_outstanding_amount` sudah > 0 lagi — NOC bisa salah
+        // aktifkan pelanggan yang sebenarnya nunggak lagi.
+        $this->travelTo(now()->parse('2026-09-25'));
+
+        $customer = $this->createCustomer('active');
+        $invoiceLama = $this->createOverdueInvoice($customer, '2026-08');
+        $this->artisan('isolir:sync-cases')->assertSuccessful();
+        $this->decideExecute($customer);
+
+        $this->actingAs($this->nocUser)
+            ->postJson(route('customers.toggle-suspend', $customer->id), ['note' => 'Isolir'])
+            ->assertOk();
+
+        $this->payInFull($invoiceLama);
+
+        $case = IsolationCase::where('service_id', $customer->customerService->id)->first();
+        $this->assertSame(IsolationCaseStatus::RESTORATION_PENDING, $case->status);
+
+        // Tagihan periode BARU, numpuk & jatuh tempo lagi sementara layanan
+        // masih suspended (NOC belum sempat konfirmasi).
+        $invoiceBaru = $this->createOverdueInvoice($customer, '2026-09');
+
+        // Pembayaran SEBAGIAN ke tagihan baru ini — cukup buat memicu
+        // `InvoiceStatusUpdated` (satu-satunya pemicu `handlePaymentVerified()`),
+        // tapi TIDAK melunasi, jadi `current_outstanding_amount` kasus
+        // seharusnya balik > 0.
+        Payment::create([
+            'payment_number' => 'PAY-'.$invoiceBaru->invoice_number,
+            'invoice_id' => $invoiceBaru->id,
+            'customer_id' => $invoiceBaru->customer_id,
+            'pop_id' => $invoiceBaru->pop_id,
+            'payment_date' => now()->toDateString(),
+            'payment_method' => 'cash',
+            'amount' => 20000,
+            'received_by' => $this->adminUser->id,
+            'payment_status' => 'valid',
+        ]);
+        $invoiceBaru->refresh()->recalculateFromPayments();
+
+        $case->refresh();
+        $this->assertSame(IsolationCaseStatus::SUSPENDED, $case->status);
+        $this->assertGreaterThan(0.0, (float) $case->current_outstanding_amount);
+        $this->assertEquals('suspended', $customer->refresh()->status);
+
+        $this->assertDatabaseHas('isolation_events', [
+            'isolation_case_id' => $case->id,
+            'event_type' => 'restoration_reverted',
+        ]);
+
+        $this->travelBack();
+    }
+
+    #[Test]
+    public function tracking_kasus_gagal_tidak_membatalkan_aksi_isolir_yang_sudah_terjadi(): void
+    {
+        // Regresi bug (2026-11-20): dulu pencatatan lifecycle kasus
+        // (`markIsolationSucceeded()`) ikut SATU transaksi dengan aksi isolir
+        // inti — exception di tracking bikin SELURUH aksi (termasuk
+        // `Customer::status`) ikut rollback. Sekarang tracking dipanggil DI
+        // LUAR transaksi itu: exception di sana cuma dicatat sebagai kasus
+        // `isolation_failed`, aksi isolir yang sudah terjadi tetap berdiri.
+        $customer = $this->createCustomer('active');
+
+        $this->mock(IsolationCaseService::class, function ($mock) {
+            $mock->shouldReceive('findActiveCaseForService')->andReturn(null);
+            $mock->shouldReceive('markIsolationSucceeded')->andThrow(new \RuntimeException('simulasi gagal tracking'));
+            $mock->shouldReceive('markTrackingFailed')->once();
+        });
+
+        $this->actingAs($this->adminUser)
+            ->postJson(route('customers.toggle-suspend', $customer->id), ['note' => 'Isolir langsung'])
+            ->assertOk();
+
+        // Aksi inti TETAP terjadi walau tracking-nya gagal.
+        $this->assertEquals('suspended', $customer->refresh()->status);
+    }
+
+    #[Test]
     public function role_di_luar_eksekutor_ditolak(): void
     {
         $salesRole = Role::where('name', 'Sales')->firstOrFail();
@@ -799,6 +884,39 @@ class IsolirQueueTest extends TestCase
             ->get(route('customers.isolir-queue.index', ['q' => 'TidakAdaPelangganIni']))
             ->assertOk()
             ->assertDontSee($case->case_number);
+    }
+
+    #[Test]
+    public function sort_header_nama_pelanggan_urut_asc_dan_desc(): void
+    {
+        // Permintaan user 2026-11-20: header tabel bisa ASC/DESC
+        // (CustomerIsolirQueueController::applySort()). `createCustomer()`
+        // menghasilkan "Pelanggan Isolir 1" lalu "Pelanggan Isolir 2" — cukup
+        // buat bedakan urutan tanpa perlu nama custom.
+        $customerA = $this->createCustomer('active'); // "Pelanggan Isolir 1"
+        $this->actingAs($this->customerServiceUser)
+            ->postJson(route('customers.isolir-queue.store'), ['customer_id' => $customerA->id, 'note' => 'uji sort A'])
+            ->assertOk();
+
+        $customerB = $this->createCustomer('active'); // "Pelanggan Isolir 2"
+        $this->actingAs($this->customerServiceUser)
+            ->postJson(route('customers.isolir-queue.store'), ['customer_id' => $customerB->id, 'note' => 'uji sort B'])
+            ->assertOk();
+
+        $caseA = IsolationCase::where('service_id', $customerA->customerService->id)->first();
+        $caseB = IsolationCase::where('service_id', $customerB->customerService->id)->first();
+
+        $asc = $this->actingAs($this->adminUser)
+            ->get(route('customers.isolir-queue.index', ['sort' => 'customer_name', 'dir' => 'asc']))
+            ->assertOk()
+            ->getContent();
+        $this->assertGreaterThan(strpos($asc, $caseA->case_number), strpos($asc, $caseB->case_number));
+
+        $desc = $this->actingAs($this->adminUser)
+            ->get(route('customers.isolir-queue.index', ['sort' => 'customer_name', 'dir' => 'desc']))
+            ->assertOk()
+            ->getContent();
+        $this->assertLessThan(strpos($desc, $caseA->case_number), strpos($desc, $caseB->case_number));
     }
 
     #[Test]
@@ -881,6 +999,37 @@ class IsolirQueueTest extends TestCase
         $this->payInFull($invoice);
 
         Event::assertNotDispatched(IsolationCaseQueueChanged::class);
+
+        $this->travelBack();
+    }
+
+    #[Test]
+    public function mark_isolation_succeeded_dengan_actor_null_tercatat_actor_type_custom(): void
+    {
+        $this->travelTo(now()->parse('2026-09-25'));
+
+        $customer = $this->createCustomer('active');
+        $this->createOverdueInvoice($customer, '2026-08');
+        $this->artisan('isolir:sync-cases')->assertSuccessful();
+        $this->decideExecute($customer);
+
+        $customer->update(['status' => 'suspended']);
+        $customer->customerService->update(['service_status' => 'isolir']);
+
+        app(IsolationCaseService::class)->markIsolationSucceeded(
+            $customer->customerService,
+            null,
+            'external_web_a'
+        );
+
+        $case = IsolationCase::where('service_id', $customer->customerService->id)->first();
+
+        $this->assertDatabaseHas('isolation_events', [
+            'isolation_case_id' => $case->id,
+            'event_type' => 'isolation_succeeded',
+            'actor_type' => 'external_web_a',
+            'actor_id' => null,
+        ]);
 
         $this->travelBack();
     }

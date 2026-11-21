@@ -5,6 +5,7 @@ use App\Http\Middleware\EnsureNetworkAssignmentWriteToken;
 use App\Http\Middleware\EnsurePopDistribusiReadToken;
 use App\Http\Middleware\EnsurePortalClientSecret;
 use App\Http\Middleware\EnsurePortalCustomerToken;
+use App\Http\Middleware\EnsureWebAWriteToken;
 use App\Http\Middleware\PortalStaffToken;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
@@ -27,6 +28,10 @@ return Application::configure(basePath: dirname(__DIR__))
             // (keputusan.md §5).
             'pop_distribusi.read' => EnsurePopDistribusiReadToken::class,
             'network_assignment.write' => EnsureNetworkAssignmentWriteToken::class,
+            // Eksekusi isolir Web A (docs/superpowers/specs/2026-11-20-
+            // webhook-isolir-web-a-design.md) — token statis terpisah, pola
+            // sama network_assignment.write.
+            'web_a.write' => EnsureWebAWriteToken::class,
             // API Portal Pelanggan (docs/api/api-portal-pelanggan/, Fase 2) —
             // dua lapis kredensial TERPISAH sengaja: client secret portal
             // (statis per environment) vs token per-pelanggan (DB lookup).

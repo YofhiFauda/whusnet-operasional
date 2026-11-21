@@ -67,6 +67,21 @@ class CustomerSearchPrefixRoutingTest extends TestCase
         $this->get('/customers?search=007')->assertDontSee('Agent 007');
     }
 
+    public function test_nama_berdigit_dengan_spasi_tetap_dicari_sebagai_nama(): void
+    {
+        // Nama pelanggan Bisnis lazim mengandung digit (nama usaha/kode
+        // cabang) tapi tetap nama biasa (ada spasi) — beda dari "Agent 007"
+        // (satu token) di atas. Bug nyata (laporan user 2026-11-20): pelanggan
+        // Bisnis hilang dari List Pelanggan saat dicari pakai nama, padahal
+        // tampil di List Pelanggan Bisnis (search-nya tidak punya gate ini).
+        $this->customer(['full_name' => 'Testing110 Bisnis', 'customer_code' => 'RQ000099']);
+
+        // Assert pakai customer_code (bukan nama yang dicari) — nama yang
+        // dicari ikut di-echo balik ke kotak pencarian apa pun hasilnya, jadi
+        // assertSee(nama) bisa lolos palsu walau barisnya sendiri tidak ada.
+        $this->get('/customers?search=Testing110 Bisnis')->assertSee('RQ000099');
+    }
+
     public function test_hp_dan_nik_dicari_prefix(): void
     {
         $c = $this->customer([

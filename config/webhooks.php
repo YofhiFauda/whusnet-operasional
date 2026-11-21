@@ -26,6 +26,26 @@ return [
         'secret' => env('WEBHOOK_WEBSITE_B_SECRET'),
     ],
 
+    /*
+    |----------------------------------------------------------------------
+    | Webhook Keluar + Masuk — Isolir Web A
+    | (docs/superpowers/specs/2026-11-20-webhook-isolir-web-a-design.md)
+    |----------------------------------------------------------------------
+    |
+    | 'web_a' (keluar, event 'isolation.ready_for_execution') ikut skema HMAC
+    | yang sama dengan 'website_b'. 'web_a_write_token' (MASUK, Web A yang
+    | connect balik ke sini buat eksekusi isolir) token statis terpisah,
+    | bukan tabel — pola sama `network_assignment_write_token`.
+    |
+    */
+
+    'web_a' => [
+        'url' => env('WEBHOOK_WEB_A_URL'),
+        'secret' => env('WEBHOOK_WEB_A_SECRET'),
+    ],
+
+    'web_a_write_token' => env('WEB_A_WRITE_TOKEN'),
+
     'telegram_external' => [
         'bot_token' => env('TELEGRAM_EXTERNAL_BOT_TOKEN'),
         'chat_id' => env('TELEGRAM_EXTERNAL_CHAT_ID'),

@@ -72,6 +72,9 @@ trait RendersCustomerList
         ));
         $completenessStatus = $request->query('completeness_status', '');
         $collectorId = $request->query('collector_id', '');
+        // Filter Pelaku Input — 'legacy' = baris migrasi (registered_by_name
+        // terisi, created_by kosong), angka = user tertentu via created_by.
+        $actorId = $request->query('actor_id', '');
         // Filter alasan putus (ADHOC-69) — cuma bermakna di List Putus, tapi
         // aman dibaca di halaman lain (query string diabaikan kalau
         // statusGroup != 'terminated', lihat blok filter di bawah).
@@ -141,11 +144,22 @@ trait RendersCustomerList
         //                cuma 1 kolom, jauh lebih murah dari 8-kolom OR)
         // Konsekuensi UX yang disengaja: query nama tidak lagi mencocokkan kode,
         // dan sebaliknya — orang mencari BY nama ATAU BY kode, bukan campur.
+        //
+        // Pengecualian (bug 2026-11-20, laporan user): nama pelanggan Bisnis
+        // lazim mengandung digit (nama usaha/kode cabang) TAPI tetap nama
+        // biasa, bukan kode — kode/CID/HP/NIK tidak pernah mengandung spasi.
+        // Search berspasi + berdigit ("Testing110 Bisnis") dulu ikut
+        // ke-reroute ke branch kode (semua kolom kosong → 0 hasil, pelanggan
+        // lenyap dari List Pelanggan padahal tetap tampil di List Pelanggan
+        // Bisnis yang selalu mencari nama). Kode murni (customer_code/CID/
+        // HP/NIK) tidak pernah ada spasi, jadi gate ini aman buat kontrak
+        // lama (lihat `test_query_berdigit_tidak_mencocokkan_nama`, "007"
+        // satu token tetap ke branch kode).
         if ($search !== '') {
             $query->where(function ($q) use ($search) {
                 if (str_contains($search, '@')) {
                     $q->where('email', 'like', "{$search}%");
-                } elseif (preg_match('/\d/', $search)) {
+                } elseif (preg_match('/\d/', $search) && ! str_contains($search, ' ')) {
                     $q->where('customer_code', 'like', "{$search}%")
                         ->orWhere('cid', 'like', "%{$search}%")
                         ->orWhere('old_customer_id', 'like', "{$search}%")
@@ -222,6 +236,13 @@ trait RendersCustomerList
             $query->whereNull('collector_id');
         } elseif ($collectorId !== '') {
             $query->where('collector_id', $collectorId);
+        }
+
+        // Filter Pelaku Input (aktor yang input/registrasi pelanggan).
+        if ($actorId === 'legacy') {
+            $query->whereNotNull('registered_by_name');
+        } elseif ($actorId !== '') {
+            $query->where('created_by', $actorId);
         }
 
         // Filter & sort alasan putus (ADHOC-69) — di level QUERY (WHERE/ORDER
@@ -376,6 +397,13 @@ trait RendersCustomerList
             ->whereHas('role', fn ($q) => $q->where('code', 'kolektor'))
             ->orderBy('name')
             ->get(['id', 'name']);
+        // Dropdown filter Pelaku Input — cuma user yang PERNAH jadi created_by
+        // pelanggan (bukan seluruh user sistem, biar dropdown gak penuh nama
+        // yang gak relevan sama sekali ke registrasi pelanggan).
+        $actorOptions = User::query()
+            ->whereIn('id', Customer::query()->whereNotNull('created_by')->distinct()->pluck('created_by'))
+            ->orderBy('name')
+            ->get(['id', 'name']);
         // Dropdown filter Alasan Putus (ADHOC-69) — cuma dipakai List Putus,
         // tapi murah untuk di-resolve di halaman lain juga (query kecil).
         $terminationReasonOptions = $statusGroup === 'terminated'
@@ -428,6 +456,8 @@ trait RendersCustomerList
             'completenessStatus',
             'collectorId',
             'collectorOptions',
+            'actorId',
+            'actorOptions',
             'terminationReasonId',
             'terminationReasonOptions',
             'terminationReasons',

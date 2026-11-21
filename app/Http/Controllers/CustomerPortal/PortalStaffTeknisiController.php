@@ -12,6 +12,8 @@ use App\Models\User;
 use App\Services\CollectorWorklistService;
 use App\Services\CustomerBalanceService;
 use App\Traits\RecordsCollectorBatch;
+use Dedoc\Scramble\Attributes\Group;
+use Dedoc\Scramble\Attributes\Response as ScrambleResponse;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -30,6 +32,7 @@ use Illuminate\Http\Request;
  * `RecordsCollectorBatch::recordStaffPortalBatch()` dan dipakai bersama dengan
  * jalur kolektor.
  */
+#[Group('Portal Pelanggan — Staf', 'Endpoint yang dipanggil Portal atas nama STAF/teknisi (bukan pelanggan), setelah scan QR di dalam app Operasional. Butuh header `X-Portal-Client` + `Authorization: Bearer <staff_portal_token>` (one-shot, TTL 15 menit, purpose `teknisi_bayar`).')]
 class PortalStaffTeknisiController extends Controller
 {
     use RecordsCollectorBatch;
@@ -42,6 +45,19 @@ class PortalStaffTeknisiController extends Controller
      * Tagihan belum lunas pelanggan ini dalam POP scope teknisi. Tidak
      * mengonsumsi token (boleh dibaca berkali-kali dalam TTL).
      */
+    #[ScrambleResponse(200, description: 'Tagihan belum lunas pelanggan ini (bisa kosong kalau semua sudah lunas).', examples: [[
+        'data' => [
+            'customer' => ['customer_code' => 'RQ000123', 'full_name' => 'Budi Santoso', 'balance' => '0.00'],
+            'bank_accounts' => [['id' => 1, 'bank_name' => 'BCA', 'account_number' => '1234567890', 'account_name' => 'Whusnet Operasional']],
+            'invoices' => [[
+                'id' => 45, 'invoice_number' => 'INV-2026-000123', 'billing_period' => '2026-08',
+                'due_date' => '2026-08-15', 'remaining_amount' => '150000.00',
+            ]],
+        ],
+    ]])]
+    #[ScrambleResponse(401, description: 'Token staf tidak ada/tidak valid/kedaluwarsa, atau bukan purpose `teknisi_bayar`.')]
+    #[ScrambleResponse(403, description: 'User pemilik token bukan teknisi, atau pelanggan di luar POP scope teknisi ini.')]
+    #[ScrambleResponse(404, description: '`code` di URL tidak cocok dengan pelanggan yang tertaut ke token (dicegah "pinjam" token pelanggan lain).')]
     public function worklist(Request $request, string $code): JsonResponse
     {
         /** @var StaffPortalToken $token */
@@ -86,6 +102,15 @@ class PortalStaffTeknisiController extends Controller
      * Catat pembayaran. Token dikonsumsi HANYA kalau batch benar-benar
      * diproses (bukan replay idempotency key, bukan validasi gagal).
      */
+    #[ScrambleResponse(200, description: 'Batch pembayaran berhasil dicatat (atau idempotency key sudah pernah diproses).', examples: [[
+        'success' => true, 'message' => '1 pembayaran berhasil dicatat untuk teknisi Budi.', 'processed' => 1,
+    ]])]
+    #[ScrambleResponse(401, description: 'Token staf tidak ada/tidak valid/kedaluwarsa, atau bukan purpose `teknisi_bayar`.')]
+    #[ScrambleResponse(403, description: 'User pemilik token bukan teknisi, atau sudah berperan kolektor (jalur ini khusus teknisi).')]
+    #[ScrambleResponse(422, description: 'Baris tidak valid — invoice di luar scope, sudah lunas, atau nominal melebihi sisa.', examples: [[
+        'success' => false, 'message' => 'Batch ditolak — ada baris tidak valid. Tidak ada payment yang tersimpan.',
+        'failures' => [['invoice_id' => 45, 'reason' => 'INV-2026-000123: sudah lunas.']],
+    ]])]
     public function payments(Request $request): JsonResponse
     {
         /** @var StaffPortalToken $token */

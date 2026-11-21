@@ -59,16 +59,18 @@ class CustomerIsolirQueueController extends Controller
             'q' => trim((string) $request->query('q', '')),
             'pop_id' => $request->query('pop_id'),
             'status' => $request->query('status'),
-            'invoice_status' => $request->query('invoice_status'),
             'date_from' => $request->query('date_from'),
             'date_to' => $request->query('date_to'),
         ];
 
         $this->applyFilters($builder, $filters, $tabStatuses);
 
+        $sort = $request->query('sort');
+        $dir = $request->query('dir') === 'desc' ? 'desc' : 'asc';
+        $this->applySort($builder, $sort, $dir);
+
         $cases = $builder
             ->with(['customer.pop', 'service', 'caseInvoices.invoice', 'events.actor'])
-            ->orderByDesc('detected_at')
             ->paginate(25)
             ->withQueryString();
 
@@ -87,10 +89,44 @@ class CustomerIsolirQueueController extends Controller
         $pops = Pop::forUser()->where('type', 'cabang')->orderBy('name')->get(['id', 'name']);
 
         return view('customers.isolir-queue.index', [
-            ...compact('cases', 'tab', 'counts', 'kpi', 'pops'),
+            ...compact('cases', 'tab', 'counts', 'kpi', 'pops', 'sort', 'dir'),
             'filters' => $filters,
             'tabStatuses' => $tabStatuses,
         ]);
+    }
+
+    /**
+     * Sort header tabel (permintaan user 2026-11-20) — allowlist kolom biar
+     * gak bisa `?sort=` ke kolom sembarang. `customer_name`/`pop_name`
+     * SENGAJA lewat correlated subquery (`orderByRaw`), BUKAN `join` —
+     * `IsolationCaseService::casesQuery()`/`applyFilters()` di atas menulis
+     * `status`/`pop_id` TANPA prefix tabel; begitu ada join ke
+     * `customers`/`pops` (yang juga punya kolom `pop_id`/`status`), query
+     * meledak "ambiguous column name". Subquery tidak menambah tabel ke
+     * scope FROM utama, jadi aman tanpa harus audit ulang semua kolom
+     * unqualified di service. `$dir` aman diselipkan mentah ke raw SQL
+     * karena sudah dipaksa 'asc'/'desc' saja sebelum masuk sini (lihat
+     * caller di `index()`). Default (tanpa `sort` valid) tetap `detected_at`
+     * DESC — kasus terbaru dulu, perilaku lama sebelum ada sort.
+     *
+     * @param  Builder<IsolationCase>  $builder
+     */
+    private function applySort(Builder $builder, ?string $sort, string $dir): void
+    {
+        match ($sort) {
+            'case_number' => $builder->orderBy('isolation_cases.case_number', $dir),
+            'customer_name' => $builder->orderByRaw(
+                '(select full_name from customers where customers.id = isolation_cases.customer_id) '.$dir
+            ),
+            'pop_name' => $builder->orderByRaw(
+                '(select name from pops where pops.id = isolation_cases.pop_id) '.$dir
+            ),
+            'outstanding' => $builder->orderBy('isolation_cases.current_outstanding_amount', $dir),
+            'status' => $builder->orderBy('isolation_cases.status', $dir),
+            default => null,
+        };
+
+        $builder->orderByDesc('isolation_cases.detected_at');
     }
 
     /**
@@ -123,12 +159,6 @@ class CustomerIsolirQueueController extends Controller
         $statusValues = array_map(fn ($s) => $s->value, $tabStatuses);
         if ($filters['status'] && in_array($filters['status'], $statusValues, true)) {
             $builder->where('status', $filters['status']);
-        }
-
-        if ($filters['invoice_status'] === 'lunas') {
-            $builder->where('current_outstanding_amount', '<=', 0);
-        } elseif ($filters['invoice_status'] === 'belum_lunas') {
-            $builder->where('current_outstanding_amount', '>', 0);
         }
 
         if ($filters['date_from']) {

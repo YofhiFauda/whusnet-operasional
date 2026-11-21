@@ -323,6 +323,26 @@
                 </select>
                 @error('internet_package_id')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
                 <p class="text-[11px] text-slate-500 dark:text-slate-400">Diskon/PPN/biaya lain yang sudah tersimpan tetap dipakai — cuma paket &amp; harga dasarnya yang diganti.</p>
+
+                {{-- Jenis Kontrak (laporan user 2026-11-20): koreksi dini kalau
+                     ternyata pelanggan beli modem sendiri padahal terdaftar Sewa
+                     (atau sebaliknya), SEBELUM pemasangan. Ini cuma label
+                     `customer_services.contract_type` — kalau pelanggan sudah
+                     lewat tahap Pemasangan dengan modem/SN yang sudah
+                     di-install/ditagih sesuai kontrak lama, ubah di sini TIDAK
+                     ikut membetulkan data SN/invoice modem itu (lihat
+                     docs/plan/task-teknisi/rancangan-ownership-modem-sewa-beli.md,
+                     belum dikerjakan). --}}
+                <div class="pt-2">
+                    <label class="block mb-1 text-[10px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400">Jenis Kontrak</label>
+                    <select name="jenis_kontrak"
+                            class="w-full text-xs sm:text-sm px-3 py-2 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500/20 focus:border-sky-500">
+                        <option value="" {{ old('jenis_kontrak', $customer->customerService?->contract_type) ? '' : 'selected' }}>— Belum diisi —</option>
+                        <option value="sewa" {{ old('jenis_kontrak', $customer->customerService?->contract_type) === 'sewa' ? 'selected' : '' }}>Sewa (Modem Dipinjamkan ISP)</option>
+                        <option value="beli" {{ old('jenis_kontrak', $customer->customerService?->contract_type) === 'beli' ? 'selected' : '' }}>Beli Putus (Modem Milik Pelanggan)</option>
+                    </select>
+                    @error('jenis_kontrak')<p class="text-xs text-rose-600 font-semibold mt-1">{{ $message }}</p>@enderror
+                </div>
                 <div class="flex justify-end gap-2 pt-1">
                     <button type="button" @click="editingPackage = false" class="px-3.5 py-2 text-xs font-semibold text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700 rounded-lg bg-white dark:bg-slate-800 transition-colors">Batal</button>
                     <button type="submit" class="px-4 py-2 bg-sky-600 hover:bg-sky-700 text-white text-xs font-bold uppercase tracking-wider rounded-lg shadow-2xs transition-colors">Simpan Paket</button>
@@ -348,6 +368,12 @@
                     <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Estimasi Tagihan Bulanan</span>
                     <span class="block text-xl font-mono font-bold text-sky-600 dark:text-sky-400">
                         Rp {{ number_format($customer->customerService->total_monthly_bill ?? ($customer->internetPackage?->monthly_price ?? 0), 0, ',', '.') }}<span class="text-xs text-slate-400 dark:text-slate-500 font-normal">/bulan</span>
+                    </span>
+                </div>
+                <div>
+                    <span class="block text-[10px] font-bold uppercase tracking-wider text-slate-400 dark:text-slate-500 mb-1">Jenis Kontrak</span>
+                    <span class="block text-sm font-bold text-slate-900 dark:text-slate-100">
+                        {{ match ($customer->customerService?->contract_type) { 'beli' => 'Beli Putus', 'sewa' => 'Sewa', default => '-' } }}
                     </span>
                 </div>
             </div>

@@ -213,6 +213,27 @@ class VerificationInlineEditTest extends TestCase
     }
 
     #[Test]
+    public function cs_bisa_ganti_jenis_kontrak_di_verifikasi_registrasi(): void
+    {
+        $customer = $this->customerAt('registered');
+        $customer->customerService()->create([
+            'internet_package_id' => $this->packageA->id,
+            'package_name_snapshot' => $this->packageA->name,
+            'contract_type' => 'sewa',
+            'monthly_price' => 100000,
+            'total_monthly_bill' => 100000,
+        ]);
+        $cs = $this->userWithOnly('customer_registration_verification.view', 'customer_registration_verification.approve');
+
+        $this->actingAs($cs)->put(route('customer-registration-verifications.update-package', $customer), [
+            'internet_package_id' => $this->packageA->id,
+            'jenis_kontrak' => 'beli',
+        ])->assertRedirect();
+
+        $this->assertSame('beli', $customer->customerService->fresh()->contract_type);
+    }
+
+    #[Test]
     public function edit_registrasi_ditolak_setelah_pelanggan_lewat_tahap_registrasi(): void
     {
         $customer = $this->customerAt('waiting_survey');
@@ -273,6 +294,27 @@ class VerificationInlineEditTest extends TestCase
         ])->assertRedirect();
         $this->assertSame('ODP-BARU', $survey->fresh()->nearest_odp);
         $this->assertSame(75, $survey->fresh()->cable_estimation_meter);
+    }
+
+    #[Test]
+    public function cs_bisa_ganti_jenis_kontrak_di_tahap_waiting_acc(): void
+    {
+        $customer = $this->customerAt('waiting_acc');
+        $customer->customerService()->create([
+            'internet_package_id' => $this->packageA->id,
+            'package_name_snapshot' => $this->packageA->name,
+            'contract_type' => 'sewa',
+            'monthly_price' => 100000,
+            'total_monthly_bill' => 100000,
+        ]);
+        $admin = $this->userWithOnly('customers.detail.installation.validate', 'customers.detail.installation.view');
+
+        $this->actingAs($admin)->put(route('customers.verification.update-package', $customer), [
+            'internet_package_id' => $this->packageA->id,
+            'jenis_kontrak' => 'beli',
+        ])->assertRedirect();
+
+        $this->assertSame('beli', $customer->customerService->fresh()->contract_type);
     }
 
     /**

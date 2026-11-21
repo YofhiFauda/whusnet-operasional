@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Enums\NotificationType;
+use App\Enums\RollStatus;
 use App\Enums\SerialStatus;
 use App\Enums\TaskStatus;
 use App\Enums\TaskType;
@@ -10,6 +11,7 @@ use App\Enums\WorkflowTransition;
 use App\Models\AuditLog;
 use App\Models\Customer;
 use App\Models\FopTask;
+use App\Models\InventoryRoll;
 use App\Models\InventorySerial;
 use App\Models\NetworkNode;
 use App\Models\NetworkNodePort;
@@ -154,7 +156,19 @@ class TaskController extends Controller
             ->with('item')
             ->get();
 
-        return view('tasks.own', compact('tasks', 'upcomingTasks', 'myCustodies', 'mySerials'));
+        // Roll kabel (tracking_type ROLL) — entitas KETIGA selain custody
+        // qty & SN, dulu kelewat di sini (bug 2026-11-20, laporan user): roll
+        // yang lagi dipegang teknisi tidak pernah masuk "Stok Saya". ISSUED =
+        // baru diambil utuh, IN_USE = sudah mulai dipotong tapi belum habis —
+        // keduanya sama-sama "masih di tangan teknisi" (lihat RollStatus).
+        $myRolls = InventoryRoll::query()
+            ->where('current_technician_id', $user->id)
+            ->whereIn('status', [RollStatus::ISSUED->value, RollStatus::IN_USE->value])
+            ->active()
+            ->with('item')
+            ->get();
+
+        return view('tasks.own', compact('tasks', 'upcomingTasks', 'myCustodies', 'mySerials', 'myRolls'));
     }
 
     /**

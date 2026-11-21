@@ -772,10 +772,11 @@ class CustomerVerificationController extends Controller
 
         $validated = $request->validate([
             'internet_package_id' => 'required|exists:internet_packages,id',
+            'jenis_kontrak' => 'nullable|string|in:sewa,beli',
         ]);
 
         try {
-            app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $user);
+            app(CustomerVerificationEditService::class)->updatePackage($customer, (int) $validated['internet_package_id'], $user, $validated['jenis_kontrak'] ?? null);
         } catch (\RuntimeException $e) {
             return redirect()->back()->with('error', $e->getMessage());
         }

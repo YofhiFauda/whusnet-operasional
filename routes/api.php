@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Api\IsolationExecutionController;
 use App\Http\Controllers\Api\NetworkAssignmentController;
 use App\Http\Controllers\Api\NetworkDeviceController;
 use App\Http\Controllers\Api\PopDistribusiController;
@@ -13,6 +14,7 @@ use App\Http\Controllers\CustomerPortal\PortalStaffKolektorController;
 use App\Http\Controllers\CustomerPortal\PortalStaffTeknisiController;
 use App\Http\Controllers\CustomerPortal\PortalStaffTicketController;
 use App\Http\Controllers\CustomerPortal\PortalTicketController;
+use Dedoc\Scramble\Attributes\Response;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -42,6 +44,13 @@ Route::prefix('v1')->group(function () {
     Route::middleware(['network_assignment.write', 'throttle:network-device-write'])
         ->post('/installations/network-device', [NetworkDeviceController::class, 'store'])
         ->name('api.installations.network-device');
+
+    // Eksekusi isolir Web A (docs/superpowers/specs/2026-11-20-webhook-isolir-
+    // web-a-design.md) — arah MASUK, Web A yang connect ke sini, kebalikan
+    // dari webhook keluar `isolation.ready_for_execution` (listener, bukan route).
+    Route::middleware(['web_a.write', 'throttle:web-a-isolation-execute'])
+        ->post('/isolation-cases/execute', [IsolationExecutionController::class, 'store'])
+        ->name('api.isolation-cases.execute');
 });
 
 /*
@@ -60,8 +69,17 @@ Route::prefix('v1')->group(function () {
 */
 
 Route::prefix('customer-portal')->group(function () {
-    Route::get('/ping', fn () => response()->json(['data' => ['status' => 'ok']]))
-        ->middleware(['throttle:customer-portal-ping'])
+    Route::get(
+        '/ping',
+        /**
+         * Health check
+         *
+         * Verifikasi server hidup + CORS + JSON error sebelum auth ada.
+         * Tanpa proteksi token — data kosong, risiko disclosure nol.
+         */
+        #[Response(200, description: 'Server hidup.', examples: [['data' => ['status' => 'ok']]])]
+        fn () => response()->json(['data' => ['status' => 'ok']])
+    )->middleware(['throttle:customer-portal-ping'])
         ->name('api.customer-portal.ping');
 
     // Fase 2 — semua route di bawah ini butuh client secret portal

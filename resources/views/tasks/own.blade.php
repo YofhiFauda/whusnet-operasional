@@ -43,7 +43,7 @@
     </div>
 
     {{-- ══ Stok Saya (ADHOC-54, Expandable Drawer/Accordion for Mobile) ═══════════════ --}}
-    @if($myCustodies->isNotEmpty() || $mySerials->isNotEmpty())
+    @if($myCustodies->isNotEmpty() || $mySerials->isNotEmpty() || $myRolls->isNotEmpty())
     <div x-data="{ openStock: false }" class="bg-surface border border-border rounded-lg overflow-hidden shadow-2xs transition-colors">
         {{-- Slim trigger row --}}
         <button type="button" 
@@ -65,6 +65,11 @@
                     @if($myCustodies->isNotEmpty())
                     <span class="px-2 py-0.5 rounded-md bg-surface-muted text-text-secondary font-mono text-[10px] font-medium border border-border">
                         {{ $myCustodies->count() }} item
+                    </span>
+                    @endif
+                    @if($myRolls->isNotEmpty())
+                    <span class="px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-mono text-[10px] font-semibold border border-amber-200 dark:border-amber-800/60">
+                        {{ $myRolls->count() }} roll
                     </span>
                     @endif
                 </div>
@@ -103,6 +108,21 @@
                         <span class="font-semibold text-text-main">{{ $custody->item->name }}</span>
                         <span class="font-mono text-text-secondary font-medium">{{ rtrim(rtrim(number_format((float) $custody->qty_remaining, 2, ',', '.'), '0'), ',') }} {{ $custody->item->unit }}</span>
                         <span class="text-text-muted">&middot; {{ $custody->ageLabel() }}</span>
+                    </span>
+                    @endforeach
+                </div>
+            </div>
+            @endif
+
+            @if($myRolls->isNotEmpty())
+            <div>
+                <p class="text-[10px] font-bold uppercase tracking-wider text-text-muted mb-2 font-ui">Roll Kabel ({{ $myRolls->count() }})</p>
+                <div class="flex flex-wrap gap-1.5">
+                    @foreach($myRolls as $roll)
+                    <span class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-amber-50 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-800/60 text-[11px] font-ui">
+                        <span class="font-semibold text-amber-700 dark:text-amber-300">{{ $roll->item->name }}</span>
+                        <span class="font-mono text-amber-600 dark:text-amber-400 font-medium">{{ $roll->roll_code }}</span>
+                        <span class="text-text-muted">&middot; sisa {{ rtrim(rtrim(number_format((float) $roll->length_remaining, 2, ',', '.'), '0'), ',') }} {{ $roll->item->unit }}</span>
                     </span>
                     @endforeach
                 </div>

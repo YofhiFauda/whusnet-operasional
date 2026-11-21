@@ -68,11 +68,6 @@ class CustomerCollectorVisibilityTest extends TestCase
         return $customer;
     }
 
-    private function owner(): User
-    {
-        return User::where('email', 'owner@whusnet.net')->firstOrFail();
-    }
-
     public function test_customer_list_shows_collector_badge_and_filters_by_collector(): void
     {
         $kolektorRole = Role::where('code', 'kolektor')->firstOrFail();
@@ -83,7 +78,7 @@ class CustomerCollectorVisibilityTest extends TestCase
         $this->createCustomer('C-CCV-B1', $kolektorB->id);
         $this->createCustomer('C-CCV-N1', null);
 
-        $owner = $this->owner();
+        $owner = $this->loginAsAdmin();
 
         // Tanpa filter: badge kolektor A & B tampil, yang tanpa kolektor tak ada badge.
         $response = $this->actingAs($owner)->get(route('customers.index'));
@@ -112,7 +107,7 @@ class CustomerCollectorVisibilityTest extends TestCase
         $withCollector = $this->createCustomer('C-CCV-D1', $kolektor->id);
         $withoutCollector = $this->createCustomer('C-CCV-D2', null);
 
-        $owner = $this->owner();
+        $owner = $this->loginAsAdmin();
 
         $responseWith = $this->actingAs($owner)->get(route('customers.show', $withCollector->id));
         $responseWith->assertOk();

@@ -111,7 +111,7 @@ class SendWebhookOutboxJob implements ShouldQueue
 
         try {
             $result = match ($row->destination) {
-                'website_b' => $this->sendHttpJson($row),
+                'website_b', 'web_a' => $this->sendHttpJson($row),
                 'telegram_external' => $this->sendTelegram($row, $presenter),
                 'customer_portal' => $this->sendPortalWebhook($row),
                 default => throw new RuntimeException("Tujuan webhook tidak dikenal: {$row->destination}"),
@@ -183,13 +183,13 @@ class SendWebhookOutboxJob implements ShouldQueue
      */
     private function configError(string $destination): ?string
     {
-        if ($destination === 'website_b') {
-            $config = config('webhooks.website_b');
+        if ($destination === 'website_b' || $destination === 'web_a') {
+            $config = config("webhooks.{$destination}");
             $url = (string) ($config['url'] ?? '');
             $secret = (string) ($config['secret'] ?? '');
 
             if (! str_starts_with($url, 'https://') || $secret === '') {
-                return 'Konfigurasi webhooks.website_b tidak valid: url wajib https:// dan secret wajib diisi.';
+                return "Konfigurasi webhooks.{$destination} tidak valid: url wajib https:// dan secret wajib diisi.";
             }
 
             return null;
@@ -240,7 +240,7 @@ class SendWebhookOutboxJob implements ShouldQueue
      */
     private function sendHttpJson(WebhookOutbox $row): array
     {
-        $config = config('webhooks.website_b');
+        $config = config("webhooks.{$row->destination}");
         $rawBody = $this->buildSignedBody($row->payload);
         $timestamp = now()->timestamp;
         $signature = hash_hmac('sha256', "{$timestamp}.{$rawBody}", (string) $config['secret']);
