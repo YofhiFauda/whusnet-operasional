@@ -55,6 +55,12 @@ class InternetPackageSeeder extends Seeder
             // 35, 7 baris NetP125 semua 40), bukan tebakan satu baris.
             $this->home('NetP110', 'Penawaran Khusus', '35 Mbps', 35, 110000, null, [], null, null, '-', 'Khusus pelanggan lama, minimal langganan 6 bulan'),
             $this->home('NetP125', 'Penawaran Khusus', '40 Mbps', 40, 125000, null, [], null, null, '-', 'Khusus pelanggan lama, minimal langganan 6 bulan'),
+            // Ditambah 2026-11-21 (rekonsiliasi Cabang Siman) — kode katalog
+            // baru. NetP150 BEDA dari Net150 yang udah ada walau harga/speed
+            // kebetulan sama (150000/45Mbps) — dikonfirmasi user ini memang
+            // 2 paket terpisah, bukan typo.
+            $this->home('NetP130', 'Penawaran Khusus', '40 Mbps', 40, 130000, null, [], null, null, '-', 'Khusus pelanggan lama, minimal langganan 6 bulan'),
+            $this->home('NetP150', 'Penawaran Khusus', '45 Mbps', 45, 150000, null, [], null, null, '-', 'Khusus pelanggan lama, minimal langganan 6 bulan'),
 
             $this->businessBroadband('NetSoLite75', '70 Mbps 1:8', 70, 8, 450000, ['Unlimited', '1 AP + 1 Router'], 'IP Private', 500000, 1),
             $this->businessBroadband('NetSoLite100', '100 Mbps 1:8', 100, 8, 550000, ['Unlimited', '1 AP + 1 Router'], 'IP Private', 500000, 1),
