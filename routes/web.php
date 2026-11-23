@@ -914,13 +914,14 @@ Route::middleware('auth')->group(function () {
 
     // Kelola PIC Gudang per Cabang (ADHOC-120) — halaman TERPISAH dari
     // Manajemen User (keputusan §15.2 no. 6 docs/plan/warehouse/
-    // rancangan-teknisi-pic-gudang-cabang.md). Permission REUSE `users.update`
-    // — lihat docblock WarehousePicGudangController soal kenapa.
-    Route::middleware('permission:users.update')->group(function () {
-        Route::get('/warehouse/pic-gudang', [WarehousePicGudangController::class, 'index'])->name('warehouse.pic-gudang.index');
-        Route::post('/warehouse/pic-gudang', [WarehousePicGudangController::class, 'store'])->name('warehouse.pic-gudang.store');
-        Route::delete('/warehouse/pic-gudang/{picGudang}', [WarehousePicGudangController::class, 'destroy'])->name('warehouse.pic-gudang.destroy');
-    });
+    // rancangan-teknisi-pic-gudang-cabang.md). Sejak ADHOC-313 punya
+    // permission sendiri `warehouse_pic_gudang.*` — dulu numpang `users.update`.
+    Route::get('/warehouse/pic-gudang', [WarehousePicGudangController::class, 'index'])
+        ->middleware('permission:warehouse_pic_gudang.view')->name('warehouse.pic-gudang.index');
+    Route::post('/warehouse/pic-gudang', [WarehousePicGudangController::class, 'store'])
+        ->middleware('permission:warehouse_pic_gudang.create')->name('warehouse.pic-gudang.store');
+    Route::delete('/warehouse/pic-gudang/{picGudang}', [WarehousePicGudangController::class, 'destroy'])
+        ->middleware('permission:warehouse_pic_gudang.delete')->name('warehouse.pic-gudang.destroy');
 
     // Konteks cabang global (analisa-ui-ux-warehouse.md §S1) — tanpa permission
     // khusus (gerbangnya scope pop di dalam controller sendiri), bukan bagian

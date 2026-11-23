@@ -27,7 +27,11 @@ class CustomerNetworkAssignmentController extends Controller
             ? Pop::where('parent_id', $customer->pop_id)->where('type', 'mini_pop')->orderBy('name')->get(['id', 'name', 'pop_code'])
             : collect();
 
-        $distributions = Distribution::whereIn('pop_id', $miniPops->pluck('id'))
+        // Distribusi di-scope ke CABANG (bukan ke Mini POP) — satu Distribusi
+        // (ODP) lazim dipakai bareng lebih dari satu Mini POP dalam Cabang
+        // yang sama (ADHOC-312, laporan user: Cabang Siman D1/D2 lintas
+        // Mini POP).
+        $distributions = Distribution::where('pop_id', $customer->pop_id)
             ->orderBy('code')
             ->get(['id', 'pop_id', 'code', 'name']);
 
@@ -72,8 +76,8 @@ class CustomerNetworkAssignmentController extends Controller
             return back()->with('error', 'Mini POP yang dipilih tidak valid untuk Cabang POP pelanggan ini.');
         }
 
-        if ($distributionId && ! NetworkAssignmentService::distributionBelongsToMiniPop($distributionId, $miniPopId)) {
-            return back()->with('error', 'Distribusi yang dipilih tidak sesuai dengan Mini POP yang dipilih.');
+        if ($distributionId && ! NetworkAssignmentService::distributionBelongsToPop($distributionId, $customer->pop_id)) {
+            return back()->with('error', 'Distribusi yang dipilih tidak sesuai dengan Cabang POP pelanggan ini.');
         }
 
         $oldValues = [

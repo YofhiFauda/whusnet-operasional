@@ -88,14 +88,15 @@ status pelanggan ∈ {registered..waiting_installation, rejected}? ──ya─�
         │ tidak (udah mulai pemasangan atau lebih lanjut)
         ▼
 Pilih Mini POP (dropdown: anak Cabang POP pelanggan)
-Pilih Distribusi (dropdown ke-filter otomatis: anak Mini POP terpilih)
+Pilih Distribusi (dropdown: anak Cabang POP pelanggan — ADHOC-312,
+                  TIDAK ke-filter ikut Mini POP yang dipilih)
         │
         ▼
 Submit PUT /customers/{customer}/network-assignment
         │
         ▼
 Validasi silang: Mini POP.parent_id == customer.pop_id?
-                 Distribusi.pop_id == mini_pop_id terpilih?
+                 Distribusi.pop_id == customer.pop_id? (ADHOC-312, dulu mini_pop_id terpilih)
         │
         ▼ (lolos)
 customer.mini_pop_id = ..., customer.distribution_id = ...
@@ -127,13 +128,13 @@ Validasi: POP dalam scope user?                                  ──tidak─�
           Ada piutang / tagihan `sebagian` / tagihan sudah dibayar sebagian?
                                                                  ──ya─────▶ TOLAK (pop_id, jumlah & total)
           Mini POP/Distribusi diisi padahal terkunci?            ──ya─────▶ TOLAK
-          Mini POP bukan anak POP / Distribusi bukan anak Mini POP? ─ya──▶ TOLAK
+          Mini POP bukan anak POP / Distribusi bukan anak Cabang? (ADHOC-312) ─ya──▶ TOLAK
         │ (lolos)
         ▼
 $customer->update()
   └─ CustomerObserver::updating()      ← jalan juga dari import/tinker/API
        1. masih ada tagihan penghalang? → CustomerRelocationBlockedException (rollback)
-       2. mini_pop bukan anak pop_id → NULL; distribusi bukan anak mini_pop_id → NULL
+       2. mini_pop bukan anak pop_id → NULL; distribusi bukan anak pop_id → NULL (ADHOC-312, independen dari #1)
        3. collector_id = NULL (selalu)
        4. CID dibuat ulang (active/suspended)
   └─ CustomerObserver::updated() (pop_id berubah)

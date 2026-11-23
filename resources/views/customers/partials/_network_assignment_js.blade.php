@@ -81,29 +81,22 @@
         document.body.classList.remove('overflow-hidden');
     }
 
+    // Distribusi anak Cabang, BUKAN anak Mini POP (ADHOC-312) — pilihan sudah
+    // di-scope ke Cabang pelanggan ini oleh server (lihat
+    // CustomerNetworkAssignmentController::data()), jadi tidak perlu disaring
+    // ulang lagi saat Mini POP dipilih/diganti.
     function renderDistributionOptions() {
-        const miniPopSelect = document.getElementById('na-mini-pop-select');
         const distSelect = document.getElementById('na-distribution-select');
-        if (!miniPopSelect || !distSelect) return;
-        const selectedMiniPopId = miniPopSelect.value;
+        if (!distSelect) return;
         const currentDistributionId = distSelect.dataset.currentDistributionId || '';
         const allDistributions = JSON.parse(distSelect.dataset.allOptions || '[]');
 
         distSelect.innerHTML = '<option value="">— Belum di-assign —</option>';
-        allDistributions
-            .filter(d => String(d.pop_id) === String(selectedMiniPopId))
-            .forEach(d => {
-                const opt = document.createElement('option');
-                opt.value = d.id;
-                opt.textContent = d.name ? `[${d.code}] ${d.name}` : d.code;
-                if (String(currentDistributionId) === String(d.id)) opt.selected = true;
-                distSelect.appendChild(opt);
-            });
+        allDistributions.forEach(d => {
+            const opt = document.createElement('option');
+            opt.value = d.id;
+            opt.textContent = d.name ? `[${d.code}] ${d.name}` : d.code;
+            if (String(currentDistributionId) === String(d.id)) opt.selected = true;
+            distSelect.appendChild(opt);
+        });
     }
-
-    window.onPageReady(() => {
-        const miniPopSelect = document.getElementById('na-mini-pop-select');
-        if (miniPopSelect) {
-            miniPopSelect.addEventListener('change', renderDistributionOptions);
-        }
-    });

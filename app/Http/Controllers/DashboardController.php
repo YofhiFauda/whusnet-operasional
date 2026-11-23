@@ -24,6 +24,7 @@ use App\Models\Pop;
 use App\Models\Role;
 use App\Models\Task;
 use App\Models\Ticket;
+use App\Services\DashboardModuleStatsService;
 use App\Services\EffectiveAccessService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -128,6 +129,13 @@ class DashboardController extends Controller
         // Lapangan biar konsisten sama siapa yang boleh lihat data Task FOP.
         $canViewFopDelivery = auth()->user()->hasPermission('task.view.all');
 
+        // Dashboard Owner Fase 2 (ADHOC-313) — gerbang tiap kartu modul =
+        // permission HALAMAN modulnya sendiri (yang juga dipakai middleware
+        // route drilldown-nya). Sengaja tanpa permission baru: yang boleh
+        // lihat ringkasan = yang boleh buka halamannya. Diteruskan ke view
+        // juga supaya link drilldown gak pernah muncul ke user yang bakal 403.
+        $moduleAccess = $this->moduleAccess($canViewWarehouse, $canViewFopDelivery);
+
         $stats = Cache::remember(
             $cacheKey,
             60,
@@ -144,7 +152,9 @@ class DashboardController extends Controller
                 $canViewTickets,
                 $canViewWarehouse,
                 $warehousePopIds,
-                $canViewFopDelivery
+                $canViewFopDelivery,
+                $moduleAccess,
+                $periodFrom
             ) {
                 $totalInvoiceAmount = (float) (clone $periodInvoiceQuery)->sum('total_amount');
                 $totalPaymentAmount = (float) (clone $periodPaymentQuery)
@@ -201,6 +211,17 @@ class DashboardController extends Controller
                     'aging_receivables' => $this->agingReceivables($popId),
                     'customer_completeness' => $this->customerCompletenessDistribution($popId),
                 ];
+
+                $baseStats['modules'] = $this->moduleStats(
+                    $moduleAccess,
+                    $popId,
+                    $periodStartDate,
+                    $periodEndDate,
+                    $periodFrom,
+                    $periodTo,
+                    $warehousePopIds,
+                    $baseStats
+                );
 
                 $baseStats['operational_pulse'] = $this->operationalPulse(
                     $baseStats,
@@ -310,9 +331,103 @@ class DashboardController extends Controller
             'lowStockItems',
             'canViewWarehouse',
             'canViewFopDelivery',
+            'moduleAccess',
             'pops',
             'filters'
         ));
+    }
+
+    /**
+     * Gerbang kartu modul Fase 2 — satu titik, dibaca controller (mau
+     * dihitung atau enggak) DAN view (mau dirender atau enggak). Tiap
+     * permission = middleware route halaman drilldown modul itu.
+     *
+     * @return array<string, bool>
+     */
+    private function moduleAccess(bool $canViewWarehouse, bool $canViewFopDelivery): array
+    {
+        $user = auth()->user();
+
+        return [
+            'isolation' => $user->hasPermission('customers.isolir_queue.view'),
+            'termination_reasons' => $user->hasPermission('customers.terminated.view'),
+            'retrieval_reviews' => $user->hasPermission('device_retrieval_review.view'),
+            'deac_queue' => $canViewFopDelivery,
+            'registration_verification' => $user->hasPermission('customer_registration_verification.view'),
+            'business_verification' => $user->hasPermission('business_development_verification.view'),
+            'creq_billing_verification' => $user->hasPermission('creq_billing_verification.view'),
+            // Feature billing_waivers cuma punya .create/.delete (tanpa .view)
+            // — waiver = urusan tagihan, jadi numpang gerbang daftar tagihan.
+            'billing_waivers' => $user->hasPermission('invoices.view'),
+            'modem_reconciliation' => $user->hasPermission('modem_sale_reconciliation.view'),
+            'collector_performance' => $user->hasPermission('collector_report.view'),
+            'port_occupancy' => $user->hasPermission('network_nodes.view'),
+            'cable_crossings' => $user->hasPermission('customer_cable_crossings.view'),
+            // Halaman Pemulihan Material ada di grup route warehouse_reassign.create.
+            'material_inspections' => $user->hasPermission('warehouse_reassign.create'),
+            'non_psb_tasks' => $canViewFopDelivery,
+            'stock_requests' => $canViewWarehouse && $user->hasPermission('warehouse_stock_request.view'),
+            'pengajuan_barang' => $canViewWarehouse && $user->hasPermission('warehouse_pengajuan_barang.view'),
+        ];
+    }
+
+    /**
+     * Angka kartu modul Fase 2 (ADHOC-313). Kartu yang gerbangnya tertutup
+     * TIDAK dihitung sama sekali (bukan dihitung lalu disembunyikan) — selain
+     * hemat query, angka yang gak boleh dilihat gak pernah ikut masuk cache.
+     *
+     * MRR/ARPU/churn, perubahan paket, dan akuisisi per agen ikut gerbang
+     * dashboard.view (sudah lolos di index()) — turunan data pelanggan &
+     * tagihan yang memang sudah tampil di KPI dashboard ini.
+     *
+     * @param  Collection<int, int>  $warehousePopIds
+     * @param  array<string, mixed>  $baseStats
+     * @return array<string, mixed>
+     */
+    private function moduleStats(
+        array $access,
+        string|int|null $popId,
+        Carbon $periodStartDate,
+        Carbon $periodEndDate,
+        string $periodFrom,
+        string $periodTo,
+        Collection $warehousePopIds,
+        array $baseStats
+    ): array {
+        $service = app(DashboardModuleStatsService::class);
+        $user = auth()->user();
+
+        return array_filter([
+            // P1
+            'isolation' => $access['isolation'] ? $service->isolation($user, $popId) : null,
+            'termination_reasons' => $access['termination_reasons'] ? $service->terminationReasons($popId, $periodStartDate, $periodEndDate) : null,
+            'retrieval_reviews_pending' => $access['retrieval_reviews'] ? $service->pendingRetrievalReviews($user, $popId) : null,
+            'deac_queue' => $access['deac_queue'] ? $service->deacQueue($popId) : null,
+            'registration_verification_pending' => $access['registration_verification'] ? $service->pendingRegistrationVerifications($popId) : null,
+            'business_verification_pending' => $access['business_verification'] ? $service->pendingBusinessVerifications($user, $popId) : null,
+            'creq_billing_verification_pending' => $access['creq_billing_verification'] ? $service->pendingCreqBillingVerifications($popId) : null,
+            'billing_waivers' => $access['billing_waivers'] ? $service->billingWaivers($popId, $periodFrom, $periodTo) : null,
+            'modem_reconciliation' => $access['modem_reconciliation'] ? $service->modemReconciliation($user, $popId) : null,
+
+            // P2
+            'revenue_quality' => $service->revenueQuality(
+                $popId,
+                (int) $baseStats['active_customers'],
+                (int) $baseStats['terminated_customers'],
+                (int) $baseStats['new_active_customers']
+            ),
+            'package_changes' => $service->packageChanges($popId, $periodFrom, $periodTo),
+            'collector_performance' => $access['collector_performance'] ? $service->collectorPerformance($popId, $periodStartDate, $periodEndDate) : null,
+            'top_agents' => $service->topAgents($popId, $periodFrom, $periodTo),
+
+            // P3
+            'port_occupancy' => $access['port_occupancy'] ? $service->portOccupancy($user, $popId) : null,
+            'cable_crossings' => $access['cable_crossings'] ? $service->cableCrossings($popId) : null,
+            'material_inspections_pending' => $access['material_inspections'] ? $service->pendingMaterialInspections($user, $popId) : null,
+            'non_psb_tasks' => $access['non_psb_tasks'] ? $service->nonPsbTasks($popId, $periodStartDate, $periodEndDate) : null,
+            'stock_requests_open' => $access['stock_requests'] ? $service->openStockRequests($warehousePopIds) : null,
+            'pengajuan_barang_pending' => $access['pengajuan_barang'] ? $service->pendingPengajuanBarang($warehousePopIds) : null,
+        ], fn ($value) => $value !== null);
     }
 
     /**

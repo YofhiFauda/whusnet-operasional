@@ -89,6 +89,10 @@ class WarehouseFeatureSeeder extends Seeder
             // `warehouse_stock_request` (barang YANG SUDAH ada di katalog
             // tapi stoknya kosong). Satu keputusan approval: FOP.
             ['code' => 'warehouse_pengajuan_barang', 'name' => 'Surat Pengajuan Barang', 'sort_order' => 25],
+            // Kelola PIC Gudang per Cabang (ADHOC-313) — dulu numpang
+            // `users.update`, kini root sendiri supaya bisa diatur di Role
+            // Matrix terpisah dari Manajemen User.
+            ['code' => 'warehouse_pic_gudang', 'name' => 'Kelola PIC Gudang per Cabang', 'sort_order' => 26],
         ];
 
         foreach ($roots as $root) {

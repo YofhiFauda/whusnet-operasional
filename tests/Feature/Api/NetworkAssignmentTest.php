@@ -45,9 +45,12 @@ class NetworkAssignmentTest extends TestCase
         ]);
     }
 
-    private function seedDistribution(Pop $miniPop, string $code = 'A'): Distribution
+    // Distribusi anak Cabang, BUKAN anak Mini POP (ADHOC-312) — satu
+    // Distribusi lazim dipakai bareng lebih dari satu Mini POP dalam Cabang
+    // yang sama.
+    private function seedDistribution(Pop $cabang, string $code = 'A'): Distribution
     {
-        return Distribution::create(['pop_id' => $miniPop->id, 'code' => $code, 'name' => 'Distribusi '.$code, 'description' => '-']);
+        return Distribution::create(['pop_id' => $cabang->id, 'code' => $code, 'name' => 'Distribusi '.$code, 'description' => '-']);
     }
 
     private function seedCustomer(Pop $cabang, array $overrides = []): Customer
@@ -149,12 +152,19 @@ class NetworkAssignmentTest extends TestCase
         $response->assertStatus(422);
     }
 
-    public function test_distribution_bukan_anak_mini_pop_yang_dipilih_422(): void
+    /**
+     * Distribusi anak Cabang, BUKAN anak Mini POP spesifik (ADHOC-312) —
+     * satu Distribusi (ODP) lazim dipakai bareng lebih dari satu Mini POP
+     * dalam Cabang yang sama (laporan user: Cabang Siman D1/D2 lintas Mini
+     * POP). Mini POP C2 di sini TIDAK dipilih, cuma pembuktian distribusi
+     * yang sama tetap sah dipakai dari Mini POP C1.
+     */
+    public function test_distribution_dipakai_bareng_lintas_mini_pop_dalam_cabang_sama(): void
     {
         $cabang = $this->seedCabang();
         $miniPop = $this->seedMiniPop($cabang);
-        $miniPopLain = $this->seedMiniPop($cabang, 'C2');
-        $this->seedDistribution($miniPopLain, 'A');
+        $this->seedMiniPop($cabang, 'C2');
+        $this->seedDistribution($cabang, 'A');
         $customer = $this->seedCustomer($cabang);
         $this->seedOutbox($customer, 'installation:4:activation:1');
 
@@ -164,14 +174,34 @@ class NetworkAssignmentTest extends TestCase
             'distribution_code' => 'A',
         ]);
 
+        $response->assertOk();
+        $this->assertSame($miniPop->id, $customer->fresh()->mini_pop_id);
+    }
+
+    public function test_distribution_bukan_anak_cabang_pelanggan_422(): void
+    {
+        $cabang = $this->seedCabang();
+        $miniPop = $this->seedMiniPop($cabang);
+        $cabangLain = Pop::create(['code' => 'X', 'pop_code' => 'X', 'name' => 'Cabang Lain', 'type' => 'cabang', 'status' => 'active', 'cid_prefix' => 'X']);
+        $this->seedDistribution($cabangLain, 'A');
+        $customer = $this->seedCustomer($cabang);
+        $this->seedOutbox($customer, 'installation:4b:activation:1');
+
+        $response = $this->postAssignment([
+            'idempotency_key' => 'installation:4b:activation:1',
+            'mini_pop_code' => 'C1',
+            'distribution_code' => 'A',
+        ]);
+
         $response->assertStatus(422);
+        $this->assertNull($customer->fresh()->distribution_id);
     }
 
     public function test_status_blocked_ditolak_422(): void
     {
         $cabang = $this->seedCabang();
         $miniPop = $this->seedMiniPop($cabang);
-        $this->seedDistribution($miniPop);
+        $this->seedDistribution($cabang);
         $customer = $this->seedCustomer($cabang, ['status' => 'waiting_installation']);
         $this->seedOutbox($customer, 'installation:5:activation:1');
 
@@ -191,7 +221,7 @@ class NetworkAssignmentTest extends TestCase
     {
         $cabang = $this->seedCabang();
         $miniPop = $this->seedMiniPop($cabang);
-        $this->seedDistribution($miniPop);
+        $this->seedDistribution($cabang);
         $customer = $this->seedCustomer($cabang);
         $this->seedOutbox($customer, 'installation:6:activation:1');
 
@@ -210,7 +240,7 @@ class NetworkAssignmentTest extends TestCase
     {
         $cabang = $this->seedCabang();
         $miniPop = $this->seedMiniPop($cabang);
-        $this->seedDistribution($miniPop);
+        $this->seedDistribution($cabang);
         $customer = $this->seedCustomer($cabang);
         $this->seedOutbox($customer, 'installation:23:activation:1');
 
@@ -231,7 +261,7 @@ class NetworkAssignmentTest extends TestCase
     {
         $cabang = $this->seedCabang();
         $miniPop = $this->seedMiniPop($cabang);
-        $this->seedDistribution($miniPop);
+        $this->seedDistribution($cabang);
         $customer = $this->seedCustomer($cabang, ['status' => 'installation_in_progress', 'cid' => null]);
         $this->seedOutbox($customer, 'installation:24:activation:1');
 
@@ -252,7 +282,7 @@ class NetworkAssignmentTest extends TestCase
     {
         $cabang = $this->seedCabang();
         $miniPop = $this->seedMiniPop($cabang);
-        $this->seedDistribution($miniPop);
+        $this->seedDistribution($cabang);
         $customer = $this->seedCustomer($cabang, ['status' => 'active', 'cid' => 'C00RQ000631']);
         $this->seedOutbox($customer, 'installation:7:activation:1');
 
@@ -273,7 +303,7 @@ class NetworkAssignmentTest extends TestCase
     {
         $cabang = $this->seedCabang();
         $miniPop = $this->seedMiniPop($cabang);
-        $this->seedDistribution($miniPop);
+        $this->seedDistribution($cabang);
         $customer = $this->seedCustomer($cabang, ['status' => 'installation_in_progress', 'cid' => null]);
         $this->seedOutbox($customer, 'installation:8:activation:1');
 
@@ -291,7 +321,7 @@ class NetworkAssignmentTest extends TestCase
     {
         $cabang = $this->seedCabang();
         $miniPop = $this->seedMiniPop($cabang);
-        $this->seedDistribution($miniPop);
+        $this->seedDistribution($cabang);
         $customer = $this->seedCustomer($cabang);
         $this->seedOutbox($customer, 'installation:16:activation:1');
 
@@ -312,7 +342,7 @@ class NetworkAssignmentTest extends TestCase
     {
         $cabang = $this->seedCabang();
         $miniPop = $this->seedMiniPop($cabang);
-        $this->seedDistribution($miniPop);
+        $this->seedDistribution($cabang);
         $customer = $this->seedCustomer($cabang);
         $lain = $this->seedCustomer($cabang, ['customer_code' => 'RQ000999']);
         $this->seedOutbox($customer, 'installation:19:activation:1');
@@ -333,7 +363,7 @@ class NetworkAssignmentTest extends TestCase
     {
         $cabang = $this->seedCabang();
         $miniPop = $this->seedMiniPop($cabang);
-        $this->seedDistribution($miniPop);
+        $this->seedDistribution($cabang);
         $customer = $this->seedCustomer($cabang);
         $this->seedOutbox($customer, 'installation:20:activation:1');
 

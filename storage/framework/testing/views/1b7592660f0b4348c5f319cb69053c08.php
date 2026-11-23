@@ -73,6 +73,8 @@ $functionalCategories = [
             // Root sendiri (WarehouseFeatureSeeder), dulu lupa didaftarkan di
             // sini → kebuang ke "Modul Tambahan Lainnya" tanpa deskripsi.
             'warehouse_pengajuan_barang',
+            // ADHOC-313 — dulu numpang users.update, kini root sendiri.
+            'warehouse_pic_gudang',
         ],
     ],
     'group_busdev' => [
@@ -134,6 +136,7 @@ $featureMeta = [
     'warehouse_report' => ['name' => 'Laporan Gudang (Agregat Periodik)', 'desc' => 'Laporan agregat pergerakan & kerugian barang per gudang/cabang dalam suatu periode.'],
     'warehouse_stock_request' => ['name' => 'Permintaan Stok Cabang', 'desc' => 'Ajukan permintaan stok dari Cabang ke Pusat saat stok cabang menipis, beserta persetujuannya.'],
     'warehouse_pengajuan_barang' => ['name' => 'Surat Pengajuan Barang', 'desc' => 'Ajukan pengadaan barang yang BELUM ADA di katalog/gudang, beserta persetujuannya. Beda dari Permintaan Stok Cabang (barang sudah ada di katalog).'],
+    'warehouse_pic_gudang' => ['name' => 'Kelola PIC Gudang per Cabang', 'desc' => 'Tunjuk/cabut teknisi ber-role "Teknisi PIC Gudang" sebagai penanggung jawab gudang cabang. Terpisah dari scope POP user; cabang tetap dibatasi scope POP pemegang permission.'],
     'customer_acquisitions' => ['name' => 'Pelanggan Aktif < 30 Hari (Busdev)', 'desc' => 'Monitoring pelanggan baru diverifikasi admin, dikelompokkan per bulan — dipakai Busdev untuk rekap komisi Sales.'],
     'agents' => ['name' => 'Master Agent', 'desc' => 'Kelola data mitra Agent (bukan akun login) yang dipakai saat mendaftarkan pelanggan atas nama Agent.'],
     'package_restrictions' => ['name' => 'Restriksi Paket per Role', 'desc' => 'Atur daftar paket internet yang boleh dipilih role bertanda "Batasi pilihan paket internet" (mis. Sales, Teknisi).'],
@@ -171,6 +174,10 @@ $actionMetaMap = [
     // (`manuals.publish`, `customers.isolir`, …). Tiap ActionCode baru yang
     // dipakai di config/rbac.php WAJIB dapat entri di sini — dijaga
     // RoleMatrixLabelTidakTampilKodeMentahTest.
+    'publish' => ['label' => 'Terbitkan', 'desc' => 'Dapat menerbitkan atau menarik terbitan konten.', 'type' => 'write', 'badge' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
+    'change' => ['label' => 'Ganti', 'desc' => 'Dapat mengganti pilihan data yang sedang berjalan.', 'type' => 'write', 'badge' => 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-800'],
+    'isolir' => ['label' => 'Isolir / Buka Isolir', 'desc' => 'Dapat mengisolir layanan atau mengaktifkannya kembali.', 'type' => 'warning', 'badge' => 'bg-amber-50 text-amber-700 dark:bg-amber-950/60 dark:text-amber-400 border-amber-200 dark:border-amber-800'],
+    'register_infra' => ['label' => 'Registrasi Aset Lama', 'desc' => 'Dapat mendaftarkan aset/material yang sudah terpasang di lapangan.', 'type' => 'write', 'badge' => 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800'],
 ];
 
 // 3b. Deskripsi PER KODE PERMISSION — sumbernya fungsi NYATA di modul
@@ -361,6 +368,9 @@ $permissionDescMap = [
     'warehouse_pengajuan_barang.create' => 'Buat Surat Pengajuan Barang baru untuk barang yang belum ada di katalog/gudang.',
     'warehouse_pengajuan_barang.approve' => 'Setujui pengajuan barang. Selain permission ini, user juga wajib ditunjuk sebagai Approver Pengajuan Barang di Kelola User.',
     'warehouse_pengajuan_barang.reject' => 'Tolak pengajuan barang (wajib alasan). Penolakan FINAL — tidak ada revisi di dokumen yang sama. Butuh penunjukan Approver di Kelola User juga.',
+    'warehouse_pic_gudang.view' => 'Buka halaman Kelola PIC Gudang: daftar Gudang Cabang beserta PIC-nya (menu Gudang).',
+    'warehouse_pic_gudang.create' => 'Tunjuk user ber-role Teknisi PIC Gudang sebagai PIC sebuah Gudang Cabang dalam scope POP Anda.',
+    'warehouse_pic_gudang.delete' => 'Cabut penunjukan PIC Gudang di Gudang Cabang dalam scope POP Anda.',
 
     // ── Laporan ──────────────────────────────────────────────────
     'reports.view' => 'Buka SEMUA halaman laporan (pelanggan, tagihan, pembayaran, import) sekaligus tombol ekspornya.',

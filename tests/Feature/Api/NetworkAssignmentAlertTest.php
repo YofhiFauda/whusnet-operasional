@@ -90,7 +90,8 @@ class NetworkAssignmentAlertTest extends TestCase
             'code' => 'JTS-C1', 'pop_code' => 'C1', 'name' => 'Mini POP C1',
             'type' => 'mini_pop', 'status' => 'active', 'parent_id' => $customer->pop_id,
         ]);
-        Distribution::create(['pop_id' => $miniPop->id, 'code' => 'A', 'name' => 'Distribusi A', 'description' => '-']);
+        // Distribusi anak Cabang, BUKAN anak Mini POP (ADHOC-312).
+        Distribution::create(['pop_id' => $customer->pop_id, 'code' => 'A', 'name' => 'Distribusi A', 'description' => '-']);
 
         $this->withToken('write-token-456')
             ->postJson('/api/v1/installations/network-assignment', [

@@ -622,6 +622,13 @@ class RolePermissionSeeder extends Seeder
                 'warehouse_branch_sale.create',
                 'warehouse_branch_sale.receive',
                 'warehouse_branch_sale_price.view',
+                // Kelola PIC Gudang per Cabang (ADHOC-313) — keputusan user
+                // 2026-11-23: default cuma owner (lewat '*') + admin_gudang.
+                // Role lain (pop_admin dll) lewat Role Matrix bila perlu;
+                // pembatasan cabang tetap dicek scope POP di controller.
+                'warehouse_pic_gudang.view',
+                'warehouse_pic_gudang.create',
+                'warehouse_pic_gudang.delete',
             ],
 
             // Sales SENGAJA tanpa customers.update/customers.isolir (2026-11-10):

@@ -122,7 +122,11 @@
                     </td>
                     <td class="px-6 py-4 whitespace-nowrap">
                         <div class="flex items-center gap-1.5">
-                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-200">{{ $category->name }}</span>
+                            @if($category->badge_color)
+                            <span class="inline-flex px-2 py-0.5 rounded text-xs font-bold" style="background-color: {{ $category->badge_color }}; color: {{ $category->badgeTextColor() }}">{{ $category->name }}</span>
+                            @else
+                            <span class="text-sm font-semibold text-slate-800 dark:text-slate-200" title="Warna badge otomatis">{{ $category->name }}</span>
+                            @endif
                             @if($category->is_batch)
                             <span title="Support Parent/Child banyak pelanggan di Worksheet Helpdesk" class="inline-flex px-1.5 py-0.5 text-[10px] font-bold uppercase rounded bg-violet-50 dark:bg-violet-900/20 text-violet-700 dark:text-violet-400 border border-violet-200 dark:border-violet-800/50">Batch</span>
                             @endif

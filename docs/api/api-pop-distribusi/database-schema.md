@@ -7,7 +7,7 @@ Ketiga endpoint membaca/menulis struktur yang **sudah ada**:
 | Tabel | Dipakai untuk | Endpoint |
 |---|---|---|
 | `pops` | Baca daftar Mini POP (`type=mini_pop`, `parent_id`) | #1 (baca), #2 (validasi) |
-| `distributions` | Baca daftar Distribusi (`pop_id` = Mini POP) | #1 (baca), #2 (validasi) |
+| `distributions` | Baca daftar Distribusi (`pop_id` = Cabang POP, ADHOC-312 — dulu Mini POP) | #1 (baca), #2 (validasi) |
 | `customers` | Tulis `mini_pop_id`, `distribution_id`, `cid` | #2 (tulis) |
 | `customer_devices` | Tulis `pppoe_username`, `pppoe_password` | #3 (tulis) |
 | `customer_technical_details` | Tulis `olt_number`, `olt_slot`, `olt_port`, `vlan` | #3 (tulis) |

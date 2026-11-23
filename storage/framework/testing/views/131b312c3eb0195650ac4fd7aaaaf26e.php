@@ -324,7 +324,7 @@
                                 <?php if(auth()->user()->hasPermission('customers.isolir_queue.view')): ?>
                                 <a href="<?php echo e(route('customers.isolir-queue.index')); ?>"
                                    class="flex items-center justify-between sidebar-subitem <?php echo e(Request::routeIs('customers.isolir-queue.index') ? 'sidebar-subitem-active' : ''); ?>">
-                                    <span>Antrean Isolir</span>
+                                    <span>Monitoring Isolir</span>
                                     <span id="badge-isolir-queue"
                                           data-count-url="<?php echo e(route('customers.isolir-queue.badge-count')); ?>"
                                           data-pop-ids='<?php echo json_encode($badge_isolir_queue_pop_ids ?? [], 15, 512) ?>'
@@ -966,7 +966,7 @@
                                 </a>
                                 <?php endif; ?>
                                 
-                                <?php if(auth()->user()->hasPermission('users.update')): ?>
+                                <?php if(auth()->user()->hasPermission('warehouse_pic_gudang.view')): ?>
                                 <a href="<?php echo e(route('warehouse.pic-gudang.index')); ?>" class="flex items-center justify-between sidebar-subitem <?php echo e(Request::is('warehouse/pic-gudang*') ? 'sidebar-subitem-active' : ''); ?>"><span>Kelola PIC Gudang</span></a>
                                 <?php endif; ?>
                             </div>

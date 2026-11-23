@@ -19,11 +19,13 @@ use Illuminate\View\View;
  * dan field-nya sengaja beda nama dari `pop_ids` (scope) di form user supaya
  * dua konsep ini tidak tertukar.
  *
- * Permission REUSE `users.update` — penunjukan PIC pada dasarnya mengatur
- * data penugasan operasional seorang user, sama kelas aksinya dengan scope
- * POP yang sudah lebih dulu digerbangi permission ini di UserController.
- * Rancangan tidak menetapkan permission baru untuk ini secara eksplisit;
- * keputusan reuse ini dicatat di laporan implementasi ADHOC-120.
+ * Permission sendiri `warehouse_pic_gudang.view|create|delete` (ADHOC-313,
+ * 2026-11-23). Dulu (ADHOC-120) numpang `users.update`: akibatnya siapa pun
+ * yang boleh edit user otomatis bisa menunjuk/mencabut PIC, Admin Gudang yang
+ * gak pegang Manajemen User justru gak bisa, dan Role Matrix gak punya baris
+ * untuk mengaturnya. Jangan dikembalikan ke `users.update`. Permission cuma
+ * menjawab "boleh aksi ini"; "boleh di cabang mana" tetap dicek scope POP
+ * actor di store()/destroy().
  */
 class WarehousePicGudangController extends Controller
 {

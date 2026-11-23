@@ -25,10 +25,11 @@ class CustomerObserver
      *
      * Urutan di bawah penting:
      * 1. Guard piutang (R4) dulu — kalau ditolak, tidak ada yang berubah.
-     * 2. Hierarki Cabang → Mini POP → Distribusi (R6) — yang tidak cocok
-     *    DILEPAS, bukan ditebak: pilihan OLT itu keputusan teknis admin.
-     *    Sebelum ini, pindah POP cuma mengganti pop_id sementara mini_pop_id
-     *    tetap menunjuk OLT cabang lama → CID campuran (kasus D1X6… JETIS →
+     * 2. Hierarki Cabang → Mini POP (R6) dan Cabang → Distribusi (ADHOC-312,
+     *    Distribusi bukan anak Mini POP) — yang tidak cocok DILEPAS, bukan
+     *    ditebak: pilihan OLT itu keputusan teknis admin. Sebelum ini,
+     *    pindah POP cuma mengganti pop_id sementara mini_pop_id tetap
+     *    menunjuk OLT cabang lama → CID campuran (kasus D1X6… JETIS →
      *    SANDYA).
      * 3. Kolektor dilepas (R8).
      * 4. CID dihitung ulang (R3) — SETELAH hierarki dibereskan, supaya CID
@@ -56,17 +57,18 @@ class CustomerObserver
             }
         }
 
-        // 2. Hierarki jaringan. Distribusi tanpa Mini POP yang cocok ikut
-        // dilepas — Distribusi tanpa Mini POP tidak punya sumber segmen OLT
-        // untuk CID. Hanya dicek kalau salah satu kolomnya berubah: nilai
-        // legacy yang tidak disentuh (di luar hierarki, hasil migrasi lama)
-        // dibiarkan apa adanya (keputusan user no. 8).
+        // 2. Hierarki jaringan. Mini POP yang bukan anak Cabang ini dilepas;
+        // Distribusi dicek terhadap CABANG (bukan Mini POP lagi — ADHOC-312,
+        // satu Distribusi lazim dipakai bareng lebih dari satu Mini POP
+        // dalam Cabang yang sama). Hanya dicek kalau salah satu kolomnya
+        // berubah: nilai legacy yang tidak disentuh (di luar hierarki, hasil
+        // migrasi lama) dibiarkan apa adanya (keputusan user no. 8).
         if ($networkChanging) {
             if ($customer->mini_pop_id && ! NetworkAssignmentService::miniPopBelongsToPop($customer->mini_pop_id, $customer->pop_id)) {
                 $customer->mini_pop_id = null;
             }
 
-            if ($customer->distribution_id && ! NetworkAssignmentService::distributionBelongsToMiniPop($customer->distribution_id, $customer->mini_pop_id)) {
+            if ($customer->distribution_id && ! NetworkAssignmentService::distributionBelongsToPop($customer->distribution_id, $customer->pop_id)) {
                 $customer->distribution_id = null;
             }
         }

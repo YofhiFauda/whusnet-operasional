@@ -169,7 +169,7 @@ class TicketController extends Controller
                 // 'pop' (bukan cuma 'customer.pop') — tiket batch gak punya
                 // customer, POP-nya dipilih manual langsung di kolom pop_id.
                 'pop:id,name',
-                'issueCategory:id,name,is_batch',
+                'issueCategory:id,name,is_batch,badge_color',
                 'fopTask:id,task_number,status',
                 'creator:id,name',
                 'histories.actor:id,name',
@@ -228,6 +228,11 @@ class TicketController extends Controller
             'odp' => $ticket->customer_odp ?: ($customer?->odp_code ?: '—'),
             'address' => $ticket->customer_address ?: ($customer?->address ?: '—'),
             'issue_category' => $ticket->issueCategory?->name,
+            // Warna badge dari color picker Master Issue. Null = worksheet
+            // fallback ke tebakan kata kunci (issueBadgeClass()) — kategori
+            // yang belum diberi warna tetap tampil seperti dulu.
+            'issue_category_color' => $ticket->issueCategory?->badge_color,
+            'issue_category_text_color' => $ticket->issueCategory?->badgeTextColor(),
             // Batch (revisi poin 4) — Parent/Child di List Task. `is_batch`
             // gerbang tombol "Tambah" + expand/collapse; `batch_members`
             // render baris child (CID/Nama/HP), lihat Ticket::batchMembers().

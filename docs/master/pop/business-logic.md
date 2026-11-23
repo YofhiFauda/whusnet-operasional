@@ -90,7 +90,9 @@ Aturan tampilan ID pelanggan berbeda tergantung status — ini **bukan** kolom t
 
 Alasan kunci dihitung satu method (`CustomerController::networkLockReason()`) untuk tampilan & validasi.
 
-**Satu sumber aturan** (ADHOC-107 R6) di `NetworkAssignmentService`: daftar status pra-pemasangan `BLOCKED_STATUSES`, serta `miniPopBelongsToPop()` & `distributionBelongsToMiniPop()` — dipakai Edit, modal, endpoint API, dan `CustomerObserver`. Jangan menulis ulang query hierarki di tempat lain.
+**Satu sumber aturan** (ADHOC-107 R6, direvisi ADHOC-312) di `NetworkAssignmentService`: daftar status pra-pemasangan `BLOCKED_STATUSES`, serta `miniPopBelongsToPop()` & `distributionBelongsToPop()` — dipakai Edit, modal, endpoint API, dan `CustomerObserver`. Jangan menulis ulang query hierarki di tempat lain.
+
+**ADHOC-312 (2026-11-23, laporan user):** `distributionBelongsToPop()` dulu bernama `distributionBelongsToMiniPop()` dan cek `distributions.pop_id === mini_pop_id` — satu Distribusi cuma sah nempel ke SATU Mini POP spesifik. Itu salah: Distribusi (ODP) adalah anak CABANG, dipakai bareng semua Mini POP di bawahnya (Cabang Siman: D1/D2 lintas Mini POP). Sekarang cek `distributions.pop_id === pop_id` (Cabang). Endpoint publik `GET /api/v1/pop-distribusi` ikut berubah (breaking change kontrak): `distributions` sejajar `mini_pops` di bawah Cabang, bukan nested di dalam Mini POP — lihat [docs/api/api-pop-distribusi/](../../api/api-pop-distribusi/). Lihat juga [docs/master/distribution/business-logic.md §3](../distribution/business-logic.md#3-relasi-ke-pop--wajib-many-to-one-ke-cabang-adhoc-312-2026-11-23).
 
 Riwayat gap sebelum fix ini (Mini POP gak pernah nyambung ke pelanggan sama sekali): [bug.md](bug.md).
 
@@ -100,7 +102,7 @@ Kasus pemicu: pelanggan dipindah JETIS → SANDYA lewat Edit, CID jadi campuran 
 
 **`CustomerObserver::updating()`** — berlaku dari **semua** jalur (Edit, modal, API, tinker), urutannya:
 1. **Guard piutang** — kalau `pop_id` berubah dan masih ada tagihan penghalang (lihat tabel), lempar `CustomerRelocationBlockedException`; tidak ada yang berubah. Lapis kedua di belakang validasi Edit.
-2. **Hierarki** — `mini_pop.type = mini_pop` & `parent_id = pop_id`, `distribution.pop_id = mini_pop_id`; yang tidak cocok **dilepas, tidak ditebak**. Hanya dicek kalau salah satu kolom jaringan berubah.
+2. **Hierarki** — `mini_pop.type = mini_pop` & `parent_id = pop_id`, `distribution.pop_id = pop_id` (ADHOC-312, dulu `= mini_pop_id`); yang tidak cocok **dilepas, tidak ditebak**, DICEK INDEPENDEN (Distribusi tidak ikut dilepas kalau cuma Mini POP-nya yang tidak cocok). Hanya dicek kalau salah satu kolom jaringan berubah.
 3. **Kolektor dilepas** kalau `pop_id` berubah.
 4. **CID dibuat ulang** (§4).
 

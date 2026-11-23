@@ -13,11 +13,13 @@
 
 **Implikasi:** 2 POP beda gak bisa punya Distribusi dengan kode yang sama persis, walau secara fisik itu perangkat yang beda-beda di lokasi beda. Kode harus didesain global-aware sejak awal (e.g. sisipkan kode POP di kode Distribusi, seperti contoh `X4A` di spesifikasi awal — bukan aturan sistem, cuma konvensi penamaan yang disarankan).
 
-## 3. Relasi ke POP — Wajib, Many-to-One (Sebenarnya ke Mini POP)
+## 3. Relasi ke POP — Wajib, Many-to-One, ke CABANG (ADHOC-312, 2026-11-23)
 
-Setiap Distribusi **wajib** terhubung ke 1 POP (`pop_id` NOT NULL, cascade delete — hapus POP ikut hapus semua Distribusi di bawahnya). Model & form gak enforce `type` tertentu di `pop_id`, tapi **struktur data yang benar** (sesuai `MasterPopSeeder`) adalah Distribusi terhubung ke **Mini POP** (`type=mini_pop`), bukan Cabang langsung — hierarki penuhnya `Cabang → Mini POP → Distribusi`.
+Setiap Distribusi **wajib** terhubung ke 1 POP (`pop_id` NOT NULL, cascade delete — hapus POP ikut hapus semua Distribusi di bawahnya). `pop_id` menunjuk **Cabang** (`type=cabang`), **bukan** Mini POP — hierarkinya `Cabang → Mini POP` dan `Cabang → Distribusi` dua cabang paralel, bukan berantai lewat Mini POP. Satu Distribusi (ODP) lazim dipakai bareng lebih dari satu Mini POP dalam Cabang yang sama (laporan user: Cabang Siman punya D1/D2 yang dipakai lintas Mini POP).
 
-Form create/edit Master Distribusi (`Pop::where('status','active')`) nawarin **semua level POP** tanpa filter type — jadi admin bisa aja gak sengaja assign Distribusi ke row Cabang langsung (melanggar konvensi hierarki, walau gak ditolak sistem). Disiplin operasional: selalu pilih Mini POP, bukan Cabang.
+**Sebelum ADHOC-312** aturannya kebalik: `pop_id` divalidasi harus Mini POP spesifik (`NetworkAssignmentService::distributionBelongsToMiniPop()`, ADHOC-107 R6) — satu Distribusi cuma sah nempel ke SATU Mini POP. Itu salah baca kenyataan lapangan. Sudah dikoreksi jadi `distributionBelongsToPop()` (cek `pop_id` Cabang). Data lama yang `pop_id`-nya masih menunjuk Mini POP dibetulkan lewat `php artisan distributions:backfill-pop-to-cabang --force` (`app/Console/Commands/OneOff/BackfillDistributionPopToCabangCommand.php`).
+
+Form create/edit Master Distribusi (`Pop::forUser()->where('type','cabang')`) cuma nawarin level Cabang — dropdown Mini POP dilepas dari form ini sejak ADHOC-312.
 
 ## 4. Peran dalam Pembentukan CID
 
@@ -31,9 +33,9 @@ Lihat [docs/master/pop/business-logic.md §4](../pop/business-logic.md#4-generat
 
 ## 5. Kapan Distribusi Di-assign ke Pelanggan (✅ Fixed 2026-07-07)
 
-**Bukan** di form laporan pemasangan — `CustomerInstallationController::store()` gak pernah menyentuh `distribution_id` (cuma isi `CustomerTechnicalDetail`/`CustomerDevice`). Distribusi (bareng Mini POP) di-assign lewat modal **"Atur Mini POP & Distribusi"** yang muncul saat klik CID/REQ ID di halaman detail pelanggan (`CustomerNetworkAssignmentController@update`) — **pasca pemasangan**, kapan pun sebelum atau sesudah aktivasi, dan bisa diganti-ganti belakangan (nyusul konfigurasi Mikrotik manual). Dropdown Distribusi di modal ini otomatis ke-filter ikut Mini POP yang dipilih (`Distribution.pop_id = mini_pop.id`).
+**Bukan** di form laporan pemasangan — `CustomerInstallationController::store()` gak pernah menyentuh `distribution_id` (cuma isi `CustomerTechnicalDetail`/`CustomerDevice`). Distribusi (bareng Mini POP) di-assign lewat modal **"Atur Mini POP & Distribusi"** yang muncul saat klik CID/REQ ID di halaman detail pelanggan (`CustomerNetworkAssignmentController@update`) — **pasca pemasangan**, kapan pun sebelum atau sesudah aktivasi, dan bisa diganti-ganti belakangan (nyusul konfigurasi Mikrotik manual). Dropdown Distribusi di modal ini di-scope ke Cabang pelanggan (ADHOC-312), **bukan** ikut Mini POP yang dipilih — pilih Mini POP tidak mempengaruhi daftar Distribusi yang tersedia.
 
-Jalur kedua (ADHOC-104/109/107): form **Edit Pelanggan** punya dropdown berantai POP → Mini POP → Distribusi dengan aturan satu sumber (`NetworkAssignmentService::miniPopBelongsToPop()`/`distributionBelongsToMiniPop()`), tapi Mini POP & Distribusi **cuma ditulis kalau Cabang ikut dipindah** dan terkunci kalau pelanggan pra-pemasangan atau user tanpa `customers.detail.installation.validate`. `CustomerObserver::updating()` menegakkan hierarki dari semua jalur: Mini POP/Distribusi yang bukan milik POP pelanggan dilepas **saat kolom jaringannya berubah** — Distribusi legacy yang menempel langsung ke Cabang (hasil `MigrateLegacyDataCommand`/import) tetap utuh selama tidak disentuh, tapi tidak bisa dipilih sebagai pilihan baru.
+Jalur kedua (ADHOC-104/109/107, direvisi ADHOC-312): form **Edit Pelanggan** punya dropdown POP → Mini POP dan POP → Distribusi (dua cabang paralel, bukan berantai) dengan aturan satu sumber (`NetworkAssignmentService::miniPopBelongsToPop()`/`distributionBelongsToPop()`), tapi Mini POP & Distribusi **cuma ditulis kalau Cabang ikut dipindah** dan terkunci kalau pelanggan pra-pemasangan atau user tanpa `customers.detail.installation.validate`. `CustomerObserver::updating()` menegakkan hierarki dari semua jalur: Mini POP yang bukan anak Cabang pelanggan, atau Distribusi yang bukan anak Cabang pelanggan, dilepas **saat kolom jaringannya berubah** — keduanya dicek independen (Distribusi TIDAK ikut dilepas hanya karena Mini POP-nya dilepas).
 
 Sebelum di-assign, segmen Distribusi di CID = `0` (dulu `'XX'`; lihat `../pop/business-logic.md` §4). Kalau Distribusi diganti setelah pelanggan `active`/`suspended`, CID dibuat ulang otomatis lewat `CustomerCidService`. Riwayat gap sebelum fix ini: [../pop/bug.md](../pop/bug.md).
 

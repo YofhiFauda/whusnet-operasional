@@ -307,7 +307,7 @@ Dikombinasikan dengan R1 (nilai tidak berubah = lolos) dan R2 (terkunci = dibuan
 1. `CustomerNetworkAssignmentController` menghapus `BLOCKED_STATUSES` privat dan merujuk `NetworkAssignmentService::BLOCKED_STATUSES`.
 2. Dua method publik di `NetworkAssignmentService`, dipakai closure Edit, modal, API, dan observer:
    - `miniPopBelongsToPop(?int $miniPopId, ?int $popId): bool` — `type = mini_pop` dan `parent_id = popId`.
-   - `distributionBelongsToMiniPop(?int $distributionId, ?int $miniPopId): bool`.
+   - `distributionBelongsToMiniPop(?int $distributionId, ?int $miniPopId): bool`. **Superseded ADHOC-312 (2026-11-23):** rename jadi `distributionBelongsToPop(?int $distributionId, ?int $popId): bool` — Distribusi ternyata anak Cabang, bukan anak Mini POP. Lihat `docs/master/distribution/business-logic.md` §3.
 3. Perbarui klaim "satu sumber" di `master/pop/business-logic.md` §7.
 
 ### R7 — Peringatan PPPoE tidak cocok dengan CID (T6, keputusan no. 6)

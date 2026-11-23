@@ -113,9 +113,18 @@ class TicketIssueCategoryController extends Controller
             // is_batch=true balik ke false waktu checkbox-nya dicentang lalu
             // di-uncheck lagi).
             'is_batch' => ['nullable', 'boolean'],
+            // Kosong = "Otomatis" (tebakan kata kunci di Worksheet Helpdesk).
+            // Cuma hex 6 digit — nilainya dirender ke atribut `style`, jadi
+            // format bebas (nama warna, `rgb()`, apalagi `;`) gak diterima.
+            'badge_color' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
+        ], [
+            'badge_color.regex' => 'Warna badge harus format hex, contoh #0ea5e9.',
         ]);
 
         $validated['is_batch'] = $request->boolean('is_batch');
+        $validated['badge_color'] = filled($validated['badge_color'] ?? null)
+            ? strtolower($validated['badge_color'])
+            : null;
 
         return $validated;
     }
