@@ -480,6 +480,31 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
         $this->assertSame('111000.00', $service->refresh()->monthly_price);
     }
 
+    public function test_header_dengan_trailing_space_tetap_terbaca(): void
+    {
+        // Regresi temuan nyata cabang Caruban: header excel aslinya "Nama
+        // Paket " (ADA trailing space), bukan "Nama Paket" persis seperti
+        // yang dicek command. Tanpa normalisasi trim di key kolom, lookup
+        // array_key_exists('Nama Paket', $row) gagal diam-diam dan $kodeRaw
+        // jadi kosong buat SEMUA baris — paket gak pernah kekoreksi walau
+        // datanya ADA.
+        $pop = Pop::factory()->create(['name' => 'Caruban']);
+        $package = $this->makePackage('Net150', 'Net150', 150000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Sulastri']);
+        $service = $this->makeService($customer, null, 0);
+
+        $file = $this->writeExcelFixture([
+            ['CID' => '', 'Nama' => 'Sulastri', 'Harga' => 150000, 'Paket' => ' Up to 45 Mbps', 'Nama Paket ' => 'Net150'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', ['file' => $file, '--pop-id' => $pop->id, '--apply' => true])
+            ->expectsOutputToContain('1 diubah')
+            ->assertSuccessful();
+
+        $this->assertSame('150000.00', $service->refresh()->monthly_price);
+        $this->assertSame($package->id, $service->internet_package_id);
+    }
+
     public function test_fallback_kolom_paket_dipakai_kalau_nama_paket_isinya_teks_speed(): void
     {
         // Regresi temuan nyata cabang Siman: header `Nama Paket`/`Paket` di

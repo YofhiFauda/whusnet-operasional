@@ -200,21 +200,30 @@ class CustomerPackageReconcileFromExcelCommand extends Command
         $presentCustomerIds = [];
 
         foreach (SimpleExcelReader::create($fullPath)->getRows() as $row) {
+            // Normalisasi key kolom (trim) SEKALI di sini — temuan nyata
+            // cabang Caruban: header aslinya "Nama Paket " (ADA trailing
+            // space), gak pernah match exact-key 'Nama Paket' di bawah,
+            // bikin $kodeRaw diam-diam kosong buat SEMUA baris walau
+            // datanya jelas ADA. File excel kolektor beda cabang gak
+            // konsisten soal trailing space di header, jangan percaya
+            // array_key_exists exact tanpa normalisasi ini lagi.
+            $row = array_combine(array_map('trim', array_keys($row)), array_values($row));
+
             $namaExcel = trim((string) ($row['Nama'] ?? ''));
             // `Harga`/`Nama Paket` adalah nama kolom yang BENERAN jelas
             // (dipakai Caruban & template baru) — diutamakan kalau ADA.
-            // `Paket`/`paket ` (huruf kecil+spasi, nyaris gak kebeda dari
-            // `Paket` biasa) nama kolom LAMA peninggalan file Sambit asli,
-            // tetap didukung buat file lama yang belum dirapiin. Kalau
-            // kolom `Harga` ada tapi isinya bukan harga (misal cabang
-            // nulis ulang header `Paket` jadi teks speed seperti "Up to 25
-            // Mbps"), `Harga` TETAP menang — jangan pernah diam-diam jatuh
-            // balik ke `Paket` cuma karena `Harga` kosong/0, itu nyembunyiin
+            // `Paket`/`paket` (huruf kecil, nyaris gak kebeda dari `Paket`
+            // biasa) nama kolom LAMA peninggalan file Sambit asli, tetap
+            // didukung buat file lama yang belum dirapiin. Kalau kolom
+            // `Harga` ada tapi isinya bukan harga (misal cabang nulis ulang
+            // header `Paket` jadi teks speed seperti "Up to 25 Mbps"),
+            // `Harga` TETAP menang — jangan pernah diam-diam jatuh balik ke
+            // `Paket` cuma karena `Harga` kosong/0, itu nyembunyiin
             // kesalahan isi data, bukan masalah nama kolom.
             $nominal = array_key_exists('Harga', $row)
                 ? (int) $row['Harga']
                 : (int) ($row['Paket'] ?? 0);
-            $kodeRaw = trim((string) (array_key_exists('Nama Paket', $row) ? $row['Nama Paket'] : ($row['paket '] ?? '')));
+            $kodeRaw = trim((string) (array_key_exists('Nama Paket', $row) ? $row['Nama Paket'] : ($row['paket'] ?? '')));
             $cidExcel = trim((string) ($row['CID'] ?? ''));
 
             if ($namaExcel === '' || $nominal <= 0) {
@@ -339,33 +348,33 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             // keduanya 198000/200Mbps — skema penamaan beda doang, bukan tier
             // beda; ganti id di sini cuma churn tanpa guna, sama kasusnya
             // dengan "NEW 45 Mbps (150K)" vs "Net150").
-            // Kolom `Paket` DICOBA DULUAN (2026-11-21, kasus Siman) — kebalikan
-            // dari quirk Sambit: di file ini `Nama Paket` isinya teks speed
-            // ("Up to 35 Mbps") dan `Paket` isinya KODE katalog ASLI per-baris
-            // ("Net138"). Label `Nama Paket` yang SAMA bisa punya `Paket` yang
-            // BEDA-BEDA antar baris (temuan nyata: ratusan baris "Up to 35
-            // Mbps" isi Paket-nya "Net138", tapi beberapa baris lain malah
-            // "Net165"/"NetP110") — typo_fix berbasis label gak boleh jalan
-            // DULUAN dan nimpa kode per-baris yang lebih spesifik ini. HANYA
-            // dicoba kalau kolom `Harga` ADA (beda nama kolom sama `Paket`),
-            // jadi `Paket` di sini sama sekali bukan dipakai buat nominal
-            // (lihat parsing $nominal di atas) — aman dicoba sebagai kode
-            // tanpa risiko salah baca angka harga sebagai kode paket.
-            $targetPackage = null;
-            if (array_key_exists('Harga', $row)) {
-                $paketKolRaw = trim((string) ($row['Paket'] ?? ''));
-                if ($paketKolRaw !== '') {
-                    $targetPackage = InternetPackage::where('package_code', $typoFixes[$paketKolRaw] ?? $paketKolRaw)->first();
-                }
-            }
+            // Resolusi 4 tahap — DUA kolom (`Nama Paket`/kodeRaw dan `Paket`)
+            // bisa jadi yang isinya KODE ASLI, tergantung cabang: Siman taruh
+            // kode di `Paket` (Nama Paket cuma teks speed), Caruban taruh
+            // kode di `Nama Paket` (Paket cuma teks speed "Up to 35 Mbps").
+            // typo_fix yang dicek DULUAN terhadap kolom yang SALAH bisa
+            // nimpa kode ASLI yang bener di kolom lain (ketahuan nyata:
+            // priority "Paket duluan" buat Siman bikin typo_fix label
+            // Caruban berisiko nimpa kode asli valid di `Nama Paket`).
+            // Jadi: 1&2 coba APA ADANYA (byte-for-byte, TANPA typo_fix) di
+            // kedua kolom dulu — kalau salah satu udah persis nama katalog,
+            // itu MENANG, titik. typo_fix (3&4) baru dicoba PALING AKHIR,
+            // cuma buat nutup baris yang beneran gak ketemu di kolom
+            // manapun — gak pernah sempat nimpa kode valid yang udah ada.
+            $paketKolRaw = array_key_exists('Harga', $row) ? trim((string) ($row['Paket'] ?? '')) : '';
 
-            // Fallback ke `Nama Paket`/`paket ` (+ typo_fix) kalau kolom
-            // `Paket` kosong atau kodenya gak dikenal katalog — di sinilah
-            // typo_fix berbasis LABEL aman dipakai, karena cuma kepake saat
-            // gak ada data per-baris yang lebih spesifik buat ditimpa.
-            if (! $targetPackage) {
-                $code = $typoFixes[$kodeRaw] ?? $kodeRaw;
-                $targetPackage = InternetPackage::where('package_code', $code)->first();
+            $targetPackage = null;
+            if ($kodeRaw !== '') {
+                $targetPackage = InternetPackage::where('package_code', $kodeRaw)->first();
+            }
+            if (! $targetPackage && $paketKolRaw !== '' && $paketKolRaw !== $kodeRaw) {
+                $targetPackage = InternetPackage::where('package_code', $paketKolRaw)->first();
+            }
+            if (! $targetPackage && $kodeRaw !== '' && isset($typoFixes[$kodeRaw])) {
+                $targetPackage = InternetPackage::where('package_code', $typoFixes[$kodeRaw])->first();
+            }
+            if (! $targetPackage && $paketKolRaw !== '' && isset($typoFixes[$paketKolRaw])) {
+                $targetPackage = InternetPackage::where('package_code', $typoFixes[$paketKolRaw])->first();
             }
 
             if ($targetPackage) {
