@@ -116,6 +116,22 @@ class MigrasiLegacyTidakAdaDataHilangTest extends TestCase
     }
 
     #[Test]
+    public function pelanggan_bisnis_berprefix_us_ikut_terimpor_beserta_tagihan_dan_pembayarannya(): void
+    {
+        // Regresi 2026-11-23: Siman RQ001407 "Taman Jatimori" (US000001,
+        // JENISPELANGGAN BISNIS) hilang total — filter prefix "PE" membuang
+        // semua akun pelanggan ber-prefix "US" sebagai akun staf.
+        $this->import()->assertExitCode(0);
+
+        $customer = Customer::where('old_customer_id', 'US000001')->first();
+        $this->assertNotNull($customer, 'Pelanggan bisnis ber-prefix US tidak boleh hilang.');
+        $this->assertSame('active', CustomerService::where('old_request_id', 'RQ001407')->value('service_status'));
+        $this->assertNotEmpty($customer->cid);
+        $this->assertTrue(Invoice::where('old_request_id', 'RQ001407')->exists(), 'Tagihan pelanggan US ikut terbuang.');
+        $this->assertEquals(512000, (float) Payment::where('old_request_id', 'RQ001407')->sum('amount'));
+    }
+
+    #[Test]
     public function rq_yatim_putus_masuk_kelompok_putus_beserta_tagihan_dan_pembayarannya(): void
     {
         $this->import()->assertExitCode(0);

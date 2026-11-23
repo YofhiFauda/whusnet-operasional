@@ -128,13 +128,25 @@ class RollbackLegacyCustomersCommand extends Command
     }
 
     /**
+     * Query `parent_id` eksplisit per level, bukan `$pop->children` —
+     * relasi itu di-lazy-load, dan `Model::preventLazyLoading()` (aktif di
+     * luar production) meledak begitu Cabang punya >1 Mini POP (regresi
+     * rollback Siman D1+D2, 2026-11-23). Cukup id, gak perlu model utuh.
+     *
      * @return list<int>
      */
     private function descendantPopIds(Pop $pop): array
     {
         $ids = [$pop->id];
-        foreach ($pop->children as $child) {
-            $ids = array_merge($ids, $this->descendantPopIds($child));
+        $frontier = [$pop->id];
+
+        while ($frontier !== []) {
+            $frontier = Pop::query()
+                ->whereIn('parent_id', $frontier)
+                ->whereNotIn('id', $ids)
+                ->pluck('id')
+                ->all();
+            $ids = array_merge($ids, $frontier);
         }
 
         return $ids;
