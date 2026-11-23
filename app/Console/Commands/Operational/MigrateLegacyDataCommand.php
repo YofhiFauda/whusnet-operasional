@@ -44,12 +44,29 @@ class MigrateLegacyDataCommand extends Command
             'PE000060', 'PE000061', 'PE000062', 'PE000063', 'PE000064',
             'PE000065', 'PE000066', 'PE000068', 'PE000012',
             'US000001', 'US000002', 'US000003', 'US000004', 'US000005', 'US000006',
+            // US000007 juga lorem ipsum — dulu gak kecatat karena semua akun
+            // "US" sudah terbuang filter prefix PE; sejak "US" ikut diimpor
+            // (isLegacyCustomerAccount, 2026-11-23) wajib didaftar eksplisit.
+            'US000007',
+        ],
+        // Audit 2026-11-23 (permintaan user): nama "Tes/Test/Testing" staf +
+        // entri "Backbone" (jalur infrastruktur, bukan pelanggan). Semuanya
+        // nol tagihan & nol pembayaran di hasil migrasi sebelumnya — aman
+        // dibuang. Pelanggan pengganti RQ yatim bernama "PE…" SENGAJA tidak
+        // masuk sini (keputusan 2026-11-11: tetap diimpor, wajib dilengkapi).
+        'siman_db_aplikasi_siman.sql' => [
+            'PE000035', 'PE000120', 'PE000244', 'PE000245', 'PE000246',
+            'PE000580', 'PE000581', 'PE000617', 'PE000840', 'PE000874',
+            'PE000884', 'PE000889', 'PE000899', 'PE000934',
         ],
         'paci_db_aplikasi_pacitan.sql' => [
             'PE000001', 'PE000051', 'PE000843', 'PE000954',
         ],
         'caru_db_caruban.sql' => [
             'PE000182',
+            // "Tiketbackbone" x4 (audit 2026-11-23) — entri jalur backbone,
+            // bukan pelanggan; nol tagihan, nol pembayaran, nol tiket.
+            'PE000139', 'PE000140', 'PE000141', 'PE000142',
         ],
         'jetis_db_aplikasi_jetis.sql' => [
             'PE000197', 'PE000243', 'PE000552',
@@ -594,8 +611,8 @@ class MigrateLegacyDataCommand extends Command
         $skippedWithoutRequest = 0;
 
         foreach ($penggunaRows as $row) {
-            // Filter: skip internal users starting with PG
-            if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+            // Filter: skip akun staf (PG…) — lihat isLegacyCustomerAccount()
+            if (! $this->isLegacyCustomerAccount($row['IDPENGGUNA'] ?? '')) {
                 continue;
             }
 
@@ -760,7 +777,7 @@ class MigrateLegacyDataCommand extends Command
         $servicesWithoutPackage = 0;
         foreach ($layananRows as $row) {
             // Filter: skip internal users
-            if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+            if (! $this->isLegacyCustomerAccount($row['IDPENGGUNA'] ?? '')) {
                 continue;
             }
 
@@ -984,7 +1001,7 @@ class MigrateLegacyDataCommand extends Command
         $technicalSheet = [];
         foreach ($laporanRows as $row) {
             // Filter: skip internal users
-            if (! str_starts_with($row['IDPENGGUNA'] ?? '', 'PE')) {
+            if (! $this->isLegacyCustomerAccount($row['IDPENGGUNA'] ?? '')) {
                 continue;
             }
 
@@ -1209,7 +1226,7 @@ class MigrateLegacyDataCommand extends Command
 
             // Filter: skip internal users
             $cust = $row['IDPELANGGAN'] ?? $requestToCustomerMap[$row['IDPERMINTAAN'] ?? ''] ?? '';
-            if (! str_starts_with($cust, 'PE')) {
+            if (! $this->isLegacyCustomerAccount($cust)) {
                 continue;
             }
 
@@ -1361,7 +1378,7 @@ class MigrateLegacyDataCommand extends Command
             $cust = $invCust ?: $reqCust;
 
             // Filter: skip internal users
-            if ($cust !== '' && ! str_starts_with($cust, 'PE')) {
+            if ($cust !== '' && ! $this->isLegacyCustomerAccount($cust)) {
                 continue;
             }
 
@@ -1438,7 +1455,7 @@ class MigrateLegacyDataCommand extends Command
             }
 
             $cust = $row['IDPELANGGAN'] ?? '';
-            if (! str_starts_with($cust, 'PE')) {
+            if (! $this->isLegacyCustomerAccount($cust)) {
                 continue;
             }
 
@@ -1654,6 +1671,22 @@ class MigrateLegacyDataCommand extends Command
     }
 
     /**
+     * Akun pelanggan legacy = prefix "PE" (rumahan) ATAU "US" (bisnis);
+     * prefix lain (PG…) itu akun staf. Dulu cuma "PE" yang lolos, sehingga
+     * pelanggan bisnis "US" hilang total tanpa peringatan beserta tagihan &
+     * pembayarannya — temuan 2026-11-23: Siman RQ001407 Taman Jatimori,
+     * Caruban SMAN Pilangkenceng, Pacitan US000001. Akun "US" yang terbukti
+     * dummy (Sambit lorem ipsum) dikeluarkan lewat DUMMY_LEGACY_ACCOUNTS,
+     * bukan dengan mempersempit prefix lagi. SATU-SATUNYA tempat aturan
+     * prefix ini — jangan tulis `str_starts_with(..., 'PE')` baru di tempat
+     * lain, satu filter yang ketinggalan = tagihan/pembayaran yatim.
+     */
+    private function isLegacyCustomerAccount(string $legacyUserId): bool
+    {
+        return str_starts_with($legacyUserId, 'PE') || str_starts_with($legacyUserId, 'US');
+    }
+
+    /**
      * Permintaan legacy yang IDPENGGUNA-nya tidak punya baris di `pengguna`
      * ("RQ yatim", mis. Jetis RQ001634→PE001630 ACTIVE ber-tagihan) dulu
      * ditolak importer beserta layanan, tagihan, dan pembayarannya. Keputusan
@@ -1675,7 +1708,7 @@ class MigrateLegacyDataCommand extends Command
 
         foreach ($layananRows as $row) {
             $customerId = trim((string) ($row['IDPENGGUNA'] ?? ''));
-            if (! str_starts_with($customerId, 'PE') || isset($known[$customerId])) {
+            if (! $this->isLegacyCustomerAccount($customerId) || isset($known[$customerId])) {
                 continue;
             }
 

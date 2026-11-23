@@ -810,7 +810,7 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
         ]);
 
         $this->artisan('app:customer-package-reconcile-excel', [
-            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--actor-id' => $actor->id, '--apply' => true,
+            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id, '--apply' => true,
         ])->assertSuccessful();
 
         $this->assertSame('active', $diExcel->refresh()->status);
@@ -842,7 +842,7 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
         ]);
 
         $this->artisan('app:customer-package-reconcile-excel', [
-            'file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--terminate-missing' => true, '--actor-id' => $actor->id, '--apply' => true,
+            'file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id, '--apply' => true,
         ])->assertSuccessful();
 
         $this->assertSame('active', $ambigu1->refresh()->status);
@@ -866,7 +866,7 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
         ]);
 
         $this->artisan('app:customer-package-reconcile-excel', [
-            'file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--terminate-missing' => true, '--actor-id' => $actor->id, '--apply' => true,
+            'file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id, '--apply' => true,
         ])->assertSuccessful();
 
         $this->assertSame('active', $overrideCustomer->refresh()->status);
@@ -884,7 +884,7 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
         ]);
 
         $this->artisan('app:customer-package-reconcile-excel', [
-            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--actor-id' => $actor->id, '--apply' => true,
+            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id, '--apply' => true,
         ])->assertSuccessful();
 
         $this->assertSame('active', $diPopLain->refresh()->status);
@@ -901,7 +901,7 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
         ]);
 
         $this->artisan('app:customer-package-reconcile-excel', [
-            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--actor-id' => $actor->id,
+            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id,
         ])->assertSuccessful();
 
         $this->assertSame('active', $tidakDiExcel->refresh()->status);
@@ -934,7 +934,161 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
         ]);
 
         $this->artisan('app:customer-package-reconcile-excel', [
-            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--actor-id' => 999999, '--apply' => true,
+            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => 999999, '--apply' => true,
+        ])->assertFailed();
+
+        $this->assertSame('active', $tidakDiExcel->refresh()->status);
+    }
+
+    /**
+     * Regresi 2026-11-23 (Siman): rekap kolektor disusun SEBELUM pasang baru
+     * bulan berjalan, jadi 17 pelanggan yang aktif 3–19 Nov ikut diputus
+     * `--terminate-missing` cuma karena belum sempat ditulis di Excel.
+     */
+    public function test_terminate_missing_tidak_memutus_pelanggan_yang_aktif_setelah_tanggal_rekap(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $package = $this->makePackage('Net165', 'Net165', 165000);
+        $pasangBaru = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Samuri', 'status' => 'active']);
+        $this->makeService($pasangBaru, $package, 165000)->update(['activation_date' => '2026-11-04']);
+        $pelangganLama = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Pelanggan Lama', 'status' => 'active']);
+        $this->makeService($pelangganLama, $package, 165000)->update(['activation_date' => '2025-01-10']);
+        $actor = User::factory()->create();
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Nama Lain', 'Paket' => 50000, 'paket ' => 'TidakAda'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id, '--apply' => true,
+        ])->assertSuccessful();
+
+        $this->assertSame('active', $pasangBaru->refresh()->status, 'Pasang baru setelah rekap disusun tidak boleh diputus.');
+        $this->assertSame('terminated', $pelangganLama->refresh()->status);
+    }
+
+    /**
+     * Regresi 2026-11-23 (Siman): pelanggan yang ditagih di luar rekap
+     * kolektor (mis. "Kos The Cozy" D1X6CRQ001247) tidak punya baris Excel —
+     * `keep_cids` di config melindunginya dari `--terminate-missing`.
+     */
+    public function test_terminate_missing_tidak_memutus_pelanggan_di_keep_cids(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $dilindungi = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Duta Mahardika', 'cid' => 'D1X6CRQ001247', 'status' => 'active']);
+        $actor = User::factory()->create();
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Nama Lain', 'Paket' => 50000, 'paket ' => 'TidakAda'],
+        ]);
+        $config = $this->writeConfigFixture([
+            'keep_cids' => ['D1X6CRQ001247'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $file, '--pop-id' => $pop->id, '--config' => $config, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id, '--apply' => true,
+        ])->assertSuccessful();
+
+        $this->assertSame('active', $dilindungi->refresh()->status);
+    }
+
+    /**
+     * Regresi 2026-11-23: pelanggan Bisnis ditagih di luar rekap kolektor
+     * (Siman "Taman Jatimori"), "tidak ada di Excel" bukan bukti berhenti.
+     */
+    public function test_terminate_missing_tidak_memutus_pelanggan_bisnis(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $bisnis = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Taman Jatimori', 'customer_type' => 'BISNIS', 'status' => 'active']);
+        $rumahan = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Pelanggan Lama', 'customer_type' => 'RUMAHAN', 'status' => 'active']);
+        $actor = User::factory()->create();
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Nama Lain', 'Paket' => 50000, 'paket ' => 'TidakAda'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id, '--apply' => true,
+        ])->assertSuccessful();
+
+        $this->assertSame('active', $bisnis->refresh()->status);
+        $this->assertSame('terminated', $rumahan->refresh()->status);
+    }
+
+    /**
+     * Regresi 2026-11-23: baris "Devy Ratna Ariestasari" di Excel Siman
+     * kolomnya bergeser (Harga = "pijeran") — dulu dibuang diam-diam, lalu
+     * pelanggannya diputus `--terminate-missing` padahal ada di rekap.
+     */
+    public function test_baris_excel_rusak_tetap_dianggap_ada_dan_tidak_dikoreksi(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $package = $this->makePackage('NetP110', 'NetP110', 110000);
+        $customer = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Devy Ratna Ariestasari', 'cid' => 'D1X6BRQ000070', 'status' => 'active']);
+        $service = $this->makeService($customer, $package, 122500);
+        $actor = User::factory()->create();
+
+        $file = $this->writeExcelFixture([
+            ['CID' => 'D00RQ000070', 'Nama' => 'Devy Ratna Ariestasari ', 'Harga' => 'pijeran', 'Nama Paket' => '122500'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id, '--apply' => true,
+        ])
+            ->expectsOutputToContain('baris Excel rusak')
+            ->assertSuccessful();
+
+        $this->assertSame('active', $customer->refresh()->status);
+        $this->assertEquals(122500, (float) $service->refresh()->monthly_price, 'Harga dari baris rusak tidak boleh dipakai mengoreksi.');
+    }
+
+    /**
+     * Regresi 2026-11-23: "Sulastri Doplang" tercatat di sheet DEAKTIVASI
+     * tapi barisnya di sheet tagihan belum dicoret — dulu tetap aktif
+     * karena cuma sheet pertama yang dibaca.
+     */
+    public function test_sheet_deaktivasi_memutus_pelanggan_walau_masih_ada_di_sheet_tagihan(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $package = $this->makePackage('Net165', 'Net165', 165000);
+        $sulastri = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Sulastri Doplang', 'cid' => 'D1X6CRQ001203', 'status' => 'active']);
+        $this->makeService($sulastri, $package, 165000);
+        $cidNyasar = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Orang Lain Sama Sekali', 'cid' => 'D1X6CRQ001204', 'status' => 'active']);
+        $actor = User::factory()->create();
+
+        $path = storage_path('framework/testing/reconcile-'.uniqid().'.xlsx');
+        $this->tempFiles[] = $path;
+        $writer = SimpleExcelWriter::create($path);
+        $writer->nameCurrentSheet('Tagihan pelanggan');
+        $writer->addRow(['CID' => 'D1X6CRQ001203', 'Nama' => 'Sulastri Doplang', 'Harga' => 165000, 'Nama Paket' => 'Net165']);
+        $writer->addNewSheetAndMakeItCurrent('DEAKTIVASI ');
+        $writer->noHeaderRow();
+        $writer->addRow([740, 'D1X6CRQ001203', 'Sulastri Doplang', 'Perumahan Amira']);
+        $writer->addRow([741, 'connexa', 'D1X6CRQ001204', 'Nama Yang Gak Nyambung', '-']);
+        $writer->close();
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $path, '--pop-id' => $pop->id, '--actor-id' => $actor->id, '--apply' => true,
+        ])
+            ->expectsOutputToContain('[DEAKTIVASI] D1X6CRQ001204')
+            ->assertSuccessful();
+
+        $this->assertSame('terminated', $sulastri->refresh()->status);
+        $this->assertSame('active', $cidNyasar->refresh()->status, 'CID DEAKTIVASI yang namanya gak nyambung tidak boleh memutus pelanggan lain.');
+    }
+
+    public function test_terminate_missing_tanpa_rekap_date_gagal(): void
+    {
+        $pop = Pop::factory()->create(['name' => 'Siman']);
+        $tidakDiExcel = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Pelanggan Lama', 'status' => 'active']);
+        $actor = User::factory()->create();
+
+        $file = $this->writeExcelFixture([
+            ['Nama' => 'Nama Lain', 'Paket' => 50000, 'paket ' => 'TidakAda'],
+        ]);
+
+        $this->artisan('app:customer-package-reconcile-excel', [
+            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--actor-id' => $actor->id, '--apply' => true,
         ])->assertFailed();
 
         $this->assertSame('active', $tidakDiExcel->refresh()->status);
@@ -1078,12 +1232,12 @@ class CustomerPackageReconcileFromExcelCommandTest extends TestCase
 
         $customer1 = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Pelanggan Satu', 'status' => 'active']);
         $this->artisan('app:customer-package-reconcile-excel', [
-            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--actor-id' => $actor->id, '--apply' => true,
+            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id, '--apply' => true,
         ])->assertSuccessful();
 
         $customer2 = Customer::factory()->create(['pop_id' => $pop->id, 'full_name' => 'Pelanggan Dua', 'status' => 'active']);
         $this->artisan('app:customer-package-reconcile-excel', [
-            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--actor-id' => $actor->id, '--apply' => true,
+            'file' => $file, '--pop-id' => $pop->id, '--terminate-missing' => true, '--rekap-date' => '2026-11-01', '--actor-id' => $actor->id, '--apply' => true,
         ])->assertSuccessful();
 
         $this->assertSame('terminated', $customer1->refresh()->status);

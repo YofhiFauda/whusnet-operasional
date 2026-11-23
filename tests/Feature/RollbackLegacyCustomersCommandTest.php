@@ -136,6 +136,38 @@ class RollbackLegacyCustomersCommandTest extends TestCase
         $this->assertDatabaseMissing('customers', ['id' => $customer->id]);
     }
 
+    /**
+     * Regresi 2026-11-23: rollback Siman (Cabang D, Mini POP D1 + D2) meledak
+     * `LazyLoadingViolationException` di `descendantPopIds()`. Laravel cuma
+     * mencegah lazy load pada model yang diambil sebagai koleksi >1 baris —
+     * test di atas cuma punya SATU Mini POP, jadi tidak pernah menangkapnya.
+     */
+    public function test_rollback_cabang_dengan_beberapa_mini_pop_tidak_meledak_lazy_loading(): void
+    {
+        $cabang = $this->createPop('POP-RB-G', 'RBG', 'Cabang Rollback G');
+        $customers = [];
+        foreach (['1', '2'] as $segment) {
+            $miniPop = Pop::create([
+                'code' => 'POP-RB-G'.$segment,
+                'pop_code' => 'RBG'.$segment,
+                'registration_prefix' => 'RQ',
+                'cid_prefix' => 'RBG',
+                'name' => 'Mini POP Rollback G'.$segment,
+                'type' => 'mini_pop',
+                'parent_id' => $cabang->id,
+                'status' => 'active',
+            ]);
+            $customers[] = $this->createLegacyCustomer($miniPop, 'RBG'.$segment.'001', 'OLD-RBG'.$segment.'001', 'Pelanggan Legacy G'.$segment);
+        }
+
+        $this->artisan('app:rollback-legacy-customers', ['pop_code' => 'RBG', '--force' => true])
+            ->assertSuccessful();
+
+        foreach ($customers as $customer) {
+            $this->assertDatabaseMissing('customers', ['id' => $customer->id]);
+        }
+    }
+
     public function test_data_survey_dan_pemasangan_hasil_import_ikut_terhapus_tanpa_mengunci_rollback(): void
     {
         $pop = $this->createPop('POP-RB-G', 'RBG', 'Cabang Rollback G');

@@ -29,6 +29,10 @@
         "Septian Hendra Wijaya": "Septian Harendra Wijaya",
         "Farid Wajdi Ardjono": "Farid Wadji Ardjono"
     },
+    "keep_cids": [
+        "D1X6CRQ001247",
+        "D1X6CRQ001407"
+    ],
     "manual_terminate_cids": [
         "D1X6BRQ000378",
         "D1X6BRQ000627",
