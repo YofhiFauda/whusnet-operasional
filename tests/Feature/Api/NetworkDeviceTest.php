@@ -46,9 +46,10 @@ class NetworkDeviceTest extends TestCase
         ]);
     }
 
-    private function seedDistribution(Pop $miniPop, string $code = 'A'): Distribution
+    // Distribusi anak Cabang, BUKAN anak Mini POP (ADHOC-312).
+    private function seedDistribution(Pop $cabang, string $code = 'A'): Distribution
     {
-        return Distribution::create(['pop_id' => $miniPop->id, 'code' => $code, 'name' => 'Distribusi '.$code, 'description' => '-']);
+        return Distribution::create(['pop_id' => $cabang->id, 'code' => $code, 'name' => 'Distribusi '.$code, 'description' => '-']);
     }
 
     private function seedCustomer(Pop $cabang, array $overrides = []): Customer
@@ -72,7 +73,7 @@ class NetworkDeviceTest extends TestCase
     private function seedAssignedCustomer(Pop $cabang, array $overrides = []): Customer
     {
         $miniPop = $this->seedMiniPop($cabang);
-        $distribution = $this->seedDistribution($miniPop);
+        $distribution = $this->seedDistribution($cabang);
 
         return $this->seedCustomer($cabang, array_merge([
             'mini_pop_id' => $miniPop->id,
@@ -377,8 +378,8 @@ class NetworkDeviceTest extends TestCase
     public function test_key_sama_dipakai_lintas_endpoint_diproses_sebagai_kejadian_terpisah(): void
     {
         $cabang = $this->seedCabang();
-        $miniPop = $this->seedMiniPop($cabang);
-        $this->seedDistribution($miniPop);
+        $this->seedMiniPop($cabang);
+        $this->seedDistribution($cabang);
         $customer = $this->seedCustomer($cabang);
         $this->seedOutbox($customer, 'installation:12:activation:1');
 

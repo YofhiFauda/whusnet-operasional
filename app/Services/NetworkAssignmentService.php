@@ -75,18 +75,22 @@ class NetworkAssignmentService
 
     /**
      * Aturan hierarki jaringan bagian 2: Distribusi sah kalau tergantung
-     * langsung di Mini POP itu (`distributions.pop_id = mini_pop_id`).
-     * Distribusi tanpa Mini POP tidak pernah sah — kalau dibiarkan, segmen
-     * OLT CID tidak punya sumber yang benar (lihat ADHOC-107 T4/K3).
+     * langsung di Cabang itu (`distributions.pop_id = pop_id`), BUKAN di
+     * Mini POP spesifik — satu Distribusi (ODP) lazim dipakai bareng oleh
+     * lebih dari satu Mini POP dalam Cabang yang sama (mis. Cabang Siman:
+     * D1/D2 dipakai lintas Mini POP). Dulu divalidasi ketat ke
+     * `mini_pop_id` (ADHOC-107 R6) — itu salah baca kenyataan lapangan,
+     * dikoreksi (ADHOC-312, laporan user 2026-11-23). Segmen OLT di CID
+     * tetap dari `customers.mini_pop_id` sendiri, tidak lewat Distribusi.
      */
-    public static function distributionBelongsToMiniPop(int|string|null $distributionId, int|string|null $miniPopId): bool
+    public static function distributionBelongsToPop(int|string|null $distributionId, int|string|null $popId): bool
     {
-        if (! $distributionId || ! $miniPopId) {
+        if (! $distributionId || ! $popId) {
             return false;
         }
 
         return Distribution::whereKey($distributionId)
-            ->where('pop_id', $miniPopId)
+            ->where('pop_id', $popId)
             ->exists();
     }
 
@@ -337,12 +341,12 @@ class NetworkAssignmentService
         }
 
         $distribution = Distribution::where('code', $distributionCode)
-            ->where('pop_id', $miniPop->id)
+            ->where('pop_id', $customer->pop_id)
             ->first();
 
         if (! $distribution) {
             throw NetworkAssignmentException::unprocessable(
-                'Distribusi yang dipilih tidak sesuai dengan Mini POP yang dipilih.'
+                'Distribusi yang dipilih tidak sesuai dengan Cabang POP pelanggan ini.'
             );
         }
 

@@ -1062,11 +1062,11 @@
                                     @if(($badge_pengajuan_barang_count ?? 0) > 0)<span data-badge="pengajuan-barang" class="sidebar-badge rounded-full bg-amber-500/15 px-1.5 py-0.5 text-[9px] font-bold text-amber-600">{{ $badge_pengajuan_barang_count }}</span>@endif
                                 </a>
                                 @endif
-                                {{-- Gerbang `users.update` = sama dengan route-nya (lihat docblock
-                                     WarehousePicGudangController). Tanpa link ini halaman cuma bisa
+                                {{-- Gerbang `warehouse_pic_gudang.view` = sama dengan route index-nya
+                                     (ADHOC-313; dulu `users.update`). Tanpa link ini halaman cuma bisa
                                      dibuka lewat ketik URL — PIC yang belum ditunjuk ditolak saat
                                      Serah ke Teknisi dan admin gak tahu harus ke mana (2026-11-11). --}}
-                                @if(auth()->user()->hasPermission('users.update'))
+                                @if(auth()->user()->hasPermission('warehouse_pic_gudang.view'))
                                 <a href="{{ route('warehouse.pic-gudang.index') }}" class="flex items-center justify-between sidebar-subitem {{ Request::is('warehouse/pic-gudang*') ? 'sidebar-subitem-active' : '' }}"><span>Kelola PIC Gudang</span></a>
                                 @endif
                             </div>

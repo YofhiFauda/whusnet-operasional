@@ -81,6 +81,12 @@
             </div>
         </div>
 
+        <!-- Warna Badge -->
+        @include('master.ticket-issue-categories.partials._color_picker', [
+            'value' => old('badge_color', $category->badge_color),
+            'name' => old('name', $category->name),
+        ])
+
         <!-- Batch -->
         <div class="pt-2">
             <label class="flex items-start gap-2.5 cursor-pointer">

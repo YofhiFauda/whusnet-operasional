@@ -55,13 +55,14 @@ trait BuildsPindahPopScenario
         $this->miniJetis = Pop::factory()->create([
             'pop_code' => 'C1X', 'cid_prefix' => 'C', 'type' => 'mini_pop', 'parent_id' => $this->jetis->id, 'name' => 'Mini JETIS',
         ]);
-        $this->distJetis = Distribution::create(['pop_id' => $this->miniJetis->id, 'code' => '4A', 'name' => 'Dist Jetis']);
+        // Distribusi anak Cabang, BUKAN anak Mini POP (ADHOC-312).
+        $this->distJetis = Distribution::create(['pop_id' => $this->jetis->id, 'code' => '4A', 'name' => 'Dist Jetis']);
 
         $this->sandya = Pop::factory()->create(['pop_code' => 'D', 'cid_prefix' => 'D', 'name' => 'SANDYA']);
         $this->miniSandya = Pop::factory()->create([
             'pop_code' => 'D2Y', 'cid_prefix' => 'D', 'type' => 'mini_pop', 'parent_id' => $this->sandya->id, 'name' => 'Mini SANDYA',
         ]);
-        $this->distSandya = Distribution::create(['pop_id' => $this->miniSandya->id, 'code' => '6B', 'name' => 'Dist Sandya']);
+        $this->distSandya = Distribution::create(['pop_id' => $this->sandya->id, 'code' => '6B', 'name' => 'Dist Sandya']);
     }
 
     /**

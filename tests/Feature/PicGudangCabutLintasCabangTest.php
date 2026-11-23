@@ -36,7 +36,9 @@ class PicGudangCabutLintasCabangTest extends TestCase
         $this->popA = $this->makePop('A');
         $this->popB = $this->makePop('B');
 
-        $role = Role::where('code', 'noc')->firstOrFail();
+        // admin_gudang = pemegang default warehouse_pic_gudang.* (ADHOC-313);
+        // dulu noc, saat halaman ini masih numpang users.update.
+        $role = Role::where('code', 'admin_gudang')->firstOrFail();
         $this->actor = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
         $scope = UserRoleScope::create([
             'user_id' => $this->actor->id,
@@ -45,7 +47,7 @@ class PicGudangCabutLintasCabangTest extends TestCase
         ]);
         UserRoleScopeTarget::create(['user_role_scope_id' => $scope->id, 'pop_id' => $this->popA->id]);
 
-        $this->assertTrue($this->actor->fresh()->hasPermission('users.update'), 'Prasyarat: actor harus punya users.update.');
+        $this->assertTrue($this->actor->fresh()->hasPermission('warehouse_pic_gudang.delete'), 'Prasyarat: actor harus punya warehouse_pic_gudang.delete.');
     }
 
     private function makePop(string $suffix): Pop

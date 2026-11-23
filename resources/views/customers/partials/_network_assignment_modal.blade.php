@@ -72,7 +72,7 @@
                 <select id="na-distribution-select" name="distribution_id" class="w-full h-10 px-3.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-xs sm:text-sm focus:ring-2 focus:ring-sky-500 focus:outline-none transition-all">
                     <option value="">—</option>
                 </select>
-                <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1">Daftar Distribusi otomatis menyesuaikan dengan Mini POP yang dipilih.</p>
+                <p class="text-[11px] text-slate-600 dark:text-slate-400 mt-1">Daftar Distribusi untuk Cabang ini — bisa dipakai bareng lebih dari satu Mini POP.</p>
             </div>
 
             <!-- Footer Buttons -->

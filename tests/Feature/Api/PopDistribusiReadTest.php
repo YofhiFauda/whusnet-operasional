@@ -34,8 +34,9 @@ class PopDistribusiReadTest extends TestCase
             'type' => 'mini_pop', 'status' => 'active', 'parent_id' => $cabang->id,
         ]);
 
-        Distribution::create(['pop_id' => $miniPop->id, 'code' => 'A', 'name' => 'Distribusi A', 'description' => '-']);
-        Distribution::create(['pop_id' => $miniPop->id, 'code' => 'B', 'name' => 'Distribusi B', 'description' => '-']);
+        // Distribusi anak Cabang, BUKAN anak Mini POP (ADHOC-312).
+        Distribution::create(['pop_id' => $cabang->id, 'code' => 'A', 'name' => 'Distribusi A', 'description' => '-']);
+        Distribution::create(['pop_id' => $cabang->id, 'code' => 'B', 'name' => 'Distribusi B', 'description' => '-']);
     }
 
     public function test_balikin_seluruh_hierarki_cabang_mini_pop_distribusi(): void
@@ -51,14 +52,13 @@ class PopDistribusiReadTest extends TestCase
                     'pop_code' => 'PNR-JTS',
                     'pop_name' => 'Jetis',
                     'mini_pops' => [
-                        [
-                            'code' => 'C1',
-                            'name' => 'Mini POP C1',
-                            'distributions' => [
-                                ['code' => 'A', 'name' => 'Distribusi A'],
-                                ['code' => 'B', 'name' => 'Distribusi B'],
-                            ],
-                        ],
+                        ['code' => 'C1', 'name' => 'Mini POP C1'],
+                    ],
+                    // Distribusi sejajar Mini POP (anak Cabang, ADHOC-312),
+                    // BUKAN nested di dalam Mini POP.
+                    'distributions' => [
+                        ['code' => 'A', 'name' => 'Distribusi A'],
+                        ['code' => 'B', 'name' => 'Distribusi B'],
                     ],
                 ],
             ],

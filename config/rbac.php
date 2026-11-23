@@ -719,6 +719,18 @@ return [
             ActionCode::REJECT->value,
         ],
 
+        // Kelola PIC Gudang per Cabang (ADHOC-313, 2026-11-23). Dulu halaman
+        // ini numpang `users.update` — siapa pun yang boleh edit user otomatis
+        // bisa menunjuk/mencabut PIC, dan Role Matrix gak punya baris untuk
+        // mengaturnya. Tiga aksi = tiga tombol nyata di halaman: buka, tunjuk,
+        // cabut. TANPA .update — penunjukan cuma pasangan (cabang, user);
+        // "ubah" = cabut lalu tunjuk ulang.
+        'warehouse_pic_gudang' => [
+            ActionCode::VIEW->value,
+            ActionCode::CREATE->value,
+            ActionCode::DELETE->value,
+        ],
+
         // Master node jaringan ber-port (ODC/ODP/dst), dulu `network_odps`.
         // Di-rename di baris Feature yang SAMA oleh migration reshape
         // (2026_10_12_110300), jadi role_permissions lama tetap nempel.
@@ -1023,5 +1035,10 @@ return [
         // Rekap Pemakaian Material Lapangan (/warehouse/usage)
         'warehouse.usage.view' => 'Lihat Rekap Pemakaian Material Lapangan',
         'warehouse.infra_stock.view' => 'Lihat Barang Terpasang di Infrastruktur',
+
+        // Kelola PIC Gudang per Cabang (ADHOC-313)
+        'warehouse_pic_gudang.view' => 'Lihat Daftar PIC Gudang per Cabang',
+        'warehouse_pic_gudang.create' => 'Tunjuk PIC Gudang Cabang',
+        'warehouse_pic_gudang.delete' => 'Cabut Penunjukan PIC Gudang Cabang',
     ],
 ];

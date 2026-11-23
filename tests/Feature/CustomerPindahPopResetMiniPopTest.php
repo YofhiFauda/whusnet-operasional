@@ -61,7 +61,8 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
         $this->miniJetis = Pop::factory()->create([
             'pop_code' => 'C1X', 'cid_prefix' => 'C', 'type' => 'mini_pop', 'parent_id' => $this->jetis->id,
         ]);
-        $this->distJetis = Distribution::create(['pop_id' => $this->miniJetis->id, 'code' => '4A', 'name' => 'Dist Jetis']);
+        // Distribusi anak Cabang, BUKAN anak Mini POP (ADHOC-312).
+        $this->distJetis = Distribution::create(['pop_id' => $this->jetis->id, 'code' => '4A', 'name' => 'Dist Jetis']);
 
         // pop_code SANDYA = cid_prefix-nya (sama seperti data asli "D"),
         // jadi segmen dari pop_code kosong dan resolveMiniPopSegment() akan
@@ -70,7 +71,7 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
         $this->miniSandya = Pop::factory()->create([
             'pop_code' => 'D2Y', 'cid_prefix' => 'D', 'type' => 'mini_pop', 'parent_id' => $this->sandya->id,
         ]);
-        $this->distSandya = Distribution::create(['pop_id' => $this->miniSandya->id, 'code' => '6B', 'name' => 'Dist Sandya']);
+        $this->distSandya = Distribution::create(['pop_id' => $this->sandya->id, 'code' => '6B', 'name' => 'Dist Sandya']);
     }
 
     private function pelangganAktifDiJetis(array $overrides = []): Customer
@@ -159,7 +160,7 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
     }
 
     #[Test]
-    public function form_edit_menampilkan_dropdown_mini_pop_berantai_dan_distribusi_per_mini_pop(): void
+    public function form_edit_menampilkan_dropdown_mini_pop_dan_distribusi_per_cabang(): void
     {
         $this->loginAsAdmin();
         $customer = $this->pelangganAktifDiJetis();
@@ -167,8 +168,11 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
         $this->get(route('customers.edit', $customer->id))
             ->assertOk()
             ->assertSee('name="mini_pop_id"', false)
+            ->assertSee('name="distribution_id"', false)
+            // Mini POP & Distribusi SANDYA keduanya anak Cabang SANDYA
+            // langsung (ADHOC-312) — sama-sama bawa data-pop-id Cabangnya.
             ->assertSee('data-pop-id="'.$this->sandya->id.'"', false)
-            ->assertSee('data-mini-pop-id="'.$this->miniSandya->id.'"', false);
+            ->assertSee($this->distSandya->code);
     }
 
     #[Test]
@@ -325,26 +329,56 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
         $this->assertSame('C1X4ARQ000631', $customer->cid);
     }
 
+    /**
+     * Distribusi anak Cabang, BUKAN anak Mini POP (ADHOC-312, laporan user:
+     * Cabang Siman D1/D2 dipakai lintas Mini POP) — sah dipilih tanpa Mini
+     * POP, atau dari Mini POP mana pun, selama tetap dalam Cabang yang sama.
+     */
     #[Test]
-    public function edit_menolak_distribusi_tanpa_mini_pop_atau_dari_mini_pop_lain(): void
+    public function edit_menerima_distribusi_tanpa_mini_pop_atau_dari_mini_pop_lain_dalam_cabang_sama(): void
+    {
+        $this->loginAsAdmin();
+        $customerTanpaMiniPop = $this->pelangganAktifDiJetis(['customer_code' => 'RQ000632']);
+
+        $this->put(route('customers.update', $customerTanpaMiniPop->id), $this->payloadEdit($customerTanpaMiniPop, [
+            'pop_id' => $this->sandya->id,
+            'mini_pop_id' => null,
+            'distribution_id' => $this->distSandya->id,
+        ]))->assertSessionHasNoErrors();
+        $this->assertSame($this->distSandya->id, (int) $customerTanpaMiniPop->fresh()->distribution_id);
+
+        // Mini POP lain dalam Cabang yang sama — distribusinya tetap sah
+        // dipakai bareng (pop_id berubah dalam SATU request yang sama,
+        // karena mini_pop_id/distribution_id diabaikan selama Cabang tidak
+        // ikut berubah).
+        $miniSandyaLain = Pop::factory()->create([
+            'pop_code' => 'D3Z', 'cid_prefix' => 'D', 'type' => 'mini_pop', 'parent_id' => $this->sandya->id,
+        ]);
+        $customerMiniPopLain = $this->pelangganAktifDiJetis(['customer_code' => 'RQ000633']);
+
+        $this->put(route('customers.update', $customerMiniPopLain->id), $this->payloadEdit($customerMiniPopLain, [
+            'pop_id' => $this->sandya->id,
+            'mini_pop_id' => $miniSandyaLain->id,
+            'distribution_id' => $this->distSandya->id,
+        ]))->assertSessionHasNoErrors();
+
+        $fresh = $customerMiniPopLain->fresh();
+        $this->assertSame($miniSandyaLain->id, (int) $fresh->mini_pop_id);
+        $this->assertSame($this->distSandya->id, (int) $fresh->distribution_id);
+    }
+
+    #[Test]
+    public function edit_menolak_distribusi_milik_cabang_lain(): void
     {
         $this->loginAsAdmin();
         $customer = $this->pelangganAktifDiJetis();
+        $cabangLain = Pop::factory()->create(['pop_code' => 'E', 'cid_prefix' => 'E', 'name' => 'Cabang Lain']);
+        $distCabangLain = Distribution::create(['pop_id' => $cabangLain->id, 'code' => 'E1A', 'name' => 'Dist Cabang Lain']);
 
         $this->put(route('customers.update', $customer->id), $this->payloadEdit($customer, [
             'pop_id' => $this->sandya->id,
             'mini_pop_id' => null,
-            'distribution_id' => $this->distSandya->id,
-        ]))->assertSessionHasErrors('distribution_id');
-
-        $miniSandyaLain = Pop::factory()->create([
-            'pop_code' => 'D3Z', 'cid_prefix' => 'D', 'type' => 'mini_pop', 'parent_id' => $this->sandya->id,
-        ]);
-
-        $this->put(route('customers.update', $customer->id), $this->payloadEdit($customer, [
-            'pop_id' => $this->sandya->id,
-            'mini_pop_id' => $miniSandyaLain->id,
-            'distribution_id' => $this->distSandya->id,
+            'distribution_id' => $distCabangLain->id,
         ]))->assertSessionHasErrors('distribution_id');
     }
 
@@ -426,16 +460,21 @@ class CustomerPindahPopResetMiniPopTest extends TestCase
         $this->assertNull($customer->distribution_id);
     }
 
+    /**
+     * Distribusi anak Cabang (ADHOC-312) — tetap sah dipertahankan walau
+     * Mini POP-nya sendiri dilepas karena bukan anak Cabang baru (Mini POP
+     * JETIS lama tidak dilepas manual di sini, ikut dilepas observer).
+     */
     #[Test]
-    public function distribusi_tanpa_mini_pop_yang_cocok_ikut_dilepas(): void
+    public function distribusi_milik_cabang_baru_dipertahankan_meski_mini_pop_lama_dilepas(): void
     {
         $customer = $this->pelangganAktifDiJetis();
 
-        // Distribusi SANDYA dipasang tanpa Mini POP-nya — segmen CID bakal
-        // jatuh ke olt_number JETIS ("1X") kalau dibiarkan.
         $customer->update(['pop_id' => $this->sandya->id, 'distribution_id' => $this->distSandya->id]);
 
-        $this->assertNull($customer->fresh()->distribution_id);
+        $fresh = $customer->fresh();
+        $this->assertNull($fresh->mini_pop_id);
+        $this->assertSame($this->distSandya->id, $fresh->distribution_id);
     }
 
     #[Test]

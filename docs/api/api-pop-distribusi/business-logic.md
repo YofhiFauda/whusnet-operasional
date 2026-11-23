@@ -21,8 +21,9 @@ keputusan.md §19 untuk analisis lengkap.
 
 ## Endpoint #1 — `GET /api/v1/pop-distribusi`
 
-Referensi, baca-saja. Balikin **seluruh hierarki**: Cabang POP → Mini POP di
-bawahnya → Distribusi di tiap Mini POP, kode + nama.
+Referensi, baca-saja. Balikin **seluruh hierarki**: Cabang POP, dengan Mini POP
+dan Distribusi SEJAJAR di bawahnya (**bukan** Distribusi nested di dalam Mini
+POP — lihat "ADHOC-312" di bawah).
 
 ```json
 {
@@ -31,19 +32,26 @@ bawahnya → Distribusi di tiap Mini POP, kode + nama.
       "pop_code": "PNR-JTS",
       "pop_name": "Jetis",
       "mini_pops": [
-        {
-          "code": "C1",
-          "name": "Mini POP C1",
-          "distributions": [
-            { "code": "A", "name": "Distribusi A" },
-            { "code": "B", "name": "Distribusi B" }
-          ]
-        }
+        { "code": "C1", "name": "Mini POP C1" }
+      ],
+      "distributions": [
+        { "code": "A", "name": "Distribusi A" },
+        { "code": "B", "name": "Distribusi B" }
       ]
     }
   ]
 }
 ```
+
+**ADHOC-312 (2026-11-23, laporan user) — BREAKING CHANGE kontrak.** Sebelumnya
+`distributions` nested di dalam tiap `mini_pops[]` (satu Distribusi dianggap
+cuma milik satu Mini POP). Itu salah: Distribusi (ODP) adalah anak CABANG,
+lazim dipakai bareng lebih dari satu Mini POP dalam Cabang yang sama (Cabang
+Siman: D1/D2 lintas Mini POP). Struktur baru: `distributions` SEJAJAR
+`mini_pops`, keduanya anak langsung objek Cabang. **Website B wajib update
+parsing-nya** — kode yang baca `mini_pops[].distributions` akan dapat array
+kosong/`null` (key itu tidak ada lagi di level itu), harus baca
+`data[].distributions` di level Cabang.
 
 **Kenapa daftar lengkap, bukan di-scope per pelanggan.** Dikonfirmasi kebutuhan:
 Website B mau tahu **semua** POP/Mini POP/Distribusi sekaligus, bukan cuma yang
@@ -57,10 +65,8 @@ Endpoint baca yang dipanggil sesuka Website B (cache, refresh berkala) lebih pas
 untuk data yang jarang berubah tapi tetap harus selalu benar.
 
 **Sumber data.** `pops` (type `mini_pop`, `parent_id` = Cabang POP) dan
-`distributions` (`pop_id` = Mini POP) — tabel yang sudah ada, tidak ada perubahan
-skema. Query yang sama persis dengan yang dipakai
-`CustomerNetworkAssignmentController::data()` (`app/Http/Controllers/CustomerNetworkAssignmentController.php:20-45`),
-cuma tanpa scoping ke satu pelanggan.
+`distributions` (`pop_id` = Cabang POP, ADHOC-312) — tabel yang sudah ada, tidak
+ada perubahan skema.
 
 **Auth.** Token bearer baca-saja, hardcode di `.env` — risiko rendah, cuma expose
 struktur topologi internal, bukan data pelanggan.
@@ -97,8 +103,10 @@ berbeda:
    `waiting_installation`, `rejected`) — belum ada dasar teknis untuk assignment.
 3. `mini_pop_code` → resolve ke `Pop` dengan `type=mini_pop` **dan**
    `parent_id` = Cabang POP pelanggan. Tidak cocok → 422.
-4. `distribution_code` → resolve ke `Distribution` dengan `pop_id` = Mini POP hasil
-   langkah 3. Tidak cocok → 422.
+4. `distribution_code` → resolve ke `Distribution` dengan `pop_id` = Cabang POP
+   pelanggan (ADHOC-312, dulu `pop_id` = Mini POP hasil langkah 3 — satu
+   Distribusi cuma sah untuk satu Mini POP spesifik, salah baca kenyataan
+   lapangan). Tidak cocok → 422.
 5. Simpan `customer.mini_pop_id`, `customer.distribution_id`.
 6. **Kalau pelanggan `active`/`suspended` (CID sudah final)**, regenerate CID:
    `$customer->pop->generateComplexCid($customer, $customer->distribution)` —

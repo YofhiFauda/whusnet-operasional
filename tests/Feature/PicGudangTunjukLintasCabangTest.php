@@ -39,7 +39,9 @@ class PicGudangTunjukLintasCabangTest extends TestCase
         $this->popA = $this->makePop('A');
         $this->popB = $this->makePop('B');
 
-        $role = Role::where('code', 'noc')->firstOrFail();
+        // admin_gudang = pemegang default warehouse_pic_gudang.* (ADHOC-313);
+        // dulu noc, saat halaman ini masih numpang users.update.
+        $role = Role::where('code', 'admin_gudang')->firstOrFail();
         $this->actor = User::factory()->create(['role_id' => $role->id, 'status' => 'active']);
         $scope = UserRoleScope::create([
             'user_id' => $this->actor->id,

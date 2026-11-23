@@ -44,7 +44,8 @@ class CustomerDistributionEditTest extends TestCase
             'code' => 'SMN1', 'pop_code' => 'D1', 'registration_prefix' => 'C', 'cid_prefix' => 'D',
             'name' => 'Mini Sooko', 'type' => 'mini_pop', 'status' => 'active', 'parent_id' => $cabang->id,
         ]);
-        $distribution = Distribution::create(['pop_id' => $miniPop->id, 'code' => 'DIST-SOOKO', 'name' => 'Distribution Sooko']);
+        // Distribusi anak Cabang, BUKAN anak Mini POP (ADHOC-312).
+        $distribution = Distribution::create(['pop_id' => $cabang->id, 'code' => 'DIST-SOOKO', 'name' => 'Distribution Sooko']);
 
         return [$cabang, $miniPop, $distribution];
     }

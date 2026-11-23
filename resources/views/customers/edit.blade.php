@@ -331,10 +331,10 @@
                                 <select name="distribution_id" id="distribution_id" @disabled($networkLockReason !== null) class="w-full text-xs font-sans px-3 py-2.5 border @error('distribution_id') border-rose-500 @else border-slate-200 dark:border-slate-700 @enderror rounded-lg bg-white dark:bg-slate-900 text-slate-900 dark:text-slate-100 focus:outline-none focus:border-sky-500 focus:ring-2 focus:ring-sky-500/20 transition-colors">
                                     <option value="">Pilih Kode Distribusi</option>
                                     @if($customer->distribution && ! $distributions->contains('id', $customer->distribution_id))
-                                        <option value="{{ $customer->distribution_id }}" data-mini-pop-id="{{ $customer->distribution->pop_id }}" selected>{{ $customer->distribution->code }} - {{ $customer->distribution->name }}</option>
+                                        <option value="{{ $customer->distribution_id }}" data-pop-id="{{ $customer->distribution->pop_id }}" selected>{{ $customer->distribution->code }} - {{ $customer->distribution->name }}</option>
                                     @endif
                                     @foreach($distributions as $dist)
-                                        <option value="{{ $dist->id }}" data-mini-pop-id="{{ $dist->pop_id }}" {{ old('distribution_id', $customer->distribution_id) == $dist->id ? 'selected' : '' }}>{{ $dist->code }} - {{ $dist->name }}</option>
+                                        <option value="{{ $dist->id }}" data-pop-id="{{ $dist->pop_id }}" {{ old('distribution_id', $customer->distribution_id) == $dist->id ? 'selected' : '' }}>{{ $dist->code }} - {{ $dist->name }}</option>
                                     @endforeach
                                 </select>
                                 @error('distribution_id')
@@ -966,7 +966,8 @@
         7: 'operasional'
     };
 
-    /* ── Dropdown berantai POP → Mini POP → Distribusi ──
+    /* ── Dropdown POP → Mini POP & POP → Distribusi (dua cabang paralel,
+       bukan berantai lewat Mini POP — Distribusi anak Cabang, ADHOC-312) ──
        Cuma menyembunyikan opsi yang bukan milik induknya & mengosongkan
        pilihan yang jadi tidak cocok (mis. setelah ganti POP). Validasi
        aslinya tetap di CustomerController::update(). */
@@ -1012,7 +1013,7 @@
         }
 
         filterChildOptions(miniPopSelect, 'popId', popSelect.value);
-        filterChildOptions(distributionSelect, 'miniPopId', miniPopSelect.value);
+        filterChildOptions(distributionSelect, 'popId', popSelect.value);
     }
 
     window.onPageReady(function() {

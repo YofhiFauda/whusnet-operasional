@@ -947,7 +947,9 @@
 
                                     {{-- Status / Issue --}}
                                     <td class="py-2.5 px-3">
-                                        <span class="block truncate px-2 py-0.5 rounded text-[10px] font-bold" :class="issueBadgeClass(task.issue_category)"
+                                        <span class="block truncate px-2 py-0.5 rounded text-[10px] font-bold"
+                                              :class="task.issue_category_color ? '' : issueBadgeClass(task.issue_category)"
+                                              :style="task.issue_category_color ? `background-color: ${task.issue_category_color}; color: ${task.issue_category_text_color}` : ''"
                                               :title="task.issue_category" x-text="task.issue_category || 'Tanpa Kategori'"></span>
                                         <div class="mt-1 flex items-center gap-1 text-[10px] text-text-muted min-w-0">
                                             <span class="w-1.5 h-1.5 rounded-full shrink-0" :class="bucketDotClass(task.bucket)"></span>
@@ -1804,6 +1806,8 @@
             // Warna badge kategori issue di-derive dari NAMA kategori (Master
             // Issue bisa nambah kapan aja, jadi gak ada peta warna hardcode
             // lengkap) — kategori yang gak dikenal jatuh ke netral, bukan error.
+            // Fallback kalau kategori belum diberi warna di Master Issue
+            // (task.issue_category_color null) — tebakan kata kunci lama.
             issueBadgeClass(category) {
                 const name = (category || '').toLowerCase();
                 if (name.includes('los') || name.includes('down') || name.includes('mati')) return 'bg-rose-600 text-white';

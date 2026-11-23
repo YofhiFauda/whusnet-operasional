@@ -43,7 +43,8 @@ class DistributionController extends Controller
         // biasa — kalau enggak, user ber-scope selected_pop/pop_tree bisa pilih
         // filter ke POP di luar cakupannya (gak bocor data, tapi bikin UI nawarin
         // pilihan yang percuma). Lihat docs/plan/analisa-celah-scope-pop.md temuan #10.
-        $pops = Pop::forUser()->where('status', 'active')->orderBy('name')->get();
+        // `type = cabang` — Distribusi anak Cabang, bukan anak Mini POP (ADHOC-312).
+        $pops = Pop::forUser()->where('status', 'active')->where('type', 'cabang')->orderBy('name')->get();
 
         return view('master.distribusi.index', compact('distributions', 'search', 'pop_id', 'pops'));
     }
@@ -53,7 +54,7 @@ class DistributionController extends Controller
      */
     public function create(): View
     {
-        $pops = Pop::forUser()->where('status', 'active')->orderBy('name')->get();
+        $pops = Pop::forUser()->where('status', 'active')->where('type', 'cabang')->orderBy('name')->get();
 
         return view('master.distribusi.create', compact('pops'));
     }
@@ -93,7 +94,7 @@ class DistributionController extends Controller
     {
         $this->authorizeDistributionPopScope($distribusi);
 
-        $pops = Pop::forUser()->where('status', 'active')->orderBy('name')->get();
+        $pops = Pop::forUser()->where('status', 'active')->where('type', 'cabang')->orderBy('name')->get();
 
         return view('master.distribusi.edit', compact('distribusi', 'pops'));
     }

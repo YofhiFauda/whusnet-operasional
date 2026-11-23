@@ -749,17 +749,20 @@ class CustomerController extends Controller
         }
         $cities = City::orderBy('name')->get();
         $pops = Pop::forUser()->where('type', 'cabang')->get();
-        // Dropdown berantai POP → Mini POP → Distribusi. Dulu Distribusi
-        // memuat SEMUA baris lintas cabang (bocor ke pop_admin cabang lain,
-        // dan tetap pre-select distribusi lama saat pindah POP). Sekarang cuma
-        // Mini POP di bawah Cabang dalam scope user, dan Distribusi di bawah
-        // Mini POP itu — penyaringan per pilihan dilakukan di klien lewat
+        // Dropdown POP → Mini POP dan POP → Distribusi (dua cabang paralel,
+        // BUKAN berantai lewat Mini POP — Distribusi adalah anak Cabang,
+        // bukan anak Mini POP, ADHOC-312: satu Distribusi lazim dipakai
+        // bareng lebih dari satu Mini POP dalam Cabang yang sama). Dulu
+        // Distribusi memuat SEMUA baris lintas cabang (bocor ke pop_admin
+        // cabang lain, dan tetap pre-select distribusi lama saat pindah
+        // POP). Sekarang cuma Mini POP/Distribusi di bawah Cabang dalam
+        // scope user — penyaringan per pilihan dilakukan di klien lewat
         // data-* option, validasi aslinya tetap di update().
         $miniPops = Pop::where('type', 'mini_pop')
             ->whereIn('parent_id', $pops->pluck('id'))
             ->orderBy('name')
             ->get(['id', 'parent_id', 'name', 'pop_code']);
-        $distributions = Distribution::whereIn('pop_id', $miniPops->pluck('id'))->orderBy('code')->get();
+        $distributions = Distribution::whereIn('pop_id', $pops->pluck('id'))->orderBy('code')->get();
         // Dropdown Mini POP & Distribusi dikunci kalau pra-pemasangan atau
         // user tanpa izin atur jaringan — rumus yang sama dengan update().
         $networkLockReason = $this->networkLockReason($customer, $user);
@@ -901,7 +904,7 @@ class CustomerController extends Controller
             ],
             // Mini POP & Distribusi — aturan hierarki satu sumber
             // (NetworkAssignmentService::miniPopBelongsToPop()/
-            // distributionBelongsToMiniPop()), sama dengan modal staf, API, dan
+            // distributionBelongsToPop()), sama dengan modal staf, API, dan
             // CustomerObserver::updating(). Pilihan yang tidak cocok DITOLAK,
             // bukan dikosongkan diam-diam, supaya admin tahu harus memilih
             // ulang. Kalau terkunci (pra-pemasangan / tanpa izin atur
@@ -931,14 +934,10 @@ class CustomerController extends Controller
 
                         return;
                     }
-                    $miniPopId = $request->input('mini_pop_id');
-                    if (! $miniPopId) {
-                        $fail('Pilih Mini POP dulu sebelum memilih Distribusi.');
-
-                        return;
-                    }
-                    if (! NetworkAssignmentService::distributionBelongsToMiniPop($value, $miniPopId)) {
-                        $fail('Distribusi yang dipilih bukan milik Mini POP ini.');
+                    // Distribusi anak Cabang, BUKAN anak Mini POP (ADHOC-312)
+                    // — gak perlu Mini POP dipilih dulu.
+                    if (! NetworkAssignmentService::distributionBelongsToPop($value, $request->input('pop_id'))) {
+                        $fail('Distribusi yang dipilih bukan milik Cabang POP ini.');
                     }
                 },
             ],

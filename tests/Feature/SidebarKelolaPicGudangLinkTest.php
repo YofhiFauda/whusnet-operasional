@@ -39,13 +39,13 @@ class SidebarKelolaPicGudangLinkTest extends TestCase
     }
 
     #[Test]
-    public function user_tanpa_users_update_tidak_melihat_link(): void
+    public function user_tanpa_permission_kelola_pic_gudang_tidak_melihat_link(): void
     {
         $role = Role::where('code', 'pic_gudang')->firstOrFail();
         $pic = User::factory()->create(['status' => 'active', 'role_id' => $role->id]);
         app(EffectiveAccessService::class)->clearCache($pic);
 
-        $this->assertFalse($pic->hasPermission('users.update'));
+        $this->assertFalse($pic->hasPermission('warehouse_pic_gudang.view'));
 
         // Dashboard me-redirect role tanpa akses dashboard — pakai halaman
         // Gudang yang memang dibuka PIC, supaya sidebar grup Gudang ter-render.

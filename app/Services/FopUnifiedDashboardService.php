@@ -412,6 +412,11 @@ class FopUnifiedDashboardService
             'total_odps' => $nodes->count(),
             'red_zone_count' => $redZoneNodes->count(),
             'red_zone' => $redZone,
+            // Dipakai kartu Okupansi Port di Dashboard Owner (ADHOC-313) —
+            // dihitung dari koleksi node yang SAMA supaya persen okupansi dan
+            // jumlah Red Zone gak pernah beda sumber.
+            'total_ports' => (int) $nodes->sum('ports_count'),
+            'used_ports' => (int) $nodes->sum('used_ports_count'),
         ];
     }
 

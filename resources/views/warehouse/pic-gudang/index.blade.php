@@ -26,6 +26,9 @@
 </div>
 @endif
 
+{{-- Form & tombol cabut digerbangi permission yang sama dengan route-nya
+     (ADHOC-313) — pemegang .view saja cuma melihat daftar. --}}
+@if(auth()->user()->hasPermission('warehouse_pic_gudang.create'))
 <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg p-5 mb-6 shadow-xs">
     <h3 class="text-sm font-bold text-slate-800 dark:text-slate-200 mb-3">Tunjuk PIC Gudang Baru</h3>
     <form method="POST" action="{{ route('warehouse.pic-gudang.store') }}" class="flex flex-col sm:flex-row gap-3">
@@ -50,6 +53,7 @@
     <p class="mt-2 text-[11px] text-slate-400">Belum ada user dengan role "Teknisi PIC Gudang" yang aktif — buat/ubah role user dulu lewat Manajemen User.</p>
     @endif
 </div>
+@endif
 
 <div class="bg-white dark:bg-slate-800/90 border border-slate-200/80 dark:border-slate-700/80 rounded-lg overflow-hidden shadow-xs">
     <table class="min-w-full divide-y divide-slate-200 dark:divide-slate-700">
@@ -68,11 +72,13 @@
                     @forelse($pop->gudangPics as $pic)
                         <span class="inline-flex items-center gap-1.5 mr-2 mb-1 px-2 py-1 rounded bg-sky-50 dark:bg-sky-900/30 text-sky-700 dark:text-sky-300 text-xs font-medium">
                             {{ $pic->name }}
+                            @if(auth()->user()->hasPermission('warehouse_pic_gudang.delete'))
                             <form method="POST" action="{{ route('warehouse.pic-gudang.destroy', $pic->pivot->id) }}" onsubmit="return confirm('Cabut penunjukan PIC Gudang {{ $pic->name }} untuk {{ $pop->name }}?')" class="inline">
                                 @csrf
                                 @method('DELETE')
                                 <button type="submit" class="text-sky-500 hover:text-rose-600" title="Cabut penunjukan">&times;</button>
                             </form>
+                            @endif
                         </span>
                     @empty
                         <span class="text-slate-400 text-xs italic">Belum ada PIC — gudang diurus POP Admin seperti biasa.</span>
