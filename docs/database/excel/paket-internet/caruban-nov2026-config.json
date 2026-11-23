@@ -1,4 +1,36 @@
 {
+    "package_code_typo_fixes": {
+        "Net110": "NetP110"
+    },
+    "skip_names": [
+        "nurul huda",
+        "aan sahwiyah",
+        "nur aliffia peting"
+    ],
+    "manual_overrides": {
+        "I1X13ARQ000367": "PK000042",
+        "I1X13ARQ000360": "NetP115",
+        "I1X13ARQ000362": "NetP115",
+        "I1X13ARQ000363": "NetP115",
+        "I1X13ARQ000370": "NetP115",
+        "I1X13ARQ000371": "NetP115",
+        "I1X13ARQ000372": "NetP115",
+        "I1X13ARQ000373": "NetP115",
+        "I1X13ARQ000377": "NetP115",
+        "I1X13ARQ000356": "Net138 Khusus",
+        "I1X13ARQ000361": "Net138 Khusus",
+        "I1X13ARQ000365": "Net138 Khusus",
+        "I1X13ARQ000369": "Net138 Khusus",
+        "I1X13ARQ000380": "Net138 Khusus",
+        "I1X13ARQ000366": "Net150 Khusus",
+        "I1X13ARQ000374": "Net150 Khusus",
+        "I1X13ARQ000375": "Net150 Khusus",
+        "I1X13ARQ000376": "Net150 Khusus",
+        "I1X13ARQ000378": "Net150 Khusus",
+        "I1X13ARQ000379": "Net150 Khusus",
+        "I1X13ARQ000368": "NetTC165",
+        "I1X13ARQ000364": "NetP150B"
+    },
     "name_aliases": {
         "Diah Mirniawati": "Diah Mirnawati",
         "Fransiko Lustiyanto": "Frasiko Lustiyanto",
