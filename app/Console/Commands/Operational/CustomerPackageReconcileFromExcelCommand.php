@@ -339,21 +339,33 @@ class CustomerPackageReconcileFromExcelCommand extends Command
             // keduanya 198000/200Mbps — skema penamaan beda doang, bukan tier
             // beda; ganti id di sini cuma churn tanpa guna, sama kasusnya
             // dengan "NEW 45 Mbps (150K)" vs "Net150").
-            $code = $typoFixes[$kodeRaw] ?? $kodeRaw;
-            $targetPackage = InternetPackage::where('package_code', $code)->first();
-
-            // Fallback kolom `Paket` sebagai kode ALTERNATIF (2026-11-21, kasus
-            // Siman) — kebalikan dari quirk Sambit: di file ini `Nama Paket`
-            // isinya teks speed ("Up to 25 Mbps") dan `Paket` isinya KODE
-            // katalog asli ("NetP110"). HANYA dicoba kalau kolom `Harga` ADA
-            // (Paket), jadi `Paket` di sini sama sekali bukan dipakai buat
-            // nominal (lihat parsing $nominal di atas) — aman dicoba sebagai
-            // kode tanpa risiko salah baca angka harga sebagai kode paket.
-            if (! $targetPackage && array_key_exists('Harga', $row)) {
-                $altCodeRaw = trim((string) ($row['Paket'] ?? ''));
-                if ($altCodeRaw !== '' && $altCodeRaw !== $kodeRaw) {
-                    $targetPackage = InternetPackage::where('package_code', $typoFixes[$altCodeRaw] ?? $altCodeRaw)->first();
+            // Kolom `Paket` DICOBA DULUAN (2026-11-21, kasus Siman) — kebalikan
+            // dari quirk Sambit: di file ini `Nama Paket` isinya teks speed
+            // ("Up to 35 Mbps") dan `Paket` isinya KODE katalog ASLI per-baris
+            // ("Net138"). Label `Nama Paket` yang SAMA bisa punya `Paket` yang
+            // BEDA-BEDA antar baris (temuan nyata: ratusan baris "Up to 35
+            // Mbps" isi Paket-nya "Net138", tapi beberapa baris lain malah
+            // "Net165"/"NetP110") — typo_fix berbasis label gak boleh jalan
+            // DULUAN dan nimpa kode per-baris yang lebih spesifik ini. HANYA
+            // dicoba kalau kolom `Harga` ADA (beda nama kolom sama `Paket`),
+            // jadi `Paket` di sini sama sekali bukan dipakai buat nominal
+            // (lihat parsing $nominal di atas) — aman dicoba sebagai kode
+            // tanpa risiko salah baca angka harga sebagai kode paket.
+            $targetPackage = null;
+            if (array_key_exists('Harga', $row)) {
+                $paketKolRaw = trim((string) ($row['Paket'] ?? ''));
+                if ($paketKolRaw !== '') {
+                    $targetPackage = InternetPackage::where('package_code', $typoFixes[$paketKolRaw] ?? $paketKolRaw)->first();
                 }
+            }
+
+            // Fallback ke `Nama Paket`/`paket ` (+ typo_fix) kalau kolom
+            // `Paket` kosong atau kodenya gak dikenal katalog — di sinilah
+            // typo_fix berbasis LABEL aman dipakai, karena cuma kepake saat
+            // gak ada data per-baris yang lebih spesifik buat ditimpa.
+            if (! $targetPackage) {
+                $code = $typoFixes[$kodeRaw] ?? $kodeRaw;
+                $targetPackage = InternetPackage::where('package_code', $code)->first();
             }
 
             if ($targetPackage) {

@@ -1,8 +1,11 @@
 {
     "package_code_typo_fixes": {
+        "Up to 35 Mbps": "Net138",
+        "Up to 45 Mbps": "Net150",
         "Up to 45Mbps": "Net150",
         "Up to 70Mbps": "Net165",
         "Up to 100 Mbps": "Net198",
+        "Up to 100 Mbos": "Net198",
         "Up to 150 Mbps": "PK000042",
         "400M": "PK000014",
         "115M": "PK000034"
