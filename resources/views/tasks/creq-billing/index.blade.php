@@ -11,7 +11,7 @@
 @endphp
 
 @section('content')
-<div class="w-full max-w-8  xl mx-auto space-y-5 pb-16 md:pb-8" x-data="creqIndexView()">
+<div class="w-full max-w-[1240px] mx-auto space-y-5 pb-16 md:pb-8" x-data="creqIndexView()">
 
     {{-- ══ LAYER 1: NAKED PAGE HEADER ══════════════════════════════════════════ --}}
     <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
