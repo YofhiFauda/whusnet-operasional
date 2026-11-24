@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: localhost
--- Waktu pembuatan: 21 Nov 2026 pada 04.02
+-- Waktu pembuatan: 24 Nov 2026 pada 01.38
 -- Versi server: 10.4.31-MariaDB
 -- Versi PHP: 8.0.30
 
@@ -5227,7 +5227,11 @@ INSERT INTO `laporan_pemasangan_wifi` (`IDREPORT`, `IDPENGGUNA`, `IDPERMINTAAN`,
 ('lpw6ae141736dc2', 'PE001478', 'RQ001474', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '', '', '', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', ''),
 ('lpw6ae8035da874', 'PE001484', 'RQ001480', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '', '', '', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', ''),
 ('lpw6aee74173bee', 'PE001492', 'RQ001488', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '', '', '', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', ''),
-('lpw6afe94915a75', 'PE001498', 'RQ001494', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '', '', '', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '');
+('lpw6afe94915a75', 'PE001498', 'RQ001494', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '', '', '', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', ''),
+('lpw6b011d8dbf8f', 'PE001499', 'RQ001495', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '', '', '', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', ''),
+('lpw6b03a8c13fba', 'PE001500', 'RQ001496', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '', '', '', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', ''),
+('lpw6b03f54deba2', 'PE001501', 'RQ001497', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '', '', '', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', ''),
+('lpw6b03fdbc7ffc', 'PE001502', 'RQ001498', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '', '', '', '', NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL, '', '');
 
 -- --------------------------------------------------------
 
@@ -7152,6 +7156,10 @@ INSERT INTO `pengguna` (`IDPENGGUNA`, `IDJABATAN`, `IDCABANG`, `NAMADEPAN`, `NAM
 ('PE001496', '8', '1', 'winuji', '', '', '6285750080449', NULL, '3502170016', NULL, NULL, NULL, 'Jl. Rujak Sente No.39, Krajan, Cokromenggalan, Kec. Ponorogo, Kabupaten Ponorogo', '....@gmail.com', '', NULL, '0', '350202801980001', '6469f15d25dafd0dbe24e4bbc08da294.jpg', 'L', 'RUMAHAN', '', '2026-11-14 02:03:53'),
 ('PE001497', '8', '1', 'adri-agung-sp', '', '', '6289504790026', NULL, '3502170006', NULL, NULL, NULL, 'Perumahan GKP 2 No. 8, Jl. Doplang, Purbosuman, Kec. Ponorogo, Kabupaten Ponorogo', '....@gmail.com', '', NULL, '0', '3312120906890004', '65fb8d88935fe7aa6246b4448df8a110.jpg', 'L', 'RUMAHAN', '', '2026-11-14 07:23:26'),
 ('PE001498', '8', '1', 'elly-astuti-mulyaningsih-', '', '', '6285829282276', NULL, '3502090018', NULL, NULL, NULL, 'Jl. Jagadan RT. 003/RW. 003, Mangunsuman, Kec. Siman, Kabupaten Ponorogo', '....@gmail.com', '', NULL, '0', '350210490168001', 'c793fd99da8075b0e388a6a01c43ce3f.jpg', 'P', 'RUMAHAN', '', '2026-11-19 06:17:53'),
+('PE001499', '8', '1', 'ratih-citra-viennarti', '', '', '6281332333252', NULL, '3502170006', NULL, NULL, NULL, 'Jl. Sekar Pundak Gg. I, Wetan Talang, Purbosuman, Kec. Ponorogo, Kabupaten Ponorogo', '....@gmail.com', '', NULL, '0', '3573016906890006', 'a8834381fd010854d3a0117c893e8094.jpg', 'P', 'RUMAHAN', '', '2026-11-21 04:26:53'),
+('PE001500', '8', '1', 'wahono', '', '', '6289615101836', NULL, '3502170004', NULL, NULL, NULL, 'Jl. Wibisono No. 89A RT. 001/RW. 004, Kepatihan, Kec. Ponorogo, Kabupaten Ponorogo', '....@gmail.com', '', NULL, '0', '3502171006630001', '3a0b4d7d9deb27fb36d1e30aae9d8b09.jpg', 'L', 'RUMAHAN', '', '2026-11-23 02:45:21'),
+('PE001501', '8', '1', 'warnoto', '', '', '6285871212744', NULL, '3502090014', NULL, NULL, NULL, 'Jl. Ki Ageng Kutu No. 39, Dkh. Godang, Patihan Kidul, Kec. Siman, Kabupaten Ponorogo', '....@gmail.com', '', NULL, '0', '3325012910880001', 'fa06cb99d1d884ade3bd2a26e0132b40.jpg', 'L', 'RUMAHAN', '', '2026-11-23 08:11:57'),
+('PE001502', '8', '1', 'agil-novela', '', '', '62895366122136', NULL, '3502090017', NULL, NULL, NULL, 'Jl. Pramuka Gg. Penegak RT. 004/RW. 001, Ronowijayan, Kec. Siman, Kabupaten Ponorogo', '....@gmail.com', '', NULL, '0', '3502102710030004', '90ddd6a330ec6c7c700ed17346ad2d2e.jpg', 'P', 'RUMAHAN', '', '2026-11-23 08:47:56'),
 ('PG000001', '1', '1', 'Faruqi R', '', '', NULL, '-', '3502110020', 'KABUPATEN PONOROGO', 'BALONG', 'NGAMPEL', '-', '-', '', NULL, NULL, '-', '', '', '', '', '2024-08-07 09:44:57'),
 ('PG000002', '1', '1', 'Taufik', '', '', NULL, '-', '3502110020', 'KABUPATEN PONOROGO', 'BALONG', 'NGAMPEL', '-', '-', '', NULL, NULL, '-', '', '', '', '', '2024-08-07 09:44:55'),
 ('PG000004', '1', '1', 'AN Muslim Rohman', '', '', NULL, '-', '3502110020', 'KABUPATEN PONOROGO', 'BALONG', 'NGAMPEL', '-', '-', '', NULL, NULL, '-', '', '', '', '', '2024-08-07 09:45:01'),
@@ -8028,7 +8036,7 @@ INSERT INTO `prosedure_permintaan_wifi` (`KODEAPP`, `kategori_perangkat_jaringan
 ('D', 1, '0', 'RQ000786', 'PE000791', 'ACTIVE', '0000-00-00', 'Berhasil', '', '', '', 0, 'PK000026', 'PG000042', 'PG000028', 'PG000005', 'PG000028', 'PG000005', '2025-02-06 08:30:10', '2025-02-05 11:17:15', '2025-02-06 13:21:17', '2025-02-06 13:27:54', 'PG000028', '2025-02-06 14:54:00', 'SEWA', 'KABEL', 0, 'IN000784', '2025-02-04 14:05:55', '2025-02-06 07:54:00'),
 ('D', 0, '0', 'RQ000787', 'PE000792', 'ACTIVE', '0000-00-00', 'Berhasil', '', '', '', 0, 'PK000017', 'PG000029', 'PG000028', 'PG000035', 'PG000028', 'PG000035', '2025-02-21 19:26:59', '2025-02-12 11:24:03', '2025-02-24 12:05:13', '2025-02-24 12:10:15', 'PG000028', '2025-02-25 13:50:33', 'SEWA', 'KABEL', 0, 'IN000800', '2025-02-05 04:57:28', '2025-02-25 06:50:33'),
 ('D', 0, '0', 'RQ000788', 'PE000793', 'ACTIVE', '0000-00-00', 'Berhasil', '', '', '', 0, 'PK000018', 'PG000035', 'PG000028', 'PG000035', 'PG000028', 'PG000035', '2025-02-12 13:18:15', '2025-02-12 11:24:14', '2025-02-16 17:15:45', '2025-02-16 17:21:38', 'PG000028', '2025-02-17 15:08:07', 'SEWA', 'KABEL', 0, 'IN000789', '2025-02-05 05:01:40', '2025-02-17 08:08:07'),
-('D', 0, '0', 'RQ000789', 'PE000794', 'ACTIVE', '0000-00-00', 'Berhasil', '', '', '', 0, 'PK000017', 'PG000042', 'PG000028', 'PG000035', 'PG000028', 'PG000035', '2025-02-12 09:39:08', '2025-02-11 10:48:58', '2025-02-13 12:57:24', '2025-02-21 17:19:44', 'PG000028', '2025-02-22 08:38:03', 'SEWA', 'KABEL', 0, 'IN000796', '2025-02-05 07:48:00', '2025-02-22 01:38:03'),
+('D', 1, 'X6A', 'RQ000789', 'PE000794', 'ACTIVE', '0000-00-00', 'Berhasil', '', '', '', 0, 'PK000017', 'PG000042', 'PG000028', 'PG000035', 'PG000028', 'PG000035', '2025-02-12 09:39:08', '2025-02-11 10:48:58', '2025-02-13 12:57:24', '2025-02-21 17:19:44', 'PG000028', '2025-02-22 08:38:03', 'SEWA', 'KABEL', 0, 'IN000796', '2025-02-05 07:48:00', '2025-02-22 01:38:03'),
 ('D', 1, 'X6A', 'RQ000790', 'PE000795', 'ACTIVE', '0000-00-00', 'Berhasil', 'menyesuaikan data', 'Sudah diambil', 'Kembali Pengajuan', 0, 'PK000021', 'PG000035', 'PG000028', 'PG000035', 'PG000028', 'PG000035', '2025-02-10 08:23:15', '2025-02-08 13:19:34', '2025-02-10 15:35:40', '2025-02-10 15:41:49', 'PG000028', '2025-02-11 09:49:23', 'SEWA', 'KABEL', 0, 'IN000788', '2025-02-06 02:11:07', '2025-02-11 02:55:48'),
 ('D', 1, 'X6B', 'RQ000791', 'PE000796', 'ACTIVE', '0000-00-00', 'Berhasil', '', '', '', 0, 'PK000021', 'PG000042', 'PG000028', 'PG000035', 'PG000028', 'PG000035', '2025-02-12 09:39:13', '2025-02-11 14:12:08', '2025-02-16 17:35:48', '2025-02-16 17:39:41', 'PG000028', '2025-02-17 15:10:26', 'SEWA', 'KABEL', 0, 'IN000790', '2025-02-06 06:51:18', '2025-02-17 08:10:26'),
 ('D', 0, '0', 'RQ000792', 'PE000797', 'ACTIVE', '0000-00-00', 'Berhasil', '', '', '', 0, 'PK000017', 'PG000042', 'PG000028', 'PG000042', 'PG000028', 'PG000042', '2025-02-18 07:46:31', '2025-02-17 11:10:20', '2025-02-18 14:51:20', '2025-02-21 17:13:13', 'PG000028', '2025-02-22 08:52:57', 'SEWA', 'KABEL', 0, 'IN000797', '2025-02-07 09:17:20', '2025-02-22 01:52:57'),
@@ -8706,7 +8714,11 @@ INSERT INTO `prosedure_permintaan_wifi` (`KODEAPP`, `kategori_perangkat_jaringan
 ('D', 1, 'X6C', 'RQ001491', 'PE001495', 'ACTIVE', '0000-00-00', 'Berhasil', '', '', '', 0, 'PK000037', 'PG000063', 'PG000055', 'PG000063', 'PG000055', 'PG000063', '2026-11-13 08:32:34', '2026-11-13 07:33:48', '2026-11-14 07:03:15', '2026-11-14 07:05:39', 'PG000055', '2026-11-16 15:25:01', 'SEWA', 'KABEL', 0, 'IN001569', '2026-11-10 03:01:20', '2026-11-16 08:25:01'),
 ('D', 1, 'X6C', 'RQ001492', 'PE001496', 'ACTIVE', '0000-00-00', 'Berhasil', '', '', '', 0, 'PK000001', 'PG000063', 'PG000005', 'PG000063', 'PG000055', 'PG000063', '2026-11-15 22:35:32', '2026-11-15 07:31:28', '2026-11-16 12:36:03', '2026-11-16 12:38:42', 'PG000055', '2026-11-16 15:29:41', 'SEWA', 'KABEL', 0, 'IN001570', '2026-11-14 02:03:53', '2026-11-16 08:29:41'),
 ('D', 1, 'X6C', 'RQ001493', 'PE001497', 'ACTIVE', '0000-00-00', 'Berhasil', '', '', '', 0, 'PK000001', 'PG000063', 'PG000005', 'PG000063', 'PG000055', 'PG000063', '2026-11-15 22:35:38', '2026-11-15 07:32:42', '2026-11-17 13:40:24', '2026-11-19 07:51:09', 'PG000055', '2026-11-20 09:58:34', 'SEWA', 'KABEL', 0, 'IN001571', '2026-11-14 07:23:26', '2026-11-20 02:58:34'),
-('D', 0, '0', 'RQ001494', 'PE001498', 'PENGAJUAN', '0000-00-00', '', '', '', '', 0, 'PK000030', NULL, NULL, NULL, 'PG000055', NULL, NULL, NULL, NULL, NULL, '', '0000-00-00 00:00:00', 'SEWA', 'KABEL', 0, '', '2026-11-19 06:17:53', '0000-00-00 00:00:00');
+('D', 0, '0', 'RQ001494', 'PE001498', 'DISURVEI', '0000-00-00', 'Verifikasi Proses', '', '', '', 0, 'PK000030', 'PG000063', 'PG000055', NULL, 'PG000055', NULL, '2026-11-23 14:37:45', '2026-11-23 10:25:41', NULL, '2026-11-23 11:22:49', '', '0000-00-00 00:00:00', 'SEWA', 'KABEL', 0, '', '2026-11-19 06:17:53', '0000-00-00 00:00:00'),
+('D', 0, '0', 'RQ001495', 'PE001499', 'DISURVEI', '0000-00-00', 'Verifikasi Proses', '', '', '', 0, 'PK000032', 'PG000029', 'PG000005', NULL, 'PG000055', NULL, '2026-11-24 07:23:03', '2026-11-21 15:03:06', NULL, '2026-11-24 06:45:00', '', '0000-00-00 00:00:00', 'SEWA', 'KABEL', 0, '', '2026-11-21 04:26:53', '0000-00-00 00:00:00'),
+('D', 0, '0', 'RQ001496', 'PE001500', 'PENGAJUAN', '0000-00-00', '', '', '', '', 0, 'PK000030', NULL, NULL, NULL, 'PG000055', NULL, NULL, NULL, NULL, NULL, '', '0000-00-00 00:00:00', 'SEWA', 'KABEL', 0, '', '2026-11-23 02:45:21', '0000-00-00 00:00:00'),
+('D', 0, '0', 'RQ001497', 'PE001501', 'PENGAJUAN', '0000-00-00', '', '', '', '', 0, 'PK000033', NULL, NULL, NULL, 'PG000055', NULL, NULL, NULL, NULL, NULL, '', '0000-00-00 00:00:00', 'SEWA', 'KABEL', 0, '', '2026-11-23 08:11:58', '0000-00-00 00:00:00'),
+('D', 0, '0', 'RQ001498', 'PE001502', 'PENGAJUAN', '0000-00-00', '', '', '', '', 0, 'PK000030', NULL, NULL, NULL, 'PG000055', NULL, NULL, NULL, NULL, NULL, '', '0000-00-00 00:00:00', 'SEWA', 'KABEL', 0, '', '2026-11-23 08:47:56', '0000-00-00 00:00:00');
 
 -- --------------------------------------------------------
 
@@ -18937,7 +18949,17 @@ INSERT INTO `riwayat_pelanggan` (`ID`, `IDPERMINTAAN`, `CREATEBY`, `STATUSTINDAK
 ('6afe42ac4d0', '', 'PG000055', 'Alat telah kembali', '', '', '2026-11-19 00:28:28', 'Sudah diambil'),
 ('6afe47fd807', 'RQ001493', 'PG000063', 'Terpasang', '', '', '2026-11-19 00:51:09', ''),
 ('6afe94915a6', 'RQ001494', 'PE001498', 'PENGAJUAN', '', '', '2026-11-19 06:17:53', ''),
-('6affb75abdd', 'RQ001493', 'PG000055', 'Berhasil Active', '', '', '2026-11-20 02:58:34', '');
+('6affb75abdd', 'RQ001493', 'PG000055', 'Berhasil Active', '', '', '2026-11-20 02:58:34', ''),
+('6b011d8dbf6', 'RQ001495', 'PE001499', 'PENGAJUAN', '', '', '2026-11-21 04:26:53', ''),
+('6b01503a2a6', 'RQ001495', 'PG000029', 'Dalam Proses Survei', '', '', '2026-11-21 08:03:06', ''),
+('6b03a8c13fa', 'RQ001496', 'PE001500', 'PENGAJUAN', '', '', '2026-11-23 02:45:21', ''),
+('6b03b2350f3', 'RQ001494', 'PG000063', 'Dalam Proses Survei', '', '', '2026-11-23 03:25:41', ''),
+('6b03bf99895', 'RQ001494', 'PG000063', 'Proses Survei Selesai', '', '', '2026-11-23 04:22:49', ''),
+('6b03ed49c00', 'RQ001494', 'PG000055', 'Verifikasi Proses', '', '', '2026-11-23 07:37:45', ''),
+('6b03f54deb7', 'RQ001497', 'PE001501', 'PENGAJUAN', '', '', '2026-11-23 08:11:57', ''),
+('6b03fdbc7fd', 'RQ001498', 'PE001502', 'PENGAJUAN', '', '', '2026-11-23 08:47:56', ''),
+('6b04cffc85c', 'RQ001495', 'PG000029', 'Proses Survei Selesai', '', '', '2026-11-23 23:45:00', ''),
+('6b04d8e7d8b', 'RQ001495', 'PG000005', 'Verifikasi Proses', '', '', '2026-11-24 00:23:03', '');
 
 -- --------------------------------------------------------
 
@@ -20645,7 +20667,11 @@ INSERT INTO `survey_pemasangan_wifi` (`IDSURVEY`, `IDPENGGUNA`, `IDPERMINTAAN`, 
 ('spw6af65b22', 'PE001495', 'RQ001491', '-7.861322', '111.490074', NULL, NULL, '85232419d1dade1401de04df250960d0.jpg', 'kabel fo 130m\r\nProtec \r\npatchcore \r\nmodem gpon', '', 'SEDANG', NULL, '2026-11-13 00:34:42'),
 ('spw6af8fda1', 'PE001496', 'RQ001492', '-7.857125', '111.476161', NULL, NULL, '2de22e32e18d3eb5569d8e7266d99994.jpeg', 'kabel fo 100m\r\npatchcore \r\nProtec\r\nmodem gpon', '', 'SEDANG', NULL, '2026-11-15 00:32:33'),
 ('spw6af8fde9', 'PE001497', 'RQ001493', '-7.881845', '111.480715', NULL, NULL, '55e4e2b427ac4fce690d06ae4c7c30e5.jpg', 'kabel fo 150m\r\npatchcore \r\nProtec\r\nmodem gpon ', '', 'SEDANG', NULL, '2026-11-15 00:33:45'),
-('spw6afe9491', 'PE001498', 'RQ001494', '-7.861288', '111.489471', NULL, NULL, NULL, NULL, '', '', NULL, NULL);
+('spw6b03a8c1', 'PE001500', 'RQ001496', '-7.876056', '111.467851', NULL, NULL, NULL, NULL, '', '', NULL, NULL),
+('spw6b03bf99', 'PE001498', 'RQ001494', '-7.861288', '111.489471', NULL, NULL, 'c45c2742d928a8373a12e62b3d1be9ad.jpeg', 'kabel fo 130m\r\nprotect \r\npatchcore\r\nmodem gpon', '', 'SEDANG', NULL, '2026-11-23 04:22:49'),
+('spw6b03f54d', 'PE001501', 'RQ001497', '-7.873416', '111.493002', NULL, NULL, NULL, NULL, '', '', NULL, NULL),
+('spw6b03fdbc', 'PE001502', 'RQ001498', '-7.863828', '111.489235', NULL, NULL, NULL, NULL, '', '', NULL, NULL),
+('spw6b04cffc', 'PE001499', 'RQ001495', '-7.875687', '111.480376', NULL, NULL, 'f45a01dc65df1c1a01b81ece661a942d.jpg', 'Kabel fo 80m\r\nModem\r\nPathcore', '', 'SEDANG', NULL, '2026-11-23 23:45:00');
 
 -- --------------------------------------------------------
 
@@ -22535,7 +22561,9 @@ INSERT INTO `tb_history_process_survey` (`IDUNIQ`, `IDREQUEST`, `NOTE`, `INSERTE
 ('his6af2aa86f', 'RQ001489', 'PROSES SURVEY', '2026-11-10 07:07:02', '14', 1),
 ('his6af65aec7', 'RQ001491', 'PROSES SURVEY', '2026-11-13 02:07:01', '14', 1),
 ('his6af8fd609', 'RQ001492', 'PROSES SURVEY', '2026-11-15 02:07:02', '14', 1),
-('his6af8fdaa8', 'RQ001493', 'PROSES SURVEY', '2026-11-15 02:07:03', '14', 1);
+('his6af8fdaa8', 'RQ001493', 'PROSES SURVEY', '2026-11-15 02:07:03', '14', 1),
+('his6b01503a2', 'RQ001495', 'PROSES SURVEY', '2026-11-21 09:07:02', '14', 1),
+('his6b03b2350', 'RQ001494', 'PROSES SURVEY', '2026-11-23 05:07:02', '14', 1);
 
 -- --------------------------------------------------------
 
@@ -23463,7 +23491,11 @@ INSERT INTO `tb_history_registrations` (`IDUNIQ`, `IDREQUEST`, `NOTE`, `INSERTED
 ('his6af28900b', 'RQ001491', 'PENGAJUAN PELANGGAN', '2026-11-10 03:01:20', '13', 1),
 ('his6af7c1896', 'RQ001492', 'PENGAJUAN PELANGGAN', '2026-11-14 02:03:53', '13', 1),
 ('his6af80c6e0', 'RQ001493', 'PENGAJUAN PELANGGAN', '2026-11-14 07:23:26', '13', 1),
-('his6afe94915', 'RQ001494', 'PENGAJUAN PELANGGAN', '2026-11-19 06:17:53', '13', 1);
+('his6afe94915', 'RQ001494', 'PENGAJUAN PELANGGAN', '2026-11-19 06:17:53', '13', 1),
+('his6b011d8db', 'RQ001495', 'PENGAJUAN PELANGGAN', '2026-11-21 04:26:53', '13', 1),
+('his6b03a8c13', 'RQ001496', 'PENGAJUAN PELANGGAN', '2026-11-23 02:45:21', '13', 1),
+('his6b03f54de', 'RQ001497', 'PENGAJUAN PELANGGAN', '2026-11-23 08:11:57', '13', 1),
+('his6b03fdbc8', 'RQ001498', 'PENGAJUAN PELANGGAN', '2026-11-23 08:47:56', '13', 1);
 
 -- --------------------------------------------------------
 
@@ -24252,7 +24284,9 @@ INSERT INTO `tb_history_report_survey` (`IDUNIQ`, `IDREQUEST`, `NOTE`, `INSERTED
 ('his6af2aabac', 'RQ001489', 'REPORT SURVEY', '2026-11-10 07:07:03', '15', 1),
 ('his6af65b235', 'RQ001491', 'REPORT SURVEY', '2026-11-13 02:07:03', '15', 1),
 ('his6af8fda1b', 'RQ001492', 'REPORT SURVEY', '2026-11-15 02:07:04', '15', 1),
-('his6af8fdea4', 'RQ001493', 'REPORT SURVEY', '2026-11-15 02:07:05', '15', 1);
+('his6af8fdea4', 'RQ001493', 'REPORT SURVEY', '2026-11-15 02:07:05', '15', 1),
+('his6b03bf998', 'RQ001494', 'REPORT SURVEY', '2026-11-23 06:07:01', '15', 1),
+('his6b04cffc8', 'RQ001495', 'REPORT SURVEY', '2026-11-24 01:07:01', '15', 1);
 
 -- --------------------------------------------------------
 
@@ -24661,8 +24695,8 @@ CREATE TABLE `tb_urut` (
 --
 
 INSERT INTO `tb_urut` (`idurut`, `namaForm`, `noUrut`) VALUES
-(1, 'RQ', '1494'),
-(2, 'PE', '1498'),
+(1, 'RQ', '1498'),
+(2, 'PE', '1502'),
 (3, 'US', '1'),
 (4, 'PG', '67'),
 (6, 'ME', '0'),
@@ -28310,7 +28344,11 @@ INSERT INTO `users` (`IDUSERS`, `IDPENGGUNA`, `USERNAME`, `PASSWORD`, `IDCABANG`
 ('6af7c1895f', 'PE001496', 'winuji', '20eabe5d64b0e216796e834f52d61fd0b70332fc', 1, 8, 0, 1, '', 'PG000055', '2026-11-14 00:00:00', NULL, '165.99.203.249', ''),
 ('6af80c6e06', 'PE001497', 'adri-agung-sp', '20eabe5d64b0e216796e834f52d61fd0b70332fc', 1, 8, 0, 1, '', 'PG000055', '2026-11-14 00:00:00', NULL, '165.99.203.249', ''),
 ('6afe949158', 'PE001498', 'elly-astuti-mulyaningsih ', '20eabe5d64b0e216796e834f52d61fd0b70332fc', 1, 8, 0, 1, '', 'PG000055', '2026-11-19 00:00:00', NULL, '165.99.203.249', ''),
-('6b010c32ad', 'PG000067', 'yopi', '6ac1efb9ff828ac07918b80ea30cd2d0eea2992d', 1, 1, 0, 1, '', 'PG000004', '2026-11-21 10:13:11', '2026-11-21 00:00:00', '165.99.203.251', '');
+('6b010c32ad', 'PG000067', 'yopi', '6ac1efb9ff828ac07918b80ea30cd2d0eea2992d', 1, 1, 0, 1, '', 'PG000004', '2026-11-21 10:13:11', '2026-11-21 00:00:00', '165.99.203.251', ''),
+('6b011d8dbd', 'PE001499', 'ratih-citra-viennarti', '20eabe5d64b0e216796e834f52d61fd0b70332fc', 1, 8, 0, 1, '', 'PG000055', '2026-11-21 00:00:00', NULL, '165.99.203.249', ''),
+('6b03a8c13d', 'PE001500', 'wahono', '20eabe5d64b0e216796e834f52d61fd0b70332fc', 1, 8, 0, 1, '', 'PG000055', '2026-11-23 00:00:00', NULL, '165.99.203.249', ''),
+('6b03f54ddf', 'PE001501', 'warnoto', '20eabe5d64b0e216796e834f52d61fd0b70332fc', 1, 8, 0, 1, '', 'PG000055', '2026-11-23 00:00:00', NULL, '165.99.203.249', ''),
+('6b03fdbc7c', 'PE001502', 'agil-novela', '20eabe5d64b0e216796e834f52d61fd0b70332fc', 1, 8, 0, 1, '', 'PG000055', '2026-11-23 00:00:00', NULL, '165.99.203.249', '');
 
 -- --------------------------------------------------------
 
